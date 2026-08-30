@@ -9,6 +9,7 @@ import {
   getReferenceDiscountPercent,
   type PricingResult,
 } from "@/lib/pricing";
+import { findReferral } from "@/lib/referrals";
 
 export default function TopupExperience() {
   const [query, setQuery] = useState("");
@@ -21,8 +22,10 @@ export default function TopupExperience() {
   const [serverId, setServerId] = useState("");
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
+  const [referralInput, setReferralInput] = useState("");
+  const [appliedReferralCode, setAppliedReferralCode] = useState("");
+  const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,19 +42,25 @@ export default function TopupExperience() {
     selectedGame.packages.find((item) => item.id === selectedPackageId) ?? selectedGame.packages[0];
   const paymentMethod = paymentMethods.find((method) => method.id === paymentId) ?? paymentMethods[0];
   const activePromotion = findPromotion(appliedPromoCode);
+  const activeReferral = findReferral(appliedReferralCode);
   const pricing = calculatePricing({
     item: selectedPackage,
     paymentMethod,
     promotion: activePromotion,
-    hasAffiliate: Boolean(referralCode.trim()),
+    referral: activeReferral,
   });
+
+  function resetPricingMessages() {
+    setNotice("");
+    setPromoMessage("");
+    setReferralMessage("");
+  }
 
   function chooseGame(gameId: string) {
     const nextGame = games.find((game) => game.id === gameId) ?? games[0];
     setSelectedGameId(nextGame.id);
     setSelectedPackageId(nextGame.packages[0].id);
-    setNotice("");
-    setPromoMessage("");
+    resetPricingMessages();
     requestAnimationFrame(() => {
       document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -77,6 +86,28 @@ export default function TopupExperience() {
     setAppliedPromoCode(promotion.code);
     setPromoInput(promotion.code);
     setPromoMessage(`${promotion.code} dipasang. Kelayakan promo dicek ulang saat checkout.`);
+  }
+
+  function applyReferral() {
+    const normalized = referralInput.trim().toUpperCase();
+    setNotice("");
+
+    if (!normalized) {
+      setAppliedReferralCode("");
+      setReferralMessage("Referral dihapus.");
+      return;
+    }
+
+    const referral = findReferral(normalized);
+    if (!referral) {
+      setAppliedReferralCode("");
+      setReferralMessage("Kode referral tidak ditemukan.");
+      return;
+    }
+
+    setAppliedReferralCode(referral.code);
+    setReferralInput(referral.code);
+    setReferralMessage(`${referral.code} dipasang. Benefit dihitung otomatis dari harga checkout.`);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -109,7 +140,7 @@ export default function TopupExperience() {
           packageId: selectedPackage.id,
           paymentId: paymentMethod.id,
           promoCode: appliedPromoCode,
-          referralCode,
+          referralCode: appliedReferralCode,
         }),
       });
 
@@ -183,12 +214,12 @@ export default function TopupExperience() {
           <span className="eyebrow">Checkout</span>
           <h2>Top up tanpa muter-muter.</h2>
           <p>
-            Harga Nambah, promo, dan referral dihitung terpisah. Harga supplier live akan menggantikan data MVP saat integrasi backend diaktifkan.
+            Harga Nambah, promo, dan benefit referral dihitung terpisah. Harga supplier live akan menggantikan data MVP saat integrasi backend diaktifkan.
           </p>
           <div className="trust-list">
             <span><b>01</b> Harga jelas</span>
             <span><b>02</b> Promo terukur</span>
-            <span><b>03</b> Referral terlacak</span>
+            <span><b>03</b> Referral menguntungkan</span>
           </div>
         </div>
 
@@ -256,8 +287,7 @@ export default function TopupExperience() {
                     type="button"
                     onClick={() => {
                       setSelectedPackageId(item.id);
-                      setNotice("");
-                      setPromoMessage("");
+                      resetPricingMessages();
                     }}
                   >
                     <span className="package-name">{item.label}</span>
@@ -278,7 +308,7 @@ export default function TopupExperience() {
               <span className="step-number">3</span>
               <div>
                 <strong>Promo & referral</strong>
-                <small>Promo mengurangi harga nyata. Referral tidak menambah harga customer.</small>
+                <small>Referral memberi diskon ke kamu dan komisi ke partner.</small>
               </div>
             </div>
 
@@ -298,21 +328,30 @@ export default function TopupExperience() {
 
               <label className="discount-field">
                 <span>Kode referral <em>opsional</em></span>
-                <input
-                  autoCapitalize="characters"
-                  placeholder="Kode partner / teman"
-                  value={referralCode}
-                  onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
-                />
+                <span className="discount-input-row">
+                  <input
+                    autoCapitalize="characters"
+                    placeholder="Contoh: TEMAN"
+                    value={referralInput}
+                    onChange={(event) => setReferralInput(event.target.value.toUpperCase())}
+                  />
+                  <button type="button" onClick={applyReferral}>Pakai</button>
+                </span>
               </label>
             </div>
 
             {promoMessage && <p className="inline-message">{promoMessage}</p>}
-            {appliedPromoCode && pricing.rejectionReason && (
-              <p className="inline-message warning">{pricing.rejectionReason}</p>
+            {referralMessage && <p className="inline-message referral-message">{referralMessage}</p>}
+
+            {appliedReferralCode && activeReferral && pricing.referralDiscount > 0 && (
+              <p className="referral-active">
+                Referral {activeReferral.code} aktif · kamu hemat {formatIDR(pricing.referralDiscount)} · partner mendapat {Math.round(activeReferral.commissionRate * 100)}% dari net profit.
+                {pricing.referralDiscountCapped ? " Benefit disesuaikan otomatis agar transaksi tetap aman." : ""}
+              </p>
             )}
-            {referralCode.trim() && (
-              <p className="referral-active">Referral {referralCode.trim().toUpperCase()} aktif · komisi partner dibayar dari profit Nambah.</p>
+
+            {(appliedPromoCode || appliedReferralCode) && pricing.rejectionReason && (
+              <p className="inline-message warning">{pricing.rejectionReason}</p>
             )}
           </div>
 
@@ -366,16 +405,16 @@ export default function TopupExperience() {
                 <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
               </div>
             )}
+            {pricing.referralDiscount > 0 && (
+              <div className="summary-line referral-benefit">
+                <span>Benefit referral {pricing.referralCode}</span>
+                <strong>-{formatIDR(pricing.referralDiscount)}</strong>
+              </div>
+            )}
             <div className="summary-line">
               <span>Biaya pembayaran</span>
               <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
             </div>
-            {referralCode.trim() && (
-              <div className="summary-line referral">
-                <span>Referral</span>
-                <strong>{referralCode.trim().toUpperCase()}</strong>
-              </div>
-            )}
             <div className="summary-total">
               <span>Total</span>
               <strong>{formatIDR(pricing.finalPrice)}</strong>

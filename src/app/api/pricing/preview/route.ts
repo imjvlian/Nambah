@@ -1,5 +1,6 @@
 import { games, paymentMethods } from "@/lib/catalog";
 import { calculatePricing, findPromotion } from "@/lib/pricing";
+import { findReferral } from "@/lib/referrals";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const promoCode = body.promoCode?.trim() ?? "";
+  const promoCode = body.promoCode?.trim().toUpperCase() ?? "";
   const promotion = promoCode ? findPromotion(promoCode) : null;
 
   if (promoCode && !promotion) {
@@ -29,11 +30,17 @@ export async function POST(request: Request) {
   }
 
   const referralCode = body.referralCode?.trim().toUpperCase() ?? "";
+  const referral = referralCode ? findReferral(referralCode) : null;
+
+  if (referralCode && !referral) {
+    return Response.json({ error: "Kode referral tidak ditemukan." }, { status: 400 });
+  }
+
   const pricing = calculatePricing({
     item: selectedPackage,
     paymentMethod,
     promotion,
-    hasAffiliate: Boolean(referralCode),
+    referral,
   });
 
   return Response.json({
@@ -45,10 +52,14 @@ export async function POST(request: Request) {
       id: selectedPackage.id,
       label: selectedPackage.label,
     },
-    referral: referralCode
+    referral: referral
       ? {
-          code: referralCode,
-          commissionRate: pricing.affiliateRate,
+          code: referral.code,
+          name: referral.name,
+          commissionRate: referral.commissionRate,
+          userBenefit: pricing.referralDiscount,
+          requestedUserBenefit: pricing.referralRequestedDiscount,
+          capped: pricing.referralDiscountCapped,
         }
       : null,
     pricing,

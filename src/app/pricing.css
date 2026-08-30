@@ -127,6 +127,12 @@
   color: #bdc8b5;
 }
 
+.inline-message.referral-message {
+  border-color: rgba(120, 167, 255, 0.16);
+  background: rgba(120, 167, 255, 0.04);
+  color: #b9c8e5;
+}
+
 .inline-message.warning {
   border-color: rgba(255, 184, 77, 0.18);
   background: rgba(255, 184, 77, 0.05);
@@ -212,9 +218,9 @@
   color: var(--lime);
 }
 
-.summary-line.referral strong {
+.summary-line.referral-benefit,
+.summary-line.referral-benefit strong {
   color: #a9c5ff;
-  letter-spacing: 0.04em;
 }
 
 .summary-total {
