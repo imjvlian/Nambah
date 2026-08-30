@@ -1,5 +1,6 @@
-import type { GamePackage, PaymentMethod } from "@/lib/catalog";
+import type { PaymentMethod } from "@/lib/catalog";
 import type { ReferralProgram } from "@/lib/referrals";
+import type { SupplierPricedPackage } from "@/lib/supplier-pricing";
 
 export const DEFAULT_AFFILIATE_RATE = 0.2;
 export const MINIMUM_NAMBAH_PROFIT = 500;
@@ -147,7 +148,7 @@ function evaluatePrice({
   referralDiscount,
   affiliateRate,
 }: {
-  item: GamePackage;
+  item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
   promotionDiscount: number;
   referralDiscount: number;
@@ -220,7 +221,7 @@ export function calculatePricing({
   referral,
   minimumNambahProfit = MINIMUM_NAMBAH_PROFIT,
 }: {
-  item: GamePackage;
+  item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
   promotion: Promotion | null;
   referral: ReferralProgram | null;
