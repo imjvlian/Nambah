@@ -1,6 +1,8 @@
 import { games, paymentMethods } from "@/lib/catalog";
 import { calculatePricing, findPromotion } from "@/lib/pricing";
+import { toPublicPricing } from "@/lib/public-pricing";
 import { findReferral } from "@/lib/referrals";
+import { attachSupplierCost } from "@/lib/supplier-pricing";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -22,6 +24,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const supplierPricedPackage = attachSupplierCost(selectedPackage);
+  if (!supplierPricedPackage) {
+    return Response.json(
+      { error: "Harga supplier untuk produk ini belum tersedia." },
+      { status: 503 },
+    );
+  }
+
   const promoCode = body.promoCode?.trim().toUpperCase() ?? "";
   const promotion = promoCode ? findPromotion(promoCode) : null;
 
@@ -37,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const pricing = calculatePricing({
-    item: selectedPackage,
+    item: supplierPricedPackage,
     paymentMethod,
     promotion,
     referral,
@@ -52,16 +62,6 @@ export async function POST(request: Request) {
       id: selectedPackage.id,
       label: selectedPackage.label,
     },
-    referral: referral
-      ? {
-          code: referral.code,
-          name: referral.name,
-          commissionRate: referral.commissionRate,
-          userBenefit: pricing.referralDiscount,
-          requestedUserBenefit: pricing.referralRequestedDiscount,
-          capped: pricing.referralDiscountCapped,
-        }
-      : null,
-    pricing,
+    pricing: toPublicPricing(pricing),
   });
 }
