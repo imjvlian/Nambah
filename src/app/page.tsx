@@ -1,6 +1,9 @@
 import TopupExperience from "@/components/TopupExperience";
+import { getPublicCatalog } from "@/lib/catalog-repository";
 
-export default function Home() {
+export default async function Home() {
+  const catalog = await getPublicCatalog();
+
   return (
     <main>
       <header className="site-header shell">
@@ -55,7 +58,11 @@ export default function Home() {
       </section>
 
       <div className="shell">
-        <TopupExperience />
+        <TopupExperience
+          games={catalog.games}
+          paymentMethods={catalog.paymentMethods}
+          catalogSource={catalog.source}
+        />
       </div>
 
       <section className="how-section shell" id="how-it-works">
