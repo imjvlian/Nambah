@@ -14,9 +14,11 @@ import {
   type PreviewOrder,
 } from "@/lib/order-preview";
 
+type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+
 type TopupExperienceProps = {
   games: Game[];
-  paymentMethods: PaymentMethod[];
+  paymentMethods: PublicPaymentMethod[];
   catalogSource: "static" | "supabase";
 };
 

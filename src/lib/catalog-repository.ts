@@ -31,16 +31,14 @@ type PaymentMethodRow = {
   id: string;
   name: string;
   detail: string;
-  customer_fee_flat: number | string;
-  customer_fee_percent: number | string;
-  merchant_fee_flat: number | string;
-  merchant_fee_percent: number | string;
   sort_order: number;
 };
 
+export type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+
 export type PublicCatalogResult = {
   games: Game[];
-  paymentMethods: PaymentMethod[];
+  paymentMethods: PublicPaymentMethod[];
   source: "static" | "supabase";
 };
 
@@ -48,7 +46,11 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
   if (!isSupabaseConfigured()) {
     return {
       games: staticGames,
-      paymentMethods: staticPaymentMethods,
+      paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
+        id,
+        name,
+        detail,
+      })),
       source: "static",
     };
   }
@@ -65,8 +67,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
       order: "sort_order.asc",
     }),
     supabaseSelect<PaymentMethodRow>("payment_methods", {
-      select:
-        "id,name,detail,customer_fee_flat,customer_fee_percent,merchant_fee_flat,merchant_fee_percent,sort_order",
+      select: "id,name,detail,sort_order",
       filters: { active: "eq.true" },
       order: "sort_order.asc",
     }),
@@ -93,14 +94,10 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     }))
     .filter((game) => game.packages.length > 0);
 
-  const paymentMethods: PaymentMethod[] = paymentRows.map((method) => ({
+  const paymentMethods: PublicPaymentMethod[] = paymentRows.map((method) => ({
     id: method.id,
     name: method.name,
     detail: method.detail,
-    customerFeeFlat: Number(method.customer_fee_flat),
-    customerFeePercent: Number(method.customer_fee_percent),
-    merchantFeeFlat: Number(method.merchant_fee_flat),
-    merchantFeePercent: Number(method.merchant_fee_percent),
   }));
 
   if (games.length === 0 || paymentMethods.length === 0) {
