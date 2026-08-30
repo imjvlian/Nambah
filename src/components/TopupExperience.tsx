@@ -1,17 +1,22 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { games, paymentMethods } from "@/lib/catalog";
+import { findPromotion, formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
 import {
-  calculatePricing,
-  findPromotion,
-  formatIDR,
-  getReferenceDiscountPercent,
-  type PricingResult,
-} from "@/lib/pricing";
+  createPublicPricingFallback,
+  type PublicPricingResult,
+} from "@/lib/public-pricing";
 import { findReferral } from "@/lib/referrals";
+import {
+  createPreviewOrderId,
+  previewOrderStorageKey,
+  type PreviewOrder,
+} from "@/lib/order-preview";
 
 export default function TopupExperience() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedGameId, setSelectedGameId] = useState(games[0].id);
   const [selectedPackageId, setSelectedPackageId] = useState(
@@ -27,6 +32,9 @@ export default function TopupExperience() {
   const [appliedReferralCode, setAppliedReferralCode] = useState("");
   const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
+  const [pricingError, setPricingError] = useState("");
+  const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredGames = useMemo(() => {
@@ -41,14 +49,66 @@ export default function TopupExperience() {
   const selectedPackage =
     selectedGame.packages.find((item) => item.id === selectedPackageId) ?? selectedGame.packages[0];
   const paymentMethod = paymentMethods.find((method) => method.id === paymentId) ?? paymentMethods[0];
-  const activePromotion = findPromotion(appliedPromoCode);
   const activeReferral = findReferral(appliedReferralCode);
-  const pricing = calculatePricing({
-    item: selectedPackage,
-    paymentMethod,
-    promotion: activePromotion,
-    referral: activeReferral,
-  });
+  const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+
+    async function refreshPricing() {
+      setPricingLoading(true);
+      setPricingError("");
+      setServerPricing(null);
+
+      try {
+        const response = await fetch("/api/pricing/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gameId: selectedGame.id,
+            packageId: selectedPackage.id,
+            paymentId: paymentMethod.id,
+            promoCode: appliedPromoCode,
+            referralCode: appliedReferralCode,
+          }),
+          signal: controller.signal,
+        });
+
+        const data = (await response.json()) as {
+          error?: string;
+          pricing?: PublicPricingResult;
+        };
+
+        if (!mounted) return;
+
+        if (!response.ok || !data.pricing) {
+          setPricingError(data.error ?? "Harga gagal dihitung.");
+          return;
+        }
+
+        setServerPricing(data.pricing);
+      } catch (error) {
+        if (!mounted || (error instanceof DOMException && error.name === "AbortError")) return;
+        setPricingError("Tidak bisa menghitung harga. Coba lagi.");
+      } finally {
+        if (mounted) setPricingLoading(false);
+      }
+    }
+
+    void refreshPricing();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [
+    selectedGame.id,
+    selectedPackage.id,
+    paymentMethod.id,
+    appliedPromoCode,
+    appliedReferralCode,
+  ]);
 
   function resetPricingMessages() {
     setNotice("");
@@ -60,6 +120,8 @@ export default function TopupExperience() {
     const nextGame = games.find((game) => game.id === gameId) ?? games[0];
     setSelectedGameId(nextGame.id);
     setSelectedPackageId(nextGame.packages[0].id);
+    setUserId("");
+    setServerId("");
     resetPricingMessages();
     requestAnimationFrame(() => {
       document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -124,8 +186,13 @@ export default function TopupExperience() {
       return;
     }
 
-    if (!pricing.safeToCheckout) {
-      setNotice(pricing.rejectionReason ?? "Harga belum aman untuk checkout.");
+    if (!serverPricing) {
+      setNotice(pricingError || "Harga belum tervalidasi. Coba lagi.");
+      return;
+    }
+
+    if (!serverPricing.safeToCheckout) {
+      setNotice(serverPricing.rejectionReason ?? "Harga belum aman untuk checkout.");
       return;
     }
 
@@ -146,7 +213,7 @@ export default function TopupExperience() {
 
       const data = (await response.json()) as {
         error?: string;
-        pricing?: PricingResult;
+        pricing?: PublicPricingResult;
       };
 
       if (!response.ok || !data.pricing) {
@@ -159,11 +226,44 @@ export default function TopupExperience() {
         return;
       }
 
-      setNotice(
-        `Harga tervalidasi ${formatIDR(data.pricing.finalPrice)}. Checkout live akan aktif setelah supplier dan payment gateway terhubung.`,
+      const orderId = createPreviewOrderId();
+      const previewOrder: PreviewOrder = {
+        id: orderId,
+        createdAt: new Date().toISOString(),
+        mode: "preview",
+        status: "waiting_payment",
+        product: {
+          gameId: selectedGame.id,
+          gameName: selectedGame.name,
+          shortName: selectedGame.shortName,
+          packageId: selectedPackage.id,
+          packageLabel: selectedPackage.label,
+          accent: selectedGame.accent,
+          initials: selectedGame.initials,
+        },
+        account: {
+          userId: userId.trim(),
+          ...(selectedGame.requiresServer && serverId.trim()
+            ? { serverId: serverId.trim() }
+            : {}),
+        },
+        payment: {
+          id: paymentMethod.id,
+          name: paymentMethod.name,
+          detail: paymentMethod.detail,
+        },
+        pricing: data.pricing,
+        ...(appliedPromoCode ? { promoCode: appliedPromoCode } : {}),
+        ...(appliedReferralCode ? { referralCode: appliedReferralCode } : {}),
+      };
+
+      window.localStorage.setItem(
+        previewOrderStorageKey(orderId),
+        JSON.stringify(previewOrder),
       );
+      router.push(`/order/${encodeURIComponent(orderId)}`);
     } catch {
-      setNotice("Tidak bisa memvalidasi harga. Coba lagi.");
+      setNotice("Tidak bisa menyiapkan pesanan. Coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -342,6 +442,7 @@ export default function TopupExperience() {
 
             {promoMessage && <p className="inline-message">{promoMessage}</p>}
             {referralMessage && <p className="inline-message referral-message">{referralMessage}</p>}
+            {pricingError && <p className="inline-message warning">{pricingError}</p>}
 
             {appliedReferralCode && activeReferral && pricing.referralDiscount > 0 && (
               <p className="referral-active">
@@ -360,7 +461,7 @@ export default function TopupExperience() {
               <span className="step-number">4</span>
               <div>
                 <strong>Metode pembayaran</strong>
-                <small>Fee live akan mengikuti gateway yang nanti dipilih.</small>
+                <small>Midtrans dipilih untuk gateway production. Fee live mengikuti rate merchant yang disetujui.</small>
               </div>
             </div>
             <div className="payment-list">
@@ -383,7 +484,7 @@ export default function TopupExperience() {
             </div>
           </div>
 
-          <div className="pricing-summary">
+          <div className={`pricing-summary ${pricingLoading ? "is-loading" : ""}`}>
             <div className="pricing-product-row">
               <div>
                 <small>{selectedGame.shortName}</small>
@@ -417,12 +518,20 @@ export default function TopupExperience() {
             </div>
             <div className="summary-total">
               <span>Total</span>
-              <strong>{formatIDR(pricing.finalPrice)}</strong>
+              <strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong>
             </div>
           </div>
 
-          <button className="primary-button full" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Memvalidasi harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
+          <button
+            className="primary-button full"
+            disabled={isSubmitting || pricingLoading || Boolean(pricingError)}
+            type="submit"
+          >
+            {isSubmitting
+              ? "Menyiapkan pesanan..."
+              : pricingLoading
+                ? "Menghitung harga..."
+                : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
           </button>
 
           {notice && <p className="form-notice" role="status">{notice}</p>}
