@@ -4,9 +4,9 @@ Nambah adalah web top up digital berbasis Next.js. Arsitektur MVP menggunakan Mi
 
 ## Status
 
-`0.2.0` — database foundation.
+`0.2.1` — Digiflazz TEST integration.
 
-Saat credential Supabase belum diisi, aplikasi otomatis memakai static catalog/pricing fallback sehingga flow frontend tetap bisa dites.
+Saat credential Supabase/Digiflazz belum diisi, flow customer tetap dapat memakai static catalog/pricing fallback. Endpoint Digiflazz hanya tersedia melalui server dan seluruh endpoint admin dilindungi bearer token internal.
 
 ## Development
 
@@ -17,56 +17,105 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
-## Supabase setup
+## Supabase
 
-Gunakan **project Supabase khusus Nambah**. Jangan gunakan database project lain.
+Gunakan project Supabase khusus Nambah.
 
-1. Buat project Supabase baru.
-2. Jalankan `supabase/schema.sql` di SQL Editor.
-3. Jalankan `supabase/seed.sql` setelah schema berhasil.
-4. Copy `.env.example` menjadi `.env.local`.
-5. Isi server credential project Nambah:
+Untuk instalasi baru:
+
+1. Jalankan `supabase/schema.sql`.
+2. Jalankan `supabase/seed.sql`.
+3. Jalankan migration 0.2.1 di `supabase/migrations/20260831_001_digiflazz_test.sql`.
+
+Untuk project yang sudah memakai schema 0.2.0, cukup jalankan migration 0.2.1 tersebut.
+
+Server credential:
 
 ```env
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_...
 ```
 
-`SUPABASE_SECRET_KEY` hanya boleh digunakan server-side dan tidak boleh diberi prefix `NEXT_PUBLIC_`.
+## Digiflazz TEST setup
 
-`NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` disiapkan untuk milestone Supabase Auth berikutnya dan belum diperlukan untuk katalog/pricing 0.2.0.
+Tambahkan ke `.env.local`:
 
-### Database behavior
+```env
+NAMBAH_ADMIN_API_TOKEN=buat-token-random-panjang
+DIGIFLAZZ_USERNAME=username-buyer
+DIGIFLAZZ_API_KEY=api-key-buyer
+DIGIFLAZZ_WEBHOOK_SECRET=secret-webhook
+DIGIFLAZZ_CALLBACK_URL=https://domain-kamu.com/api/webhooks/digiflazz
+```
 
-- Tanpa `SUPABASE_URL` + `SUPABASE_SECRET_KEY`: katalog/pricing memakai static fallback.
-- Dengan credential lengkap: homepage membaca game, produk, metode pembayaran, promo, referral, supplier cost, dan pricing rules dari Supabase.
-- Supplier cost, margin, balance supplier, commission internal, dan financial records tidak dikirim mentah ke browser.
-- Browser tidak mendapat direct table access pada 0.2.0; semua tabel public-schema tetap RLS-enabled dan akses dilakukan melalui Next.js server.
+Semua nilai di atas server-only. Jangan pernah menambahkan prefix `NEXT_PUBLIC_`.
 
-`supabase/schema.sql` masih berupa **bootstrap schema**, bukan migration history. Setelah project Nambah benar-benar dibuat dan schema diverifikasi, buat migration resmi menggunakan Supabase CLI dari state project tersebut.
+### Endpoint internal
 
-## Database foundation
+Semua endpoint admin membutuhkan header:
 
-Schema 0.2.0 mencakup:
+```text
+Authorization: Bearer <NAMBAH_ADMIN_API_TOKEN>
+```
 
-- games
-- products
-- payment_methods
-- suppliers
-- supplier_products
-- pricing_rules
-- promotions + promotion_products
-- affiliates
-- supplier_balances + supplier_balance_snapshots
-- orders
-- payments
-- supplier_transactions
-- commissions
-- affiliate_withdrawals
+Price list prepaid:
+
+```text
+GET /api/admin/digiflazz/price-list
+GET /api/admin/digiflazz/price-list?brand=MOBILE%20LEGENDS&limit=50
+GET /api/admin/digiflazz/price-list?code=SKU
+```
+
+Mapping SKU Digiflazz ke produk Nambah:
+
+```text
+POST /api/admin/digiflazz/map-sku
+```
+
+Body:
+
+```json
+{
+  "productId": "ml-86",
+  "supplierSku": "SKU_DARI_DIGIFLAZZ"
+}
+```
+
+Mapping memverifikasi SKU ke Digiflazz lalu menyimpan `supplier_sku`, `supplier_cost`, status, dan `last_synced_at` ke `supplier_products`.
+
+Test transaction:
+
+```text
+POST /api/admin/digiflazz/test-transaction
+```
+
+Body `outcome` yang tersedia:
+
+- `success`
+- `failed`
+- `pending-success`
+- `pending-failed`
+
+Endpoint ini **selalu mengirim `testing: true`**, memakai SKU/test number resmi Digiflazz, dan tidak menyediakan jalur production transaction.
+
+Webhook callback:
+
+```text
+POST /api/webhooks/digiflazz
+```
+
+Handler memverifikasi `X-Hub-Signature` dengan HMAC-SHA1 menggunakan `DIGIFLAZZ_WEBHOOK_SECRET`, lalu menyimpan event ke `supplier_webhook_events` untuk audit test callback.
+
+## Security boundary
+
+- Supplier cost, merchant fee, margin, balance, dan credential hanya diproses server-side.
+- Public catalog tidak mengirim financial internals.
+- Endpoint Digiflazz price list/mapping/test transaction membutuhkan admin bearer token.
+- Test transaction 0.2.1 tidak memiliki opsi untuk menonaktifkan `testing: true`.
+- Semua tabel database tetap RLS-enabled dan browser tidak mendapat direct table access.
 
 ## Roadmap berikutnya
 
-- `0.2.1` Digiflazz TEST integration
 - `0.2.2` supplier price sync + pricing production rules
 - `0.2.3` supplier balance monitoring + Telegram alert
 - `0.3.0` Midtrans Sandbox end-to-end
