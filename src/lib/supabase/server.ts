@@ -6,7 +6,11 @@ type SupabaseSelectOptions = {
 };
 
 function getSupabaseConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "") ?? "";
+  const url = (
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+  )
+    .trim()
+    .replace(/\/$/, "");
   const secretKey = process.env.SUPABASE_SECRET_KEY?.trim() ?? "";
 
   return { url, secretKey };
