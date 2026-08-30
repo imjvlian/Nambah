@@ -1,11 +1,9 @@
-import { games, paymentMethods } from "@/lib/catalog";
-import { calculatePricing, findPromotion } from "@/lib/pricing";
+import { calculatePricing } from "@/lib/pricing";
+import { getPricingContext } from "@/lib/pricing-repository";
 import { toPublicPricing } from "@/lib/public-pricing";
-import { findReferral } from "@/lib/referrals";
-import { attachSupplierCost } from "@/lib/supplier-pricing";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  let body: {
     gameId?: string;
     packageId?: string;
     paymentId?: string;
@@ -13,51 +11,36 @@ export async function POST(request: Request) {
     referralCode?: string;
   };
 
-  const game = games.find((item) => item.id === body.gameId);
-  const selectedPackage = game?.packages.find((item) => item.id === body.packageId);
-  const paymentMethod = paymentMethods.find((item) => item.id === body.paymentId);
-
-  if (!game || !selectedPackage || !paymentMethod) {
-    return Response.json(
-      { error: "Produk atau metode pembayaran tidak valid." },
-      { status: 400 },
-    );
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json({ error: "Request checkout tidak valid." }, { status: 400 });
   }
 
-  const supplierPricedPackage = attachSupplierCost(selectedPackage);
-  if (!supplierPricedPackage) {
-    return Response.json(
-      { error: "Harga supplier untuk produk ini belum tersedia." },
-      { status: 503 },
-    );
+  const result = await getPricingContext(body);
+  if (!result.ok) {
+    return Response.json({ error: result.error }, { status: result.status });
   }
 
-  const promoCode = body.promoCode?.trim().toUpperCase() ?? "";
-  const promotion = promoCode ? findPromotion(promoCode) : null;
-
-  if (promoCode && !promotion) {
-    return Response.json({ error: "Kode promo tidak ditemukan." }, { status: 400 });
-  }
-
-  const referralCode = body.referralCode?.trim().toUpperCase() ?? "";
-  const referral = referralCode ? findReferral(referralCode) : null;
-
-  if (referralCode && !referral) {
-    return Response.json({ error: "Kode referral tidak ditemukan." }, { status: 400 });
-  }
-
-  const pricing = calculatePricing({
-    item: supplierPricedPackage,
+  const {
+    game,
+    selectedPackage,
     paymentMethod,
     promotion,
     referral,
+    minimumNambahProfit,
+  } = result.context;
+
+  const pricing = calculatePricing({
+    item: selectedPackage,
+    paymentMethod,
+    promotion,
+    referral,
+    minimumNambahProfit,
   });
 
   return Response.json({
-    game: {
-      id: game.id,
-      name: game.name,
-    },
+    game,
     package: {
       id: selectedPackage.id,
       label: selectedPackage.label,
