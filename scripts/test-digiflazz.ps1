@@ -6,8 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $testCases = @{
-  "success"        = "087800001230"
-  "failed"         = "087800001232"
+  "success"         = "087800001230"
+  "failed"          = "087800001232"
   "pending-success" = "087800001233"
   "pending-failed"  = "087800001234"
 }
