@@ -1,0 +1,63 @@
+.package-card-v3 .package-item-visual {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.28));
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.package-card-v3:hover .package-item-visual,
+.package-card-v3.active .package-item-visual {
+  transform: translateY(-1px) scale(1.05);
+  filter: drop-shadow(0 7px 10px rgba(0, 0, 0, 0.34));
+}
+
+.package-card-v3 .package-item-visual.diamond {
+  background-image: url("/nominal-icons/diamond.svg") !important;
+}
+
+.package-card-v3 .package-item-visual.pass {
+  background-image: url("/nominal-icons/pass.svg") !important;
+}
+
+.package-card-v3 .package-item-visual.uc {
+  background-image: url("/nominal-icons/uc.svg") !important;
+}
+
+.package-card-v3 .package-item-visual.robux {
+  background-image: url("/nominal-icons/robux.svg") !important;
+}
+
+.package-card-v3 .package-item-visual.voucher {
+  background-image: url("/nominal-icons/voucher.svg") !important;
+}
+
+.package-card-v3 .package-item-visual.default {
+  background-image: url("/nominal-icons/digital.svg") !important;
+}
+
+.nominal-section-first-top-up .package-card-v3 .package-item-visual {
+  background-image: url("/nominal-icons/first-top-up.svg") !important;
+}
+
+.nominal-section-weekly-monthly .package-card-v3 .package-item-visual {
+  background-image: url("/nominal-icons/pack.svg") !important;
+}
+
+.nominal-section-special .package-card-v3 .package-item-visual {
+  background-image: url("/nominal-icons/pass.svg") !important;
+}
+
+@media (max-width: 700px) {
+  .package-card-v3 .package-item-visual {
+    width: 36px;
+    height: 36px;
+  }
+}
