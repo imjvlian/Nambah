@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { bootstrapDigiflazzCatalog } from "@/lib/digiflazz/bootstrap";
+import { DigiflazzApiError } from "@/lib/digiflazz/client";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,18 @@ export async function POST(request: Request) {
     return Response.json(result);
   } catch (error) {
     console.error("Digiflazz bootstrap failed", error);
+
+    if (error instanceof DigiflazzApiError) {
+      return Response.json(
+        {
+          error: error.message,
+          code: error.code,
+          retryable: error.retryable,
+        },
+        { status: 502 },
+      );
+    }
+
     return Response.json(
       { error: "Bootstrap catalog Digiflazz gagal dijalankan." },
       { status: 502 },
