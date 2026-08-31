@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import AdminDashboard from "@/components/AdminDashboard";
 
 export const metadata: Metadata = {
@@ -7,5 +8,12 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AdminDashboard />;
+  return (
+    <>
+      <AdminDashboard />
+      <Link className="supplier-catalog-fab" href="/admin/digiflazz">
+        Katalog Digiflazz →
+      </Link>
+    </>
+  );
 }
