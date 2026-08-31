@@ -11,7 +11,6 @@ import {
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
-type PackageGroupFilter = "all" | ProductGroup;
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
 type UsernameCheckStatus = "idle" | "loading" | "success" | "pending" | "error";
 type UsernameCheckState = {
@@ -19,6 +18,7 @@ type UsernameCheckState = {
   nickname?: string;
   message?: string;
 };
+type NominalSectionId = "special" | "first-top-up" | "weekly-monthly" | "top-up";
 
 type TopupExperienceProps = {
   games: Game[];
@@ -31,6 +31,37 @@ const GROUP_OPTIONS: Array<{ id: ProductGroup; label: string }> = [
   { id: "populer", label: "Populer" },
   { id: "langganan", label: "Langganan" },
   { id: "promo", label: "Promo" },
+];
+
+const NOMINAL_SECTIONS: Array<{
+  id: NominalSectionId;
+  label: string;
+  description: string;
+  featured?: boolean;
+}> = [
+  {
+    id: "special",
+    label: "Item Spesial",
+    description: "Pass, membership, dan item khusus.",
+    featured: true,
+  },
+  {
+    id: "first-top-up",
+    label: "First Top Up",
+    description: "Bonus pembelian pertama dan paket double.",
+    featured: true,
+  },
+  {
+    id: "weekly-monthly",
+    label: "Paket Mingguan / Bulanan",
+    description: "Paket berulang dengan periode mingguan atau bulanan.",
+  },
+  {
+    id: "top-up",
+    label: "Top Up",
+    description: "Nominal reguler untuk top up instan.",
+    featured: true,
+  },
 ];
 
 function groupsOf(item: Game["packages"][number]) {
@@ -60,6 +91,40 @@ function packageVisualLabel(kind: ReturnType<typeof getPackageVisualKind>) {
   return "N+";
 }
 
+function getNominalSectionId(item: Game["packages"][number]): NominalSectionId {
+  const text = `${item.label} ${item.note ?? ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (
+    /(first top up|first topup|first recharge|top up pertama|topup pertama|double diamond|double diamonds|double bonus)/i.test(
+      text,
+    )
+  ) {
+    return "first-top-up";
+  }
+
+  if (
+    /(weekly elite pack|monthly elite pack|weekly epic pack|monthly epic pack|weekly pack|monthly pack|paket mingguan|paket bulanan)/i.test(
+      text,
+    )
+  ) {
+    return "weekly-monthly";
+  }
+
+  if (
+    /(weekly diamond pass|twilight pass|starlight|battle pass|booyah pass|elite pass|membership|member|special item|special pack|special|\bpass\b)/i.test(
+      text,
+    )
+  ) {
+    return "special";
+  }
+
+  return "top-up";
+}
+
 export default function TopupExperience({
   games,
   paymentMethods,
@@ -73,7 +138,6 @@ export default function TopupExperience({
   const [query, setQuery] = useState("");
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPackage.id);
-  const [packageGroup, setPackageGroup] = useState<PackageGroupFilter>("all");
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
@@ -103,23 +167,17 @@ export default function TopupExperience({
     selectedGame.requiresServer &&
     /mobile\s*legends?/i.test(`${selectedGame.name} ${selectedGame.shortName}`);
 
-  const availableGroups = useMemo(
+  const nominalSections = useMemo(
     () =>
-      GROUP_OPTIONS.filter((group) =>
-        selectedGame.packages.some((item) => groupsOf(item).includes(group.id)),
-      ),
+      NOMINAL_SECTIONS.map((section) => ({
+        ...section,
+        items: selectedGame.packages.filter((item) => getNominalSectionId(item) === section.id),
+      })).filter((section) => section.items.length > 0),
     [selectedGame],
   );
-  const visiblePackages = useMemo(
-    () =>
-      packageGroup === "all"
-        ? selectedGame.packages
-        : selectedGame.packages.filter((item) => groupsOf(item).includes(packageGroup)),
-    [selectedGame, packageGroup],
-  );
+
   const selectedPackage =
     selectedGame.packages.find((item) => item.id === selectedPackageId) ??
-    visiblePackages[0] ??
     selectedGame.packages[0]!;
   const paymentMethod =
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
@@ -203,7 +261,6 @@ export default function TopupExperience({
     const nextGame = games.find((game) => game.id === gameId) ?? defaultGame;
     setSelectedGameId(nextGame.id);
     setSelectedPackageId(nextGame.packages[0]!.id);
-    setPackageGroup("all");
     setUserId("");
     setServerId("");
     resetUsernameCheck();
@@ -211,16 +268,6 @@ export default function TopupExperience({
     requestAnimationFrame(() => {
       document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }
-
-  function choosePackageGroup(nextGroup: PackageGroupFilter) {
-    setPackageGroup(nextGroup);
-    if (nextGroup === "all") return;
-    const matching = selectedGame.packages.filter((item) => groupsOf(item).includes(nextGroup));
-    if (matching.length && !matching.some((item) => item.id === selectedPackageId)) {
-      setSelectedPackageId(matching[0]!.id);
-      resetPricingMessages();
-    }
   }
 
   async function checkUsername() {
@@ -475,11 +522,7 @@ export default function TopupExperience({
                 <button
                   className="username-checker-button"
                   type="button"
-                  disabled={
-                    usernameCheck.status === "loading" ||
-                    !userId.trim() ||
-                    !serverId.trim()
-                  }
+                  disabled={usernameCheck.status === "loading" || !userId.trim() || !serverId.trim()}
                   onClick={() => void checkUsername()}
                 >
                   <span aria-hidden="true">◎</span>
@@ -490,10 +533,7 @@ export default function TopupExperience({
                   {usernameCheck.status === "success" ? (
                     <>
                       <span className="username-checker-status" aria-hidden="true">✓</span>
-                      <span>
-                        <small>Username</small>
-                        <strong>{usernameCheck.nickname ?? "Akun terverifikasi"}</strong>
-                      </span>
+                      <span><small>Username</small><strong>{usernameCheck.nickname ?? "Akun terverifikasi"}</strong></span>
                     </>
                   ) : usernameCheck.status === "pending" ? (
                     <>
@@ -516,99 +556,81 @@ export default function TopupExperience({
             )}
           </div>
 
-          <div className="form-block nominal-form-block">
+          <div className="form-block nominal-form-block nominal-form-grouped">
             <div className="form-label">
               <span className="step-number">2</span>
-              <div><strong>Pilih nominal</strong><small>Pilih paket yang paling sesuai kebutuhanmu.</small></div>
+              <div><strong>Pilih nominal</strong><small>Semua nominal ditampilkan sekaligus dan dikelompokkan berdasarkan jenis produk.</small></div>
             </div>
 
-            {availableGroups.length > 0 && (
-              <div className="package-group-tabs" role="tablist" aria-label="Kelompok nominal">
-                <button
-                  className={packageGroup === "all" ? "active" : ""}
-                  type="button"
-                  onClick={() => choosePackageGroup("all")}
-                >
-                  Semua <span>{selectedGame.packages.length}</span>
-                </button>
-                {availableGroups.map((group) => {
-                  const count = selectedGame.packages.filter((item) => groupsOf(item).includes(group.id)).length;
-                  return (
-                    <button
-                      className={packageGroup === group.id ? "active" : ""}
-                      key={group.id}
-                      type="button"
-                      onClick={() => choosePackageGroup(group.id)}
-                    >
-                      {group.label} <span>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div className="nominal-section-stack">
+              {nominalSections.map((section) => (
+                <section className={`nominal-section nominal-section-${section.id}`} key={section.id}>
+                  <div className="nominal-section-heading">
+                    <div>
+                      <strong>
+                        {section.label}
+                        {section.featured && <span className="nominal-section-spark" aria-hidden="true">✦</span>}
+                      </strong>
+                      <small>{section.description}</small>
+                    </div>
+                    <span>{section.items.length} pilihan</span>
+                  </div>
 
-            <div className="nominal-list-head">
-              <div>
-                <span className="nominal-list-icon" aria-hidden="true">⚡</span>
-                <span><strong>Top Up Instant</strong><small>Diproses otomatis setelah pembayaran terkonfirmasi.</small></span>
-              </div>
-              <b>{visiblePackages.length} pilihan</b>
-            </div>
+                  <div className="package-grid package-grid-v3">
+                    {section.items.map((item) => {
+                      const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
+                      const groups = groupsOf(item);
+                      const visualKind = getPackageVisualKind(selectedGame, item);
+                      const active = selectedPackageId === item.id;
 
-            <div className="package-grid package-grid-v2">
-              {visiblePackages.map((item) => {
-                const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
-                const groups = groupsOf(item);
-                const visualKind = getPackageVisualKind(selectedGame, item);
-                const active = selectedPackageId === item.id;
+                      return (
+                        <button
+                          className={`package-option package-priced package-card-v3 ${active ? "active" : ""}`}
+                          key={item.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            setSelectedPackageId(item.id);
+                            resetPricingMessages();
+                          }}
+                        >
+                          <span className="package-card-v3-title">{item.label}</span>
 
-                return (
-                  <button
-                    className={`package-option package-priced package-card-v2 ${active ? "active" : ""}`}
-                    key={item.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => {
-                      setSelectedPackageId(item.id);
-                      resetPricingMessages();
-                    }}
-                  >
-                    <span className={`package-item-visual ${visualKind}`} aria-hidden="true">
-                      {packageVisualLabel(visualKind)}
-                    </span>
+                          <span className="package-card-v3-main">
+                            <span className={`package-item-visual ${visualKind}`} aria-hidden="true">
+                              {packageVisualLabel(visualKind)}
+                            </span>
+                            <span className="package-card-v3-price">
+                              <strong className="package-current-price">{formatIDR(item.sellingPrice)}</strong>
+                              {(item.referencePrice > item.sellingPrice || referenceDiscount > 0) && (
+                                <span className="package-reference-row">
+                                  {item.referencePrice > item.sellingPrice && <del>{formatIDR(item.referencePrice)}</del>}
+                                  {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
+                                </span>
+                              )}
+                              {item.note && !isOnlyGroupNote(item.note) && (
+                                <small className="package-note">{item.note}</small>
+                              )}
+                            </span>
+                          </span>
 
-                    <span className="package-card-copy">
-                      <span className="package-name">{item.label}</span>
-                      <span className="package-current-price">{formatIDR(item.sellingPrice)}</span>
-
-                      {(item.referencePrice > item.sellingPrice || referenceDiscount > 0) && (
-                        <span className="package-reference-row">
-                          {item.referencePrice > item.sellingPrice && <del>{formatIDR(item.referencePrice)}</del>}
-                          {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
-                        </span>
-                      )}
-
-                      {groups.length > 0 && (
-                        <span className="package-badges">
-                          {groups.slice(0, 2).map((group) => (
-                            <b className={`package-badge ${group}`} key={group}>
-                              {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
-                            </b>
-                          ))}
-                        </span>
-                      )}
-
-                      {item.note && !isOnlyGroupNote(item.note) && (
-                        <small className="package-note">{item.note}</small>
-                      )}
-                    </span>
-
-                    <span className="package-select-indicator" aria-hidden="true">
-                      {active ? "✓" : ""}
-                    </span>
-                  </button>
-                );
-              })}
+                          <span className="package-card-v3-footer">
+                            <span className="package-badges">
+                              {groups.slice(0, 2).map((group) => (
+                                <b className={`package-badge ${group}`} key={group}>
+                                  {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
+                                </b>
+                              ))}
+                            </span>
+                            <span className="package-card-v3-brand">N+</span>
+                            <span className="package-select-indicator" aria-hidden="true">{active ? "✓" : ""}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
 
