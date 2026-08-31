@@ -3,6 +3,7 @@ import "./globals.css";
 import "./pricing.css";
 import "./order.css";
 import "./admin.css";
+import "./admin-automation.css";
 import "./midtrans.css";
 import "./admin-digiflazz.css";
 import "./admin-digiflazz-v2.css";
