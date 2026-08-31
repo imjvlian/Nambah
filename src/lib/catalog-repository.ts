@@ -55,7 +55,7 @@ const SUBSCRIPTION_PATTERN =
   /(weekly|monthly|membership|member\b|pass\b|welkin|subscription|subscribe|langganan|mingguan|bulanan|7\s*(day|hari)|30\s*(day|hari))/i;
 
 function withGameIcon(game: Game): Game {
-  const icon = `/api/icons/game?name=${encodeURIComponent(game.name)}`;
+  const icon = `/api/icons/game?v=store-1&name=${encodeURIComponent(game.name)}`;
   return {
     ...game,
     accent: `#171a16 url("${icon}") center / cover no-repeat`,
