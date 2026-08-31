@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import TopupExperience from "@/components/TopupExperience";
-import type { Game, PaymentMethod } from "@/lib/catalog";
+import { useRouter } from "next/navigation";
+import type { Game } from "@/lib/catalog";
 
-type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
 
@@ -23,13 +22,10 @@ type CatalogCategory = {
   description: string;
   order: number;
   count: number;
-  mark: string;
 };
 
 type CategorizedTopupExperienceProps = {
   games: Game[];
-  paymentMethods: PublicPaymentMethod[];
-  catalogSource: "static" | "supabase";
 };
 
 const CATEGORY_META: Record<
@@ -40,44 +36,47 @@ const CATEGORY_META: Record<
     label: "Games",
     description: "Top up game dan currency in-game",
     order: 0,
-    mark: "G",
   },
   "pulsa-data": {
     label: "Pulsa & Data",
     description: "Pulsa, paket data, masa aktif, dan produk operator",
     order: 10,
-    mark: "P",
   },
   "e-wallet": {
     label: "E-Wallet",
     description: "Saldo dan voucher dompet digital",
     order: 20,
-    mark: "E",
   },
   pln: {
     label: "PLN",
     description: "Token dan kebutuhan listrik prabayar",
     order: 30,
-    mark: "PLN",
   },
   langganan: {
     label: "Langganan",
     description: "Streaming, software, dan layanan berlangganan",
     order: 40,
-    mark: "L",
   },
   voucher: {
     label: "Voucher",
     description: "Gift card, wallet, dan voucher digital",
     order: 50,
-    mark: "V",
   },
   digital: {
     label: "Produk Digital",
     description: "Produk digital lainnya yang tersedia",
     order: 90,
-    mark: "+",
   },
+};
+
+const CATEGORY_MARK: Record<CatalogCategoryId, string> = {
+  games: "G",
+  "pulsa-data": "P",
+  "e-wallet": "E",
+  pln: "L",
+  langganan: "S",
+  voucher: "V",
+  digital: "D",
 };
 
 const GAME_PATTERN =
@@ -142,15 +141,13 @@ function popularityScore(game: Game) {
 
 export default function CategorizedTopupExperience({
   games,
-  paymentMethods,
-  catalogSource,
 }: CategorizedTopupExperienceProps) {
+  const router = useRouter();
   const categories = useMemo(() => buildCategories(games), [games]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<CatalogCategoryId>(
     categories[0]?.id ?? "games",
   );
   const [query, setQuery] = useState("");
-  const [focusedGameId, setFocusedGameId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!categories.some((category) => category.id === selectedCategoryId)) {
@@ -181,47 +178,26 @@ export default function CategorizedTopupExperience({
           (left, right) =>
             right.score - left.score || left.game.name.localeCompare(right.game.name, "id"),
         )
-        .slice(0, 10)
+        .slice(0, 8)
         .map((item) => item.game),
     [games],
   );
 
   const visibleGames = normalizedQuery ? searchResults : categoryGames;
-  const orderedVisibleGames = useMemo(() => {
-    if (!focusedGameId) return visibleGames;
-    const focused = visibleGames.find((game) => game.id === focusedGameId);
-    if (!focused) return visibleGames;
-    return [focused, ...visibleGames.filter((game) => game.id !== focusedGameId)];
-  }, [focusedGameId, visibleGames]);
 
-  function selectCategory(categoryId: CatalogCategoryId) {
-    setSelectedCategoryId(categoryId);
-    setFocusedGameId(undefined);
+  function openProduct(game: Game) {
+    router.push(`/product/${encodeURIComponent(game.id)}`);
   }
 
-  function selectPopular(game: Game) {
-    setQuery("");
-    setSelectedCategoryId(getCatalogCategoryId(game));
-    setFocusedGameId(game.id);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-  }
-
-  if (!selectedCategory) {
-    return null;
-  }
+  if (!selectedCategory) return null;
 
   return (
     <>
       <section className="home-search-section" id="catalog-start">
         <div className="home-search-heading">
           <div>
-            <span className="eyebrow">Top Up</span>
-            <strong>Cari produk favoritmu.</strong>
-            <small>Game, pulsa, e-wallet, voucher, dan kebutuhan digital lain.</small>
+            <span className="eyebrow">Cari produk</span>
+            <strong>Apa yang mau kamu nambah?</strong>
           </div>
           <span>{games.length} produk tersedia</span>
         </div>
@@ -233,44 +209,32 @@ export default function CategorizedTopupExperience({
             type="search"
             placeholder="Cari Mobile Legends, AXIS, DANA, Steam..."
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setFocusedGameId(undefined);
-            }}
+            onChange={(event) => setQuery(event.target.value)}
           />
           {query && (
-            <button type="button" onClick={() => setQuery("")} aria-label="Hapus pencarian">
-              ×
-            </button>
+            <button type="button" onClick={() => setQuery("")} aria-label="Hapus pencarian">×</button>
           )}
         </label>
       </section>
 
       {!normalizedQuery && popularGames.length > 0 && (
         <section className="home-popular-section" id="popular" aria-labelledby="popular-title">
-          <div className="home-section-heading home-popular-heading">
+          <div className="home-section-heading">
             <div>
-              <span className="eyebrow">Pilihan cepat</span>
-              <strong id="popular-title">Populer sekarang</strong>
-              <small>Produk yang sedang paling banyak dipilih.</small>
+              <span className="eyebrow">Paling dicari</span>
+              <strong id="popular-title">Populer Sekarang</strong>
+              <small>Shortcut ke produk yang paling sering dipilih.</small>
             </div>
-            <span>{popularGames.length} produk</span>
+            <span>{popularGames.length} pilihan</span>
           </div>
 
           <div className="home-popular-track">
             {popularGames.map((game, index) => {
               const category = CATEGORY_META[getCatalogCategoryId(game)];
               return (
-                <button
-                  className="home-popular-card"
-                  key={game.id}
-                  type="button"
-                  onClick={() => selectPopular(game)}
-                >
+                <button className="home-popular-card" key={game.id} type="button" onClick={() => openProduct(game)}>
                   <span className="home-popular-rank">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="home-popular-icon app-artwork" style={{ background: game.accent }}>
-                    {game.initials}
-                  </span>
+                  <span className="home-popular-icon app-artwork" style={{ background: game.accent }}>{game.initials}</span>
                   <span className="home-popular-copy">
                     <strong>{game.name}</strong>
                     <small>{category.label}</small>
@@ -287,14 +251,14 @@ export default function CategorizedTopupExperience({
         <section className="catalog-category-nav" aria-label="Kategori produk">
           <div className="home-section-heading catalog-category-header-v2">
             <div>
-              <span className="eyebrow">Kategori</span>
-              <strong>Jelajahi produk</strong>
-              <small>Pilih kategori untuk mempersempit katalog.</small>
+              <span className="eyebrow">Jelajahi</span>
+              <strong>Kategori</strong>
+              <small>{selectedCategory.description}</small>
             </div>
             <span>{categories.length} kategori</span>
           </div>
 
-          <div className="catalog-category-tabs home-category-grid" role="tablist" aria-label="Pilih kategori produk">
+          <div className="catalog-category-tabs" role="tablist" aria-label="Pilih kategori produk">
             {categories.map((category) => (
               <button
                 className={selectedCategoryId === category.id ? "active" : ""}
@@ -302,13 +266,10 @@ export default function CategorizedTopupExperience({
                 type="button"
                 role="tab"
                 aria-selected={selectedCategoryId === category.id}
-                onClick={() => selectCategory(category.id)}
+                onClick={() => setSelectedCategoryId(category.id)}
               >
-                <span className="home-category-mark">{category.mark}</span>
-                <span className="home-category-copy">
-                  <strong>{category.label}</strong>
-                  <small>{category.description}</small>
-                </span>
+                <i aria-hidden="true">{CATEGORY_MARK[category.id]}</i>
+                <span>{category.label}</span>
                 <b>{category.count}</b>
               </button>
             ))}
@@ -318,28 +279,33 @@ export default function CategorizedTopupExperience({
 
       <section className="home-catalog-results-heading" aria-live="polite">
         <div>
-          <span className="eyebrow">Katalog</span>
+          <span className="eyebrow">Produk</span>
           <strong>{normalizedQuery ? "Hasil pencarian" : selectedCategory.label}</strong>
-          <small>
-            {normalizedQuery
-              ? `Hasil untuk “${query.trim()}”`
-              : selectedCategory.description}
-          </small>
+          <small>{normalizedQuery ? `Hasil untuk “${query.trim()}”` : selectedCategory.description}</small>
         </div>
-        <span>{orderedVisibleGames.length} produk</span>
+        <span>{visibleGames.length} produk</span>
       </section>
 
-      {orderedVisibleGames.length > 0 ? (
-        <TopupExperience
-          key={`${normalizedQuery ? "search" : selectedCategoryId}:${focusedGameId ?? "default"}`}
-          games={orderedVisibleGames}
-          paymentMethods={paymentMethods}
-          catalogSource={catalogSource}
-        />
+      {visibleGames.length > 0 ? (
+        <section className="catalog-section home-products-section" id="games">
+          <div className="game-grid">
+            {visibleGames.map((game) => {
+              const category = CATEGORY_META[getCatalogCategoryId(game)];
+              return (
+                <button className="game-card" key={game.id} type="button" onClick={() => openProduct(game)}>
+                  <span className="game-mark app-artwork" style={{ background: game.accent }}>{game.initials}</span>
+                  <span className="game-copy">
+                    <strong>{game.name}</strong>
+                    <small>{category.label}</small>
+                  </span>
+                  <span className="card-arrow" aria-hidden="true">↗</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       ) : (
-        <div className="empty-state home-search-empty">
-          Tidak ada produk yang cocok. Coba nama game, operator, e-wallet, atau voucher lain.
-        </div>
+        <div className="empty-state home-search-empty">Tidak ada produk yang cocok. Coba nama game, operator, e-wallet, atau voucher lain.</div>
       )}
     </>
   );

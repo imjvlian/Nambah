@@ -71,11 +71,7 @@ export default async function Home() {
       </section>
 
       <div className="shell">
-        <CategorizedTopupExperience
-          games={catalog.games}
-          paymentMethods={catalog.paymentMethods}
-          catalogSource={catalog.source}
-        />
+        <CategorizedTopupExperience games={catalog.games} />
       </div>
 
       <section className="how-section shell home-how-section" id="how-it-works">
