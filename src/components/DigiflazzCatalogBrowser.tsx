@@ -25,14 +25,8 @@ type SupplierItem = {
     productId: string;
     label: string;
     gameName: string | null;
+    published: boolean;
   } | null;
-};
-
-type NambahProduct = {
-  id: string;
-  gameId: string;
-  gameName: string;
-  label: string;
 };
 
 type FilterOptions = {
@@ -49,18 +43,19 @@ type CatalogFilters = {
   seller: string;
   availability: string;
   mapping: string;
+  visibility: string;
   mode: string;
 };
 
 type SupplierCatalogPayload = {
   latestScanAt: string | null;
   scanTotal: number;
+  publishedCount: number;
   total: number;
   page: number;
   limit: number;
   pages: number;
   items: SupplierItem[];
-  nambahProducts: NambahProduct[];
   filterOptions?: FilterOptions;
 };
 
@@ -71,6 +66,7 @@ const DEFAULT_FILTERS: CatalogFilters = {
   seller: "all",
   availability: "all",
   mapping: "all",
+  visibility: "all",
   mode: "all",
 };
 
@@ -102,7 +98,6 @@ export default function DigiflazzCatalogBrowser() {
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
-  const [targets, setTargets] = useState<Record<string, string>>({});
 
   async function load(
     nextPage = page,
@@ -170,7 +165,7 @@ export default function DigiflazzCatalogBrowser() {
       setPage(1);
       await load(1, query, filters, true);
       setNotice(
-        `Scan selesai. Digiflazz mengirim ${data.summary?.supplierCatalogItems ?? 0} SKU prepaid pada scan ini.`,
+        `Scan selesai. ${data.summary?.supplierCatalogItems ?? 0} SKU prepaid diterima dari Digiflazz. Pilih produk yang ingin ditampilkan ke user.`,
       );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Scan Digiflazz gagal.");
@@ -179,28 +174,49 @@ export default function DigiflazzCatalogBrowser() {
     }
   }
 
-  async function mapSku(item: SupplierItem) {
-    const productId = targets[item.sku] ?? "";
-    if (!productId) {
-      setNotice(`Pilih produk Nambah untuk SKU ${item.sku}.`);
+  async function togglePublished(item: SupplierItem) {
+    const ready = item.buyerActive && item.sellerActive;
+    const nextPublished = !Boolean(item.mapping?.published);
+
+    if (nextPublished && !ready) {
+      setNotice(`${item.sku} sedang tidak aktif di supplier dan tidak bisa ditampilkan.`);
       return;
     }
 
-    setBusy(`map:${item.sku}`);
+    setBusy(`publish:${item.sku}`);
     setNotice("");
+
     try {
-      const response = await fetch("/api/admin/digiflazz/map-sku", {
+      const response = await fetch("/api/admin/digiflazz/catalog/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, supplierSku: item.sku }),
+        body: JSON.stringify({ supplierSku: item.sku, published: nextPublished }),
       });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Mapping SKU gagal.");
+      const data = (await response.json()) as {
+        error?: string;
+        publication?: {
+          productId?: string | null;
+          published?: boolean;
+          created?: boolean;
+          sellingPrice?: number;
+        };
+      };
+
+      if (!response.ok || !data.publication) {
+        throw new Error(data.error ?? "Status tampil produk gagal diperbarui.");
+      }
 
       await load(page, query, filters, false);
-      setNotice(`${item.sku} berhasil di-map ke ${productId}.`);
+
+      if (nextPublished) {
+        setNotice(
+          `${item.name} sekarang tampil ke user${data.publication.created ? " dan katalog Nambah dibuat otomatis" : ""}${data.publication.sellingPrice ? ` dengan harga awal ${formatIDR(data.publication.sellingPrice)}` : ""}.`,
+        );
+      } else {
+        setNotice(`${item.name} disembunyikan dari user. Mapping dan histori tetap disimpan.`);
+      }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Mapping SKU gagal.");
+      setNotice(error instanceof Error ? error.message : "Status tampil produk gagal diperbarui.");
     } finally {
       setBusy("");
     }
@@ -262,9 +278,9 @@ export default function DigiflazzCatalogBrowser() {
       <section className="supplier-browser-hero">
         <div>
           <span className="admin-kicker">Supplier Catalog</span>
-          <h1>Semua SKU yang dikirim Digiflazz.</h1>
+          <h1>Scan, pilih, tampilkan.</h1>
           <p>
-            Cari dan filter katalog supplier berdasarkan kategori, brand, tipe, seller, status, mapping, dan mode transaksi.
+            Digiflazz menjadi sumber katalog. Scan produk supplier lalu aktifkan hanya SKU yang ingin dijual di website Nambah.
           </p>
         </div>
         <button type="button" onClick={() => void scanCatalog()} disabled={Boolean(busy)}>
@@ -273,14 +289,15 @@ export default function DigiflazzCatalogBrowser() {
       </section>
 
       <section className="supplier-browser-warning">
-        <strong>Catatan API Digiflazz</strong>
+        <strong>Publish otomatis</strong>
         <span>
-          Price-list hanya berisi produk yang tersedia/disetting pada akun Buyer kamu. Jika sebuah SKU tidak muncul di sini setelah scan, Nambah memang tidak menerimanya dari API.
+          Saat SKU pertama kali ditampilkan, Nambah otomatis membuat brand/game, produk, mapping supplier, dan harga minimum aman. Produk bisa disembunyikan lagi tanpa menghapus data.
         </span>
       </section>
 
       <section className="supplier-browser-stats">
         <div><small>SKU scan terakhir</small><strong>{payload?.scanTotal ?? 0}</strong></div>
+        <div><small>Ditampilkan ke user</small><strong>{payload?.publishedCount ?? 0}</strong></div>
         <div><small>Hasil filter</small><strong>{payload?.total ?? 0}</strong></div>
         <div><small>Terakhir scan</small><strong className="small-value">{formatTime(payload?.latestScanAt ?? null)}</strong></div>
         <div><small>Halaman</small><strong>{payload?.pages ? `${payload.page}/${payload.pages}` : "-"}</strong></div>
@@ -341,6 +358,15 @@ export default function DigiflazzCatalogBrowser() {
           </label>
 
           <label>
+            <span>Tampil ke user</span>
+            <select value={filters.visibility} onChange={(event) => changeFilter("visibility", event.target.value)}>
+              <option value="all">Semua tampilan</option>
+              <option value="published">Ditampilkan</option>
+              <option value="hidden">Tidak ditampilkan</option>
+            </select>
+          </label>
+
+          <label>
             <span>Mapping Nambah</span>
             <select value={filters.mapping} onChange={(event) => changeFilter("mapping", event.target.value)}>
               <option value="all">Semua mapping</option>
@@ -375,15 +401,17 @@ export default function DigiflazzCatalogBrowser() {
         <div className="supplier-browser-table-head">
           <span>Produk Digiflazz</span>
           <span>Harga & seller</span>
-          <span>Status</span>
-          <span>Mapping Nambah</span>
+          <span>Status supplier</span>
+          <span>Katalog user</span>
         </div>
 
         {loading && <div className="supplier-browser-loading">Memuat katalog supplier...</div>}
 
         {!loading && payload?.items.map((item) => {
           const ready = item.buyerActive && item.sellerActive;
-          const mappingBusy = busy === `map:${item.sku}`;
+          const published = Boolean(item.mapping?.published);
+          const publishBusy = busy === `publish:${item.sku}`;
+
           return (
             <article className="supplier-browser-row" key={item.sku}>
               <div className="supplier-browser-product">
@@ -408,33 +436,35 @@ export default function DigiflazzCatalogBrowser() {
               <div className="supplier-browser-statuses">
                 <span className={item.buyerActive ? "ok" : "off"}>Buyer {item.buyerActive ? "aktif" : "off"}</span>
                 <span className={item.sellerActive ? "ok" : "off"}>Seller {item.sellerActive ? "aktif" : "off"}</span>
-                <small>{ready ? "Siap digunakan" : "Jangan dipakai checkout"}</small>
+                <small>{ready ? "Siap dijual" : "Tidak bisa dipublish"}</small>
               </div>
 
-              <div className="supplier-browser-mapping">
-                {item.mapping ? (
+              <div className="supplier-browser-publish">
+                <button
+                  className={`supplier-publish-button ${published ? "published" : ""}`}
+                  type="button"
+                  disabled={Boolean(busy) || (!ready && !published)}
+                  onClick={() => void togglePublished(item)}
+                >
+                  <span className="supplier-publish-switch" aria-hidden="true"><i /></span>
+                  <span>
+                    <strong>{publishBusy ? "Menyimpan..." : published ? "Ditampilkan ke user" : "Tidak ditampilkan"}</strong>
+                    <small>
+                      {published
+                        ? "Klik untuk sembunyikan"
+                        : item.mapping
+                          ? "Klik untuk tampilkan lagi"
+                          : "Klik untuk buat katalog otomatis"}
+                    </small>
+                  </span>
+                </button>
+
+                {item.mapping && (
                   <div className="supplier-browser-mapped">
-                    <small>Sudah mapped</small>
+                    <small>Mapping tersimpan</small>
                     <strong>{item.mapping.gameName} · {item.mapping.label}</strong>
                     <code>{item.mapping.productId}</code>
                   </div>
-                ) : (
-                  <>
-                    <select
-                      value={targets[item.sku] ?? ""}
-                      onChange={(event) => setTargets((current) => ({ ...current, [item.sku]: event.target.value }))}
-                    >
-                      <option value="">Pilih produk Nambah...</option>
-                      {payload.nambahProducts.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.gameName} · {product.label} · {product.id}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" disabled={Boolean(busy) || !ready} onClick={() => void mapSku(item)}>
-                      {mappingBusy ? "Mapping..." : ready ? "Map SKU" : "Supplier inactive"}
-                    </button>
-                  </>
                 )}
               </div>
             </article>

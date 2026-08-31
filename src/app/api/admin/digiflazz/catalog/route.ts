@@ -39,6 +39,7 @@ type ProductRow = {
   id: string;
   game_id: string;
   label: string;
+  active: boolean;
 };
 
 type GameRow = {
@@ -64,6 +65,67 @@ function sortOptions(values: Set<string>) {
   return Array.from(values)
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right, "id", { sensitivity: "base" }));
+}
+
+function resolveSkuFilter(
+  mapping: string,
+  visibility: string,
+  mappedSkus: Set<string>,
+  publishedSkus: Set<string>,
+) {
+  if (mapping === "unmapped" && visibility === "published") {
+    return { empty: true, filter: null as string | null };
+  }
+
+  if (mapping === "mapped" && visibility === "published") {
+    const values = Array.from(publishedSkus);
+    return {
+      empty: values.length === 0,
+      filter: values.length ? quotedInFilter(values) : null,
+    };
+  }
+
+  if (mapping === "mapped" && visibility === "hidden") {
+    const values = Array.from(mappedSkus).filter((sku) => !publishedSkus.has(sku));
+    return {
+      empty: values.length === 0,
+      filter: values.length ? quotedInFilter(values) : null,
+    };
+  }
+
+  if (mapping === "unmapped") {
+    const values = Array.from(mappedSkus);
+    return {
+      empty: false,
+      filter: values.length ? `not.${quotedInFilter(values)}` : null,
+    };
+  }
+
+  if (mapping === "mapped") {
+    const values = Array.from(mappedSkus);
+    return {
+      empty: values.length === 0,
+      filter: values.length ? quotedInFilter(values) : null,
+    };
+  }
+
+  if (visibility === "published") {
+    const values = Array.from(publishedSkus);
+    return {
+      empty: values.length === 0,
+      filter: values.length ? quotedInFilter(values) : null,
+    };
+  }
+
+  if (visibility === "hidden") {
+    const values = Array.from(publishedSkus);
+    return {
+      empty: false,
+      filter: values.length ? `not.${quotedInFilter(values)}` : null,
+    };
+  }
+
+  return { empty: false, filter: null as string | null };
 }
 
 async function loadFilterOptions(latestScanAt: string) {
@@ -127,6 +189,7 @@ export async function GET(request: Request) {
   const type = cleanExact(url.searchParams.get("type")) || "all";
   const seller = cleanExact(url.searchParams.get("seller")) || "all";
   const mapping = cleanExact(url.searchParams.get("mapping")) || "all";
+  const visibility = cleanExact(url.searchParams.get("visibility")) || "all";
   const transactionMode = cleanExact(url.searchParams.get("mode")) || "all";
   const includeOptions = url.searchParams.get("includeOptions") !== "false";
 
@@ -143,7 +206,7 @@ export async function GET(request: Request) {
         filters: { supplier_id: "eq.digiflazz", supplier_sku: "not.is.null" },
       }),
       supabaseSelect<ProductRow>("products", {
-        select: "id,game_id,label",
+        select: "id,game_id,label,active",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
       supabaseSelect<GameRow>("games", {
@@ -154,17 +217,34 @@ export async function GET(request: Request) {
 
     const latestScanAt = latestRows[0]?.last_seen_at ?? null;
     const gamesById = new Map(games.map((game) => [game.id, game]));
+    const productsById = new Map(products.map((product) => [product.id, product]));
     const nambahProducts = products.map((product) => ({
       id: product.id,
       gameId: product.game_id,
       gameName: gamesById.get(product.game_id)?.name ?? product.game_id,
       label: product.label,
+      active: product.active,
     }));
+
+    const mappedSkus = new Set(
+      supplierProducts
+        .map((row) => row.supplier_sku?.trim() ?? "")
+        .filter(Boolean),
+    );
+    const publishedSkus = new Set(
+      supplierProducts
+        .filter((row) => {
+          if (!row.supplier_sku) return false;
+          return Boolean(productsById.get(row.product_id)?.active);
+        })
+        .map((row) => row.supplier_sku!.trim()),
+    );
 
     if (!latestScanAt) {
       return Response.json({
         latestScanAt: null,
         scanTotal: 0,
+        publishedCount: publishedSkus.size,
         total: 0,
         page,
         limit,
@@ -179,10 +259,6 @@ export async function GET(request: Request) {
         nambahProducts,
       });
     }
-
-    const mappedSupplierSkus = supplierProducts
-      .map((row) => row.supplier_sku?.trim() ?? "")
-      .filter(Boolean);
 
     const filters: Record<string, string> = {
       supplier_id: "eq.digiflazz",
@@ -205,16 +281,8 @@ export async function GET(request: Request) {
     if (transactionMode === "multi") filters.multi = "eq.true";
     if (transactionMode === "single") filters.multi = "eq.false";
 
-    let mappingForcesEmpty = false;
-    if (mapping === "mapped") {
-      if (mappedSupplierSkus.length === 0) {
-        mappingForcesEmpty = true;
-      } else {
-        filters.supplier_sku = quotedInFilter(mappedSupplierSkus);
-      }
-    } else if (mapping === "unmapped" && mappedSupplierSkus.length > 0) {
-      filters.supplier_sku = `not.${quotedInFilter(mappedSupplierSkus)}`;
-    }
+    const skuFilter = resolveSkuFilter(mapping, visibility, mappedSkus, publishedSkus);
+    if (skuFilter.filter) filters.supplier_sku = skuFilter.filter;
 
     const rawQuery = queryText
       ? {
@@ -237,7 +305,7 @@ export async function GET(request: Request) {
           filterOptions: undefined,
         }));
 
-    const resultPromise = mappingForcesEmpty
+    const resultPromise = skuFilter.empty
       ? Promise.resolve({ data: [] as SupplierCatalogRow[], count: 0 })
       : supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
           select:
@@ -250,7 +318,6 @@ export async function GET(request: Request) {
         });
 
     const [scanMeta, result] = await Promise.all([scanMetaPromise, resultPromise]);
-    const productsById = new Map(products.map((product) => [product.id, product]));
     const mappedBySku = new Map(
       supplierProducts
         .filter((row) => row.supplier_sku)
@@ -261,6 +328,7 @@ export async function GET(request: Request) {
     return Response.json({
       latestScanAt,
       scanTotal: scanMeta.scanTotal,
+      publishedCount: publishedSkus.size,
       total,
       page,
       limit,
@@ -293,6 +361,7 @@ export async function GET(request: Request) {
                 gameName: mappedProduct
                   ? gamesById.get(mappedProduct.game_id)?.name ?? mappedProduct.game_id
                   : null,
+                published: Boolean(mappedProduct?.active),
               }
             : null,
         };
