@@ -47,6 +47,25 @@ export type DigiflazzTestOutcome =
   | "pending-success"
   | "pending-failed";
 
+type DigiflazzErrorPayload = {
+  message?: unknown;
+  error?: unknown;
+  rc?: unknown;
+  response_code?: unknown;
+};
+
+export class DigiflazzApiError extends Error {
+  readonly code: string | null;
+  readonly retryable: boolean;
+
+  constructor(message: string, options?: { code?: string | null; retryable?: boolean }) {
+    super(message);
+    this.name = "DigiflazzApiError";
+    this.code = options?.code ?? null;
+    this.retryable = options?.retryable ?? false;
+  }
+}
+
 const TEST_TARGETS: Record<DigiflazzTestOutcome, string> = {
   success: "087800001230",
   failed: "087800001232",
@@ -71,13 +90,40 @@ export function isDigiflazzConfigured() {
 function requireApiConfig() {
   const config = getConfig();
   if (!config.username || !config.apiKey) {
-    throw new Error("Digiflazz API configuration is incomplete.");
+    throw new DigiflazzApiError("Konfigurasi API Digiflazz belum lengkap.");
   }
   return config;
 }
 
 function md5(value: string) {
   return createHash("md5").update(value).digest("hex");
+}
+
+function asNonEmptyString(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function getDigiflazzErrorDetail(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { message: null as string | null, code: null as string | null };
+  }
+
+  const payload = value as DigiflazzErrorPayload;
+  const message = asNonEmptyString(payload.message) ?? asNonEmptyString(payload.error);
+  const code =
+    asNonEmptyString(payload.rc) ??
+    asNonEmptyString(payload.response_code) ??
+    (typeof payload.rc === "number" ? String(payload.rc) : null) ??
+    (typeof payload.response_code === "number" ? String(payload.response_code) : null);
+
+  return { message, code };
+}
+
+function isLikelyRetryableDigiflazzMessage(message: string | null) {
+  if (!message) return false;
+  return /(limit|too many|rate|timeout|temporar|sementara|coba lagi|busy|maintenance)/i.test(message);
 }
 
 async function postDigiflazz<T>(url: string, body: Record<string, unknown>): Promise<T> {
@@ -102,14 +148,33 @@ async function postDigiflazz<T>(url: string, body: Record<string, unknown>): Pro
     try {
       parsed = raw ? JSON.parse(raw) : null;
     } catch {
-      throw new Error(`Digiflazz returned non-JSON response (${response.status}).`);
+      throw new DigiflazzApiError(`Digiflazz mengembalikan response non-JSON (${response.status}).`, {
+        retryable: response.status >= 500,
+      });
     }
 
     if (!response.ok) {
-      throw new Error(`Digiflazz request failed (${response.status}): ${raw}`);
+      const detail = getDigiflazzErrorDetail(parsed);
+      const codeLabel = detail.code ? ` [${detail.code}]` : "";
+      const message = detail.message
+        ? `Digiflazz request gagal${codeLabel}: ${detail.message}`
+        : `Digiflazz request gagal (${response.status})${codeLabel}.`;
+
+      throw new DigiflazzApiError(message, {
+        code: detail.code,
+        retryable: response.status === 429 || response.status >= 500 || isLikelyRetryableDigiflazzMessage(detail.message),
+      });
     }
 
     return parsed as T;
+  } catch (error) {
+    if (error instanceof DigiflazzApiError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new DigiflazzApiError("Request ke Digiflazz timeout. Coba scan lagi beberapa saat lagi.", {
+        retryable: true,
+      });
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -125,7 +190,7 @@ export async function getDigiflazzBalance() {
 
   const balance = Number(response.data?.deposit);
   if (!Number.isFinite(balance) || balance < 0) {
-    throw new Error("Digiflazz balance response does not contain a valid deposit value.");
+    throw new DigiflazzApiError("Response saldo Digiflazz tidak memiliki nilai deposit yang valid.");
   }
 
   return balance;
@@ -139,7 +204,13 @@ export async function getDigiflazzPrepaidPriceList(filters?: {
 }) {
   const { username, apiKey } = requireApiConfig();
 
-  const response = await postDigiflazz<{ data?: DigiflazzPriceItem[] }>(PRICE_LIST_URL, {
+  const response = await postDigiflazz<{
+    data?: DigiflazzPriceItem[] | DigiflazzErrorPayload;
+    message?: unknown;
+    error?: unknown;
+    rc?: unknown;
+    response_code?: unknown;
+  }>(PRICE_LIST_URL, {
     cmd: "prepaid",
     username,
     sign: md5(`${username}${apiKey}pricelist`),
@@ -150,7 +221,16 @@ export async function getDigiflazzPrepaidPriceList(filters?: {
   });
 
   if (!Array.isArray(response.data)) {
-    throw new Error("Digiflazz price list response does not contain a data array.");
+    const detail = getDigiflazzErrorDetail(response.data ?? response);
+    const codeLabel = detail.code ? ` [${detail.code}]` : "";
+    const message = detail.message
+      ? `Digiflazz menolak price-list${codeLabel}: ${detail.message}`
+      : `Digiflazz mengembalikan format price-list yang tidak valid${codeLabel}.`;
+
+    throw new DigiflazzApiError(message, {
+      code: detail.code,
+      retryable: isLikelyRetryableDigiflazzMessage(detail.message),
+    });
   }
 
   return response.data;
@@ -175,7 +255,7 @@ export async function runDigiflazzTestTransaction(input: {
   });
 
   if (!response.data) {
-    throw new Error("Digiflazz transaction response does not contain data.");
+    throw new DigiflazzApiError("Response transaksi Digiflazz tidak memiliki data transaksi.");
   }
 
   return response.data;
