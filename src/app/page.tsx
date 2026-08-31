@@ -1,4 +1,4 @@
-import TopupExperience from "@/components/TopupExperience";
+import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 
 export default async function Home() {
@@ -27,7 +27,7 @@ export default async function Home() {
             Game, voucher, dan kebutuhan digital dalam satu tempat. Cepat dipilih, jelas dibayar, gampang dilacak.
           </p>
           <div className="hero-actions">
-            <a className="primary-button" href="#games">Pilih game <span>↓</span></a>
+            <a className="primary-button" href="#games">Pilih produk <span>↓</span></a>
             <a className="text-link" href="#how-it-works">Lihat cara kerja</a>
           </div>
         </div>
@@ -58,7 +58,7 @@ export default async function Home() {
       </section>
 
       <div className="shell">
-        <TopupExperience
+        <CategorizedTopupExperience
           games={catalog.games}
           paymentMethods={catalog.paymentMethods}
           catalogSource={catalog.source}
@@ -76,12 +76,12 @@ export default async function Home() {
           <article>
             <span>01</span>
             <h3>Pilih produk</h3>
-            <p>Cari game atau voucher yang kamu butuhkan.</p>
+            <p>Cari game, pulsa, voucher, atau produk digital yang kamu butuhkan.</p>
           </article>
           <article>
             <span>02</span>
             <h3>Isi data</h3>
-            <p>Masukkan ID akun dan pilih nominal top up.</p>
+            <p>Masukkan data tujuan dan pilih nominal yang tersedia.</p>
           </article>
           <article>
             <span>03</span>
