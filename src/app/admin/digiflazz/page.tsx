@@ -1,5 +1,5 @@
-import DigiflazzCatalogBrowser from "@/components/DigiflazzCatalogBrowser";
+import DigiflazzCatalogBrowserV2 from "@/components/DigiflazzCatalogBrowserV2";
 
 export default function DigiflazzAdminPage() {
-  return <DigiflazzCatalogBrowser />;
+  return <DigiflazzCatalogBrowserV2 />;
 }
