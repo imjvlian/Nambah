@@ -26,13 +26,18 @@ export async function POST(request: Request) {
     console.error("Digiflazz bootstrap failed", error);
 
     if (error instanceof DigiflazzApiError) {
+      const rateLimited = error.code === "83";
       return Response.json(
         {
-          error: error.message,
+          error: rateLimited
+            ? "Limit pengecekan price-list Digiflazz sedang tercapai. Katalog hasil scan terakhir tetap aman dan bisa dipakai untuk sync harga; coba Scan ulang beberapa saat lagi."
+            : error.message,
+          providerMessage: error.message,
           code: error.code,
           retryable: error.retryable,
+          cachedCatalogUsable: rateLimited,
         },
-        { status: 502 },
+        { status: rateLimited ? 429 : 502 },
       );
     }
 
