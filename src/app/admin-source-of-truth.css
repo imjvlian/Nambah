@@ -1,0 +1,7 @@
+/* 0.3.12 — Digiflazz catalog is the catalog source of truth.
+   AdminDashboard still keeps the legacy auto-map implementation internally for
+   backward compatibility, but it is intentionally removed from the primary UI.
+   Button order in AdminDashboard: scan, auto-map, sync price, balance. */
+.admin-action-group > button:nth-child(2) {
+  display: none;
+}
