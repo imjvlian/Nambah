@@ -4,6 +4,7 @@ import {
 } from "@/lib/digiflazz/client";
 import {
   supabaseSelect,
+  supabaseSelectPage,
   supabaseUpsert,
 } from "@/lib/supabase/server";
 
@@ -24,6 +25,25 @@ type SupplierProductRow = {
   supplier_sku: string | null;
   supplier_cost: number | string;
   active: boolean;
+};
+
+type SupplierCatalogRow = {
+  supplier_sku: string;
+  product_name: string;
+  category: string;
+  brand: string;
+  type: string;
+  seller_name: string;
+  supplier_cost: number | string;
+  buyer_active: boolean;
+  seller_active: boolean;
+  unlimited_stock: boolean;
+  stock: number | string | null;
+  multi: boolean;
+  start_cut_off: string | null;
+  end_cut_off: string | null;
+  description: string | null;
+  last_seen_at: string;
 };
 
 type Candidate = {
@@ -141,14 +161,69 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-export async function bootstrapDigiflazzCatalog(input?: {
-  apply?: boolean;
-  remap?: boolean;
-}) {
-  const apply = input?.apply === true;
-  const remap = input?.remap === true;
+async function loadLatestCachedPriceList() {
+  const [latest] = await supabaseSelect<{ last_seen_at: string }>("supplier_catalog_items", {
+    select: "last_seen_at",
+    filters: { supplier_id: "eq.digiflazz" },
+    order: "last_seen_at.desc",
+    limit: 1,
+  });
+
+  if (!latest?.last_seen_at) {
+    throw new Error(
+      "Cache katalog Digiflazz belum tersedia. Jalankan Scan katalog Digiflazz terlebih dahulu.",
+    );
+  }
+
+  const rows: SupplierCatalogRow[] = [];
+  const batchSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    const page = await supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
+      select:
+        "supplier_sku,product_name,category,brand,type,seller_name,supplier_cost,buyer_active,seller_active,unlimited_stock,stock,multi,start_cut_off,end_cut_off,description,last_seen_at",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        last_seen_at: `eq.${latest.last_seen_at}`,
+      },
+      order: "supplier_sku.asc",
+      limit: batchSize,
+      offset,
+    });
+
+    rows.push(...page.data);
+    offset += page.data.length;
+
+    if (page.data.length === 0) break;
+    if (page.count !== null && offset >= page.count) break;
+    if (page.count === null && page.data.length < batchSize) break;
+  }
+
+  const priceList: DigiflazzPriceItem[] = rows.map((row) => ({
+    product_name: row.product_name,
+    category: row.category,
+    brand: row.brand,
+    type: row.type,
+    seller_name: row.seller_name,
+    price: Number(row.supplier_cost),
+    buyer_sku_code: row.supplier_sku,
+    buyer_product_status: Boolean(row.buyer_active),
+    seller_product_status: Boolean(row.seller_active),
+    unlimited_stock: Boolean(row.unlimited_stock),
+    stock: row.stock === null ? 0 : Number(row.stock),
+    multi: Boolean(row.multi),
+    start_cut_off: row.start_cut_off ?? "",
+    end_cut_off: row.end_cut_off ?? "",
+    desc: row.description ?? "",
+  }));
+
+  return { priceList, catalogScanAt: latest.last_seen_at };
+}
+
+async function loadLivePriceListAndRefreshCache() {
   const priceList = await getDigiflazzPrepaidPriceList();
-  const syncedAt = new Date().toISOString();
+  const catalogScanAt = new Date().toISOString();
 
   const cacheRows = priceList.map((item) => ({
     supplier_id: "digiflazz",
@@ -167,8 +242,8 @@ export async function bootstrapDigiflazzCatalog(input?: {
     start_cut_off: item.start_cut_off || null,
     end_cut_off: item.end_cut_off || null,
     description: item.desc || null,
-    last_seen_at: syncedAt,
-    updated_at: syncedAt,
+    last_seen_at: catalogScanAt,
+    updated_at: catalogScanAt,
   }));
 
   for (const batch of chunk(cacheRows, 250)) {
@@ -177,6 +252,22 @@ export async function bootstrapDigiflazzCatalog(input?: {
       prefer: "resolution=merge-duplicates,return=minimal",
     });
   }
+
+  return { priceList, catalogScanAt };
+}
+
+export async function bootstrapDigiflazzCatalog(input?: {
+  apply?: boolean;
+  remap?: boolean;
+}) {
+  const apply = input?.apply === true;
+  const remap = input?.remap === true;
+
+  const catalog = apply
+    ? await loadLatestCachedPriceList()
+    : await loadLivePriceListAndRefreshCache();
+  const priceList = catalog.priceList;
+  const syncedAt = new Date().toISOString();
 
   const [games, products, supplierProducts] = await Promise.all([
     supabaseSelect<GameRow>("games", {
@@ -280,7 +371,12 @@ export async function bootstrapDigiflazzCatalog(input?: {
       productId: product.id,
       label: product.label,
       gameId: product.game_id,
-      state: best && highConfidence ? (apply ? "auto-mapped" as const : "suggested" as const) : "unmapped" as const,
+      state:
+        best && highConfidence
+          ? apply
+            ? ("auto-mapped" as const)
+            : ("suggested" as const)
+          : ("unmapped" as const),
       suggestion: best ?? null,
       candidates: candidates.slice(0, 3),
     };
@@ -304,8 +400,10 @@ export async function bootstrapDigiflazzCatalog(input?: {
 
   return {
     mode: apply ? "applied" : "dry-run",
+    source: apply ? "supplier_catalog_cache" : "digiflazz_live",
     remap,
     syncedAt,
+    catalogScanAt: catalog.catalogScanAt,
     summary,
     products: results,
   };

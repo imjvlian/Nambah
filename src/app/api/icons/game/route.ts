@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ICONIFY_SEARCH_URL = "https://api.iconify.design/search";
 const ICONIFY_ICON_URL = "https://api.iconify.design";
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details";
-const CACHE_SECONDS = 60 * 60 * 24 * 7;
+const CACHE_SECONDS = 60 * 60 * 24;
 
 const PLAY_STORE_PACKAGES: Array<{ aliases: string[]; packageId: string }> = [
   { aliases: ["mobile legends", "mobile legends bang bang", "mlbb"], packageId: "com.mobile.legends" },
@@ -47,12 +48,43 @@ const PLAY_STORE_PACKAGES: Array<{ aliases: string[]; packageId: string }> = [
   { aliases: ["linkaja"], packageId: "com.telkom.mwallet" },
 ];
 
+const APP_STORE_TERMS: Array<{ aliases: string[]; term: string }> = [
+  { aliases: ["mobile legends", "mlbb"], term: "Mobile Legends Bang Bang" },
+  { aliases: ["free fire"], term: "Free Fire" },
+  { aliases: ["pubg mobile", "pubg"], term: "PUBG MOBILE" },
+  { aliases: ["honor of kings", "hok"], term: "Honor of Kings" },
+  { aliases: ["genshin impact", "genshin"], term: "Genshin Impact" },
+  { aliases: ["honkai star rail", "hsr"], term: "Honkai Star Rail" },
+  { aliases: ["zenless zone zero", "zzz"], term: "Zenless Zone Zero" },
+  { aliases: ["wuthering waves", "wuwa"], term: "Wuthering Waves" },
+  { aliases: ["roblox"], term: "Roblox" },
+  { aliases: ["steam", "steam wallet"], term: "Steam Mobile" },
+  { aliases: ["wild rift"], term: "League of Legends Wild Rift" },
+  { aliases: ["call of duty mobile", "cod mobile", "codm"], term: "Call of Duty Mobile" },
+  { aliases: ["efootball"], term: "eFootball" },
+  { aliases: ["fc mobile", "fifa mobile"], term: "EA SPORTS FC Mobile" },
+  { aliases: ["spotify"], term: "Spotify" },
+  { aliases: ["netflix"], term: "Netflix" },
+  { aliases: ["discord"], term: "Discord" },
+  { aliases: ["canva"], term: "Canva" },
+  { aliases: ["capcut"], term: "CapCut" },
+  { aliases: ["tiktok"], term: "TikTok" },
+];
+
 const PREFIX_SCORE: Record<string, number> = {
   arcticons: 130,
   "simple-icons": 120,
   logos: 110,
   "skill-icons": 80,
   devicon: 70,
+};
+
+type AppStoreResult = {
+  trackName?: string;
+  bundleId?: string;
+  sellerName?: string;
+  artworkUrl512?: string;
+  artworkUrl100?: string;
 };
 
 function normalize(value: string) {
@@ -102,6 +134,69 @@ function fallbackSvg(name: string) {
 </svg>`;
 }
 
+function resolveSearchTerm(name: string) {
+  const normalized = normalize(name);
+  const match = APP_STORE_TERMS.find((entry) =>
+    entry.aliases.some((alias) => {
+      const normalizedAlias = normalize(alias);
+      return normalized === normalizedAlias || normalized.includes(normalizedAlias);
+    }),
+  );
+  return match?.term ?? name;
+}
+
+function appStoreScore(result: AppStoreResult, requestedName: string, searchTerm: string) {
+  const title = normalize(result.trackName ?? "");
+  const requested = normalize(requestedName);
+  const searched = normalize(searchTerm);
+  const titleCompact = compact(result.trackName ?? "");
+  const requestedCompact = compact(requestedName);
+  const searchedCompact = compact(searchTerm);
+
+  let score = 0;
+  if (title === searched) score += 260;
+  if (title === requested) score += 240;
+  if (titleCompact === searchedCompact) score += 220;
+  if (titleCompact === requestedCompact) score += 200;
+  if (titleCompact.includes(searchedCompact) || searchedCompact.includes(titleCompact)) score += 90;
+  if (titleCompact.includes(requestedCompact) || requestedCompact.includes(titleCompact)) score += 70;
+
+  const words = searched.split(" ").filter((word) => word.length >= 3);
+  score += words.filter((word) => title.includes(word)).length * 25;
+  return score;
+}
+
+async function searchAppStore(name: string, country: string) {
+  const term = resolveSearchTerm(name);
+  const url = new URL(ITUNES_SEARCH_URL);
+  url.searchParams.set("term", term);
+  url.searchParams.set("country", country);
+  url.searchParams.set("media", "software");
+  url.searchParams.set("entity", "software");
+  url.searchParams.set("limit", "12");
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: CACHE_SECONDS },
+  });
+  if (!response.ok) return null;
+
+  const data = (await response.json()) as { results?: AppStoreResult[] };
+  const results = Array.isArray(data.results) ? data.results : [];
+  const ranked = results
+    .map((result) => ({ result, score: appStoreScore(result, name, term) }))
+    .sort((left, right) => right.score - left.score);
+  const best = ranked[0];
+  if (!best || best.score < 110) return null;
+
+  const artwork = best.result.artworkUrl512 ?? best.result.artworkUrl100 ?? null;
+  return artwork && /^https:\/\//i.test(artwork) ? artwork : null;
+}
+
+async function findAppStoreIcon(name: string) {
+  return (await searchAppStore(name, "ID")) ?? (await searchAppStore(name, "US"));
+}
+
 function resolvePlayStorePackage(name: string) {
   const normalized = normalize(name);
   const exact = PLAY_STORE_PACKAGES.find((entry) =>
@@ -120,14 +215,40 @@ function resolvePlayStorePackage(name: string) {
 
 function extractMetaContent(html: string, property: string) {
   const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(`<meta[^>]+property=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i"),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${escaped}["']`, "i"),
-  ];
+  const attributes = ["property", "name", "itemprop"];
+  for (const attribute of attributes) {
+    const patterns = [
+      new RegExp(`<meta[^>]+${attribute}=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i"),
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${attribute}=["']${escaped}["']`, "i"),
+    ];
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) return decodeHtml(match[1]);
+    }
+  }
+  return null;
+}
 
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) return decodeHtml(match[1]);
+function extractJsonLdImage(html: string) {
+  const scripts = html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  for (const match of scripts) {
+    try {
+      const value = JSON.parse(match[1] ?? "null") as unknown;
+      const items = Array.isArray(value) ? value : [value];
+      for (const item of items) {
+        if (!item || typeof item !== "object") continue;
+        const image = (item as { image?: unknown }).image;
+        if (typeof image === "string" && /^https:\/\//i.test(image)) return image;
+        if (image && typeof image === "object") {
+          const url = (image as { url?: unknown }).url;
+          if (typeof url === "string" && /^https:\/\//i.test(url)) return url;
+        }
+      }
+    } catch {
+      // Ignore malformed JSON-LD and continue with other Play Store metadata.
+    }
   }
   return null;
 }
@@ -152,7 +273,10 @@ async function findPlayStoreIcon(name: string) {
 
   if (!response.ok) return null;
   const html = await response.text();
-  const image = extractMetaContent(html, "og:image");
+  const image =
+    extractJsonLdImage(html) ??
+    extractMetaContent(html, "image") ??
+    extractMetaContent(html, "og:image");
   if (!image || !/^https:\/\//i.test(image)) return null;
   return image;
 }
@@ -207,6 +331,16 @@ async function findSoftwareIcon(name: string) {
   return `${ICONIFY_ICON_URL}/${encodeURIComponent(prefix)}/${encodeURIComponent(iconName)}.svg`;
 }
 
+function redirectToIcon(iconUrl: string, source: string) {
+  return NextResponse.redirect(iconUrl, {
+    status: 307,
+    headers: {
+      "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
+      "X-Nambah-Icon-Source": source,
+    },
+  });
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const name = (url.searchParams.get("name") ?? "").trim().slice(0, 100);
@@ -221,27 +355,14 @@ export async function GET(request: Request) {
   }
 
   try {
+    const appStoreIcon = await findAppStoreIcon(name);
+    if (appStoreIcon) return redirectToIcon(appStoreIcon, "app-store");
+
     const playStoreIcon = await findPlayStoreIcon(name);
-    if (playStoreIcon) {
-      return NextResponse.redirect(playStoreIcon, {
-        status: 307,
-        headers: {
-          "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
-          "X-Nambah-Icon-Source": "play-store",
-        },
-      });
-    }
+    if (playStoreIcon) return redirectToIcon(playStoreIcon, "play-store");
 
     const softwareIcon = await findSoftwareIcon(name);
-    if (softwareIcon) {
-      return NextResponse.redirect(softwareIcon, {
-        status: 307,
-        headers: {
-          "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
-          "X-Nambah-Icon-Source": "software-icon",
-        },
-      });
-    }
+    if (softwareIcon) return redirectToIcon(softwareIcon, "software-icon");
   } catch (error) {
     console.warn("Game icon lookup failed", name, error);
   }
