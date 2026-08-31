@@ -5,49 +5,69 @@ export default async function Home() {
   const catalog = await getPublicCatalog();
 
   return (
-    <main className="home-v2">
-      <header className="site-header shell home-v2-header">
-        <a className="brand" href="#top">
+    <main className="home-v2 home-oura-refine">
+      <header className="site-header shell home-v2-header home-market-header">
+        <a className="brand" href="#top" aria-label="Nambah">
           <span className="brand-mark">N+</span>
           <span>Nambah</span>
         </a>
-        <nav className="desktop-nav" aria-label="Navigasi utama">
-          <a href="#catalog-start">Produk</a>
-          <a href="#topup">Top Up</a>
+
+        <nav className="desktop-nav home-market-nav" aria-label="Navigasi utama">
+          <a href="#catalog-start">Top Up</a>
+          <a href="#popular">Populer</a>
           <a href="#how-it-works">Cara Kerja</a>
         </nav>
-        <a className="header-cta" href="#catalog-start">Cari produk</a>
+
+        <a className="header-cta" href="#catalog-start">Mulai top up</a>
       </header>
 
-      <section className="hero shell home-v2-hero" id="top">
-        <div className="hero-copy">
-          <span className="eyebrow">Top up digital, lebih cepat</span>
-          <h1>Nambah.<br /><em>Lanjut main.</em></h1>
+      <section className="hero shell home-v2-hero home-market-hero" id="top">
+        <div className="hero-copy home-market-copy">
+          <span className="eyebrow">Top up digital · 24/7</span>
+          <h1>Top up cepat.<br /><em>Lanjut main.</em></h1>
           <p>
-            Game, pulsa, e-wallet, voucher, dan kebutuhan digital dalam satu tempat. Pilih produk, bayar, lalu lanjut.
+            Pilih game atau kebutuhan digitalmu, bayar dengan cara yang simpel, lalu pantau prosesnya dengan jelas.
           </p>
           <div className="hero-actions">
-            <a className="primary-button" href="#catalog-start">Cari produk <span>↓</span></a>
+            <a className="primary-button" href="#catalog-start">Top up sekarang <span>↓</span></a>
             <a className="text-link" href="#how-it-works">Cara kerja</a>
           </div>
         </div>
 
-        <aside className="home-v2-hero-card" aria-label="Ringkasan layanan Nambah">
-          <span className="home-v2-hero-card-kicker">Nambah</span>
-          <strong>Top up tanpa muter-muter.</strong>
-          <p>Produk digital yang kamu butuhkan, dalam flow yang singkat dan jelas.</p>
-          <div className="home-v2-hero-card-tags">
-            <span>Game</span>
-            <span>Pulsa</span>
-            <span>E-Wallet</span>
-            <span>Voucher</span>
+        <aside className="home-market-board" aria-label="Layanan Nambah">
+          <div className="home-market-board-head">
+            <span className="home-market-board-mark">N+</span>
+            <span className="home-market-live"><i /> ONLINE</span>
           </div>
-          <div className="home-v2-hero-card-meta">
-            <span>QRIS</span>
-            <span>24/7</span>
-            <span>Tracked</span>
+          <div className="home-market-board-copy">
+            <small>SEMUA DALAM SATU FLOW</small>
+            <strong>Pilih.<br />Bayar.<br /><em>Beres.</em></strong>
+          </div>
+          <div className="home-market-board-meta">
+            <span><b>QRIS</b><small>Pembayaran simpel</small></span>
+            <span><b>24/7</b><small>Katalog selalu siap</small></span>
+            <span><b>TRACKED</b><small>Status lebih jelas</small></span>
           </div>
         </aside>
+      </section>
+
+      <section className="shell home-trust-strip" aria-label="Keunggulan layanan">
+        <article>
+          <span>01</span>
+          <div><strong>Proses cepat</strong><small>Flow top up dibuat sesingkat mungkin.</small></div>
+        </article>
+        <article>
+          <span>02</span>
+          <div><strong>Tersedia 24/7</strong><small>Pilih produk kapan pun kamu butuh.</small></div>
+        </article>
+        <article>
+          <span>03</span>
+          <div><strong>Pembayaran aman</strong><small>Harga divalidasi sebelum checkout.</small></div>
+        </article>
+        <article>
+          <span>04</span>
+          <div><strong>Status terlacak</strong><small>Proses transaksi tetap transparan.</small></div>
+        </article>
       </section>
 
       <div className="shell">
@@ -58,7 +78,7 @@ export default async function Home() {
         />
       </div>
 
-      <section className="how-section shell" id="how-it-works">
+      <section className="how-section shell home-how-section" id="how-it-works">
         <div className="section-heading compact">
           <div>
             <span className="eyebrow">Cara kerja</span>
@@ -74,22 +94,22 @@ export default async function Home() {
           <article>
             <span>02</span>
             <h3>Isi data</h3>
-            <p>Masukkan data tujuan dan pilih nominal yang tersedia.</p>
+            <p>Masukkan data tujuan lalu pilih nominal yang tersedia.</p>
           </article>
           <article>
             <span>03</span>
             <h3>Bayar & beres</h3>
-            <p>Pembayaran terkonfirmasi, transaksi diproses otomatis.</p>
+            <p>Pembayaran terkonfirmasi lalu transaksi diproses secara otomatis.</p>
           </article>
         </div>
       </section>
 
-      <footer className="site-footer shell">
+      <footer className="site-footer shell home-market-footer">
         <a className="brand" href="#top">
           <span className="brand-mark">N+</span>
           <span>Nambah</span>
         </a>
-        <p>Top up cepat. Main lagi.</p>
+        <p>Top up cepat. Lanjut main.</p>
         <span>© 2026 Nambah.</span>
       </footer>
     </main>

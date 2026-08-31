@@ -23,6 +23,7 @@ type CatalogCategory = {
   description: string;
   order: number;
   count: number;
+  mark: string;
 };
 
 type CategorizedTopupExperienceProps = {
@@ -39,36 +40,43 @@ const CATEGORY_META: Record<
     label: "Games",
     description: "Top up game dan currency in-game",
     order: 0,
+    mark: "G",
   },
   "pulsa-data": {
     label: "Pulsa & Data",
     description: "Pulsa, paket data, masa aktif, dan produk operator",
     order: 10,
+    mark: "P",
   },
   "e-wallet": {
     label: "E-Wallet",
     description: "Saldo dan voucher dompet digital",
     order: 20,
+    mark: "E",
   },
   pln: {
     label: "PLN",
     description: "Token dan kebutuhan listrik prabayar",
     order: 30,
+    mark: "PLN",
   },
   langganan: {
     label: "Langganan",
     description: "Streaming, software, dan layanan berlangganan",
     order: 40,
+    mark: "L",
   },
   voucher: {
     label: "Voucher",
     description: "Gift card, wallet, dan voucher digital",
     order: 50,
+    mark: "V",
   },
   digital: {
     label: "Produk Digital",
     description: "Produk digital lainnya yang tersedia",
     order: 90,
+    mark: "+",
   },
 };
 
@@ -173,7 +181,7 @@ export default function CategorizedTopupExperience({
           (left, right) =>
             right.score - left.score || left.game.name.localeCompare(right.game.name, "id"),
         )
-        .slice(0, 8)
+        .slice(0, 10)
         .map((item) => item.game),
     [games],
   );
@@ -211,8 +219,9 @@ export default function CategorizedTopupExperience({
       <section className="home-search-section" id="catalog-start">
         <div className="home-search-heading">
           <div>
-            <span className="eyebrow">Cari produk</span>
-            <strong>Apa yang mau kamu nambah?</strong>
+            <span className="eyebrow">Top Up</span>
+            <strong>Cari produk favoritmu.</strong>
+            <small>Game, pulsa, e-wallet, voucher, dan kebutuhan digital lain.</small>
           </div>
           <span>{games.length} produk tersedia</span>
         </div>
@@ -222,7 +231,7 @@ export default function CategorizedTopupExperience({
           <input
             aria-label="Cari produk"
             type="search"
-            placeholder="Cari game, pulsa, e-wallet, voucher..."
+            placeholder="Cari Mobile Legends, AXIS, DANA, Steam..."
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -238,18 +247,18 @@ export default function CategorizedTopupExperience({
       </section>
 
       {!normalizedQuery && popularGames.length > 0 && (
-        <section className="home-popular-section" aria-labelledby="popular-title">
-          <div className="home-section-heading">
+        <section className="home-popular-section" id="popular" aria-labelledby="popular-title">
+          <div className="home-section-heading home-popular-heading">
             <div>
               <span className="eyebrow">Pilihan cepat</span>
-              <strong id="popular-title">Populer</strong>
-              <small>Paling sering dipilih.</small>
+              <strong id="popular-title">Populer sekarang</strong>
+              <small>Produk yang sedang paling banyak dipilih.</small>
             </div>
             <span>{popularGames.length} produk</span>
           </div>
 
           <div className="home-popular-track">
-            {popularGames.map((game) => {
+            {popularGames.map((game, index) => {
               const category = CATEGORY_META[getCatalogCategoryId(game)];
               return (
                 <button
@@ -258,6 +267,7 @@ export default function CategorizedTopupExperience({
                   type="button"
                   onClick={() => selectPopular(game)}
                 >
+                  <span className="home-popular-rank">{String(index + 1).padStart(2, "0")}</span>
                   <span className="home-popular-icon app-artwork" style={{ background: game.accent }}>
                     {game.initials}
                   </span>
@@ -277,14 +287,14 @@ export default function CategorizedTopupExperience({
         <section className="catalog-category-nav" aria-label="Kategori produk">
           <div className="home-section-heading catalog-category-header-v2">
             <div>
-              <span className="eyebrow">Jelajahi</span>
-              <strong>Kategori</strong>
-              <small>{selectedCategory.description}</small>
+              <span className="eyebrow">Kategori</span>
+              <strong>Jelajahi produk</strong>
+              <small>Pilih kategori untuk mempersempit katalog.</small>
             </div>
             <span>{categories.length} kategori</span>
           </div>
 
-          <div className="catalog-category-tabs" role="tablist" aria-label="Pilih kategori produk">
+          <div className="catalog-category-tabs home-category-grid" role="tablist" aria-label="Pilih kategori produk">
             {categories.map((category) => (
               <button
                 className={selectedCategoryId === category.id ? "active" : ""}
@@ -294,7 +304,11 @@ export default function CategorizedTopupExperience({
                 aria-selected={selectedCategoryId === category.id}
                 onClick={() => selectCategory(category.id)}
               >
-                <span>{category.label}</span>
+                <span className="home-category-mark">{category.mark}</span>
+                <span className="home-category-copy">
+                  <strong>{category.label}</strong>
+                  <small>{category.description}</small>
+                </span>
                 <b>{category.count}</b>
               </button>
             ))}
@@ -304,7 +318,7 @@ export default function CategorizedTopupExperience({
 
       <section className="home-catalog-results-heading" aria-live="polite">
         <div>
-          <span className="eyebrow">Produk</span>
+          <span className="eyebrow">Katalog</span>
           <strong>{normalizedQuery ? "Hasil pencarian" : selectedCategory.label}</strong>
           <small>
             {normalizedQuery
