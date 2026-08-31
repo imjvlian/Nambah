@@ -3,6 +3,7 @@ import {
   paymentMethods,
   type PaymentMethod,
 } from "@/lib/catalog";
+import { isFlowTestMode } from "@/lib/flow-test";
 import {
   findPromotion,
   type Promotion,
@@ -236,7 +237,18 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
       return { ok: false, status: 400, error: "Produk atau metode pembayaran tidak valid." };
     }
 
-    if (!supplierProduct) {
+    const flowTestSupplierPackage =
+      !supplierProduct && isFlowTestMode()
+        ? attachSupplierCost({
+            id: product.id,
+            label: product.label,
+            ...(product.note ? { note: product.note } : {}),
+            sellingPrice: Number(product.selling_price),
+            referencePrice: Number(product.reference_price),
+          })
+        : null;
+
+    if (!supplierProduct && !flowTestSupplierPackage) {
       return { ok: false, status: 503, error: "Harga supplier untuk produk ini belum tersedia." };
     }
 
@@ -302,7 +314,9 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
           ...(product.note ? { note: product.note } : {}),
           sellingPrice: Number(product.selling_price),
           referencePrice: Number(product.reference_price),
-          supplierCost: Number(supplierProduct.supplier_cost),
+          supplierCost: supplierProduct
+            ? Number(supplierProduct.supplier_cost)
+            : flowTestSupplierPackage!.supplierCost,
         },
         paymentMethod: {
           id: payment.id,
