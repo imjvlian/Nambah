@@ -8,6 +8,7 @@ import "./admin-source-of-truth.css";
 import "./midtrans.css";
 import "./admin-digiflazz.css";
 import "./admin-digiflazz-v2.css";
+import "./admin-publish-checkbox.css";
 import "./admin-supplier-link.css";
 
 export const metadata: Metadata = {
