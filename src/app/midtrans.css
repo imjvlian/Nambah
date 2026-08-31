@@ -1,0 +1,110 @@
+.midtrans-native-section {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #0d0f0c;
+}
+
+.midtrans-native-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.midtrans-native-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.midtrans-native-head small,
+.midtrans-native-footer,
+.midtrans-native-loading,
+.midtrans-native-warning {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.midtrans-native-head strong {
+  font-size: 13px;
+}
+
+.midtrans-native-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.midtrans-native-head > span {
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(201, 255, 63, 0.07);
+  color: var(--lime);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+}
+
+.midtrans-native-loading,
+.midtrans-native-warning {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.midtrans-native-warning {
+  color: #e4bf82;
+}
+
+.midtrans-snap-container {
+  width: 100%;
+  min-height: 620px;
+  background: #fff;
+}
+
+.midtrans-snap-container:empty {
+  min-height: 160px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
+    #11130f;
+}
+
+.midtrans-snap-container iframe {
+  display: block;
+  width: 100% !important;
+  min-height: 620px !important;
+  border: 0 !important;
+}
+
+.midtrans-native-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.midtrans-native-footer button {
+  border: 0;
+  background: transparent;
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .midtrans-native-head,
+  .midtrans-native-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .midtrans-snap-container,
+  .midtrans-snap-container iframe {
+    min-height: 700px !important;
+  }
+}

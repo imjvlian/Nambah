@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicOrder } from "@/lib/order-public";
 import {
   previewOrderStorageKey,
@@ -11,22 +11,29 @@ import {
 } from "@/lib/order-preview";
 import { formatIDR } from "@/lib/pricing";
 
+type SnapCallbacks = {
+  onSuccess?: (result: unknown) => void;
+  onPending?: (result: unknown) => void;
+  onError?: (result: unknown) => void;
+  onClose?: () => void;
+  language?: "id" | "en";
+};
+
 declare global {
   interface Window {
     snap?: {
-      pay: (
+      pay: (token: string, options: SnapCallbacks) => void;
+      embed: (
         token: string,
-        options: {
-          onSuccess?: (result: unknown) => void;
-          onPending?: (result: unknown) => void;
-          onError?: (result: unknown) => void;
-          onClose?: () => void;
-          language?: "id" | "en";
-        },
+        options: SnapCallbacks & { embedId: string },
       ) => void;
+      show?: () => void;
+      hide?: () => void;
     };
   }
 }
+
+const SNAP_EMBED_ID = "midtrans-snap-container";
 
 function formatOrderTime(value: string) {
   const date = new Date(value);
@@ -71,6 +78,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [snapReady, setSnapReady] = useState(false);
+  const embeddedOrderRef = useRef<string | null>(null);
   const midtransClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
 
   async function loadLiveOrder(id: string) {
@@ -81,6 +89,51 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     if (!response.ok) return null;
     const data = (await response.json()) as { order?: PublicOrder };
     return data.order ?? null;
+  }
+
+  async function refreshStatus(id: string) {
+    setBusy(true);
+    setNotice("Memeriksa status langsung ke Midtrans...");
+
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(id)}/refresh`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as { error?: string; order?: PublicOrder };
+
+      if (!response.ok || !data.order) {
+        setNotice(data.error ?? "Status Midtrans belum dapat diperbarui.");
+        return;
+      }
+
+      setOrder(data.order);
+      setNotice(`Status diperbarui: ${statusLabel(data.order.status)}.`);
+    } catch {
+      setNotice("Tidak dapat memeriksa status pembayaran.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function snapCallbacks(id: string): SnapCallbacks {
+    return {
+      language: "id",
+      onSuccess: () => {
+        setNotice("Pembayaran selesai. Nambah sedang memverifikasi ke Midtrans...");
+        void refreshStatus(id);
+      },
+      onPending: () => {
+        setNotice("Pembayaran masih pending. Nambah sedang memverifikasi status...");
+        void refreshStatus(id);
+      },
+      onError: () => {
+        setNotice("Percobaan pembayaran gagal. Status akan diperiksa ulang.");
+        void refreshStatus(id);
+      },
+      onClose: () => {
+        setNotice("Panel pembayaran ditutup. Order masih dapat dibayar selama belum kedaluwarsa.");
+      },
+    };
   }
 
   useEffect(() => {
@@ -97,7 +150,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           return;
         }
       } catch {
-        // Fall back to a browser preview below.
+        // Backward-compatible local preview fallback.
       }
 
       try {
@@ -147,13 +200,43 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }, 4_000);
 
     return () => window.clearInterval(timer);
-  }, [order]);
+  }, [order?.id, order?.status]);
+
+  useEffect(() => {
+    if (
+      !order ||
+      order.status !== "pending_payment" ||
+      !snapReady ||
+      !window.snap ||
+      !order.payment.snapToken ||
+      embeddedOrderRef.current === order.id
+    ) {
+      return;
+    }
+
+    const container = document.getElementById(SNAP_EMBED_ID);
+    if (!container) return;
+
+    embeddedOrderRef.current = order.id;
+    container.innerHTML = "";
+
+    try {
+      window.snap.embed(order.payment.snapToken, {
+        embedId: SNAP_EMBED_ID,
+        ...snapCallbacks(order.id),
+      });
+      setNotice("Pembayaran Midtrans dimuat langsung di halaman Nambah.");
+    } catch {
+      embeddedOrderRef.current = null;
+      setNotice("Embedded Midtrans belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
+    }
+  }, [order?.id, order?.status, order?.payment.snapToken, snapReady]);
 
   const timeline = useMemo(
     () => [
       {
         title: "Menunggu pembayaran",
-        description: "Order terbentuk dan menunggu pembayaran melalui Midtrans Sandbox.",
+        description: "Pembayaran Midtrans tampil langsung di halaman Nambah.",
       },
       {
         title: "Pembayaran berhasil",
@@ -201,7 +284,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       setPreview(null);
       setOrder(data.order);
       router.replace(`/order/${encodeURIComponent(data.order.id)}`);
-      setNotice("Order Sandbox dibuat. Klik Bayar sekarang untuk membuka Midtrans.");
+      setNotice("Order Sandbox dibuat. Pembayaran akan dimuat di halaman ini.");
     } catch {
       setNotice("Tidak dapat menghubungi server pembayaran.");
     } finally {
@@ -209,62 +292,12 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
   }
 
-  async function refreshStatus(id: string) {
-    setBusy(true);
-    setNotice("Memeriksa status langsung ke Midtrans...");
-
-    try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(id)}/refresh`, {
-        method: "POST",
-      });
-      const data = (await response.json()) as { error?: string; order?: PublicOrder };
-
-      if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Status Midtrans belum dapat diperbarui.");
-        return;
-      }
-
-      setOrder(data.order);
-      setNotice(`Status diperbarui: ${statusLabel(data.order.status)}.`);
-    } catch {
-      setNotice("Tidak dapat memeriksa status pembayaran.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function startPayment() {
-    if (!order || order.status !== "pending_payment") return;
-    setNotice("");
-
-    if (snapReady && window.snap && order.payment.snapToken) {
-      window.snap.pay(order.payment.snapToken, {
-        language: "id",
-        onSuccess: () => {
-          setNotice("Pembayaran selesai. Memverifikasi ke Midtrans...");
-          void refreshStatus(order.id);
-        },
-        onPending: () => {
-          setNotice("Pembayaran masih pending. Memverifikasi status...");
-          void refreshStatus(order.id);
-        },
-        onError: () => {
-          setNotice("Percobaan pembayaran gagal. Kamu masih bisa mencoba kembali.");
-          void refreshStatus(order.id);
-        },
-        onClose: () => {
-          setNotice("Jendela pembayaran ditutup. Order masih dapat dibayar selama Snap belum kedaluwarsa.");
-        },
-      });
+  function openFallbackPayment() {
+    if (order?.payment.redirectUrl) {
+      window.open(order.payment.redirectUrl, "_blank", "noopener,noreferrer");
       return;
     }
-
-    if (order.payment.redirectUrl) {
-      window.location.assign(order.payment.redirectUrl);
-      return;
-    }
-
-    setNotice("Snap Midtrans belum siap. Coba muat ulang halaman.");
+    setNotice("URL pembayaran cadangan belum tersedia.");
   }
 
   if (preview === undefined || order === undefined) {
@@ -316,7 +349,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const displayId = preview?.id ?? order!.id;
   const liveStatus = order?.status ?? "pending_payment";
   const reachedIndex = isPreview ? 0 : timelineIndex(liveStatus);
-  const paymentActionEnabled = isPreview || liveStatus === "pending_payment";
 
   return (
     <main>
@@ -342,16 +374,16 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <section className="order-status-shell shell">
         <div className="order-status-title">
           <div>
-            <span className="eyebrow">{isPreview ? "Checkout preview" : "Midtrans Sandbox"}</span>
+            <span className="eyebrow">{isPreview ? "Checkout preview" : "Midtrans Embedded"}</span>
             <h1>{isPreview ? "Siap membuat pembayaran." : statusLabel(liveStatus)}</h1>
             <p>
               {isPreview
-                ? "Harga akan divalidasi ulang di server sebelum order dan Snap token dibuat."
-                : "Status pembayaran berasal dari webhook Midtrans atau Get Status API, bukan callback browser."}
+                ? "Harga akan divalidasi ulang di server sebelum order dan token pembayaran dibuat."
+                : "Pembayaran berjalan di dalam website Nambah. Status tetap diverifikasi oleh backend melalui Midtrans."}
             </p>
           </div>
           <span className="order-mode-badge">
-            {isPreview ? "PREVIEW" : "SANDBOX · NO REAL CHARGE"}
+            {isPreview ? "PREVIEW" : "SANDBOX · EMBEDDED"}
           </span>
         </div>
 
@@ -400,44 +432,56 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               ))}
             </div>
 
-            <div className="order-payment-preview">
-              <div>
-                <small>Metode pembayaran</small>
-                <strong>{payment.name}</strong>
-                <p>{payment.detail}</p>
+            {isPreview ? (
+              <div className="order-payment-preview">
+                <div>
+                  <small>Metode pembayaran</small>
+                  <strong>{payment.name}</strong>
+                  <p>{payment.detail}</p>
+                </div>
+                <button type="button" disabled={busy} onClick={() => void createSandboxOrder()}>
+                  {busy ? "Memproses..." : "Buat pembayaran Sandbox"}
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={busy || !paymentActionEnabled}
-                onClick={() => {
-                  if (isPreview) void createSandboxOrder();
-                  else startPayment();
-                }}
-                style={
-                  paymentActionEnabled && !busy
-                    ? {
-                        cursor: "pointer",
-                        background: "var(--lime)",
-                        color: "#111",
-                        borderColor: "transparent",
-                      }
-                    : undefined
-                }
-              >
-                {busy
-                  ? "Memproses..."
-                  : isPreview
-                    ? "Buat pembayaran Sandbox"
-                    : liveStatus === "pending_payment"
-                      ? "Bayar sekarang"
-                      : statusLabel(liveStatus)}
-              </button>
-            </div>
+            ) : order!.status === "pending_payment" ? (
+              <div className="midtrans-native-section">
+                <div className="midtrans-native-head">
+                  <div>
+                    <small>Pembayaran</small>
+                    <strong>{payment.name}</strong>
+                    <p>{payment.detail}</p>
+                  </div>
+                  <span>Midtrans Sandbox</span>
+                </div>
 
-            {order && order.status === "pending_payment" && (
-              <p className="order-preview-note">
-                Snap akan terbuka di halaman ini jika Client Key tersedia. Jika tidak, Nambah memakai redirect URL Sandbox. Setelah membayar, status diverifikasi ulang dari backend.
-              </p>
+                {!midtransClientKey && (
+                  <div className="midtrans-native-warning">
+                    NEXT_PUBLIC_MIDTRANS_CLIENT_KEY belum tersedia. Embedded checkout tidak dapat dimuat.
+                  </div>
+                )}
+
+                {midtransClientKey && !snapReady && (
+                  <div className="midtrans-native-loading">Memuat pembayaran Midtrans...</div>
+                )}
+
+                <div id={SNAP_EMBED_ID} className="midtrans-snap-container" />
+
+                <div className="midtrans-native-footer">
+                  <span>Pembayaran tetap diverifikasi server-side.</span>
+                  {(!midtransClientKey || !snapReady) && order!.payment.redirectUrl && (
+                    <button type="button" onClick={openFallbackPayment}>Buka pembayaran cadangan</button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="order-payment-preview">
+                <div>
+                  <small>Metode pembayaran</small>
+                  <strong>{payment.name}</strong>
+                  <p>{payment.detail}</p>
+                </div>
+                <button type="button" disabled>{statusLabel(liveStatus)}</button>
+              </div>
             )}
 
             {notice && <p className="order-preview-note">{notice}</p>}
@@ -450,65 +494,20 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </div>
 
             <dl className="order-detail-list">
-              <div>
-                <dt>Produk</dt>
-                <dd>{product.gameName}</dd>
-              </div>
-              <div>
-                <dt>Nominal</dt>
-                <dd>{product.packageLabel}</dd>
-              </div>
-              <div>
-                <dt>User ID</dt>
-                <dd>{account.userId}</dd>
-              </div>
-              {account.serverId && (
-                <div>
-                  <dt>Server / Zone</dt>
-                  <dd>{account.serverId}</dd>
-                </div>
-              )}
-              {promoCode && (
-                <div>
-                  <dt>Promo</dt>
-                  <dd>{promoCode}</dd>
-                </div>
-              )}
-              {referralCode && (
-                <div>
-                  <dt>Referral</dt>
-                  <dd>{referralCode}</dd>
-                </div>
-              )}
-              {order?.payment.paymentType && (
-                <div>
-                  <dt>Channel Midtrans</dt>
-                  <dd>{order.payment.paymentType}</dd>
-                </div>
-              )}
+              <div><dt>Produk</dt><dd>{product.gameName}</dd></div>
+              <div><dt>Nominal</dt><dd>{product.packageLabel}</dd></div>
+              <div><dt>User ID</dt><dd>{account.userId}</dd></div>
+              {account.serverId && <div><dt>Server / Zone</dt><dd>{account.serverId}</dd></div>}
+              {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
+              {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
+              {order?.payment.paymentType && <div><dt>Channel Midtrans</dt><dd>{order.payment.paymentType}</dd></div>}
             </dl>
 
             <div className="order-price-breakdown">
-              <div>
-                <span>Harga Nambah</span>
-                <strong>{formatIDR(pricing.sellingPrice)}</strong>
-              </div>
-              {pricing.promotionDiscount > 0 && (
-                <div className="saving">
-                  <span>Promo</span>
-                  <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
-                </div>
-              )}
-              {pricing.referralDiscount > 0 && (
-                <div className="referral-saving">
-                  <span>Benefit referral</span>
-                  <strong>-{formatIDR(pricing.referralDiscount)}</strong>
-                </div>
-              )}
-              <div>
-                <span>Biaya pembayaran</span>
-                <strong>{formatIDR(pricing.customerPaymentFee)}</strong>
-              </div>
+              <div><span>Harga Nambah</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
+              {pricing.promotionDiscount > 0 && <div className="saving"><span>Promo</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>}
+              {pricing.referralDiscount > 0 && <div className="referral-saving"><span>Benefit referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>}
+              <div><span>Biaya pembayaran</span><strong>{formatIDR(pricing.customerPaymentFee)}</strong></div>
             </div>
 
             <div className="order-grand-total">
@@ -518,12 +517,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
             <div className="order-summary-actions">
               {order && order.status === "pending_payment" && (
-                <button
-                  className="primary-button full"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void refreshStatus(order.id)}
-                >
+                <button className="primary-button full" type="button" disabled={busy} onClick={() => void refreshStatus(order.id)}>
                   Cek status Midtrans <span>↻</span>
                 </button>
               )}
