@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
+const BALANCE_URL = "https://api.digiflazz.com/v1/cek-saldo";
 const PRICE_LIST_URL = "https://api.digiflazz.com/v1/price-list";
 const TRANSACTION_URL = "https://api.digiflazz.com/v1/transaction";
 
@@ -112,6 +113,22 @@ async function postDigiflazz<T>(url: string, body: Record<string, unknown>): Pro
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function getDigiflazzBalance() {
+  const { username, apiKey } = requireApiConfig();
+  const response = await postDigiflazz<{ data?: { deposit?: number | string } }>(BALANCE_URL, {
+    cmd: "deposit",
+    username,
+    sign: md5(`${username}${apiKey}depo`),
+  });
+
+  const balance = Number(response.data?.deposit);
+  if (!Number.isFinite(balance) || balance < 0) {
+    throw new Error("Digiflazz balance response does not contain a valid deposit value.");
+  }
+
+  return balance;
 }
 
 export async function getDigiflazzPrepaidPriceList(filters?: {
