@@ -5,56 +5,49 @@ export default async function Home() {
   const catalog = await getPublicCatalog();
 
   return (
-    <main>
-      <header className="site-header shell">
+    <main className="home-v2">
+      <header className="site-header shell home-v2-header">
         <a className="brand" href="#top">
           <span className="brand-mark">N+</span>
           <span>Nambah</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi utama">
-          <a href="#games">Produk</a>
+          <a href="#catalog-start">Produk</a>
           <a href="#topup">Top Up</a>
           <a href="#how-it-works">Cara Kerja</a>
         </nav>
-        <a className="header-cta" href="#topup">Mulai top up</a>
+        <a className="header-cta" href="#catalog-start">Cari produk</a>
       </header>
 
-      <section className="hero shell" id="top">
+      <section className="hero shell home-v2-hero" id="top">
         <div className="hero-copy">
-          <span className="eyebrow">Top up digital, dibikin simpel</span>
-          <h1>Nambah dikit,<br /><em>lanjut main.</em></h1>
+          <span className="eyebrow">Top up digital, lebih cepat</span>
+          <h1>Nambah.<br /><em>Lanjut main.</em></h1>
           <p>
-            Game, voucher, dan kebutuhan digital dalam satu tempat. Cepat dipilih, jelas dibayar, gampang dilacak.
+            Game, pulsa, e-wallet, voucher, dan kebutuhan digital dalam satu tempat. Pilih produk, bayar, lalu lanjut.
           </p>
           <div className="hero-actions">
-            <a className="primary-button" href="#games">Pilih produk <span>↓</span></a>
-            <a className="text-link" href="#how-it-works">Lihat cara kerja</a>
+            <a className="primary-button" href="#catalog-start">Cari produk <span>↓</span></a>
+            <a className="text-link" href="#how-it-works">Cara kerja</a>
           </div>
         </div>
 
-        <div className="hero-visual" aria-hidden="true">
-          <div className="orb orb-one" />
-          <div className="orb orb-two" />
-          <div className="hero-ticket">
-            <div className="ticket-top">
-              <span>Nambah</span>
-              <span>TOP UP</span>
-            </div>
-            <div className="ticket-main">
-              <small>STATUS</small>
-              <strong>SIAP<br />MAIN.</strong>
-            </div>
-            <div className="ticket-bottom">
-              <span>FAST</span>
-              <span>•</span>
-              <span>SIMPLE</span>
-              <span>•</span>
-              <span>TRACKED</span>
-            </div>
+        <aside className="home-v2-hero-card" aria-label="Ringkasan layanan Nambah">
+          <span className="home-v2-hero-card-kicker">Nambah</span>
+          <strong>Top up tanpa muter-muter.</strong>
+          <p>Produk digital yang kamu butuhkan, dalam flow yang singkat dan jelas.</p>
+          <div className="home-v2-hero-card-tags">
+            <span>Game</span>
+            <span>Pulsa</span>
+            <span>E-Wallet</span>
+            <span>Voucher</span>
           </div>
-          <div className="floating-chip chip-one">QRIS</div>
-          <div className="floating-chip chip-two">24/7</div>
-        </div>
+          <div className="home-v2-hero-card-meta">
+            <span>QRIS</span>
+            <span>24/7</span>
+            <span>Tracked</span>
+          </div>
+        </aside>
       </section>
 
       <div className="shell">

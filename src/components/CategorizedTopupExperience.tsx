@@ -5,6 +5,8 @@ import TopupExperience from "@/components/TopupExperience";
 import type { Game, PaymentMethod } from "@/lib/catalog";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
+type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
 
 type CatalogCategoryId =
   | "games"
@@ -82,6 +84,10 @@ const SUBSCRIPTION_PATTERN =
 const VOUCHER_PATTERN =
   /(voucher|gift\s*card|steam\s*wallet|google\s*play|app\s*store|itunes|playstation|psn\b|xbox|nintendo|wallet\s*code)/i;
 
+function groupsOf(item: Game["packages"][number]) {
+  return ((item as GroupedPackage).groups ?? []) as ProductGroup[];
+}
+
 function searchableGameText(game: Game) {
   return [
     game.name,
@@ -119,6 +125,13 @@ function buildCategories(games: Game[]): CatalogCategory[] {
     .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, "id"));
 }
 
+function popularityScore(game: Game) {
+  return game.packages.reduce(
+    (score, item) => score + (groupsOf(item).includes("populer") ? 1 : 0),
+    0,
+  );
+}
+
 export default function CategorizedTopupExperience({
   games,
   paymentMethods,
@@ -128,6 +141,8 @@ export default function CategorizedTopupExperience({
   const [selectedCategoryId, setSelectedCategoryId] = useState<CatalogCategoryId>(
     categories[0]?.id ?? "games",
   );
+  const [query, setQuery] = useState("");
+  const [focusedGameId, setFocusedGameId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!categories.some((category) => category.id === selectedCategoryId)) {
@@ -137,50 +152,181 @@ export default function CategorizedTopupExperience({
 
   const selectedCategory =
     categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
+
   const categoryGames = useMemo(
     () => games.filter((game) => getCatalogCategoryId(game) === selectedCategoryId),
     [games, selectedCategoryId],
   );
 
-  if (!selectedCategory || categoryGames.length === 0) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return games.filter((game) => searchableGameText(game).toLowerCase().includes(normalizedQuery));
+  }, [games, normalizedQuery]);
+
+  const popularGames = useMemo(
+    () =>
+      games
+        .map((game) => ({ game, score: popularityScore(game) }))
+        .filter((item) => item.score > 0)
+        .sort(
+          (left, right) =>
+            right.score - left.score || left.game.name.localeCompare(right.game.name, "id"),
+        )
+        .slice(0, 8)
+        .map((item) => item.game),
+    [games],
+  );
+
+  const visibleGames = normalizedQuery ? searchResults : categoryGames;
+  const orderedVisibleGames = useMemo(() => {
+    if (!focusedGameId) return visibleGames;
+    const focused = visibleGames.find((game) => game.id === focusedGameId);
+    if (!focused) return visibleGames;
+    return [focused, ...visibleGames.filter((game) => game.id !== focusedGameId)];
+  }, [focusedGameId, visibleGames]);
+
+  function selectCategory(categoryId: CatalogCategoryId) {
+    setSelectedCategoryId(categoryId);
+    setFocusedGameId(undefined);
+  }
+
+  function selectPopular(game: Game) {
+    setQuery("");
+    setSelectedCategoryId(getCatalogCategoryId(game));
+    setFocusedGameId(game.id);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  if (!selectedCategory) {
     return null;
   }
 
   return (
     <>
-      <section className="catalog-category-nav" aria-label="Kategori produk">
-        <div className="catalog-category-header">
+      <section className="home-search-section" id="catalog-start">
+        <div className="home-search-heading">
           <div>
-            <span className="eyebrow">Kategori produk</span>
-            <strong>{selectedCategory.label}</strong>
-            <small>{selectedCategory.description}</small>
+            <span className="eyebrow">Cari produk</span>
+            <strong>Apa yang mau kamu nambah?</strong>
           </div>
-          <span>{categories.length} kategori tersedia</span>
+          <span>{games.length} produk tersedia</span>
         </div>
 
-        <div className="catalog-category-tabs" role="tablist" aria-label="Pilih kategori produk">
-          {categories.map((category) => (
-            <button
-              className={selectedCategoryId === category.id ? "active" : ""}
-              key={category.id}
-              type="button"
-              role="tab"
-              aria-selected={selectedCategoryId === category.id}
-              onClick={() => setSelectedCategoryId(category.id)}
-            >
-              <span>{category.label}</span>
-              <b>{category.count}</b>
+        <label className="home-search-box">
+          <span className="home-search-icon" aria-hidden="true">⌕</span>
+          <input
+            aria-label="Cari produk"
+            type="search"
+            placeholder="Cari game, pulsa, e-wallet, voucher..."
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setFocusedGameId(undefined);
+            }}
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery("")} aria-label="Hapus pencarian">
+              ×
             </button>
-          ))}
-        </div>
+          )}
+        </label>
       </section>
 
-      <TopupExperience
-        key={selectedCategoryId}
-        games={categoryGames}
-        paymentMethods={paymentMethods}
-        catalogSource={catalogSource}
-      />
+      {!normalizedQuery && popularGames.length > 0 && (
+        <section className="home-popular-section" aria-labelledby="popular-title">
+          <div className="home-section-heading">
+            <div>
+              <span className="eyebrow">Pilihan cepat</span>
+              <strong id="popular-title">Populer</strong>
+              <small>Paling sering dipilih.</small>
+            </div>
+            <span>{popularGames.length} produk</span>
+          </div>
+
+          <div className="home-popular-track">
+            {popularGames.map((game) => {
+              const category = CATEGORY_META[getCatalogCategoryId(game)];
+              return (
+                <button
+                  className="home-popular-card"
+                  key={game.id}
+                  type="button"
+                  onClick={() => selectPopular(game)}
+                >
+                  <span className="home-popular-icon app-artwork" style={{ background: game.accent }}>
+                    {game.initials}
+                  </span>
+                  <span className="home-popular-copy">
+                    <strong>{game.name}</strong>
+                    <small>{category.label}</small>
+                  </span>
+                  <span className="home-popular-arrow" aria-hidden="true">↗</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {!normalizedQuery && (
+        <section className="catalog-category-nav" aria-label="Kategori produk">
+          <div className="home-section-heading catalog-category-header-v2">
+            <div>
+              <span className="eyebrow">Jelajahi</span>
+              <strong>Kategori</strong>
+              <small>{selectedCategory.description}</small>
+            </div>
+            <span>{categories.length} kategori</span>
+          </div>
+
+          <div className="catalog-category-tabs" role="tablist" aria-label="Pilih kategori produk">
+            {categories.map((category) => (
+              <button
+                className={selectedCategoryId === category.id ? "active" : ""}
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategoryId === category.id}
+                onClick={() => selectCategory(category.id)}
+              >
+                <span>{category.label}</span>
+                <b>{category.count}</b>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="home-catalog-results-heading" aria-live="polite">
+        <div>
+          <span className="eyebrow">Produk</span>
+          <strong>{normalizedQuery ? "Hasil pencarian" : selectedCategory.label}</strong>
+          <small>
+            {normalizedQuery
+              ? `Hasil untuk “${query.trim()}”`
+              : selectedCategory.description}
+          </small>
+        </div>
+        <span>{orderedVisibleGames.length} produk</span>
+      </section>
+
+      {orderedVisibleGames.length > 0 ? (
+        <TopupExperience
+          key={`${normalizedQuery ? "search" : selectedCategoryId}:${focusedGameId ?? "default"}`}
+          games={orderedVisibleGames}
+          paymentMethods={paymentMethods}
+          catalogSource={catalogSource}
+        />
+      ) : (
+        <div className="empty-state home-search-empty">
+          Tidak ada produk yang cocok. Coba nama game, operator, e-wallet, atau voucher lain.
+        </div>
+      )}
     </>
   );
 }
