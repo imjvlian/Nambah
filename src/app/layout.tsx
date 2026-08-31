@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./pricing.css";
 import "./order.css";
-import "./midtrans.css";
 import "./admin.css";
+import "./midtrans.css";
+import "./admin-digiflazz.css";
+import "./admin-supplier-link.css";
 
 export const metadata: Metadata = {
   title: "Nambah — Top Up Cepat, Main Lagi",

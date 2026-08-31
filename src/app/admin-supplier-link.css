@@ -1,0 +1,14 @@
+.supplier-catalog-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 50;
+  padding: 10px 13px;
+  border: 1px solid rgba(201, 255, 63, 0.3);
+  border-radius: 999px;
+  background: #171a15;
+  color: var(--lime);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  font-size: 9px;
+  font-weight: 850;
+}

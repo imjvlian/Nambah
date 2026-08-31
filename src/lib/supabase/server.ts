@@ -5,6 +5,11 @@ type SupabaseSelectOptions = {
   limit?: number;
 };
 
+type SupabaseSelectPageOptions = SupabaseSelectOptions & {
+  offset?: number;
+  query?: Record<string, string>;
+};
+
 type SupabaseMutationOptions = {
   filters?: Record<string, string>;
   prefer?: string;
@@ -51,6 +56,12 @@ function applyFilters(query: URLSearchParams, filters?: Record<string, string>) 
   }
 }
 
+function applyRawQuery(query: URLSearchParams, values?: Record<string, string>) {
+  for (const [key, value] of Object.entries(values ?? {})) {
+    query.set(key, value);
+  }
+}
+
 export function isSupabaseConfigured() {
   const { url, secretKey } = getSupabaseConfig();
   return Boolean(url && secretKey);
@@ -81,6 +92,42 @@ export async function supabaseSelect<T>(
   }
 
   return (await response.json()) as T[];
+}
+
+export async function supabaseSelectPage<T>(
+  table: string,
+  options: SupabaseSelectPageOptions,
+): Promise<{ data: T[]; count: number | null }> {
+  const { url, secretKey } = requireSupabaseConfig();
+
+  const query = new URLSearchParams();
+  query.set("select", options.select);
+  applyFilters(query, options.filters);
+  applyRawQuery(query, options.query);
+
+  if (options.order) query.set("order", options.order);
+  if (options.limit !== undefined) query.set("limit", String(options.limit));
+  if (options.offset !== undefined) query.set("offset", String(options.offset));
+
+  const response = await fetch(`${url}/rest/v1/${table}?${query.toString()}`, {
+    method: "GET",
+    headers: createHeaders(secretKey, "count=exact"),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase ${table} paged query failed (${response.status}): ${body}`);
+  }
+
+  const contentRange = response.headers.get("content-range") ?? "";
+  const totalPart = contentRange.split("/")[1] ?? "";
+  const parsedCount = Number(totalPart);
+
+  return {
+    data: (await response.json()) as T[],
+    count: Number.isFinite(parsedCount) ? parsedCount : null,
+  };
 }
 
 export async function supabaseInsert<T>(
