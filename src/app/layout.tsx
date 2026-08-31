@@ -5,6 +5,7 @@ import "./home-v2.css";
 import "./product-v2.css";
 import "./pricing.css";
 import "./product-checkout-v2.css";
+import "./product-grouped-nominals.css";
 import "./order.css";
 import "./admin.css";
 import "./admin-automation.css";
