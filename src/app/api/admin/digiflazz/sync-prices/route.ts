@@ -159,7 +159,6 @@ export async function POST(request: Request) {
                 supplier_id: "eq.digiflazz",
                 product_id: `eq.${result.productId}`,
               },
-              prefer: "return=minimal",
             },
           ),
         ),
