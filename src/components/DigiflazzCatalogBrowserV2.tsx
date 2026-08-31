@@ -59,6 +59,31 @@ type SupplierCatalogPayload = {
   filterOptions?: FilterOptions;
 };
 
+type BatchPublicationResult = {
+  supplierSku: string;
+  ok: boolean;
+  error?: string;
+  publication?: {
+    supplierSku: string;
+    productId: string | null;
+    published: boolean;
+    created: boolean;
+  };
+};
+
+type BatchPublicationPayload = {
+  error?: string;
+  summary?: {
+    requested: number;
+    succeeded: number;
+    failed: number;
+    published: number;
+    hidden: number;
+    created: number;
+  };
+  results?: BatchPublicationResult[];
+};
+
 const DEFAULT_FILTERS: CatalogFilters = {
   category: "all",
   brand: "all",
@@ -77,6 +102,8 @@ const EMPTY_OPTIONS: FilterOptions = {
   sellers: [],
 };
 
+const SAVE_BATCH_SIZE = 25;
+
 function formatTime(value: string | null) {
   if (!value) return "Belum pernah";
   const date = new Date(value);
@@ -88,7 +115,19 @@ function formatTime(value: string | null) {
 }
 
 function iconUrl(name: string) {
-  return `/api/icons/game?name=${encodeURIComponent(name || "Produk Digital")}`;
+  return `/api/icons/game?v=store-1&name=${encodeURIComponent(name || "Produk Digital")}`;
+}
+
+function isPublished(item: SupplierItem) {
+  return Boolean(item.mapping?.published);
+}
+
+function chunk<T>(items: T[], size: number) {
+  const groups: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    groups.push(items.slice(index, index + size));
+  }
+  return groups;
 }
 
 export default function DigiflazzCatalogBrowserV2() {
@@ -103,6 +142,7 @@ export default function DigiflazzCatalogBrowserV2() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [publicationDrafts, setPublicationDrafts] = useState<Record<string, boolean>>({});
 
   async function load(
     nextPage = page,
@@ -140,6 +180,18 @@ export default function DigiflazzCatalogBrowserV2() {
       setPayload(data);
       if (data.filterOptions) setFilterOptions(data.filterOptions);
       setPage(data.page);
+      setPublicationDrafts((current) => {
+        const next = { ...current };
+        for (const item of data.items) {
+          if (
+            Object.prototype.hasOwnProperty.call(next, item.sku) &&
+            next[item.sku] === isPublished(item)
+          ) {
+            delete next[item.sku];
+          }
+        }
+        return next;
+      });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Katalog Digiflazz gagal dimuat.");
     } finally {
@@ -177,6 +229,11 @@ export default function DigiflazzCatalogBrowserV2() {
   }
 
   async function scanCatalog() {
+    if (Object.keys(publicationDrafts).length > 0) {
+      setNotice("Simpan atau batalkan perubahan checkbox sebelum scan ulang Digiflazz.");
+      return;
+    }
+
     setBusy("scan");
     setNotice("");
     try {
@@ -194,7 +251,7 @@ export default function DigiflazzCatalogBrowserV2() {
       setPage(1);
       await load(1, query, filters, true);
       setNotice(
-        `Scan selesai. ${data.summary?.supplierCatalogItems ?? 0} SKU prepaid diterima dari Digiflazz.`,
+        `Scan selesai. ${data.summary?.supplierCatalogItems ?? 0} SKU prepaid diterima dari Digiflazz. Centang produk lalu simpan sekali.`,
       );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Scan Digiflazz gagal.");
@@ -203,46 +260,108 @@ export default function DigiflazzCatalogBrowserV2() {
     }
   }
 
-  async function togglePublished(item: SupplierItem) {
-    const ready = item.buyerActive && item.sellerActive;
-    const nextPublished = !Boolean(item.mapping?.published);
+  function draftPublished(item: SupplierItem) {
+    return publicationDrafts[item.sku] ?? isPublished(item);
+  }
 
-    if (nextPublished && !ready) {
+  function setPublicationDraft(item: SupplierItem, nextPublished: boolean) {
+    const saved = isPublished(item);
+    const ready = item.buyerActive && item.sellerActive;
+
+    if (nextPublished && !ready && !saved) {
       setNotice(`${item.sku} sedang tidak aktif di supplier dan tidak bisa ditampilkan.`);
       return;
     }
 
-    setBusy(`publish:${item.sku}`);
+    setPublicationDrafts((current) => {
+      const next = { ...current };
+      if (nextPublished === saved) delete next[item.sku];
+      else next[item.sku] = nextPublished;
+      return next;
+    });
+  }
+
+  function setCurrentPagePublished(nextPublished: boolean) {
+    if (!payload) return;
+
+    setPublicationDrafts((current) => {
+      const next = { ...current };
+      for (const item of payload.items) {
+        const saved = isPublished(item);
+        const ready = item.buyerActive && item.sellerActive;
+        if (nextPublished && !ready && !saved) continue;
+
+        if (nextPublished === saved) delete next[item.sku];
+        else next[item.sku] = nextPublished;
+      }
+      return next;
+    });
+  }
+
+  async function savePublicationDrafts() {
+    const pending = Object.entries(publicationDrafts).map(([supplierSku, published]) => ({
+      supplierSku,
+      published,
+    }));
+    if (pending.length === 0) return;
+
+    setBusy("publish-save");
     setNotice("");
 
-    try {
-      const response = await fetch("/api/admin/digiflazz/catalog/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplierSku: item.sku, published: nextPublished }),
-      });
-      const data = (await response.json()) as {
-        error?: string;
-        publication?: {
-          productId?: string | null;
-          published?: boolean;
-          created?: boolean;
-          sellingPrice?: number;
-        };
-      };
+    const succeededSkus = new Set<string>();
+    const failures: Array<{ supplierSku: string; error: string }> = [];
+    let publishedCount = 0;
+    let hiddenCount = 0;
+    let createdCount = 0;
 
-      if (!response.ok || !data.publication) {
-        throw new Error(data.error ?? "Status tampil produk gagal diperbarui.");
+    try {
+      for (const batch of chunk(pending, SAVE_BATCH_SIZE)) {
+        const response = await fetch("/api/admin/digiflazz/catalog/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: batch }),
+        });
+        const data = (await response.json()) as BatchPublicationPayload;
+        if (!response.ok) {
+          throw new Error(data.error ?? "Perubahan tampilan katalog gagal disimpan.");
+        }
+
+        publishedCount += data.summary?.published ?? 0;
+        hiddenCount += data.summary?.hidden ?? 0;
+        createdCount += data.summary?.created ?? 0;
+
+        for (const result of data.results ?? []) {
+          if (result.ok) succeededSkus.add(result.supplierSku);
+          else {
+            failures.push({
+              supplierSku: result.supplierSku,
+              error: result.error ?? "Gagal disimpan.",
+            });
+          }
+        }
       }
 
+      setPublicationDrafts((current) => {
+        const next = { ...current };
+        for (const supplierSku of succeededSkus) delete next[supplierSku];
+        return next;
+      });
+
       await load(page, query, filters, false);
-      setNotice(
-        nextPublished
-          ? `${item.name} sekarang tampil ke user${data.publication.sellingPrice ? ` · ${formatIDR(data.publication.sellingPrice)}` : ""}.`
-          : `${item.name} disembunyikan dari user.`,
-      );
+
+      if (failures.length > 0) {
+        const preview = failures
+          .slice(0, 3)
+          .map((item) => `${item.supplierSku}: ${item.error}`)
+          .join(" · ");
+        setNotice(`${succeededSkus.size} perubahan tersimpan, ${failures.length} gagal. ${preview}`);
+      } else {
+        setNotice(
+          `${succeededSkus.size} perubahan tersimpan. ${publishedCount} ditampilkan, ${hiddenCount} disembunyikan${createdCount ? `, ${createdCount} produk Nambah dibuat baru` : ""}.`,
+        );
+      }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Status tampil produk gagal diperbarui.");
+      setNotice(error instanceof Error ? error.message : "Perubahan tampilan katalog gagal disimpan.");
     } finally {
       setBusy("");
     }
@@ -260,6 +379,13 @@ export default function DigiflazzCatalogBrowserV2() {
       ).length,
     [filters],
   );
+
+  const pendingCount = Object.keys(publicationDrafts).length;
+  const pageEligibleItems = payload?.items.filter(
+    (item) => (item.buyerActive && item.sellerActive) || isPublished(item),
+  ) ?? [];
+  const pageAllChecked =
+    pageEligibleItems.length > 0 && pageEligibleItems.every((item) => draftPublished(item));
 
   if (unauthorized) {
     return (
@@ -287,8 +413,8 @@ export default function DigiflazzCatalogBrowserV2() {
       <section className="supplier-browser-hero clean-hero">
         <div>
           <span className="admin-kicker">Supplier Catalog</span>
-          <h1>Pilih yang memang mau dijual.</h1>
-          <p>Scan katalog Buyer Digiflazz, cek status supplier, lalu tentukan produk yang tampil ke customer.</p>
+          <h1>Centang yang mau dijual.</h1>
+          <p>Scan katalog Buyer Digiflazz, pilih banyak SKU dengan checkbox, lalu simpan seluruh perubahan sekali klik.</p>
         </div>
         <button type="button" onClick={() => void scanCatalog()} disabled={Boolean(busy)}>
           {busy === "scan" ? "Scanning..." : "Scan ulang"}
@@ -299,6 +425,7 @@ export default function DigiflazzCatalogBrowserV2() {
         <div><small>Hasil scan</small><strong>{payload?.scanTotal ?? 0}</strong></div>
         <div><small>Ditampilkan</small><strong>{payload?.publishedCount ?? 0}</strong></div>
         <div><small>Hasil filter</small><strong>{payload?.total ?? 0}</strong></div>
+        <div><small>Belum disimpan</small><strong>{pendingCount}</strong></div>
         <div><small>Terakhir scan</small><strong className="small-value">{formatTime(payload?.latestScanAt ?? null)}</strong></div>
       </section>
 
@@ -313,13 +440,13 @@ export default function DigiflazzCatalogBrowserV2() {
               onChange={(event) => setQueryInput(event.target.value)}
             />
           </div>
-          <button type="submit" disabled={loading}>Cari</button>
+          <button type="submit" disabled={loading || Boolean(busy)}>Cari</button>
         </form>
 
         <div className="catalog-primary-filters">
           <label className="catalog-compact-select wide">
             <span>Brand</span>
-            <select value={filters.brand} onChange={(event) => changeFilter("brand", event.target.value)}>
+            <select value={filters.brand} onChange={(event) => changeFilter("brand", event.target.value)} disabled={Boolean(busy)}>
               <option value="all">Semua brand</option>
               {filterOptions.brands.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
@@ -327,7 +454,7 @@ export default function DigiflazzCatalogBrowserV2() {
 
           <label className="catalog-compact-select">
             <span>Status</span>
-            <select value={filters.availability} onChange={(event) => changeFilter("availability", event.target.value)}>
+            <select value={filters.availability} onChange={(event) => changeFilter("availability", event.target.value)} disabled={Boolean(busy)}>
               <option value="all">Semua</option>
               <option value="ready">Siap dijual</option>
               <option value="buyer-inactive">Buyer off</option>
@@ -337,7 +464,7 @@ export default function DigiflazzCatalogBrowserV2() {
 
           <label className="catalog-compact-select">
             <span>Tampilan</span>
-            <select value={filters.visibility} onChange={(event) => changeFilter("visibility", event.target.value)}>
+            <select value={filters.visibility} onChange={(event) => changeFilter("visibility", event.target.value)} disabled={Boolean(busy)}>
               <option value="all">Semua</option>
               <option value="published">Ditampilkan</option>
               <option value="hidden">Disembunyikan</option>
@@ -347,6 +474,7 @@ export default function DigiflazzCatalogBrowserV2() {
           <button
             className={advancedOpen || advancedFilterCount ? "catalog-more active" : "catalog-more"}
             type="button"
+            disabled={Boolean(busy)}
             onClick={() => setAdvancedOpen((current) => !current)}
           >
             Filter lainnya{advancedFilterCount ? ` · ${advancedFilterCount}` : ""}
@@ -354,7 +482,7 @@ export default function DigiflazzCatalogBrowserV2() {
           </button>
 
           {activeFilterCount > 0 && (
-            <button className="catalog-reset" type="button" onClick={resetFilters} disabled={loading}>
+            <button className="catalog-reset" type="button" onClick={resetFilters} disabled={loading || Boolean(busy)}>
               Reset
             </button>
           )}
@@ -362,11 +490,11 @@ export default function DigiflazzCatalogBrowserV2() {
 
         {advancedOpen && (
           <div className="catalog-advanced-filters">
-            <label><span>Kategori</span><select value={filters.category} onChange={(event) => changeFilter("category", event.target.value)}><option value="all">Semua kategori</option>{filterOptions.categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label><span>Tipe</span><select value={filters.type} onChange={(event) => changeFilter("type", event.target.value)}><option value="all">Semua tipe</option>{filterOptions.types.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label><span>Seller</span><select value={filters.seller} onChange={(event) => changeFilter("seller", event.target.value)}><option value="all">Semua seller</option>{filterOptions.sellers.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label><span>Mapping</span><select value={filters.mapping} onChange={(event) => changeFilter("mapping", event.target.value)}><option value="all">Semua</option><option value="mapped">Sudah mapped</option><option value="unmapped">Belum mapped</option></select></label>
-            <label><span>Mode</span><select value={filters.mode} onChange={(event) => changeFilter("mode", event.target.value)}><option value="all">Semua</option><option value="single">Single</option><option value="multi">Multi</option></select></label>
+            <label><span>Kategori</span><select value={filters.category} onChange={(event) => changeFilter("category", event.target.value)} disabled={Boolean(busy)}><option value="all">Semua kategori</option>{filterOptions.categories.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label><span>Tipe</span><select value={filters.type} onChange={(event) => changeFilter("type", event.target.value)} disabled={Boolean(busy)}><option value="all">Semua tipe</option>{filterOptions.types.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label><span>Seller</span><select value={filters.seller} onChange={(event) => changeFilter("seller", event.target.value)} disabled={Boolean(busy)}><option value="all">Semua seller</option>{filterOptions.sellers.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label><span>Mapping</span><select value={filters.mapping} onChange={(event) => changeFilter("mapping", event.target.value)} disabled={Boolean(busy)}><option value="all">Semua</option><option value="mapped">Sudah mapped</option><option value="unmapped">Belum mapped</option></select></label>
+            <label><span>Mode</span><select value={filters.mode} onChange={(event) => changeFilter("mode", event.target.value)} disabled={Boolean(busy)}><option value="all">Semua</option><option value="single">Single</option><option value="multi">Multi</option></select></label>
           </div>
         )}
 
@@ -378,20 +506,64 @@ export default function DigiflazzCatalogBrowserV2() {
 
       {notice && <p className="supplier-browser-notice">{notice}</p>}
 
+      <section className="supplier-publication-toolbar">
+        <div className="supplier-publication-page-actions">
+          <label className="supplier-publication-select-all">
+            <input
+              type="checkbox"
+              checked={pageAllChecked}
+              disabled={loading || Boolean(busy) || pageEligibleItems.length === 0}
+              onChange={(event) => setCurrentPagePublished(event.target.checked)}
+            />
+            <span>Pilih semua di halaman</span>
+          </label>
+          <button
+            type="button"
+            className="supplier-publication-clear"
+            disabled={loading || Boolean(busy) || !payload?.items.length}
+            onClick={() => setCurrentPagePublished(false)}
+          >
+            Kosongkan halaman
+          </button>
+        </div>
+
+        <div className={`supplier-publication-save ${pendingCount ? "dirty" : ""}`}>
+          <span><strong>{pendingCount}</strong> perubahan belum disimpan</span>
+          <button
+            type="button"
+            className="supplier-publication-discard"
+            disabled={Boolean(busy) || pendingCount === 0}
+            onClick={() => setPublicationDrafts({})}
+          >
+            Batalkan
+          </button>
+          <button
+            type="button"
+            className="supplier-publication-save-button"
+            disabled={Boolean(busy) || pendingCount === 0}
+            onClick={() => void savePublicationDrafts()}
+          >
+            {busy === "publish-save" ? "Menyimpan..." : "Simpan tampilan"}
+          </button>
+        </div>
+      </section>
+
       <section className="supplier-browser-table-card clean-table">
         <div className="supplier-browser-table-head">
-          <span>Produk</span><span>Harga</span><span>Status</span><span>Katalog user</span>
+          <span>Produk</span><span>Harga</span><span>Status</span><span>Tampilkan</span>
         </div>
 
         {loading && <div className="supplier-browser-loading">Memuat katalog supplier...</div>}
 
         {!loading && payload?.items.map((item) => {
           const ready = item.buyerActive && item.sellerActive;
-          const published = Boolean(item.mapping?.published);
-          const publishBusy = busy === `publish:${item.sku}`;
+          const savedPublished = isPublished(item);
+          const checked = draftPublished(item);
+          const changed = Object.prototype.hasOwnProperty.call(publicationDrafts, item.sku);
+          const disabled = Boolean(busy) || (!ready && !savedPublished);
 
           return (
-            <article className="supplier-browser-row clean-row" key={item.sku}>
+            <article className={`supplier-browser-row clean-row ${changed ? "publication-dirty-row" : ""}`} key={item.sku}>
               <div className="supplier-browser-product product-with-icon">
                 <img className="catalog-game-icon" src={iconUrl(item.brand)} alt="" loading="lazy" />
                 <div>
@@ -414,22 +586,26 @@ export default function DigiflazzCatalogBrowserV2() {
               </div>
 
               <div className="catalog-publish-cell">
-                <div className="catalog-publish-copy">
-                  <strong>{published ? "Ditampilkan" : "Disembunyikan"}</strong>
-                  <small>{item.mapping ? item.mapping.label : "Belum dibuat di Nambah"}</small>
-                </div>
-                <button
-                  className={published ? "catalog-switch on" : "catalog-switch"}
-                  type="button"
-                  role="switch"
-                  aria-checked={published}
-                  aria-label={`${published ? "Sembunyikan" : "Tampilkan"} ${item.name}`}
-                  disabled={Boolean(busy) || (!published && !ready)}
-                  onClick={() => void togglePublished(item)}
-                >
-                  <span />
-                  <b>{publishBusy ? "..." : published ? "ON" : "OFF"}</b>
-                </button>
+                <label className={`supplier-publication-choice ${checked ? "checked" : ""} ${changed ? "dirty" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={(event) => setPublicationDraft(item, event.target.checked)}
+                  />
+                  <span>
+                    <strong>{checked ? "Tampilkan ke user" : "Jangan tampilkan"}</strong>
+                    <small>
+                      {changed
+                        ? "Belum disimpan"
+                        : savedPublished
+                          ? "Tersimpan · tampil di katalog"
+                          : item.mapping
+                            ? "Tersimpan · disembunyikan"
+                            : "Belum dibuat di Nambah"}
+                    </small>
+                  </span>
+                </label>
               </div>
             </article>
           );
@@ -442,9 +618,9 @@ export default function DigiflazzCatalogBrowserV2() {
 
       {payload && payload.pages > 1 && (
         <div className="supplier-browser-pagination clean-pagination">
-          <button type="button" disabled={loading || payload.page <= 1} onClick={() => void load(payload.page - 1, query, filters, false)}>← Sebelumnya</button>
+          <button type="button" disabled={loading || Boolean(busy) || payload.page <= 1} onClick={() => void load(payload.page - 1, query, filters, false)}>← Sebelumnya</button>
           <span>{payload.total} SKU · halaman {payload.page} dari {payload.pages}</span>
-          <button type="button" disabled={loading || payload.page >= payload.pages} onClick={() => void load(payload.page + 1, query, filters, false)}>Berikutnya →</button>
+          <button type="button" disabled={loading || Boolean(busy) || payload.page >= payload.pages} onClick={() => void load(payload.page + 1, query, filters, false)}>Berikutnya →</button>
         </div>
       )}
     </main>
