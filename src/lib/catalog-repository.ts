@@ -42,10 +42,19 @@ export type PublicCatalogResult = {
   source: "static" | "supabase";
 };
 
+function withGameIcon(game: Game): Game {
+  const icon = `/api/icons/game?name=${encodeURIComponent(game.name)}`;
+  return {
+    ...game,
+    accent: `#171a16 url("${icon}") center / 68% 68% no-repeat`,
+    initials: "",
+  };
+}
+
 export async function getPublicCatalog(): Promise<PublicCatalogResult> {
   if (!isSupabaseConfigured()) {
     return {
-      games: staticGames,
+      games: staticGames.map(withGameIcon),
       paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
         id,
         name,
@@ -92,7 +101,8 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
           referencePrice: Number(product.reference_price),
         })),
     }))
-    .filter((game) => game.packages.length > 0);
+    .filter((game) => game.packages.length > 0)
+    .map(withGameIcon);
 
   const paymentMethods: PublicPaymentMethod[] = paymentRows.map((method) => ({
     id: method.id,

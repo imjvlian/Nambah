@@ -5,6 +5,7 @@ import "./order.css";
 import "./admin.css";
 import "./midtrans.css";
 import "./admin-digiflazz.css";
+import "./admin-digiflazz-v2.css";
 import "./admin-supplier-link.css";
 
 export const metadata: Metadata = {
