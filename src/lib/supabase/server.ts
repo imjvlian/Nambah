@@ -120,12 +120,13 @@ export async function supabaseUpsert<T>(
     cache: "no-store",
   });
 
+  const responseBody = await response.text();
   if (!response.ok) {
-    const responseBody = await response.text();
     throw new Error(`Supabase ${table} upsert failed (${response.status}): ${responseBody}`);
   }
 
-  return (await response.json()) as T[];
+  if (!responseBody) return [];
+  return JSON.parse(responseBody) as T[];
 }
 
 export async function supabaseUpdate<T>(
