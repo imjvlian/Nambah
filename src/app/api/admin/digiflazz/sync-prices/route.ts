@@ -1,8 +1,8 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { getDigiflazzPrepaidPriceList } from "@/lib/digiflazz/client";
 import {
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectPage,
   supabaseUpdate,
 } from "@/lib/supabase/server";
 
@@ -26,10 +26,49 @@ type PricingRuleRow = {
   minimum_nambah_profit: number | string;
 };
 
+type SupplierCatalogRow = {
+  supplier_sku: string;
+  supplier_cost: number | string;
+  buyer_active: boolean;
+  seller_active: boolean;
+  stock: number | string | null;
+  unlimited_stock: boolean;
+  last_seen_at: string;
+};
+
 type SyncBody = {
   productIds?: string[];
   dryRun?: boolean;
 };
+
+async function loadLatestCatalogRows(latestScanAt: string) {
+  const rows: SupplierCatalogRow[] = [];
+  const batchSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    const page = await supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
+      select:
+        "supplier_sku,supplier_cost,buyer_active,seller_active,stock,unlimited_stock,last_seen_at",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        last_seen_at: `eq.${latestScanAt}`,
+      },
+      order: "supplier_sku.asc",
+      limit: batchSize,
+      offset,
+    });
+
+    rows.push(...page.data);
+    offset += page.data.length;
+
+    if (page.data.length === 0) break;
+    if (page.count !== null && offset >= page.count) break;
+    if (page.count === null && page.data.length < batchSize) break;
+  }
+
+  return rows;
+}
 
 export async function POST(request: Request) {
   const auth = authorizeAdminRequest(request);
@@ -54,7 +93,7 @@ export async function POST(request: Request) {
   const dryRun = body.dryRun === true;
 
   try {
-    const [supplierRows, productRows, pricingRows, priceList] = await Promise.all([
+    const [supplierRows, productRows, pricingRows, latestScanRows] = await Promise.all([
       supabaseSelect<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
         filters: {
@@ -71,8 +110,24 @@ export async function POST(request: Request) {
         filters: { id: "eq.default" },
         limit: 1,
       }),
-      getDigiflazzPrepaidPriceList(),
+      supabaseSelect<{ last_seen_at: string }>("supplier_catalog_items", {
+        select: "last_seen_at",
+        filters: { supplier_id: "eq.digiflazz" },
+        order: "last_seen_at.desc",
+        limit: 1,
+      }),
     ]);
+
+    const latestScanAt = latestScanRows[0]?.last_seen_at ?? null;
+    if (!latestScanAt) {
+      return Response.json(
+        {
+          error:
+            "Cache katalog Digiflazz belum tersedia. Jalankan Scan katalog Digiflazz terlebih dahulu.",
+        },
+        { status: 409 },
+      );
+    }
 
     const selectedRows = requestedProductIds.length
       ? supplierRows.filter((row) => requestedProductIds.includes(row.product_id))
@@ -89,9 +144,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const catalogRows = await loadLatestCatalogRows(latestScanAt);
     const products = new Map(productRows.map((row) => [row.id, row]));
     const supplierItems = new Map(
-      priceList.map((item) => [item.buyer_sku_code.toUpperCase(), item]),
+      catalogRows.map((item) => [item.supplier_sku.toUpperCase(), item]),
     );
     const minimumNambahProfit = Number(pricingRows[0]?.minimum_nambah_profit ?? 500);
     const syncedAt = new Date().toISOString();
@@ -116,14 +172,14 @@ export async function POST(request: Request) {
         };
       }
 
-      const currentCost = Number(item.price);
-      const active = Boolean(item.buyer_product_status && item.seller_product_status);
+      const currentCost = Number(item.supplier_cost);
+      const active = Boolean(item.buyer_active && item.seller_active);
       const sellingPrice = product ? Number(product.selling_price) : null;
       const grossMargin = sellingPrice === null ? null : sellingPrice - currentCost;
 
       return {
         productId: row.product_id,
-        supplierSku: item.buyer_sku_code,
+        supplierSku: item.supplier_sku,
         status: "found" as const,
         previousCost: Number(row.supplier_cost),
         currentCost,
@@ -134,10 +190,10 @@ export async function POST(request: Request) {
         grossMarginBeforePaymentFees: grossMargin,
         minimumProfitBuffer:
           grossMargin === null ? null : grossMargin - minimumNambahProfit,
-        stock: Number.isFinite(Number(item.stock)) ? Number(item.stock) : null,
+        stock: item.stock === null ? null : Number(item.stock),
         unlimitedStock: Boolean(item.unlimited_stock),
-        buyerActive: Boolean(item.buyer_product_status),
-        sellerActive: Boolean(item.seller_product_status),
+        buyerActive: Boolean(item.buyer_active),
+        sellerActive: Boolean(item.seller_active),
       };
     });
 
@@ -182,6 +238,8 @@ export async function POST(request: Request) {
 
     return Response.json({
       mode: dryRun ? "dry-run" : "applied",
+      source: "supplier_catalog_cache",
+      catalogScanAt: latestScanAt,
       syncedAt: dryRun ? null : syncedAt,
       minimumNambahProfit,
       summary: {
@@ -197,9 +255,9 @@ export async function POST(request: Request) {
       products: results,
     });
   } catch (error) {
-    console.error("Digiflazz price sync failed", error);
+    console.error("Digiflazz cached price sync failed", error);
     return Response.json(
-      { error: "Sinkronisasi harga Digiflazz gagal dijalankan." },
+      { error: "Sinkronisasi harga dari cache katalog Digiflazz gagal dijalankan." },
       { status: 502 },
     );
   }
