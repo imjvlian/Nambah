@@ -27,6 +27,10 @@ type ProductRow = {
   sort_order: number;
 };
 
+type SupplierProductRow = {
+  product_id: string;
+};
+
 type PaymentMethodRow = {
   id: string;
   name: string;
@@ -55,7 +59,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     };
   }
 
-  const [gameRows, productRows, paymentRows] = await Promise.all([
+  const [gameRows, productRows, supplierProductRows, paymentRows] = await Promise.all([
     supabaseSelect<GameRow>("games", {
       select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
       filters: { active: "eq.true" },
@@ -66,12 +70,23 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
       filters: { active: "eq.true" },
       order: "sort_order.asc",
     }),
+    supabaseSelect<SupplierProductRow>("supplier_products", {
+      select: "product_id",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        active: "eq.true",
+        supplier_sku: "not.is.null",
+      },
+    }),
     supabaseSelect<PaymentMethodRow>("payment_methods", {
       select: "id,name,detail,sort_order",
       filters: { active: "eq.true" },
       order: "sort_order.asc",
     }),
   ]);
+
+  const availableProductIds = new Set(supplierProductRows.map((row) => row.product_id));
+  const availableProducts = productRows.filter((product) => availableProductIds.has(product.id));
 
   const games: Game[] = gameRows
     .map((game) => ({
@@ -82,7 +97,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
       accent: game.accent,
       initials: game.initials,
       requiresServer: game.requires_server,
-      packages: productRows
+      packages: availableProducts
         .filter((product) => product.game_id === game.id)
         .map((product) => ({
           id: product.id,
@@ -101,7 +116,9 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
   }));
 
   if (games.length === 0 || paymentMethods.length === 0) {
-    throw new Error("Supabase catalog is configured but contains no active catalog data.");
+    throw new Error(
+      "Supabase catalog is configured but has no checkout-ready supplier mappings.",
+    );
   }
 
   return { games, paymentMethods, source: "supabase" };
