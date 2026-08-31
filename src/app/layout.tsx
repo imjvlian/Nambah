@@ -4,6 +4,7 @@ import "./catalog-categories.css";
 import "./home-v2.css";
 import "./product-v2.css";
 import "./pricing.css";
+import "./product-checkout-v2.css";
 import "./order.css";
 import "./admin.css";
 import "./admin-automation.css";

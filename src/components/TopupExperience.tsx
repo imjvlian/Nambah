@@ -13,6 +13,12 @@ type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type PackageGroupFilter = "all" | ProductGroup;
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
+type UsernameCheckStatus = "idle" | "loading" | "success" | "pending" | "error";
+type UsernameCheckState = {
+  status: UsernameCheckStatus;
+  nickname?: string;
+  message?: string;
+};
 
 type TopupExperienceProps = {
   games: Game[];
@@ -35,6 +41,25 @@ function isOnlyGroupNote(note?: string) {
   return Boolean(note && /^(hemat|populer|popular|langganan|promo)$/i.test(note.trim()));
 }
 
+function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
+  const text = `${game.name} ${item.label} ${item.note ?? ""}`.toLowerCase();
+  if (/(weekly|pass|membership|member|starlight|langganan)/i.test(text)) return "pass";
+  if (/(diamond|diamonds)/i.test(text)) return "diamond";
+  if (/(\buc\b|unknown cash)/i.test(text)) return "uc";
+  if (/robux/i.test(text)) return "robux";
+  if (/(voucher|gift card|wallet)/i.test(text)) return "voucher";
+  return "default";
+}
+
+function packageVisualLabel(kind: ReturnType<typeof getPackageVisualKind>) {
+  if (kind === "diamond") return "◆";
+  if (kind === "pass") return "PASS";
+  if (kind === "uc") return "UC";
+  if (kind === "robux") return "R$";
+  if (kind === "voucher") return "V";
+  return "N+";
+}
+
 export default function TopupExperience({
   games,
   paymentMethods,
@@ -52,6 +77,7 @@ export default function TopupExperience({
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
+  const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>({ status: "idle" });
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
@@ -73,6 +99,10 @@ export default function TopupExperience({
   }, [games, query]);
 
   const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
+  const canCheckUsername =
+    selectedGame.requiresServer &&
+    /mobile\s*legends?/i.test(`${selectedGame.name} ${selectedGame.shortName}`);
+
   const availableGroups = useMemo(
     () =>
       GROUP_OPTIONS.filter((group) =>
@@ -165,6 +195,10 @@ export default function TopupExperience({
     setReferralMessage("");
   }
 
+  function resetUsernameCheck() {
+    setUsernameCheck({ status: "idle" });
+  }
+
   function chooseGame(gameId: string) {
     const nextGame = games.find((game) => game.id === gameId) ?? defaultGame;
     setSelectedGameId(nextGame.id);
@@ -172,6 +206,7 @@ export default function TopupExperience({
     setPackageGroup("all");
     setUserId("");
     setServerId("");
+    resetUsernameCheck();
     resetPricingMessages();
     requestAnimationFrame(() => {
       document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -185,6 +220,76 @@ export default function TopupExperience({
     if (matching.length && !matching.some((item) => item.id === selectedPackageId)) {
       setSelectedPackageId(matching[0]!.id);
       resetPricingMessages();
+    }
+  }
+
+  async function checkUsername() {
+    const normalizedUserId = userId.trim();
+    const normalizedServerId = serverId.trim();
+
+    if (!normalizedUserId || !normalizedServerId) {
+      setUsernameCheck({
+        status: "error",
+        message: "Isi User ID dan Server / Zone ID terlebih dahulu.",
+      });
+      return;
+    }
+
+    setUsernameCheck({ status: "loading", message: "Mengecek akun..." });
+
+    try {
+      const response = await fetch("/api/game-account/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: selectedGame.id,
+          userId: normalizedUserId,
+          serverId: normalizedServerId,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        nickname?: string;
+        message?: string;
+        error?: string;
+        pending?: boolean;
+        verified?: boolean;
+      };
+
+      if (response.status === 202 || data.pending) {
+        setUsernameCheck({
+          status: "pending",
+          message: data.message ?? "Checker masih memproses akun. Coba lagi sebentar.",
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        setUsernameCheck({
+          status: "error",
+          message: data.error ?? "Username tidak dapat diperiksa.",
+        });
+        return;
+      }
+
+      if (data.nickname) {
+        setUsernameCheck({
+          status: "success",
+          nickname: data.nickname,
+          message: "Akun ditemukan.",
+        });
+        return;
+      }
+
+      setUsernameCheck({
+        status: data.verified ? "success" : "error",
+        message: data.message ?? "Akun ditemukan, tetapi nickname tidak tersedia.",
+      });
+    } catch {
+      setUsernameCheck({
+        status: "error",
+        message: "Tidak bisa terhubung ke username checker. Coba lagi.",
+      });
     }
   }
 
@@ -331,7 +436,7 @@ export default function TopupExperience({
             <span className="preview-badge">{catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}</span>
           </div>
 
-          <div className="form-block">
+          <div className="form-block account-form-block">
             <div className="form-label">
               <span className="step-number">1</span>
               <div><strong>Data akun</strong><small>Pastikan ID yang dimasukkan benar.</small></div>
@@ -339,21 +444,82 @@ export default function TopupExperience({
             <div className={selectedGame.requiresServer ? "input-grid two" : "input-grid"}>
               <label>
                 <span>User ID</span>
-                <input inputMode="numeric" placeholder="Masukkan User ID" value={userId} onChange={(event) => setUserId(event.target.value)} />
+                <input
+                  inputMode="numeric"
+                  placeholder="Masukkan User ID"
+                  value={userId}
+                  onChange={(event) => {
+                    setUserId(event.target.value);
+                    resetUsernameCheck();
+                  }}
+                />
               </label>
               {selectedGame.requiresServer && (
                 <label>
                   <span>Server / Zone ID</span>
-                  <input inputMode="numeric" placeholder="Contoh: 1234" value={serverId} onChange={(event) => setServerId(event.target.value)} />
+                  <input
+                    inputMode="numeric"
+                    placeholder="Contoh: 1234"
+                    value={serverId}
+                    onChange={(event) => {
+                      setServerId(event.target.value);
+                      resetUsernameCheck();
+                    }}
+                  />
                 </label>
               )}
             </div>
+
+            {canCheckUsername && (
+              <div className="username-checker">
+                <button
+                  className="username-checker-button"
+                  type="button"
+                  disabled={
+                    usernameCheck.status === "loading" ||
+                    !userId.trim() ||
+                    !serverId.trim()
+                  }
+                  onClick={() => void checkUsername()}
+                >
+                  <span aria-hidden="true">◎</span>
+                  {usernameCheck.status === "loading" ? "Mengecek..." : "Cek username"}
+                </button>
+
+                <div className={`username-checker-result ${usernameCheck.status}`} role="status">
+                  {usernameCheck.status === "success" ? (
+                    <>
+                      <span className="username-checker-status" aria-hidden="true">✓</span>
+                      <span>
+                        <small>Username</small>
+                        <strong>{usernameCheck.nickname ?? "Akun terverifikasi"}</strong>
+                      </span>
+                    </>
+                  ) : usernameCheck.status === "pending" ? (
+                    <>
+                      <span className="username-checker-status" aria-hidden="true">…</span>
+                      <span><small>Masih diproses</small><strong>{usernameCheck.message}</strong></span>
+                    </>
+                  ) : usernameCheck.status === "error" ? (
+                    <>
+                      <span className="username-checker-status" aria-hidden="true">!</span>
+                      <span><small>Belum terverifikasi</small><strong>{usernameCheck.message}</strong></span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="username-checker-status" aria-hidden="true">?</span>
+                      <span><small>Opsional</small><strong>Cek nickname sebelum lanjut.</strong></span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="form-block">
+          <div className="form-block nominal-form-block">
             <div className="form-label">
               <span className="step-number">2</span>
-              <div><strong>Pilih nominal</strong><small>Kelompok produk dibuat dari harga, tipe produk, dan data transaksi.</small></div>
+              <div><strong>Pilih nominal</strong><small>Pilih paket yang paling sesuai kebutuhanmu.</small></div>
             </div>
 
             {availableGroups.length > 0 && (
@@ -381,36 +547,65 @@ export default function TopupExperience({
               </div>
             )}
 
-            <div className="package-grid">
+            <div className="nominal-list-head">
+              <div>
+                <span className="nominal-list-icon" aria-hidden="true">⚡</span>
+                <span><strong>Top Up Instant</strong><small>Diproses otomatis setelah pembayaran terkonfirmasi.</small></span>
+              </div>
+              <b>{visiblePackages.length} pilihan</b>
+            </div>
+
+            <div className="package-grid package-grid-v2">
               {visiblePackages.map((item) => {
                 const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
                 const groups = groupsOf(item);
+                const visualKind = getPackageVisualKind(selectedGame, item);
+                const active = selectedPackageId === item.id;
+
                 return (
                   <button
-                    className={`package-option package-priced ${selectedPackageId === item.id ? "active" : ""}`}
+                    className={`package-option package-priced package-card-v2 ${active ? "active" : ""}`}
                     key={item.id}
                     type="button"
+                    aria-pressed={active}
                     onClick={() => {
                       setSelectedPackageId(item.id);
                       resetPricingMessages();
                     }}
                   >
-                    {groups.length > 0 && (
-                      <span className="package-badges">
-                        {groups.map((group) => (
-                          <b className={`package-badge ${group}`} key={group}>
-                            {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
-                          </b>
-                        ))}
-                      </span>
-                    )}
-                    <span className="package-name">{item.label}</span>
-                    <span className="package-current-price">{formatIDR(item.sellingPrice)}</span>
-                    <span className="package-reference-row">
-                      {item.referencePrice > item.sellingPrice ? <del>{formatIDR(item.referencePrice)}</del> : <span>Harga normal</span>}
-                      {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
+                    <span className={`package-item-visual ${visualKind}`} aria-hidden="true">
+                      {packageVisualLabel(visualKind)}
                     </span>
-                    {item.note && !isOnlyGroupNote(item.note) && <small>{item.note}</small>}
+
+                    <span className="package-card-copy">
+                      <span className="package-name">{item.label}</span>
+                      <span className="package-current-price">{formatIDR(item.sellingPrice)}</span>
+
+                      {(item.referencePrice > item.sellingPrice || referenceDiscount > 0) && (
+                        <span className="package-reference-row">
+                          {item.referencePrice > item.sellingPrice && <del>{formatIDR(item.referencePrice)}</del>}
+                          {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
+                        </span>
+                      )}
+
+                      {groups.length > 0 && (
+                        <span className="package-badges">
+                          {groups.slice(0, 2).map((group) => (
+                            <b className={`package-badge ${group}`} key={group}>
+                              {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
+                            </b>
+                          ))}
+                        </span>
+                      )}
+
+                      {item.note && !isOnlyGroupNote(item.note) && (
+                        <small className="package-note">{item.note}</small>
+                      )}
+                    </span>
+
+                    <span className="package-select-indicator" aria-hidden="true">
+                      {active ? "✓" : ""}
+                    </span>
                   </button>
                 );
               })}

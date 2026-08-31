@@ -162,7 +162,10 @@ async function postDigiflazz<T>(url: string, body: Record<string, unknown>): Pro
 
       throw new DigiflazzApiError(message, {
         code: detail.code,
-        retryable: response.status === 429 || response.status >= 500 || isLikelyRetryableDigiflazzMessage(detail.message),
+        retryable:
+          response.status === 429 ||
+          response.status >= 500 ||
+          isLikelyRetryableDigiflazzMessage(detail.message),
       });
     }
 
@@ -170,7 +173,7 @@ async function postDigiflazz<T>(url: string, body: Record<string, unknown>): Pro
   } catch (error) {
     if (error instanceof DigiflazzApiError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
-      throw new DigiflazzApiError("Request ke Digiflazz timeout. Coba scan lagi beberapa saat lagi.", {
+      throw new DigiflazzApiError("Request ke Digiflazz timeout. Coba lagi beberapa saat lagi.", {
         retryable: true,
       });
     }
@@ -236,22 +239,26 @@ export async function getDigiflazzPrepaidPriceList(filters?: {
   return response.data;
 }
 
-export async function runDigiflazzTestTransaction(input: {
-  outcome: DigiflazzTestOutcome;
+export async function runDigiflazzPrepaidTransaction(input: {
+  buyerSkuCode: string;
+  customerNo: string;
   refId: string;
+  maxPrice?: number;
+  testing?: boolean;
+  useCallback?: boolean;
 }) {
   const { username, apiKey, callbackUrl } = requireApiConfig();
-  const customerNo = TEST_TARGETS[input.outcome];
+  const maxPrice = Number(input.maxPrice);
 
   const response = await postDigiflazz<{ data?: DigiflazzTransactionData }>(TRANSACTION_URL, {
     username,
-    buyer_sku_code: "xld10",
-    customer_no: customerNo,
+    buyer_sku_code: input.buyerSkuCode,
+    customer_no: input.customerNo,
     ref_id: input.refId,
     sign: md5(`${username}${apiKey}${input.refId}`),
-    testing: true,
-    max_price: 100_000,
-    ...(callbackUrl ? { cb_url: callbackUrl } : {}),
+    ...(Number.isFinite(maxPrice) && maxPrice > 0 ? { max_price: Math.round(maxPrice) } : {}),
+    ...(typeof input.testing === "boolean" ? { testing: input.testing } : {}),
+    ...(input.useCallback && callbackUrl ? { cb_url: callbackUrl } : {}),
   });
 
   if (!response.data) {
@@ -259,6 +266,21 @@ export async function runDigiflazzTestTransaction(input: {
   }
 
   return response.data;
+}
+
+export async function runDigiflazzTestTransaction(input: {
+  outcome: DigiflazzTestOutcome;
+  refId: string;
+}) {
+  const customerNo = TEST_TARGETS[input.outcome];
+  return runDigiflazzPrepaidTransaction({
+    buyerSkuCode: "xld10",
+    customerNo,
+    refId: input.refId,
+    testing: true,
+    maxPrice: 100_000,
+    useCallback: true,
+  });
 }
 
 export function verifyDigiflazzWebhookSignature(rawBody: string, signatureHeader: string | null) {
