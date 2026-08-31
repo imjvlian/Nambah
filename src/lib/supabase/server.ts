@@ -10,6 +10,11 @@ type SupabaseMutationOptions = {
   prefer?: string;
 };
 
+type SupabaseUpsertOptions = {
+  onConflict: string;
+  prefer?: string;
+};
+
 function getSupabaseConfig() {
   const url = (
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
@@ -94,6 +99,30 @@ export async function supabaseInsert<T>(
   if (!response.ok) {
     const responseBody = await response.text();
     throw new Error(`Supabase ${table} insert failed (${response.status}): ${responseBody}`);
+  }
+
+  return (await response.json()) as T[];
+}
+
+export async function supabaseUpsert<T>(
+  table: string,
+  body: Record<string, unknown> | Array<Record<string, unknown>>,
+  options: SupabaseUpsertOptions,
+): Promise<T[]> {
+  const { url, secretKey } = requireSupabaseConfig();
+  const query = new URLSearchParams({ on_conflict: options.onConflict });
+  const prefer = options.prefer ?? "resolution=merge-duplicates,return=representation";
+
+  const response = await fetch(`${url}/rest/v1/${table}?${query.toString()}`, {
+    method: "POST",
+    headers: createHeaders(secretKey, prefer),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new Error(`Supabase ${table} upsert failed (${response.status}): ${responseBody}`);
   }
 
   return (await response.json()) as T[];
