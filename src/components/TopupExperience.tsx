@@ -10,12 +10,30 @@ import {
 } from "@/lib/public-pricing";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
+type PackageGroupFilter = "all" | ProductGroup;
+type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
 
 type TopupExperienceProps = {
   games: Game[];
   paymentMethods: PublicPaymentMethod[];
   catalogSource: "static" | "supabase";
 };
+
+const GROUP_OPTIONS: Array<{ id: ProductGroup; label: string }> = [
+  { id: "hemat", label: "Hemat" },
+  { id: "populer", label: "Populer" },
+  { id: "langganan", label: "Langganan" },
+  { id: "promo", label: "Promo" },
+];
+
+function groupsOf(item: Game["packages"][number]) {
+  return ((item as GroupedPackage).groups ?? []) as ProductGroup[];
+}
+
+function isOnlyGroupNote(note?: string) {
+  return Boolean(note && /^(hemat|populer|popular|langganan|promo)$/i.test(note.trim()));
+}
 
 export default function TopupExperience({
   games,
@@ -30,6 +48,7 @@ export default function TopupExperience({
   const [query, setQuery] = useState("");
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPackage.id);
+  const [packageGroup, setPackageGroup] = useState<PackageGroupFilter>("all");
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
@@ -54,8 +73,23 @@ export default function TopupExperience({
   }, [games, query]);
 
   const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
+  const availableGroups = useMemo(
+    () =>
+      GROUP_OPTIONS.filter((group) =>
+        selectedGame.packages.some((item) => groupsOf(item).includes(group.id)),
+      ),
+    [selectedGame],
+  );
+  const visiblePackages = useMemo(
+    () =>
+      packageGroup === "all"
+        ? selectedGame.packages
+        : selectedGame.packages.filter((item) => groupsOf(item).includes(packageGroup)),
+    [selectedGame, packageGroup],
+  );
   const selectedPackage =
     selectedGame.packages.find((item) => item.id === selectedPackageId) ??
+    visiblePackages[0] ??
     selectedGame.packages[0]!;
   const paymentMethod =
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
@@ -90,7 +124,6 @@ export default function TopupExperience({
         };
 
         if (!mounted) return;
-
         if (!response.ok || !data.pricing) {
           setPricingError(data.error ?? "Harga gagal dihitung.");
           if (appliedPromoCode) setPromoMessage("");
@@ -99,11 +132,9 @@ export default function TopupExperience({
         }
 
         setServerPricing(data.pricing);
-
         if (appliedPromoCode && data.pricing.promoCode === appliedPromoCode) {
           setPromoMessage(`${appliedPromoCode} aktif. Harga sudah dihitung ulang.`);
         }
-
         if (appliedReferralCode && data.pricing.referralCode === appliedReferralCode) {
           setReferralMessage(`${appliedReferralCode} aktif. Benefit dihitung otomatis.`);
         }
@@ -116,7 +147,6 @@ export default function TopupExperience({
     }
 
     void refreshPricing();
-
     return () => {
       mounted = false;
       controller.abort();
@@ -139,6 +169,7 @@ export default function TopupExperience({
     const nextGame = games.find((game) => game.id === gameId) ?? defaultGame;
     setSelectedGameId(nextGame.id);
     setSelectedPackageId(nextGame.packages[0]!.id);
+    setPackageGroup("all");
     setUserId("");
     setServerId("");
     resetPricingMessages();
@@ -147,17 +178,25 @@ export default function TopupExperience({
     });
   }
 
+  function choosePackageGroup(nextGroup: PackageGroupFilter) {
+    setPackageGroup(nextGroup);
+    if (nextGroup === "all") return;
+    const matching = selectedGame.packages.filter((item) => groupsOf(item).includes(nextGroup));
+    if (matching.length && !matching.some((item) => item.id === selectedPackageId)) {
+      setSelectedPackageId(matching[0]!.id);
+      resetPricingMessages();
+    }
+  }
+
   function applyPromo() {
     const normalized = promoInput.trim().toUpperCase();
     setNotice("");
     setPricingError("");
-
     if (!normalized) {
       setAppliedPromoCode("");
       setPromoMessage("Promo dihapus.");
       return;
     }
-
     setAppliedPromoCode(normalized);
     setPromoInput(normalized);
     setPromoMessage(`${normalized} dipasang. Server sedang memvalidasi kode.`);
@@ -167,13 +206,11 @@ export default function TopupExperience({
     const normalized = referralInput.trim().toUpperCase();
     setNotice("");
     setPricingError("");
-
     if (!normalized) {
       setAppliedReferralCode("");
       setReferralMessage("Referral dihapus.");
       return;
     }
-
     setAppliedReferralCode(normalized);
     setReferralInput(normalized);
     setReferralMessage(`${normalized} dipasang. Server sedang memvalidasi kode.`);
@@ -187,24 +224,20 @@ export default function TopupExperience({
       setNotice("Masukkan User ID terlebih dahulu.");
       return;
     }
-
     if (selectedGame.requiresServer && !serverId.trim()) {
       setNotice("Masukkan Server / Zone ID terlebih dahulu.");
       return;
     }
-
     if (!serverPricing) {
       setNotice(pricingError || "Harga belum tervalidasi. Coba lagi.");
       return;
     }
-
     if (!serverPricing.safeToCheckout) {
       setNotice(serverPricing.rejectionReason ?? "Harga belum aman untuk checkout.");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -219,17 +252,11 @@ export default function TopupExperience({
           referralCode: appliedReferralCode,
         }),
       });
-
-      const data = (await response.json()) as {
-        error?: string;
-        order?: { id: string };
-      };
-
+      const data = (await response.json()) as { error?: string; order?: { id: string } };
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
         return;
       }
-
       router.push(`/order/${encodeURIComponent(data.order.id)}`);
     } catch {
       setNotice("Tidak bisa menyiapkan pembayaran Sandbox. Coba lagi.");
@@ -260,15 +287,8 @@ export default function TopupExperience({
 
         <div className="game-grid">
           {filteredGames.map((game) => (
-            <button
-              className="game-card"
-              key={game.id}
-              type="button"
-              onClick={() => chooseGame(game.id)}
-            >
-              <span className="game-mark" style={{ background: game.accent }}>
-                {game.initials}
-              </span>
+            <button className="game-card" key={game.id} type="button" onClick={() => chooseGame(game.id)}>
+              <span className="game-mark app-artwork" style={{ background: game.accent }}>{game.initials}</span>
               <span className="game-copy">
                 <strong>{game.name}</strong>
                 <small>{game.category === "game" ? "Top up instan" : "Voucher digital"}</small>
@@ -302,46 +322,29 @@ export default function TopupExperience({
         <form className="order-card" onSubmit={submitOrder}>
           <div className="order-head">
             <div className="selected-product">
-              <span className="selected-mark" style={{ background: selectedGame.accent }}>
-                {selectedGame.initials}
-              </span>
+              <span className="selected-mark app-artwork" style={{ background: selectedGame.accent }}>{selectedGame.initials}</span>
               <div>
                 <small>Produk dipilih</small>
                 <strong>{selectedGame.name}</strong>
               </div>
             </div>
-            <span className="preview-badge">
-              {catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}
-            </span>
+            <span className="preview-badge">{catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}</span>
           </div>
 
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">1</span>
-              <div>
-                <strong>Data akun</strong>
-                <small>Pastikan ID yang dimasukkan benar.</small>
-              </div>
+              <div><strong>Data akun</strong><small>Pastikan ID yang dimasukkan benar.</small></div>
             </div>
             <div className={selectedGame.requiresServer ? "input-grid two" : "input-grid"}>
               <label>
                 <span>User ID</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="Masukkan User ID"
-                  value={userId}
-                  onChange={(event) => setUserId(event.target.value)}
-                />
+                <input inputMode="numeric" placeholder="Masukkan User ID" value={userId} onChange={(event) => setUserId(event.target.value)} />
               </label>
               {selectedGame.requiresServer && (
                 <label>
                   <span>Server / Zone ID</span>
-                  <input
-                    inputMode="numeric"
-                    placeholder="Contoh: 1234"
-                    value={serverId}
-                    onChange={(event) => setServerId(event.target.value)}
-                  />
+                  <input inputMode="numeric" placeholder="Contoh: 1234" value={serverId} onChange={(event) => setServerId(event.target.value)} />
                 </label>
               )}
             </div>
@@ -350,17 +353,38 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">2</span>
-              <div>
-                <strong>Pilih nominal</strong>
-                <small>Harga coret adalah reference price, bukan biaya promo.</small>
-              </div>
+              <div><strong>Pilih nominal</strong><small>Kelompok produk dibuat dari harga, tipe produk, dan data transaksi.</small></div>
             </div>
+
+            {availableGroups.length > 0 && (
+              <div className="package-group-tabs" role="tablist" aria-label="Kelompok nominal">
+                <button
+                  className={packageGroup === "all" ? "active" : ""}
+                  type="button"
+                  onClick={() => choosePackageGroup("all")}
+                >
+                  Semua <span>{selectedGame.packages.length}</span>
+                </button>
+                {availableGroups.map((group) => {
+                  const count = selectedGame.packages.filter((item) => groupsOf(item).includes(group.id)).length;
+                  return (
+                    <button
+                      className={packageGroup === group.id ? "active" : ""}
+                      key={group.id}
+                      type="button"
+                      onClick={() => choosePackageGroup(group.id)}
+                    >
+                      {group.label} <span>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="package-grid">
-              {selectedGame.packages.map((item) => {
-                const referenceDiscount = getReferenceDiscountPercent(
-                  item.referencePrice,
-                  item.sellingPrice,
-                );
+              {visiblePackages.map((item) => {
+                const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
+                const groups = groupsOf(item);
                 return (
                   <button
                     className={`package-option package-priced ${selectedPackageId === item.id ? "active" : ""}`}
@@ -371,13 +395,22 @@ export default function TopupExperience({
                       resetPricingMessages();
                     }}
                   >
+                    {groups.length > 0 && (
+                      <span className="package-badges">
+                        {groups.map((group) => (
+                          <b className={`package-badge ${group}`} key={group}>
+                            {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
+                          </b>
+                        ))}
+                      </span>
+                    )}
                     <span className="package-name">{item.label}</span>
                     <span className="package-current-price">{formatIDR(item.sellingPrice)}</span>
                     <span className="package-reference-row">
-                      <del>{formatIDR(item.referencePrice)}</del>
+                      {item.referencePrice > item.sellingPrice ? <del>{formatIDR(item.referencePrice)}</del> : <span>Harga normal</span>}
                       {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
                     </span>
-                    {item.note && <small>{item.note}</small>}
+                    {item.note && !isOnlyGroupNote(item.note) && <small>{item.note}</small>}
                   </button>
                 );
               })}
@@ -387,35 +420,21 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">3</span>
-              <div>
-                <strong>Promo & referral</strong>
-                <small>Kode selalu divalidasi oleh backend, bukan dipercaya dari browser.</small>
-              </div>
+              <div><strong>Promo & referral</strong><small>Kode selalu divalidasi oleh backend, bukan dipercaya dari browser.</small></div>
             </div>
 
             <div className="discount-stack">
               <label className="discount-field">
                 <span>Kode promo</span>
                 <span className="discount-input-row">
-                  <input
-                    autoCapitalize="characters"
-                    placeholder="Contoh: WELCOME"
-                    value={promoInput}
-                    onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
-                  />
+                  <input autoCapitalize="characters" placeholder="Contoh: WELCOME" value={promoInput} onChange={(event) => setPromoInput(event.target.value.toUpperCase())} />
                   <button type="button" onClick={applyPromo}>Pakai</button>
                 </span>
               </label>
-
               <label className="discount-field">
                 <span>Kode referral <em>opsional</em></span>
                 <span className="discount-input-row">
-                  <input
-                    autoCapitalize="characters"
-                    placeholder="Contoh: TEMAN"
-                    value={referralInput}
-                    onChange={(event) => setReferralInput(event.target.value.toUpperCase())}
-                  />
+                  <input autoCapitalize="characters" placeholder="Contoh: TEMAN" value={referralInput} onChange={(event) => setReferralInput(event.target.value.toUpperCase())} />
                   <button type="button" onClick={applyReferral}>Pakai</button>
                 </span>
               </label>
@@ -428,12 +447,9 @@ export default function TopupExperience({
             {pricing.referralCode && pricing.referralDiscount > 0 && (
               <p className="referral-active">
                 Referral {pricing.referralCode} aktif · kamu hemat {formatIDR(pricing.referralDiscount)} · partner mendapat {Math.round(pricing.affiliateRate * 100)}% dari net profit.
-                {pricing.referralDiscountCapped
-                  ? " Benefit disesuaikan otomatis agar transaksi tetap aman."
-                  : ""}
+                {pricing.referralDiscountCapped ? " Benefit disesuaikan otomatis agar transaksi tetap aman." : ""}
               </p>
             )}
-
             {(appliedPromoCode || appliedReferralCode) && pricing.rejectionReason && (
               <p className="inline-message warning">{pricing.rejectionReason}</p>
             )}
@@ -442,29 +458,14 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">4</span>
-              <div>
-                <strong>Metode pembayaran</strong>
-                <small>Selama flow test, pembayaran menggunakan Midtrans Sandbox dan tidak menagih uang asli.</small>
-              </div>
+              <div><strong>Metode pembayaran</strong><small>Selama flow test, pembayaran menggunakan Midtrans Sandbox dan tidak menagih uang asli.</small></div>
             </div>
             <div className="payment-list">
               {paymentMethods.map((method) => (
-                <label
-                  className={`payment-option ${paymentId === method.id ? "active" : ""}`}
-                  key={method.id}
-                >
-                  <input
-                    checked={paymentId === method.id}
-                    name="payment"
-                    type="radio"
-                    value={method.id}
-                    onChange={() => setPaymentId(method.id)}
-                  />
+                <label className={`payment-option ${paymentId === method.id ? "active" : ""}`} key={method.id}>
+                  <input checked={paymentId === method.id} name="payment" type="radio" value={method.id} onChange={() => setPaymentId(method.id)} />
                   <span className="radio-dot" />
-                  <span>
-                    <strong>{method.name}</strong>
-                    <small>{method.detail}</small>
-                  </span>
+                  <span><strong>{method.name}</strong><small>{method.detail}</small></span>
                 </label>
               ))}
             </div>
@@ -472,60 +473,29 @@ export default function TopupExperience({
 
           <div className={`pricing-summary ${pricingLoading ? "is-loading" : ""}`}>
             <div className="pricing-product-row">
-              <div>
-                <small>{selectedGame.shortName}</small>
-                <strong>{selectedPackage.label}</strong>
-              </div>
+              <div><small>{selectedGame.shortName}</small><strong>{selectedPackage.label}</strong></div>
               <div className="summary-reference">
-                <del>{formatIDR(pricing.referencePrice)}</del>
-                {pricing.referenceDiscountPercent > 0 && (
-                  <span>-{pricing.referenceDiscountPercent}%</span>
-                )}
+                {pricing.referencePrice > pricing.sellingPrice && <del>{formatIDR(pricing.referencePrice)}</del>}
+                {pricing.referenceDiscountPercent > 0 && <span>-{pricing.referenceDiscountPercent}%</span>}
               </div>
             </div>
-
-            <div className="summary-line">
-              <span>Harga Nambah</span>
-              <strong>{formatIDR(pricing.sellingPrice)}</strong>
-            </div>
+            <div className="summary-line"><span>Harga Nambah</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
             {pricing.promotionDiscount > 0 && (
-              <div className="summary-line discount">
-                <span>Promo {pricing.promoCode}</span>
-                <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
-              </div>
+              <div className="summary-line discount"><span>Promo {pricing.promoCode}</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
             )}
             {pricing.referralDiscount > 0 && (
-              <div className="summary-line referral-benefit">
-                <span>Benefit referral {pricing.referralCode}</span>
-                <strong>-{formatIDR(pricing.referralDiscount)}</strong>
-              </div>
+              <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
             )}
             <div className="summary-line">
               <span>Biaya pembayaran</span>
-              <strong>
-                {pricing.customerPaymentFee === 0
-                  ? "Rp0 (MVP)"
-                  : formatIDR(pricing.customerPaymentFee)}
-              </strong>
+              <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
             </div>
-            <div className="summary-total">
-              <span>Total</span>
-              <strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong>
-            </div>
+            <div className="summary-total"><span>Total</span><strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong></div>
           </div>
 
-          <button
-            className="primary-button full"
-            disabled={isSubmitting || pricingLoading || Boolean(pricingError)}
-            type="submit"
-          >
-            {isSubmitting
-              ? "Membuat pembayaran Sandbox..."
-              : pricingLoading
-                ? "Menghitung harga..."
-                : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
+          <button className="primary-button full" disabled={isSubmitting || pricingLoading || Boolean(pricingError)} type="submit">
+            {isSubmitting ? "Membuat pembayaran Sandbox..." : pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
           </button>
-
           {notice && <p className="form-notice" role="status">{notice}</p>}
         </form>
       </section>

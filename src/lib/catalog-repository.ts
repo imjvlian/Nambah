@@ -34,6 +34,11 @@ type PaymentMethodRow = {
   sort_order: number;
 };
 
+type OrderPopularityRow = {
+  product_id: string;
+};
+
+export type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 export type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 
 export type PublicCatalogResult = {
@@ -42,19 +47,84 @@ export type PublicCatalogResult = {
   source: "static" | "supabase";
 };
 
+type GroupablePackage = Game["packages"][number] & {
+  groups?: ProductGroup[];
+};
+
+const SUBSCRIPTION_PATTERN =
+  /(weekly|monthly|membership|member\b|pass\b|welkin|subscription|subscribe|langganan|mingguan|bulanan|7\s*(day|hari)|30\s*(day|hari))/i;
+
 function withGameIcon(game: Game): Game {
   const icon = `/api/icons/game?name=${encodeURIComponent(game.name)}`;
   return {
     ...game,
-    accent: `#171a16 url("${icon}") center / 68% 68% no-repeat`,
+    accent: `#171a16 url("${icon}") center / cover no-repeat`,
     initials: "",
+  };
+}
+
+function discountPercent(item: GroupablePackage) {
+  if (item.referencePrice <= item.sellingPrice || item.referencePrice <= 0) return 0;
+  return ((item.referencePrice - item.sellingPrice) / item.referencePrice) * 100;
+}
+
+function enrichPackages(
+  packages: GroupablePackage[],
+  popularity: Map<string, number>,
+): GroupablePackage[] {
+  if (packages.length === 0) return packages;
+
+  const rankedSavings = packages
+    .map((item) => ({
+      id: item.id,
+      percent: discountPercent(item),
+      saving: Math.max(0, item.referencePrice - item.sellingPrice),
+      price: item.sellingPrice,
+    }))
+    .filter((item) => item.percent > 0)
+    .sort(
+      (left, right) =>
+        right.percent - left.percent ||
+        right.saving - left.saving ||
+        left.price - right.price,
+    );
+
+  const bestSavingId = rankedSavings[0]?.id ?? null;
+
+  const rankedPopularity = packages
+    .map((item) => ({ id: item.id, count: popularity.get(item.id) ?? 0 }))
+    .sort((left, right) => right.count - left.count);
+  const bestPopularId = (rankedPopularity[0]?.count ?? 0) >= 2 ? rankedPopularity[0]!.id : null;
+
+  return packages.map((item) => {
+    const groups = new Set<ProductGroup>();
+    const note = item.note ?? "";
+    const searchable = `${item.label} ${note}`;
+
+    if (item.referencePrice > item.sellingPrice) groups.add("promo");
+    if (SUBSCRIPTION_PATTERN.test(searchable)) groups.add("langganan");
+    if (/\bhemat\b/i.test(note) || item.id === bestSavingId) groups.add("hemat");
+    if (/\bpopuler\b/i.test(note) || item.id === bestPopularId) groups.add("populer");
+
+    return {
+      ...item,
+      ...(groups.size ? { groups: Array.from(groups) } : {}),
+    };
+  });
+}
+
+function enrichGame(game: Game, popularity: Map<string, number>): Game {
+  return {
+    ...game,
+    packages: enrichPackages(game.packages as GroupablePackage[], popularity),
   };
 }
 
 export async function getPublicCatalog(): Promise<PublicCatalogResult> {
   if (!isSupabaseConfigured()) {
+    const popularity = new Map<string, number>();
     return {
-      games: staticGames.map(withGameIcon),
+      games: staticGames.map((game) => withGameIcon(enrichGame(game, popularity))),
       paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
         id,
         name,
@@ -64,7 +134,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     };
   }
 
-  const [gameRows, productRows, paymentRows] = await Promise.all([
+  const [gameRows, productRows, paymentRows, recentOrders] = await Promise.all([
     supabaseSelect<GameRow>("games", {
       select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
       filters: { active: "eq.true" },
@@ -80,7 +150,18 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
       filters: { active: "eq.true" },
       order: "sort_order.asc",
     }),
+    supabaseSelect<OrderPopularityRow>("orders", {
+      select: "product_id",
+      filters: { status: "in.(paid,processing,success)" },
+      order: "created_at.desc",
+      limit: 1000,
+    }),
   ]);
+
+  const popularity = new Map<string, number>();
+  for (const order of recentOrders) {
+    popularity.set(order.product_id, (popularity.get(order.product_id) ?? 0) + 1);
+  }
 
   const games: Game[] = gameRows
     .map((game) => ({
@@ -102,7 +183,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
         })),
     }))
     .filter((game) => game.packages.length > 0)
-    .map(withGameIcon);
+    .map((game) => withGameIcon(enrichGame(game, popularity)));
 
   const paymentMethods: PublicPaymentMethod[] = paymentRows.map((method) => ({
     id: method.id,

@@ -35,6 +35,110 @@
   font-size: 8px;
 }
 
+.package-group-tabs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  padding: 1px 0 5px;
+  scrollbar-width: none;
+}
+
+.package-group-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.package-group-tabs button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #0d0f0c;
+  color: #9ba294;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.package-group-tabs button span {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #747b70;
+  font-size: 8px;
+}
+
+.package-group-tabs button:hover,
+.package-group-tabs button.active {
+  border-color: rgba(201, 255, 63, 0.28);
+  background: rgba(201, 255, 63, 0.07);
+  color: var(--lime);
+}
+
+.package-group-tabs button.active span {
+  background: rgba(201, 255, 63, 0.12);
+  color: var(--lime);
+}
+
+.package-badges {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 1px;
+}
+
+.package-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  padding: 0 6px;
+  border: 1px solid rgba(201, 255, 63, 0.14);
+  border-radius: 999px;
+  background: rgba(201, 255, 63, 0.055);
+  color: #b9d978;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.package-badge.populer {
+  border-color: rgba(120, 167, 255, 0.18);
+  background: rgba(120, 167, 255, 0.06);
+  color: #a9c5ff;
+}
+
+.package-badge.langganan {
+  border-color: rgba(255, 184, 77, 0.18);
+  background: rgba(255, 184, 77, 0.06);
+  color: #dfbd82;
+}
+
+.package-badge.promo {
+  border-color: rgba(201, 255, 63, 0.18);
+  color: var(--lime);
+}
+
+.app-artwork {
+  overflow: hidden;
+  background-color: #171a16 !important;
+  background-position: center !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
 .discount-stack {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -256,6 +360,11 @@
 @media (max-width: 520px) {
   .package-option.package-priced {
     min-height: 105px;
+  }
+
+  .package-group-tabs {
+    margin-right: -18px;
+    padding-right: 18px;
   }
 
   .pricing-product-row {
