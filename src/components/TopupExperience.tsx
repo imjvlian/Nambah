@@ -8,11 +8,6 @@ import {
   createPublicPricingFallback,
   type PublicPricingResult,
 } from "@/lib/public-pricing";
-import {
-  createPreviewOrderId,
-  previewOrderStorageKey,
-  type PreviewOrder,
-} from "@/lib/order-preview";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 
@@ -211,13 +206,15 @@ export default function TopupExperience({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/pricing/preview", {
+      const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId: selectedGame.id,
           packageId: selectedPackage.id,
           paymentId: paymentMethod.id,
+          targetUserId: userId.trim(),
+          targetServerId: selectedGame.requiresServer ? serverId.trim() : undefined,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
         }),
@@ -225,57 +222,17 @@ export default function TopupExperience({
 
       const data = (await response.json()) as {
         error?: string;
-        pricing?: PublicPricingResult;
+        order?: { id: string };
       };
 
-      if (!response.ok || !data.pricing) {
-        setNotice(data.error ?? "Harga gagal divalidasi.");
+      if (!response.ok || !data.order) {
+        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
         return;
       }
 
-      if (!data.pricing.safeToCheckout) {
-        setNotice(data.pricing.rejectionReason ?? "Harga belum aman untuk checkout.");
-        return;
-      }
-
-      const orderId = createPreviewOrderId();
-      const previewOrder: PreviewOrder = {
-        id: orderId,
-        createdAt: new Date().toISOString(),
-        mode: "preview",
-        status: "waiting_payment",
-        product: {
-          gameId: selectedGame.id,
-          gameName: selectedGame.name,
-          shortName: selectedGame.shortName,
-          packageId: selectedPackage.id,
-          packageLabel: selectedPackage.label,
-          accent: selectedGame.accent,
-          initials: selectedGame.initials,
-        },
-        account: {
-          userId: userId.trim(),
-          ...(selectedGame.requiresServer && serverId.trim()
-            ? { serverId: serverId.trim() }
-            : {}),
-        },
-        payment: {
-          id: paymentMethod.id,
-          name: paymentMethod.name,
-          detail: paymentMethod.detail,
-        },
-        pricing: data.pricing,
-        ...(appliedPromoCode ? { promoCode: appliedPromoCode } : {}),
-        ...(appliedReferralCode ? { referralCode: appliedReferralCode } : {}),
-      };
-
-      window.localStorage.setItem(
-        previewOrderStorageKey(orderId),
-        JSON.stringify(previewOrder),
-      );
-      router.push(`/order/${encodeURIComponent(orderId)}`);
+      router.push(`/order/${encodeURIComponent(data.order.id)}`);
     } catch {
-      setNotice("Tidak bisa menyiapkan pesanan. Coba lagi.");
+      setNotice("Tidak bisa menyiapkan pembayaran Sandbox. Coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -332,7 +289,7 @@ export default function TopupExperience({
           <h2>Top up tanpa muter-muter.</h2>
           <p>
             {catalogSource === "supabase"
-              ? "Katalog dan pricing dibaca dari database Nambah. Harga final tetap divalidasi ulang oleh server saat checkout."
+              ? "Katalog dan pricing dibaca dari database Nambah. Harga final divalidasi ulang saat order Midtrans Sandbox dibuat."
               : "Harga Nambah, promo, dan benefit referral dihitung terpisah. Static fallback tetap aktif sampai database Nambah dihubungkan."}
           </p>
           <div className="trust-list">
@@ -354,7 +311,7 @@ export default function TopupExperience({
               </div>
             </div>
             <span className="preview-badge">
-              {catalogSource === "supabase" ? "Database Pricing" : "MVP Pricing"}
+              {catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}
             </span>
           </div>
 
@@ -487,7 +444,7 @@ export default function TopupExperience({
               <span className="step-number">4</span>
               <div>
                 <strong>Metode pembayaran</strong>
-                <small>Midtrans dipilih untuk gateway production. Fee live mengikuti rate merchant yang disetujui.</small>
+                <small>Selama flow test, pembayaran menggunakan Midtrans Sandbox dan tidak menagih uang asli.</small>
               </div>
             </div>
             <div className="payment-list">
@@ -563,7 +520,7 @@ export default function TopupExperience({
             type="submit"
           >
             {isSubmitting
-              ? "Menyiapkan pesanan..."
+              ? "Membuat pembayaran Sandbox..."
               : pricingLoading
                 ? "Menghitung harga..."
                 : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
