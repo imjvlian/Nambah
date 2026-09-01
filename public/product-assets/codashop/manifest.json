@@ -1,0 +1,2778 @@
+{
+  "version": 1,
+  "source": "Codashop Indonesia public product catalog",
+  "sourceHomepages": [
+    "https://www.codashop.com/id-id/",
+    "https://app.codashop.com/id-id/"
+  ],
+  "generatedAt": "2026-09-01T18:33:49.123Z",
+  "previousGeneratedAt": null,
+  "stats": {
+    "discoveredProductPages": 70,
+    "productsWithAssets": 65,
+    "uniqueSourceUrls": 275,
+    "uniqueContentFiles": 241,
+    "totalReferencedBytes": 6757793
+  },
+  "products": {
+    "afk-journey": {
+      "name": "AFK Journey",
+      "pageUrl": "https://www.codashop.com/id-id/afk-journey",
+      "cover": "/product-assets/codashop/_assets/06d70ecbab2bd7f5269a.jpg",
+      "assets": [
+        {
+          "alt": "AFK Journey",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/AFK-journey.jpg",
+          "localPath": "/product-assets/codashop/_assets/06d70ecbab2bd7f5269a.jpg",
+          "sha256": "06d70ecbab2bd7f5269a6ae6e1d9ab75c9be47c2e967904ba0e04e663a838404",
+          "bytes": 27731
+        },
+        {
+          "alt": "21 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/4aa857c624124807a06998ea6a1a2c55.png",
+          "localPath": "/product-assets/codashop/_assets/fa6f906b388e6253932b.png",
+          "sha256": "fa6f906b388e6253932b2c6de12e375d934b4d07df3da34fbe57baf45181bd96",
+          "bytes": 6464
+        },
+        {
+          "alt": "Esperia Monthly - Classic Gazette",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/defcc5c3d459c7128057628c67604381.png",
+          "localPath": "/product-assets/codashop/_assets/8c5879074413cff733ae.png",
+          "sha256": "8c5879074413cff733ae99eebd0570cd392b304b27f836de3b5f3d0a534b1418",
+          "bytes": 9937
+        },
+        {
+          "alt": "126 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/b782b8d402212234d3b35fa1395e92ea.png",
+          "localPath": "/product-assets/codashop/_assets/618ccd4fb60b830ddb3b.png",
+          "sha256": "618ccd4fb60b830ddb3bafe49ecb40a8bd6bb29fc38802bea7bdeeb841cb5b7b",
+          "bytes": 7718
+        },
+        {
+          "alt": "294 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/7f436ddcf61abe525969b80a00f6eb57.png",
+          "localPath": "/product-assets/codashop/_assets/9f8f86993b2cf56eb6dd.png",
+          "sha256": "9f8f86993b2cf56eb6dd887d9e8405f53c85b5a0a3ec12558e0c775730b62f6a",
+          "bytes": 9479
+        },
+        {
+          "alt": "Esperia Monthly - Premium Gazette",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/58ad932b4626269e8f19d65f438b23d0.png",
+          "localPath": "/product-assets/codashop/_assets/85c2950ae67b28925dd7.png",
+          "sha256": "85c2950ae67b28925dd77f70a850c3f6fbc70a5567ca5e4e0b3806e0cdbd8d54",
+          "bytes": 9401
+        },
+        {
+          "alt": "588 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/1be927e2b8a97fdc33a02f64498b01ca.png",
+          "localPath": "/product-assets/codashop/_assets/ab214eb813690a6f3cf8.png",
+          "sha256": "ab214eb813690a6f3cf87e0b78a4d1798310ea97b72b00f0311e3f573c25b5b0",
+          "bytes": 9991
+        },
+        {
+          "alt": "Growth Bundle",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/112259fb8f31fafb1d5b0763454a55e9.png",
+          "localPath": "/product-assets/codashop/_assets/ab55a18f007a28587b98.png",
+          "sha256": "ab55a18f007a28587b98faa14befc5030acefefcc55c7c5dec4308b5609a9238",
+          "bytes": 9116
+        },
+        {
+          "alt": "1554 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/4210a03db484e728ef30685092534363.png",
+          "localPath": "/product-assets/codashop/_assets/6ed2580e3a5ca18fe778.png",
+          "sha256": "6ed2580e3a5ca18fe778e8edfc8e15e205ad899b99f8f72b22ebf4e740c73a4e",
+          "bytes": 9646
+        },
+        {
+          "alt": "3150 Dragon Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/743_f3598da5-dca3-4ce9-a6b8-c1775933642f_d357c9838b585080c013c935cadc79a0_image/429f9f096839ddb57ac453d1b56737ab.png",
+          "localPath": "/product-assets/codashop/_assets/af282a91d75bc7954e85.png",
+          "sha256": "af282a91d75bc7954e8567c0c31d60b07fb342025c3f6012814a4d5ce0af3c10",
+          "bytes": 9988
+        }
+      ]
+    },
+    "apple-itunes-usa": {
+      "name": "Apple iTunes USA",
+      "pageUrl": "https://www.codashop.com/id-id/apple-itunes-usa",
+      "cover": "/product-assets/codashop/_assets/4a1166128610e3f1a09e.jpg",
+      "assets": [
+        {
+          "alt": "Apple iTunes USA",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/itunes_us_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/4a1166128610e3f1a09e.jpg",
+          "sha256": "4a1166128610e3f1a09ea2d52f0349e3c76af9db30b86f3a5f9e0e16a98d56f6",
+          "bytes": 15563
+        }
+      ]
+    },
+    "arena-of-valor": {
+      "name": "Arena of Valor",
+      "pageUrl": "https://www.codashop.com/id-id/arena-of-valor",
+      "cover": "/product-assets/codashop/_assets/db246aec412ac4b73fce.jpg",
+      "assets": [
+        {
+          "alt": "Arena of Valor",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/AOV-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/db246aec412ac4b73fce.jpg",
+          "sha256": "db246aec412ac4b73fceba29e14e458c99d1355a74e7f9fca50b6813ee397bf4",
+          "bytes": 9845
+        }
+      ]
+    },
+    "battle-through-the-heavens-3d-fight": {
+      "name": "Battle Through the Heavens 3D: Fight",
+      "pageUrl": "https://www.codashop.com/id-id/battle-through-the-heavens-3d-fight",
+      "cover": "/product-assets/codashop/_assets/96e445bf0edf41127245.png",
+      "assets": [
+        {
+          "alt": "Battle Through the Heavens 3D: Fight",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/btts_new_tile.png",
+          "localPath": "/product-assets/codashop/_assets/96e445bf0edf41127245.png",
+          "sha256": "96e445bf0edf41127245e43d23fe7b9608885c76a5e91f4d7566b7f75cede6f5",
+          "bytes": 78293
+        },
+        {
+          "alt": "99 Coupon",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5065_e8bf1d6d-21b4-4b4c-aa81-4e65a9a3b694_4e6b83a09aeb02b4e71ad89f3c20816f_image/5f7d9fc71628fa772f32904abeab0605.png",
+          "localPath": "/product-assets/codashop/_assets/0d29e4cb6494d6453a28.png",
+          "sha256": "0d29e4cb6494d6453a28dc25739bd72df3825e272fb12e86dc5b6bb9771671ac",
+          "bytes": 22380
+        }
+      ]
+    },
+    "be-the-king-judge-destiny": {
+      "name": "Be The King: Judge Destiny",
+      "pageUrl": "https://www.codashop.com/id-id/be-the-king-judge-destiny",
+      "cover": "/product-assets/codashop/_assets/43ca386fa9c29e37eb6b.png",
+      "assets": [
+        {
+          "alt": "Be The King: Judge Destiny",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/betheking_tile.png",
+          "localPath": "/product-assets/codashop/_assets/43ca386fa9c29e37eb6b.png",
+          "sha256": "43ca386fa9c29e37eb6bd957ed332fbd4d02d7136d04e152c44d28d3efffc784",
+          "bytes": 22855
+        }
+      ]
+    },
+    "bigo-live-voucher": {
+      "name": "Bigo Live Voucher",
+      "pageUrl": "https://www.codashop.com/id-id/bigo-live-voucher",
+      "cover": "/product-assets/codashop/_assets/73f2772ac69b08432962.jpg",
+      "assets": [
+        {
+          "alt": "Bigo Live Voucher",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/ID_BigoLive-cctile.jpg",
+          "localPath": "/product-assets/codashop/_assets/73f2772ac69b08432962.jpg",
+          "sha256": "73f2772ac69b084329622c3ce6d75cc8bb5e048930c632f0fb9e965cc3e99d76",
+          "bytes": 7824
+        },
+        {
+          "alt": "Bigo 10 Diamond",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/denom-bigo-1-small-diamonds.jpg",
+          "localPath": "/product-assets/codashop/_assets/77602af7153cea6394eb.jpg",
+          "sha256": "77602af7153cea6394ebf8fe314bda29663d24b89241624fcfc9a54b8b4df733",
+          "bytes": 9723
+        },
+        {
+          "alt": "Bigo 100 Diamond",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/denom-bigo-2-medium-diamonds.jpg",
+          "localPath": "/product-assets/codashop/_assets/4317f119d97cc525c971.jpg",
+          "sha256": "4317f119d97cc525c9717f52a8e26afd4fb014c4ce7734e62ca0f4dc0c158f02",
+          "bytes": 11622
+        },
+        {
+          "alt": "Bigo 750 Diamond",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/denom-bigo-3-big-diamonds.jpg",
+          "localPath": "/product-assets/codashop/_assets/e62c537382203ff86c97.jpg",
+          "sha256": "e62c537382203ff86c97c790ab0f14f39a6e0454541831845a3cc5c9ab79e69f",
+          "bytes": 14164
+        }
+      ]
+    },
+    "bioskop-online": {
+      "name": "Bioskop Online",
+      "pageUrl": "https://www.codashop.com/id-id/bioskop-online",
+      "cover": "/product-assets/codashop/_assets/13654cef14de7b5bef47.jpg",
+      "assets": [
+        {
+          "alt": "Bioskop Online",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Bioskop-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/13654cef14de7b5bef47.jpg",
+          "sha256": "13654cef14de7b5bef47230728d7fe8655c245bdefe59a27138e4d3ce277f767",
+          "bytes": 6485
+        }
+      ]
+    },
+    "blood-strike": {
+      "name": "Blood Strike",
+      "pageUrl": "https://www.codashop.com/id-id/blood-strike",
+      "cover": "/product-assets/codashop/_assets/df2b851fbc1dfd755b16.png",
+      "assets": [
+        {
+          "alt": "Blood Strike",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/blood_strike_tile.png",
+          "localPath": "/product-assets/codashop/_assets/df2b851fbc1dfd755b16.png",
+          "sha256": "df2b851fbc1dfd755b16a99198157a315fe12a9387d5d91777f7e628d40b19a7",
+          "bytes": 21475
+        }
+      ]
+    },
+    "bookbot-phonics-books-for-kids": {
+      "name": "BOOKBOT PHONICS BOOKS FOR KIDS",
+      "pageUrl": "https://www.codashop.com/id-id/bookbot-phonics-books-for-kids",
+      "cover": "/product-assets/codashop/_assets/1411ae3f39ce1b3a8b4a.png",
+      "assets": [
+        {
+          "alt": "BOOKBOT PHONICS BOOKS FOR KIDS",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Bookbot_Tile.png",
+          "localPath": "/product-assets/codashop/_assets/1411ae3f39ce1b3a8b4a.png",
+          "sha256": "1411ae3f39ce1b3a8b4abafc292becc092c208660527389e52cd73f3397235b9",
+          "bytes": 52437
+        }
+      ]
+    },
+    "call-of-duty-mobile": {
+      "name": "Call of Duty Mobile",
+      "pageUrl": "https://www.codashop.com/id-id/call-of-duty-mobile",
+      "cover": "/product-assets/codashop/_assets/18411808382df721f90d.jpg",
+      "assets": [
+        {
+          "alt": "Call of Duty Mobile",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/CODM-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/18411808382df721f90d.jpg",
+          "sha256": "18411808382df721f90df5b573a567a3c8015ea47cbb2c41a0ae89a6fce89dc8",
+          "bytes": 9880
+        }
+      ]
+    },
+    "chamet": {
+      "name": "Chamet",
+      "pageUrl": "https://www.codashop.com/id-id/chamet",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "6250 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5066_5591264a-a438-4a73-8686-8b211a451e8b_be0697a7bafb70dbb6dfd94dda8f158c_image/1cb2be4d9cf337d80744926ae743c51f.png",
+          "localPath": "/product-assets/codashop/_assets/212f1824ef34d9a7264e.png",
+          "sha256": "212f1824ef34d9a7264e493b0c987d496b3db3095b8e2dc2e07388f85edc95fb",
+          "bytes": 13578
+        }
+      ]
+    },
+    "coding-games-for-kids": {
+      "name": "Coding Games For Kids",
+      "pageUrl": "https://www.codashop.com/id-id/coding-games-for-kids",
+      "cover": "/product-assets/codashop/_assets/a454c5496e786af862d1.png",
+      "assets": [
+        {
+          "alt": "Coding Games For Kids",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/codinggame_tile178x78.png",
+          "localPath": "/product-assets/codashop/_assets/a454c5496e786af862d1.png",
+          "sha256": "a454c5496e786af862d1644c278c57449925d76fd771ffac2d0f0323a935a58c",
+          "bytes": 30907
+        }
+      ]
+    },
+    "conquer-online-mobile": {
+      "name": "Conquer Online Mobile",
+      "pageUrl": "https://www.codashop.com/id-id/conquer-online-mobile",
+      "cover": "/product-assets/codashop/_assets/5b60656327f4ae0e2564.png",
+      "assets": [
+        {
+          "alt": "Conquer Online Mobile",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/conquer_tile.png",
+          "localPath": "/product-assets/codashop/_assets/5b60656327f4ae0e2564.png",
+          "sha256": "5b60656327f4ae0e2564e03dd47c6855002c644c6d20dedb2fdd95c61fd6f663",
+          "bytes": 19270
+        }
+      ]
+    },
+    "conquer-online-pc": {
+      "name": "Conquer Online PC",
+      "pageUrl": "https://www.codashop.com/id-id/conquer-online-pc",
+      "cover": "/product-assets/codashop/_assets/db7dd24d0c35c8d46204.jpg",
+      "assets": [
+        {
+          "alt": "Conquer Online PC",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Conquer_Online_PC.jpg",
+          "localPath": "/product-assets/codashop/_assets/db7dd24d0c35c8d46204.jpg",
+          "sha256": "db7dd24d0c35c8d46204aa6cf9533cbe3d628be26fa448bdcc2f7ea26e0ddd66",
+          "bytes": 23077
+        }
+      ]
+    },
+    "cooking-adventure": {
+      "name": "Cooking Adventure",
+      "pageUrl": "https://www.codashop.com/id-id/cooking-adventure",
+      "cover": "/product-assets/codashop/_assets/37e474b70e12be340787.png",
+      "assets": [
+        {
+          "alt": "Cooking Adventure",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/cookingadventure_tile.png",
+          "localPath": "/product-assets/codashop/_assets/37e474b70e12be340787.png",
+          "sha256": "37e474b70e12be3407875d70c85dd6a19df8000d7c0c03cbc14de05c5b1bc9ba",
+          "bytes": 20430
+        },
+        {
+          "alt": "22000 Cony",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883757103_1f62d37f-62fa-4062-b0d1-dafb42aa32f7.png",
+          "localPath": "/product-assets/codashop/_assets/b21417d364373783cb4d.png",
+          "sha256": "b21417d364373783cb4d76f4b37b09f939e91e36bfc7f0974c33c3918293991a",
+          "bytes": 3476
+        },
+        {
+          "alt": "10 Gems",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883758013_1473dc4f-35a3-46da-9d51-716719bfb8bf.png",
+          "localPath": "/product-assets/codashop/_assets/f47382732a313a4d4e4f.png",
+          "sha256": "f47382732a313a4d4e4f6bce4acd9c12a4295eb77bd1f75a0e5d337398978e73",
+          "bytes": 3007
+        },
+        {
+          "alt": "22 Gems",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883757787_63152e74-9a14-49b7-a45d-6dbeaaf515d2.png",
+          "localPath": "/product-assets/codashop/_assets/5b29e3bb5eda31faccdc.png",
+          "sha256": "5b29e3bb5eda31faccdc029c35f359689f305df09ff4b63dbe4c22fa8d5b4e6a",
+          "bytes": 4064
+        },
+        {
+          "alt": "10000 Tiara",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883756343_416c546d-ea91-4b7d-b7c4-5419f8cc82cd.png",
+          "localPath": "/product-assets/codashop/_assets/e0ea312e2cb128f303f2.png",
+          "sha256": "e0ea312e2cb128f303f2b61a1f628bc745058d39cb0b07e3154381cb9ac25bb6",
+          "bytes": 3905
+        },
+        {
+          "alt": "57500 Cony",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883756928_bb3667e3-75a7-427c-8c59-87ebd007123b.png",
+          "localPath": "/product-assets/codashop/_assets/499557c01961392f6660.png",
+          "sha256": "499557c01961392f6660d373fc76d5fde6b0b5cca75b2c009a493e8dd4387de6",
+          "bytes": 4273
+        },
+        {
+          "alt": "60 Gems",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883757555_eaa8b838-3dc0-4b5c-85af-b888af28685c.png",
+          "localPath": "/product-assets/codashop/_assets/18eeca7620a0a754e321.png",
+          "sha256": "18eeca7620a0a754e321575482784c6a9601f756f21fb3640686662bed20fbb4",
+          "bytes": 4242
+        },
+        {
+          "alt": "120000 Cony",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883756781_ccb46563-5ef9-4482-8270-2f716d2a5798.png",
+          "localPath": "/product-assets/codashop/_assets/288680011ae79db128a3.png",
+          "sha256": "288680011ae79db128a335ef39cb762d9e70dff3f5f60c833c34673025968e03",
+          "bytes": 4827
+        },
+        {
+          "alt": "33000 Tiara",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883756196_ba0b7349-f922-496f-8c10-c6939ae4fe2a.png",
+          "localPath": "/product-assets/codashop/_assets/aa4767da94ec8c9e1f9f.png",
+          "sha256": "aa4767da94ec8c9e1f9f88d2fde09ddd32919b4cf554d981acc9a760b7f880d8",
+          "bytes": 3686
+        },
+        {
+          "alt": "250000 Cony",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883756635_56d7b180-fb6b-438f-81e6-ae1f50a0ed7b.png",
+          "localPath": "/product-assets/codashop/_assets/cc8eaa0a0084e6a320c5.png",
+          "sha256": "cc8eaa0a0084e6a320c56a0457dab9670eee59c364139363320987c1506a12fb",
+          "bytes": 4520
+        },
+        {
+          "alt": "125 Gems",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883757401_46d1895e-78a6-45b5-b1cb-bd5f95f27687.png",
+          "localPath": "/product-assets/codashop/_assets/b73f244d6117475f87cb.png",
+          "sha256": "b73f244d6117475f87cb8142eb467a96cb643483e757dd52fd41dc6dbe7ac4a9",
+          "bytes": 4003
+        },
+        {
+          "alt": "800000 Cony",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883744397_af92b074-a1b2-47f4-b3dc-39d254c7a893.png",
+          "localPath": "/product-assets/codashop/_assets/ee3501b4283564f5eb4c.png",
+          "sha256": "ee3501b4283564f5eb4cb6f7786f515024fe11458b30d570e05020818e019d99",
+          "bytes": 4268
+        },
+        {
+          "alt": "420 Gems",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/571_a18253a5-ff5d-4897-aff0-3134564e860b_product/1742883744539_9c2e08dd-55f4-47ce-8019-c245ac3a4def.png",
+          "localPath": "/product-assets/codashop/_assets/031c826175f036750acd.png",
+          "sha256": "031c826175f036750acd6152dabcc81aff5f19f2a5460d7f8a6f77c3f24a37f3",
+          "bytes": 4424
+        }
+      ]
+    },
+    "crisis-action": {
+      "name": "Crisis Action",
+      "pageUrl": "https://www.codashop.com/id-id/crisis-action",
+      "cover": "/product-assets/codashop/_assets/f9afd4975daf64040027.jpg",
+      "assets": [
+        {
+          "alt": "Crisis Action",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/crisis_action_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/f9afd4975daf64040027.jpg",
+          "sha256": "f9afd4975daf640400279792d4ac30f08ff13e074f752b62950a0b323c6bd4cf",
+          "bytes": 18854
+        }
+      ]
+    },
+    "ea-sports-fc-mobile": {
+      "name": "EA SPORTS FC™ Mobile",
+      "pageUrl": "https://www.codashop.com/id-id/ea-sports-fc-mobile",
+      "cover": "/product-assets/codashop/_assets/fcd7c3a8b796996a22cd.png",
+      "assets": [
+        {
+          "alt": "EA SPORTS FC Mobile",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/EA_FC_Oct_2025.png",
+          "localPath": "/product-assets/codashop/_assets/fcd7c3a8b796996a22cd.png",
+          "sha256": "fcd7c3a8b796996a22cdd3c835fea1ad3fc2e2b4b68740ddc307acd1ba1bb9a8",
+          "bytes": 54350
+        },
+        {
+          "alt": "40 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/9c791f94113c5fffb593411867a0601b.png",
+          "localPath": "/product-assets/codashop/_assets/4aaefb66ae36867739fc.png",
+          "sha256": "4aaefb66ae36867739fcff70c363d2279c7e9eb3e57011b717e31f5e20039314",
+          "bytes": 6799
+        },
+        {
+          "alt": "100 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/3dc2b799f5b68755bcb49d682c081a61.png",
+          "localPath": "/product-assets/codashop/_assets/7f0df529ea475844b799.png",
+          "sha256": "7f0df529ea475844b799eb0ac5c7b4623a3ff790ab05dc4fb3f7deb0cc4eaa6c",
+          "bytes": 9440
+        },
+        {
+          "alt": "520 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/3231a5af12d881c6a88ad4fe221f5fc4.png",
+          "localPath": "/product-assets/codashop/_assets/ccafe6a636533e4dd07b.png",
+          "sha256": "ccafe6a636533e4dd07b10358025f237fb93a121c796326ae8e9035d0bd24038",
+          "bytes": 10543
+        },
+        {
+          "alt": "1070 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/a170279f4510f8f5734a423af9d02118.png",
+          "localPath": "/product-assets/codashop/_assets/111c8aed7028c620c0c0.png",
+          "sha256": "111c8aed7028c620c0c096a507e00f084a605dea06f97ee76754615f8dfe4871",
+          "bytes": 12763
+        },
+        {
+          "alt": "2200 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/b53d2e47254fe8456dd35041cb4d8e7f.png",
+          "localPath": "/product-assets/codashop/_assets/76c14bab9c3dc3979345.png",
+          "sha256": "76c14bab9c3dc3979345138689e64a6e15380bed077d4d45ac9da4b06f2cb79e",
+          "bytes": 13487
+        },
+        {
+          "alt": "5750 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/c35f0944a64a9109ccce9cbc24291c1e.png",
+          "localPath": "/product-assets/codashop/_assets/d66206fd9daa0689cde2.png",
+          "sha256": "d66206fd9daa0689cde27f6eee6463b135451bfaeca25ae5ce8ea61458e3d308",
+          "bytes": 12930
+        },
+        {
+          "alt": "12000 FC POINTS",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/453a1767f313ea05fb4fc838635dae37.png",
+          "localPath": "/product-assets/codashop/_assets/963ca31b6f0dfabe3d5e.png",
+          "sha256": "963ca31b6f0dfabe3d5e002178a9297a160154f3e11c763f144f3c64d2e098bc",
+          "bytes": 13419
+        },
+        {
+          "alt": "39 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/a7f26a86ef3329f8e6f064a54e395902.png",
+          "localPath": "/product-assets/codashop/_assets/f6e40def4ecfa5fd37a3.png",
+          "sha256": "f6e40def4ecfa5fd37a3de908eadd602497534499ab671ee5e839ad06115010b",
+          "bytes": 20419
+        },
+        {
+          "alt": "99 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/c30d05de57d0893291276d4335779ca5.png",
+          "localPath": "/product-assets/codashop/_assets/fa529ffc49e2eb50cb99.png",
+          "sha256": "fa529ffc49e2eb50cb99bf2bd03fb64b0c949ffd3c96d8d65ffb4b3cfa8b0c33",
+          "bytes": 23794
+        },
+        {
+          "alt": "499 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/fdf2e2ce01d2885686d4c6b7f162cb33.png",
+          "localPath": "/product-assets/codashop/_assets/8b9899514d77746b2b3d.png",
+          "sha256": "8b9899514d77746b2b3dec18d778a12708cee71102697ec573b77109d1ece3f9",
+          "bytes": 28887
+        },
+        {
+          "alt": "999 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/dc6c86afb0fba47aad21adc17d447255.png",
+          "localPath": "/product-assets/codashop/_assets/3bf6c58d8af738f46450.png",
+          "sha256": "3bf6c58d8af738f46450b87547b01d31d90c76b728441ee3daae5eea41cba5cc",
+          "bytes": 28604
+        },
+        {
+          "alt": "1999 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/adf04936c53da8a0202fae85ca43ed44.png",
+          "localPath": "/product-assets/codashop/_assets/69d1d361ddca1a667e40.png",
+          "sha256": "69d1d361ddca1a667e40fc737497fbe3eb9ac6ef55fc9db216e8dba5d1eb5bd9",
+          "bytes": 38233
+        },
+        {
+          "alt": "4999 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/f27cdad088b1ab659041d0423a2f52c8.png",
+          "localPath": "/product-assets/codashop/_assets/7ad390298b90b00478a7.png",
+          "sha256": "7ad390298b90b00478a7969ca7039c3f686c9a02bea3745dfb83e2a1966238b5",
+          "bytes": 38506
+        },
+        {
+          "alt": "9999 Silver",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/826_219b1202-df20-4fe8-bfcb-d2689d381d31_823ff62524a33a1ea5aee54da1ea2dbe_image/ab8debb7b199f570bb52d95ef6680ad1.png",
+          "localPath": "/product-assets/codashop/_assets/61fef1bec3391a87fc0a.png",
+          "sha256": "61fef1bec3391a87fc0adfe567b3369c7d65fe49b846d5b9b6e61fd14664a7a6",
+          "bytes": 37789
+        }
+      ]
+    },
+    "free-fire": {
+      "name": "Free Fire Top-up",
+      "pageUrl": "https://www.codashop.com/id-id/free-fire",
+      "cover": "/product-assets/codashop/_assets/902336ed3c960bb72ec5.jpg",
+      "assets": [
+        {
+          "alt": "Free Fire",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/free-fire-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/902336ed3c960bb72ec5.jpg",
+          "sha256": "902336ed3c960bb72ec5cabe5054f2d9606accd9b448b02415f84f05aa8523b8",
+          "bytes": 12019
+        },
+        {
+          "alt": "5 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843971236_75ed2db9-44ca-450f-8f11-bb91a4ec9ea0.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "12 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970649_04013157-7557-4929-baa7-312b6ea9d463.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "50 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970453_c87f44d2-1b38-4f1b-8ab0-edf47abbbaef.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "70 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843971039_d26fa4a0-8f6f-4d94-8f0a-a311e8918836.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "140 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970845_66bd750d-7c1f-4432-adf1-b10399d815f9.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "355 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970258_caa85b75-a621-4867-84e7-c89716c74f7c.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "720 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970053_64378e4c-fe7b-4cd1-814f-5b52cc085b2d.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "1450 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969859_c51305ce-e1b0-4875-8f37-c2c7082c91ce.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "2180 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969665_1c6cc1b0-7cff-4277-98d0-43f883298419.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "3640 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969474_1f773efc-54a8-44d5-a3d7-2ee7672d3375.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "7290 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843949065_e19f9be1-7ba7-4ccc-a438-271bcaa42dfa.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "36500 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843948874_f9b6adf0-c9fe-4d12-8b7b-0da6a0e42d9c.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "73100 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843948664_f01e7761-c19c-47fc-9406-8724125cdf89.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        }
+      ]
+    },
+    "free-fire-max": {
+      "name": "Free Fire MAX Top-up",
+      "pageUrl": "https://www.codashop.com/id-id/free-fire-max",
+      "cover": "/product-assets/codashop/_assets/fcae50234939add2b0b2.jpg",
+      "assets": [
+        {
+          "alt": "Free Fire MAX",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/FFmax-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/fcae50234939add2b0b2.jpg",
+          "sha256": "fcae50234939add2b0b247902315e9678c5e3393a3c31f9a4262d78c21195335",
+          "bytes": 13087
+        },
+        {
+          "alt": "5 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843971236_75ed2db9-44ca-450f-8f11-bb91a4ec9ea0.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "12 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970649_04013157-7557-4929-baa7-312b6ea9d463.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "50 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970453_c87f44d2-1b38-4f1b-8ab0-edf47abbbaef.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "70 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843971039_d26fa4a0-8f6f-4d94-8f0a-a311e8918836.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "140 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970845_66bd750d-7c1f-4432-adf1-b10399d815f9.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "355 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970258_caa85b75-a621-4867-84e7-c89716c74f7c.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "720 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843970053_64378e4c-fe7b-4cd1-814f-5b52cc085b2d.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "1450 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969859_c51305ce-e1b0-4875-8f37-c2c7082c91ce.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "2180 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969665_1c6cc1b0-7cff-4277-98d0-43f883298419.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "3640 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843969474_1f773efc-54a8-44d5-a3d7-2ee7672d3375.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "7290 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843949065_e19f9be1-7ba7-4ccc-a438-271bcaa42dfa.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "36500 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843948874_f9b6adf0-c9fe-4d12-8b7b-0da6a0e42d9c.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        },
+        {
+          "alt": "73100 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/337_448ecd16-c203-497d-af3b-eecc4fbad855_product/1759843948664_f01e7761-c19c-47fc-9406-8724125cdf89.png",
+          "localPath": "/product-assets/codashop/_assets/7c77ef25ab71668ce144.png",
+          "sha256": "7c77ef25ab71668ce14480e52815e31bcf9e19f2409889048c0c00bde9716895",
+          "bytes": 5052
+        }
+      ]
+    },
+    "garena-shells-voucher": {
+      "name": "Garena Shells Voucher",
+      "pageUrl": "https://www.codashop.com/id-id/garena-shells-voucher",
+      "cover": "/product-assets/codashop/_assets/a465cd9102f72daf3ce9.jpg",
+      "assets": [
+        {
+          "alt": "Garena Shells Voucher",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/garena-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/a465cd9102f72daf3ce9.jpg",
+          "sha256": "a465cd9102f72daf3ce925ad0df5a9582d3c1d3362c5cec6779893f647e6e1bb",
+          "bytes": 4249
+        }
+      ]
+    },
+    "genshin-impact": {
+      "name": "Genshin Impact",
+      "pageUrl": "https://www.codashop.com/id-id/genshin-impact",
+      "cover": "/product-assets/codashop/_assets/f4f7823bac1b4382c8a3.jpg",
+      "assets": [
+        {
+          "alt": "Genshin Impact",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/genshinimpact_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/f4f7823bac1b4382c8a3.jpg",
+          "sha256": "f4f7823bac1b4382c8a312cacf77b9d575355218e891a6e5ef18916c84f512ed",
+          "bytes": 12601
+        },
+        {
+          "alt": "60 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/91730ed3564f23cbd2733e6f17b7fe30.png",
+          "localPath": "/product-assets/codashop/_assets/c24b02e61074fb9ce1e6.png",
+          "sha256": "c24b02e61074fb9ce1e607cdad093b9830c26366a73fb047db9514b9c8a5ab49",
+          "bytes": 12133
+        },
+        {
+          "alt": "300 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/4c496b490e6032fb082fcd8eaa1248c1.png",
+          "localPath": "/product-assets/codashop/_assets/93d2f8ad3de9a27a9a10.png",
+          "sha256": "93d2f8ad3de9a27a9a10415c1a6e84a14252815806706e56a977fceaf2dcd595",
+          "bytes": 21468
+        },
+        {
+          "alt": "980 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/54e5cedc8ca6210e5bd40b49189eac2d.png",
+          "localPath": "/product-assets/codashop/_assets/c735385e7c8d8a715308.png",
+          "sha256": "c735385e7c8d8a7153087bfd46bca599300a06d65aac818232f1f93e1c02cb34",
+          "bytes": 25276
+        },
+        {
+          "alt": "1,980 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/d90c280572f9859be0b190cb699f5bd2.png",
+          "localPath": "/product-assets/codashop/_assets/ce731b8d4683c0b80e51.png",
+          "sha256": "ce731b8d4683c0b80e5103b23ad92600cf39fa4899907a15f17e30ad30c29f17",
+          "bytes": 35818
+        },
+        {
+          "alt": "3,280 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/09901cba8a61a58c156903f37f63ec72.png",
+          "localPath": "/product-assets/codashop/_assets/6feae6bef9b13cdef4cb.png",
+          "sha256": "6feae6bef9b13cdef4cb674fc7bc2ae0827309d67969559fa9f3edeb24973f6f",
+          "bytes": 44108
+        },
+        {
+          "alt": "6,480 Chronal Nexus",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/7e27ce14e412a591c9a7e49c5aa1a02b.png",
+          "localPath": "/product-assets/codashop/_assets/7bc5b4bfbf9f5e1c2358.png",
+          "sha256": "7bc5b4bfbf9f5e1c2358377edb22c4adb5d8abeb0c6fb159124d7c15e4cb251f",
+          "bytes": 47478
+        },
+        {
+          "alt": "60 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309047075_aa38d9d0-9fa4-4145-b7a7-4b839e9f50c7.png",
+          "localPath": "/product-assets/codashop/_assets/d802e1e7cf8897ae961a.png",
+          "sha256": "d802e1e7cf8897ae961ae3442e580754c3c070a749ecd9177ee498955ceff8af",
+          "bytes": 4300
+        },
+        {
+          "alt": "Blessing of the Welkin Moon",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309045962_aeae7bd5-558d-4b60-893d-d5f8094211d0.png",
+          "localPath": "/product-assets/codashop/_assets/f7d949e2baa9de2b4264.png",
+          "sha256": "f7d949e2baa9de2b4264e4e7cd2c4132d9b85725943813aa87c79e956b479222",
+          "bytes": 6083
+        },
+        {
+          "alt": "330 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309046913_b90933ec-1100-4965-8575-c970216fecb3.png",
+          "localPath": "/product-assets/codashop/_assets/fc07a1c8833b7c0c03ae.png",
+          "sha256": "fc07a1c8833b7c0c03ae051594d9490fff249e31ec36376adda90e5c1b34f344",
+          "bytes": 4925
+        },
+        {
+          "alt": "1090 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309046747_e9c2e439-8518-4a2d-b844-4fdcda8e120b.png",
+          "localPath": "/product-assets/codashop/_assets/c6a6c965ca674af2d503.png",
+          "sha256": "c6a6c965ca674af2d50351dcb1424c6183eb0df83dd5c49d047a7b958479926c",
+          "bytes": 5865
+        },
+        {
+          "alt": "2240 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309046580_044f64d8-52d3-4085-b3ed-cabcb5e36e94.png",
+          "localPath": "/product-assets/codashop/_assets/55dd86341ad75d3fce73.png",
+          "sha256": "55dd86341ad75d3fce73755ecabd7390e90800dcc1cd9ce75a37a91dc966deda",
+          "bytes": 6160
+        },
+        {
+          "alt": "3880 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309046400_0d71767c-f275-4690-b710-0b7e123dde90.png",
+          "localPath": "/product-assets/codashop/_assets/73594146d80654b9538d.png",
+          "sha256": "73594146d80654b9538da174fccd93f74257430b05c508fb076a4f6e4c07f3ec",
+          "bytes": 6810
+        },
+        {
+          "alt": "8080 Genesis Crystals",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_product/1758309046161_9078cb82-5ff6-4606-961b-6375536a7ead.png",
+          "localPath": "/product-assets/codashop/_assets/ea8a5954d374c9799821.png",
+          "sha256": "ea8a5954d374c979982108d639f933513f3dbb9484a8b92a914df4b171cc3db0",
+          "bytes": 8083
+        }
+      ]
+    },
+    "hago": {
+      "name": "Hago",
+      "pageUrl": "https://www.codashop.com/id-id/hago",
+      "cover": "/product-assets/codashop/_assets/97ef6bf8efb3ab92b8a8.jpg",
+      "assets": [
+        {
+          "alt": "Hago",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/hago-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/97ef6bf8efb3ab92b8a8.jpg",
+          "sha256": "97ef6bf8efb3ab92b8a8f41702c154181607eea7bb11ed68f94846ef29819519",
+          "bytes": 5844
+        }
+      ]
+    },
+    "heaven-domain-rebirth": {
+      "name": "Heaven Domain: Rebirth",
+      "pageUrl": "https://www.codashop.com/id-id/heaven-domain-rebirth",
+      "cover": "/product-assets/codashop/_assets/fa464cf3b4613a28e980.png",
+      "assets": [
+        {
+          "alt": "Heaven Domain: Rebirth",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/HeavenDomainRebirth_Tile_178x178.png",
+          "localPath": "/product-assets/codashop/_assets/fa464cf3b4613a28e980.png",
+          "sha256": "fa464cf3b4613a28e980f047fda0a98646420cfb3f1101b9fc928aec307482a2",
+          "bytes": 21196
+        },
+        {
+          "alt": "60 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/902e8a9e085f9bf19f1de345abd632eb.png",
+          "localPath": "/product-assets/codashop/_assets/17a45f0681a1b520397d.png",
+          "sha256": "17a45f0681a1b520397d17bce9b7027668647b62d25fd0f2a0947549c5e14ebd",
+          "bytes": 13824
+        },
+        {
+          "alt": "300 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/c1aac2f42413073d602c0c3594c43d69.png",
+          "localPath": "/product-assets/codashop/_assets/3e864dba8cbdfbc8f978.png",
+          "sha256": "3e864dba8cbdfbc8f9788cc74ed8185f9be3a426d0d8c738c68f7972c8868005",
+          "bytes": 16665
+        },
+        {
+          "alt": "680 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/53f3779cfd72fcdc44242352b5d82fea.png",
+          "localPath": "/product-assets/codashop/_assets/eb0cc55f03f2942924c0.png",
+          "sha256": "eb0cc55f03f2942924c09ea49a324a017b706aca24866cac67e46b0157f3f5e9",
+          "bytes": 18594
+        },
+        {
+          "alt": "980 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/58fd22dffff355be96da9f2d67f9c304.png",
+          "localPath": "/product-assets/codashop/_assets/6f85ab2558f1a0f87fc4.png",
+          "sha256": "6f85ab2558f1a0f87fc4b92288d34ad391df16f72996c8aaf7785f38fd0bfcc8",
+          "bytes": 22989
+        },
+        {
+          "alt": "1280 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/f525d5b25c47263e33a8d305c5610c5a.png",
+          "localPath": "/product-assets/codashop/_assets/ed08db595e6fc9fd5c82.png",
+          "sha256": "ed08db595e6fc9fd5c827427af7fc8ea1dbbda7e94551a825fcbbe2426d9af96",
+          "bytes": 23255
+        },
+        {
+          "alt": "1980 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/4e054dc379572836a79b5fbf78ab091e.png",
+          "localPath": "/product-assets/codashop/_assets/7355d150a1a6349f16d4.png",
+          "sha256": "7355d150a1a6349f16d4ea45fe40767c4cc55103dd23673c51060369f5108f7d",
+          "bytes": 24109
+        },
+        {
+          "alt": "3280 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/2661c801a555bb9c7ef8ff5738d7be81.png",
+          "localPath": "/product-assets/codashop/_assets/08ee8b7d468f4200b3a0.png",
+          "sha256": "08ee8b7d468f4200b3a0b9d306f157ae4ce29dbed263238624400b5e062ee35b",
+          "bytes": 23860
+        },
+        {
+          "alt": "6480 Jade",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/19_33674342-d3b8-4b86-a51c-b4a8c5591751_ef2f42600d6e641fdecbacad3c16748f_image/e80e89eb47ab2335335e826883177d92.png",
+          "localPath": "/product-assets/codashop/_assets/b397e47709cb75861763.png",
+          "sha256": "b397e47709cb758617632dfc5d1b84025c16c9d0b95abc4c0e60421de43a0382",
+          "bytes": 25657
+        }
+      ]
+    },
+    "honkai-star-rail": {
+      "name": "Honkai: Star Rail",
+      "pageUrl": "https://www.codashop.com/id-id/honkai-star-rail",
+      "cover": "/product-assets/codashop/_assets/8df4b8fb28a4b20d61fb.jpg",
+      "assets": [
+        {
+          "alt": "Honkai: Star Rail",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/hsr_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/8df4b8fb28a4b20d61fb.jpg",
+          "sha256": "8df4b8fb28a4b20d61fbb5727364f507444840c30c3fa9c4243e4b450e377ffc",
+          "bytes": 41702
+        },
+        {
+          "alt": "60 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290820_de21e227-2bfb-4ce5-8c3d-d5ecf3370500.png",
+          "localPath": "/product-assets/codashop/_assets/53915baaad54ddae4768.png",
+          "sha256": "53915baaad54ddae476881dea1f2292fe564b5425e54645765b41a8082440cf7",
+          "bytes": 4209
+        },
+        {
+          "alt": "Express Supply Pass",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290492_fd929cc3-27be-4c00-b9dd-1638ca7460b8.png",
+          "localPath": "/product-assets/codashop/_assets/9c4380584bd90439c646.png",
+          "sha256": "9c4380584bd90439c646b1105f8df04ce67f2c5696204ebb5ea172b7a7b28846",
+          "bytes": 6277
+        },
+        {
+          "alt": "330 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290765_c9c674b0-df39-40b5-86ae-b1c32b59b8dd.png",
+          "localPath": "/product-assets/codashop/_assets/53686fdfd3a9eb14d195.png",
+          "sha256": "53686fdfd3a9eb14d19522c57c88b339200cf245340297d4bbb77a7f39d22bee",
+          "bytes": 4624
+        },
+        {
+          "alt": "1090 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290710_0e57fc6d-fec9-45d6-85e4-efb5133518b7.png",
+          "localPath": "/product-assets/codashop/_assets/6a151e6075869685d5a3.png",
+          "sha256": "6a151e6075869685d5a34d6472c5b27ffe679a29723faa9a8fbabcef9e5d4a2c",
+          "bytes": 5529
+        },
+        {
+          "alt": "2240 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290656_ac9ec3ac-48fc-4dca-9ccd-85336f7ea395.png",
+          "localPath": "/product-assets/codashop/_assets/21a299b981026fbf97e5.png",
+          "sha256": "21a299b981026fbf97e56f270f2bc66446fba83c3e2b610ffd6cea39dabe07d5",
+          "bytes": 6530
+        },
+        {
+          "alt": "3880 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290602_d23dbc26-cbb8-46d2-a79c-1bcc65742bbf.png",
+          "localPath": "/product-assets/codashop/_assets/57ae9e691b0c005a2fae.png",
+          "sha256": "57ae9e691b0c005a2faedf6fbcc870aaea223a15a5dfa5906eedbaf871944182",
+          "bytes": 8409
+        },
+        {
+          "alt": "8080 Oneiric Shard",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_b562a1b5-6e30-46c4-a47d-1c9420203bed_product/1759167290549_00e02d82-6dbc-440c-95ab-015dfb7f324f.png",
+          "localPath": "/product-assets/codashop/_assets/8d16322d60ed4827da1c.png",
+          "sha256": "8d16322d60ed4827da1c77b50d58ff79bb619ecc4acd2f030a49da9f96e049c0",
+          "bytes": 8551
+        }
+      ]
+    },
+    "honor-of-kings": {
+      "name": "Honor of Kings",
+      "pageUrl": "https://www.codashop.com/id-id/honor-of-kings",
+      "cover": "/product-assets/codashop/_assets/d248f5251ed418d22c58.jpg",
+      "assets": [
+        {
+          "alt": "Honor of Kings",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/HonorofKings_Codacash178x178.jpg",
+          "localPath": "/product-assets/codashop/_assets/d248f5251ed418d22c58.jpg",
+          "sha256": "d248f5251ed418d22c5879a4178b56835cc4b7b97373e296d0d79ea9c5419734",
+          "bytes": 10585
+        }
+      ]
+    },
+    "idn-nonton": {
+      "name": "IDN Nonton",
+      "pageUrl": "https://www.codashop.com/id-id/idn-nonton",
+      "cover": "/product-assets/codashop/_assets/1b80d56ecdc6d1ac300c.png",
+      "assets": [
+        {
+          "alt": "IDN Nonton",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/IDN-Nonton-tile.png",
+          "localPath": "/product-assets/codashop/_assets/1b80d56ecdc6d1ac300c.png",
+          "sha256": "1b80d56ecdc6d1ac300cf39b0638707eb0165c372787d14977dc18b8b07a11d1",
+          "bytes": 44446
+        },
+        {
+          "alt": "IDN Nonton 1 Day",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1772679874479_8d866721-0e50-42b6-9c14-4d67c3517622.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        },
+        {
+          "alt": "IDN Nonton 3 Days",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1768892250934_60602363-7ee7-4f1f-9a65-3158bceeab49.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        },
+        {
+          "alt": "IDN Nonton Monthly",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1768892206136_595c5ac2-861f-4311-80f2-dd03596ed9a2.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        },
+        {
+          "alt": "IDN Nonton Weekly",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1768892229013_2ed3f1b0-0040-4cbf-a615-e17913b85918.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        },
+        {
+          "alt": "IDN Nonton 3 Month",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1768892184580_fb1afb88-4097-4e3f-962d-43c5b77ca091.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        },
+        {
+          "alt": "IDN Nonton Yearly",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/6544_399cd1eb-2b18-4117-a062-a426729d070b_4250eab7bde0c6aba8b416fcf99054f8_product/1768892142746_09d840dc-1642-4e22-aa9e-8754d8c4e1c8.png",
+          "localPath": "/product-assets/codashop/_assets/4bbcde2e60a91da028d4.png",
+          "sha256": "4bbcde2e60a91da028d461482453b7ff2d0ae24cb8497f6e9ffc8fb98a738003",
+          "bytes": 4200
+        }
+      ]
+    },
+    "joker-master": {
+      "name": "Joker Master (IDN)",
+      "pageUrl": "https://www.codashop.com/id-id/joker-master",
+      "cover": "/product-assets/codashop/_assets/ca314fcc6ec15cb2fd05.png",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Jokermaster_tile.png",
+          "localPath": "/product-assets/codashop/_assets/ca314fcc6ec15cb2fd05.png",
+          "sha256": "ca314fcc6ec15cb2fd05ae496196206be25c3debfc354361d1e1a0e372aa1e0c",
+          "bytes": 51387
+        }
+      ]
+    },
+    "kidloland-kids-and-toddler-games": {
+      "name": "KIDLOLAND KIDS and TODDLER GAMES",
+      "pageUrl": "https://www.codashop.com/id-id/kidloland-kids-and-toddler-games",
+      "cover": "/product-assets/codashop/_assets/b54b8cfb33fd5e3b7245.png",
+      "assets": [
+        {
+          "alt": "KIDLOLAND KIDS and TODDLER GAMES",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Kidoland_Tile.png",
+          "localPath": "/product-assets/codashop/_assets/b54b8cfb33fd5e3b7245.png",
+          "sha256": "b54b8cfb33fd5e3b724530f5f478fdf1e443e02cb46c148986d761a1f5f1f1b2",
+          "bytes": 31468
+        }
+      ]
+    },
+    "kode-voucher-google-play": {
+      "name": "Kode Voucher Google Play",
+      "pageUrl": "https://www.codashop.com/id-id/kode-voucher-google-play",
+      "cover": "/product-assets/codashop/_assets/f288a5480954460b2b50.jpg",
+      "assets": [
+        {
+          "alt": "Kode Voucher Google Play",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/GP-cc_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/f288a5480954460b2b50.jpg",
+          "sha256": "f288a5480954460b2b50d13132e7b15e8e337aa7e9ef0d5dbfab2eba916332ba",
+          "bytes": 4270
+        }
+      ]
+    },
+    "league-of-legends": {
+      "name": "League of Legends",
+      "pageUrl": "https://www.codashop.com/id-id/league-of-legends",
+      "cover": "/product-assets/codashop/_assets/7b8f8b4b8016106cba5a.jpg",
+      "assets": [
+        {
+          "alt": "League of Legends",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/LOL_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/7b8f8b4b8016106cba5a.jpg",
+          "sha256": "7b8f8b4b8016106cba5a6dcaa670e199e6d395aab0463cffd3e1141bc55bc5c6",
+          "bytes": 21042
+        },
+        {
+          "alt": "575 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/5367ca6f9c4514557204be78c4ae870b.png",
+          "localPath": "/product-assets/codashop/_assets/15110a2317f11ef5a3c6.png",
+          "sha256": "15110a2317f11ef5a3c6cd18da2d8efe8ce84b8e6b7c23d6321a9a1cc0dacb0d",
+          "bytes": 16714
+        },
+        {
+          "alt": "1380 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/40b83c659a13b2cc608d6b99bfcf0f65.png",
+          "localPath": "/product-assets/codashop/_assets/d9ed5b79c157e77704d9.png",
+          "sha256": "d9ed5b79c157e77704d9a2d94e81a321a0febd8811fb131d898383b3eba4da40",
+          "bytes": 18633
+        },
+        {
+          "alt": "2800 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/3e825354d91b4c1038b2e175c11d55c8.png",
+          "localPath": "/product-assets/codashop/_assets/01f847b384a6e84b631e.png",
+          "sha256": "01f847b384a6e84b631e299494e830f302fbbda190cc36f89cbbcca79b57238a",
+          "bytes": 21281
+        },
+        {
+          "alt": "4500 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/73e14d912bf983fb70d40dd4a6febe6c.png",
+          "localPath": "/product-assets/codashop/_assets/8ae6add60a04661f3494.png",
+          "sha256": "8ae6add60a04661f34940b71fc01de492455ff17fd0bac04f4d9c0412f650130",
+          "bytes": 17241
+        },
+        {
+          "alt": "6500 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/7fcefd3fbb54c8b22ef7d090cf06bc16.png",
+          "localPath": "/product-assets/codashop/_assets/8ed9ccef59af38e9fe45.png",
+          "sha256": "8ed9ccef59af38e9fe4594eabbed29fe13f3f34a1f570e9f94d65c13c99de42a",
+          "bytes": 18886
+        },
+        {
+          "alt": "13500 RP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/556_5a3a81fa-3ba3-4a3d-82c4-9ba85d04b3bb_e1d0bbe910e3eb4d973973a4de3c5ddd_image/edcf799c9fa3bc1aa5b257c7a411563d.png",
+          "localPath": "/product-assets/codashop/_assets/1d38ced556b2aadb8ffe.png",
+          "sha256": "1d38ced556b2aadb8ffecfc7390f12815ab02770d206624106ab9e9e2fbf9bbf",
+          "bytes": 22165
+        }
+      ]
+    },
+    "league-of-legends-wild-rift": {
+      "name": "League of Legends: Wild Rift",
+      "pageUrl": "https://www.codashop.com/id-id/league-of-legends-wild-rift",
+      "cover": "/product-assets/codashop/_assets/691a80e84cde147b1691.png",
+      "assets": [
+        {
+          "alt": "League of Legends: Wild Rift",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Wildrift_APPICON_iOS_1024px.png",
+          "localPath": "/product-assets/codashop/_assets/691a80e84cde147b1691.png",
+          "sha256": "691a80e84cde147b169182d553199cab70d2aecb72906810b66a3c1b6a6dc3e4",
+          "bytes": 1385898
+        },
+        {
+          "alt": "Stellacorn’s Gift",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_6907880b44941404c2e73e303293cdd9_image/533227040281fdd3ea5d237a01dfa642.png",
+          "localPath": "/product-assets/codashop/_assets/b52bd6799b0150045c05.png",
+          "sha256": "b52bd6799b0150045c055208a9d89cd2c13346102abea16ac059148ac775f6ad",
+          "bytes": 14839
+        },
+        {
+          "alt": "425 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/8bb9889b136f7ec3bdb65c1cc921fa7e.png",
+          "localPath": "/product-assets/codashop/_assets/b52bd6799b0150045c05.png",
+          "sha256": "b52bd6799b0150045c055208a9d89cd2c13346102abea16ac059148ac775f6ad",
+          "bytes": 14839
+        },
+        {
+          "alt": "1000 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/013aa256bd6a56d6514f2c01ad0aba34.png",
+          "localPath": "/product-assets/codashop/_assets/e95769f960c65865ef36.png",
+          "sha256": "e95769f960c65865ef36b8d959f2cee1adaebe2dc0c566c2d29e9c6a90abc281",
+          "bytes": 14850
+        },
+        {
+          "alt": "1850 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/ec0c56eb5d6a3d558b5f6a80206d8ccc.png",
+          "localPath": "/product-assets/codashop/_assets/8a605716a21055f2d6c7.png",
+          "sha256": "8a605716a21055f2d6c798fa005b92791cd9f45db8884bafd6737a99712547a3",
+          "bytes": 15042
+        },
+        {
+          "alt": "Celestial Blessing",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_6907880b44941404c2e73e303293cdd9_image/702a1dbce5fdcdc073bd274888ab05fc.png",
+          "localPath": "/product-assets/codashop/_assets/d87d5c9e3407bd041bba.png",
+          "sha256": "d87d5c9e3407bd041bba6cde1378cb743768bd845172a28b60f3f0eede94ca2b",
+          "bytes": 14088
+        },
+        {
+          "alt": "3275 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/1c838777efd025a4480048ca2ac760b3.png",
+          "localPath": "/product-assets/codashop/_assets/3da568d7bc32ae1eee2e.png",
+          "sha256": "3da568d7bc32ae1eee2e9e508967aab8a408fa10351b55ded67919c7c86bffb9",
+          "bytes": 15068
+        },
+        {
+          "alt": "4800 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/1fd6b8b40423bab66dd51840a80f787f.png",
+          "localPath": "/product-assets/codashop/_assets/40cd250309aae22b195a.png",
+          "sha256": "40cd250309aae22b195a32c20c67d32d58b1c7c2950273cc9219dd30a63a8f1c",
+          "bytes": 12715
+        },
+        {
+          "alt": "10000 Wild Cores",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_1db19a77-4479-4926-b339-2de86affe7d7_5f4d9bf3def2df99e573a1d74deb3146_image/9c8f8acb8181bf61eceba1e955b74692.png",
+          "localPath": "/product-assets/codashop/_assets/d87d5c9e3407bd041bba.png",
+          "sha256": "d87d5c9e3407bd041bba6cde1378cb743768bd845172a28b60f3f0eede94ca2b",
+          "bytes": 14088
+        }
+      ]
+    },
+    "light-and-night": {
+      "name": "Light and Night",
+      "pageUrl": "https://www.codashop.com/id-id/light-and-night",
+      "cover": "/product-assets/codashop/_assets/9d4a6bd57edf31b98853.png",
+      "assets": [
+        {
+          "alt": "Light and Night",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/LightAndNightTileImage.png",
+          "localPath": "/product-assets/codashop/_assets/9d4a6bd57edf31b98853.png",
+          "sha256": "9d4a6bd57edf31b988536d59c28134af0facfa4289b27de1685ab7a6a44b9620",
+          "bytes": 87206
+        }
+      ]
+    },
+    "machina-waking": {
+      "name": "Machina Waking",
+      "pageUrl": "https://www.codashop.com/id-id/machina-waking",
+      "cover": "/product-assets/codashop/_assets/5f97740702d9b522c4fc.jpg",
+      "assets": [
+        {
+          "alt": "Machina Waking",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Machina_waking_tile_178x178.jpg",
+          "localPath": "/product-assets/codashop/_assets/5f97740702d9b522c4fc.jpg",
+          "sha256": "5f97740702d9b522c4fce05cefa314d4fb9f30c1e3025b07c9504517f3dafe62",
+          "bytes": 6257
+        }
+      ]
+    },
+    "magic-chess-go-go": {
+      "name": "Magic Chess: Go Go",
+      "pageUrl": "https://www.codashop.com/id-id/magic-chess-go-go",
+      "cover": "/product-assets/codashop/_assets/4f5d90adac527d52f265.png",
+      "assets": [
+        {
+          "alt": "Magic Chess: Go Go",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/NEWmcgg.PNG",
+          "localPath": "/product-assets/codashop/_assets/4f5d90adac527d52f265.png",
+          "sha256": "4f5d90adac527d52f2651e472830107c77874d3d44844c5a4c7d8d15b771d8e4",
+          "bytes": 68619
+        },
+        {
+          "alt": "100 Diamonds (50+50) first recharge!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/00cdf0d7a10ab1081d9f70253b1f485a.png",
+          "localPath": "/product-assets/codashop/_assets/65c37402af5adb2e26d3.png",
+          "sha256": "65c37402af5adb2e26d366a529836f3bef4119e47e41efde9e517f54a13ef104",
+          "bytes": 4876
+        },
+        {
+          "alt": "300 Diamonds (150+150) first recharge!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/83bc0a5411df742ef2c55f30f9c7cf8a.png",
+          "localPath": "/product-assets/codashop/_assets/dd2511dc0ffc89047c72.png",
+          "sha256": "dd2511dc0ffc89047c7285787e5fa3b909de2d40e9c794252d768bcbbfa96ae4",
+          "bytes": 5568
+        },
+        {
+          "alt": "500 Diamonds (250+250) first recharge!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/695e3051e322553331176b7267d8855c.png",
+          "localPath": "/product-assets/codashop/_assets/788855ecd3b8b3092775.png",
+          "sha256": "788855ecd3b8b3092775fb72e87e4f4e969bfb6391938262de58beb8e7bffbb3",
+          "bytes": 4496
+        },
+        {
+          "alt": "1000 Diamonds (500+500) first recharge!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/066bdbe90233733528b3bab48391b9c4.png",
+          "localPath": "/product-assets/codashop/_assets/654f786ad857c34c9b1e.png",
+          "sha256": "654f786ad857c34c9b1e4fd70ff51f2ead300ef7c17398a8c7e0c6508e47a020",
+          "bytes": 5657
+        },
+        {
+          "alt": "5 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/ac5831b2d1f00ef06f82f67eec5ddfe2.png",
+          "localPath": "/product-assets/codashop/_assets/7ae74b0aeb0fe054f63b.png",
+          "sha256": "7ae74b0aeb0fe054f63b63f7b20814e8a9ed6ff247eb2ae33669fcd6dc0bf865",
+          "bytes": 7006
+        },
+        {
+          "alt": "12 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/2e233a5e15a53931b8d41e42cc43edc2.png",
+          "localPath": "/product-assets/codashop/_assets/b27f78e0bcdadeca6518.png",
+          "sha256": "b27f78e0bcdadeca65185a44e32df210814266e175374f43d1b9e78bb8e2a058",
+          "bytes": 7333
+        },
+        {
+          "alt": "19 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/e265c28307ec069731d232ad8deaa8e1.png",
+          "localPath": "/product-assets/codashop/_assets/569b60b57654640d7f07.png",
+          "sha256": "569b60b57654640d7f07dbfc6390517078734a671d31f0bb8df12047dcb4f12a",
+          "bytes": 8877
+        },
+        {
+          "alt": "28 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/a102d4dd3af2c2b4e5735e1242d55ed6.png",
+          "localPath": "/product-assets/codashop/_assets/dedb3dcfe51128134cfd.png",
+          "sha256": "dedb3dcfe51128134cfd17ca5dcdc058bb408cf396f87627ad01f4eaeb9e1683",
+          "bytes": 9385
+        },
+        {
+          "alt": "44 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/d82daa464259e33bb8a8bc47203c2a04.png",
+          "localPath": "/product-assets/codashop/_assets/5380c92e1eabb9e0dfa7.png",
+          "sha256": "5380c92e1eabb9e0dfa71b51223f92ce0abfaccc49f0c175be9b37963576ec7d",
+          "bytes": 9401
+        },
+        {
+          "alt": "85 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/ee0ad04f84a047167782309906ce3c2a.png",
+          "localPath": "/product-assets/codashop/_assets/ab1c6769175a638b3b77.png",
+          "sha256": "ab1c6769175a638b3b776c7395565d908545e997cf2c757a31b5810d6be51e4f",
+          "bytes": 8744
+        },
+        {
+          "alt": "240 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/4a5e93cf5d6a3d7501a281774f2175f1.png",
+          "localPath": "/product-assets/codashop/_assets/763009ec73557e47c810.png",
+          "sha256": "763009ec73557e47c81055c98e96ddb26c9791444ee2bdc629fa506ec8843c00",
+          "bytes": 9167
+        },
+        {
+          "alt": "408 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/2d5bab70628c4ddc9a74e7a8c6114195.png",
+          "localPath": "/product-assets/codashop/_assets/50cfdea9fdedaca9b80e.png",
+          "sha256": "50cfdea9fdedaca9b80e26f2e4f1ea4d8ebbf47aeeee979ec0d1f3a17b0fe9f3",
+          "bytes": 8492
+        },
+        {
+          "alt": "875 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/98e944d413859db664e72df177494ebf.png",
+          "localPath": "/product-assets/codashop/_assets/8350556a0802d77ae260.png",
+          "sha256": "8350556a0802d77ae2601133dce4a3e5b89aebd9216263ff1b3c320d7d2f0454",
+          "bytes": 6993
+        },
+        {
+          "alt": "4830 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/9b37c0abd7f6a56a7a74881aeb09b48e.png",
+          "localPath": "/product-assets/codashop/_assets/8929467c2c8072a456ed.png",
+          "sha256": "8929467c2c8072a456ed26bcf7d00b77a423f4b1d507811e1f59383ce964418f",
+          "bytes": 6548
+        },
+        {
+          "alt": "Battle for Discounts",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_product/1775030405654_78622c15-7a36-4476-9a6e-c4cee93a82e8.png",
+          "localPath": "/product-assets/codashop/_assets/204c123772d0e77934cf.png",
+          "sha256": "204c123772d0e77934cfbcb5f8bc50e54d259a9a009ec37913927aa6c6d93bd4",
+          "bytes": 28026
+        },
+        {
+          "alt": "Lukas",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/6ef00df729858de9c10be72ee2c8d3f1.png",
+          "localPath": "/product-assets/codashop/_assets/0c525c09faa9447c2368.png",
+          "sha256": "0c525c09faa9447c2368769727fb234fc85e51593db60a302b12c56814966e88",
+          "bytes": 29623
+        },
+        {
+          "alt": "Weekly Pass",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/2819_7773f6d6-034c-4f41-8314-19f0acc4063d_40ae905f33127e4e116de79607e55309_image/50aaa23ffa956cdea7b85e5419c9f182.png",
+          "localPath": "/product-assets/codashop/_assets/36a31e5931797cc2b770.png",
+          "sha256": "36a31e5931797cc2b7700a4ba319c638f86c942480d04d3b1f69bbad0f376b37",
+          "bytes": 17801
+        }
+      ]
+    },
+    "mahjong-soul": {
+      "name": "Mahjong Soul",
+      "pageUrl": "https://www.codashop.com/id-id/mahjong-soul",
+      "cover": "/product-assets/codashop/_assets/2b62a45641ea89351748.png",
+      "assets": [
+        {
+          "alt": "Mahjong Soul",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/msoul_tile.png",
+          "localPath": "/product-assets/codashop/_assets/2b62a45641ea89351748.png",
+          "sha256": "2b62a45641ea8935174899f9d711639f82b515dd203714c58a5d075d728dc0fc",
+          "bytes": 22921
+        }
+      ]
+    },
+    "megaxus-mi-cash-voucher": {
+      "name": "Megaxus Mi-Cash voucher",
+      "pageUrl": "https://www.codashop.com/id-id/megaxus-mi-cash-voucher",
+      "cover": "/product-assets/codashop/_assets/a7456cd6a3bf48aa550b.jpg",
+      "assets": [
+        {
+          "alt": "Megaxus Mi-Cash Voucher",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/megaxus_ccid_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/a7456cd6a3bf48aa550b.jpg",
+          "sha256": "a7456cd6a3bf48aa550b6b45a93fcb2f7da3eccc09223c8aebbf242512004449",
+          "bytes": 16021
+        }
+      ]
+    },
+    "mobile-legends": {
+      "name": "Mobile Legends: Bang Bang",
+      "pageUrl": "https://www.codashop.com/id-id/mobile-legends",
+      "cover": "/product-assets/codashop/_assets/1f9605324323d9244b0f.jpg",
+      "assets": [
+        {
+          "alt": "Mobile Legends",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/MLBB-2025-tiles-178x178.jpg",
+          "localPath": "/product-assets/codashop/_assets/1f9605324323d9244b0f.jpg",
+          "sha256": "1f9605324323d9244b0f2c31dfc33cbf119ed01cf732a527487a49986430be66",
+          "bytes": 10623
+        },
+        {
+          "alt": "100 Diamonds (50+50) pengisian pertama!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/197c41e19d4d35b89d0b84be1999cedf.png",
+          "localPath": "/product-assets/codashop/_assets/b5c9b4f3ba5cd5bd3c7c.png",
+          "sha256": "b5c9b4f3ba5cd5bd3c7cf1fd9932eb3fd4662fbed01b5151b91032002ab31f68",
+          "bytes": 5722
+        },
+        {
+          "alt": "300 Diamonds (150+150) pengisian pertama!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/69f9b6a2b83e1af352b23daa7c59ef22.png",
+          "localPath": "/product-assets/codashop/_assets/d49efaece92616626121.png",
+          "sha256": "d49efaece9261662612109065e6ea5c3399c4fcc09583b47d01f8466a0e1b449",
+          "bytes": 15797
+        },
+        {
+          "alt": "500 Diamonds (250+250) pengisian pertama!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/698766a658ad2ad62af7b16e522275b1.png",
+          "localPath": "/product-assets/codashop/_assets/d49efaece92616626121.png",
+          "sha256": "d49efaece9261662612109065e6ea5c3399c4fcc09583b47d01f8466a0e1b449",
+          "bytes": 15797
+        },
+        {
+          "alt": "1000 Diamonds (500+500) pengisian pertama!",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/04d2430f4af882f38a89d48cd975692c.png",
+          "localPath": "/product-assets/codashop/_assets/01f330a45bf07504416b.png",
+          "sha256": "01f330a45bf07504416b0142e0900a32dc8ff4703100357412a5fab1d09ec696",
+          "bytes": 18841
+        },
+        {
+          "alt": "5 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/8266e4bfeda1bd42d8f9794eb4ea0a13.png",
+          "localPath": "/product-assets/codashop/_assets/ec91de5ee88be86aa55d.png",
+          "sha256": "ec91de5ee88be86aa55d2aaa062d1a5bada244afae642ae0656521f0a1f32703",
+          "bytes": 8151
+        },
+        {
+          "alt": "12 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/9eb60bc8bf2b004e4db7d1cc0d5f1d8c.png",
+          "localPath": "/product-assets/codashop/_assets/ec91de5ee88be86aa55d.png",
+          "sha256": "ec91de5ee88be86aa55d2aaa062d1a5bada244afae642ae0656521f0a1f32703",
+          "bytes": 8151
+        },
+        {
+          "alt": "19 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/ba6beb7ae28ef0a97d7a0a038feb5060.png",
+          "localPath": "/product-assets/codashop/_assets/ec91de5ee88be86aa55d.png",
+          "sha256": "ec91de5ee88be86aa55d2aaa062d1a5bada244afae642ae0656521f0a1f32703",
+          "bytes": 8151
+        },
+        {
+          "alt": "28 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/b9153260449b3690d1c2c5963a8cd00f.png",
+          "localPath": "/product-assets/codashop/_assets/ec91de5ee88be86aa55d.png",
+          "sha256": "ec91de5ee88be86aa55d2aaa062d1a5bada244afae642ae0656521f0a1f32703",
+          "bytes": 8151
+        },
+        {
+          "alt": "44 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/8b55fd4ed5b3ea99cdab4f296c58c31e.png",
+          "localPath": "/product-assets/codashop/_assets/ec91de5ee88be86aa55d.png",
+          "sha256": "ec91de5ee88be86aa55d2aaa062d1a5bada244afae642ae0656521f0a1f32703",
+          "bytes": 8151
+        },
+        {
+          "alt": "59 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/3942e002a3f9fd2e902df5a250c8d085.png",
+          "localPath": "/product-assets/codashop/_assets/8c9c29b4167d824fd0b7.png",
+          "sha256": "8c9c29b4167d824fd0b71028ee63e8692fb1aa7d405df81af5f4d51033efb848",
+          "bytes": 9309
+        },
+        {
+          "alt": "85 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/60587b401a257017fdea69ca8c09bc3e.png",
+          "localPath": "/product-assets/codashop/_assets/8c9c29b4167d824fd0b7.png",
+          "sha256": "8c9c29b4167d824fd0b71028ee63e8692fb1aa7d405df81af5f4d51033efb848",
+          "bytes": 9309
+        },
+        {
+          "alt": "170 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/be8666dc05b62e20fb99e36832e6c1e3.png",
+          "localPath": "/product-assets/codashop/_assets/02eff743125765e0a759.png",
+          "sha256": "02eff743125765e0a7593300133ffb6a52e3d0db9c0c4de943d4687241078624",
+          "bytes": 7405
+        },
+        {
+          "alt": "240 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/193fbed8e5522a52d25ea4fcb12abcbb.png",
+          "localPath": "/product-assets/codashop/_assets/02eff743125765e0a759.png",
+          "sha256": "02eff743125765e0a7593300133ffb6a52e3d0db9c0c4de943d4687241078624",
+          "bytes": 7405
+        },
+        {
+          "alt": "296 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/17ec560afd53bc50a2ea1105510f6fe7.png",
+          "localPath": "/product-assets/codashop/_assets/02eff743125765e0a759.png",
+          "sha256": "02eff743125765e0a7593300133ffb6a52e3d0db9c0c4de943d4687241078624",
+          "bytes": 7405
+        },
+        {
+          "alt": "408 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/9ba8c2ba0bf38e0423d393e0318de4fe.png",
+          "localPath": "/product-assets/codashop/_assets/02eff743125765e0a759.png",
+          "sha256": "02eff743125765e0a7593300133ffb6a52e3d0db9c0c4de943d4687241078624",
+          "bytes": 7405
+        },
+        {
+          "alt": "568 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/07446bc3288a69f2461bee642f89589e.png",
+          "localPath": "/product-assets/codashop/_assets/69307b57911ae49363aa.png",
+          "sha256": "69307b57911ae49363aa74a72076a35fb5e0af29d0d35943bf54802b76cd539d",
+          "bytes": 6116
+        },
+        {
+          "alt": "875 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/d1866e0c54e5de711570a02e328afbc1.png",
+          "localPath": "/product-assets/codashop/_assets/69307b57911ae49363aa.png",
+          "sha256": "69307b57911ae49363aa74a72076a35fb5e0af29d0d35943bf54802b76cd539d",
+          "bytes": 6116
+        },
+        {
+          "alt": "2010 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/d798b13560578965e6b5835f8794c275.png",
+          "localPath": "/product-assets/codashop/_assets/342c0b0ffff0173602e8.png",
+          "sha256": "342c0b0ffff0173602e8bc6d25557ff0c7b10f44f691e29431dd0aa3a1cf0225",
+          "bytes": 5973
+        },
+        {
+          "alt": "4830 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/892483e757195e2086d156af24c1d8c0.png",
+          "localPath": "/product-assets/codashop/_assets/a65d2ee9d0e9430e3c92.png",
+          "sha256": "a65d2ee9d0e9430e3c920a8ba2af24d38a51b8649b827ad9c78616cdca133822",
+          "bytes": 7223
+        },
+        {
+          "alt": "Monthly Epic Bundle",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/63cbd714e1df19179b20bc0ebf23d14e.png",
+          "localPath": "/product-assets/codashop/_assets/803328b5bd260c488364.png",
+          "sha256": "803328b5bd260c48836412ae1cda53076adefd787edfe810e36aff741f9767a9",
+          "bytes": 12375
+        },
+        {
+          "alt": "Twilight Pass",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/458cdb5c2c23903d8e9cd9da022d5855.png",
+          "localPath": "/product-assets/codashop/_assets/9080dba5a7c75457e8dd.png",
+          "sha256": "9080dba5a7c75457e8ddeb12229ad4515ee8bf7934a5602970b21d71fc3d6860",
+          "bytes": 5618
+        },
+        {
+          "alt": "Weekly Diamond Pass",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/4cd26117c3d28e42190ff1597896b537.png",
+          "localPath": "/product-assets/codashop/_assets/ace7a84facb1c7eb0e25.png",
+          "sha256": "ace7a84facb1c7eb0e25ab73a77df2a49b697c3bb412f63ef07ebfc75315a191",
+          "bytes": 16268
+        },
+        {
+          "alt": "Weekly Elite Pack",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/9177_12f2776b-cf1f-4d7f-ab0f-e5cf7cf3791e_14b0a2bb9d1e5be656f98de303c85844_image/b08ef445e94c770b2cba3b4e20ba6875.png",
+          "localPath": "/product-assets/codashop/_assets/9a83cd7eab7f87ff87b5.png",
+          "sha256": "9a83cd7eab7f87ff87b573c1fdc04050a9e67e9189032da49a3f2f126faa4368",
+          "bytes": 13698
+        }
+      ]
+    },
+    "mobile-legends-adventure": {
+      "name": "Mobile Legends: Adventure",
+      "pageUrl": "https://www.codashop.com/id-id/mobile-legends-adventure",
+      "cover": "/product-assets/codashop/_assets/0a8a0dd07584f678442f.png",
+      "assets": [
+        {
+          "alt": "Mobile Legends: Adventure",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/ml_adventure_tile.png",
+          "localPath": "/product-assets/codashop/_assets/0a8a0dd07584f678442f.png",
+          "sha256": "0a8a0dd07584f678442fe0a23f21a300ccba6a411edb74216a53fd1da4fa9d9b",
+          "bytes": 21242
+        }
+      ]
+    },
+    "nintendo-eshop-gift-card-us": {
+      "name": "Nintendo eShop Card (US)",
+      "pageUrl": "https://www.codashop.com/id-id/nintendo-eshop-gift-card-us",
+      "cover": "/product-assets/codashop/_assets/e6aa4f84d205d9ed8166.jpg",
+      "assets": [
+        {
+          "alt": "Nintendo eShop Gift Card (US)",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/nintendo_ccid_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/e6aa4f84d205d9ed8166.jpg",
+          "sha256": "e6aa4f84d205d9ed8166edc07d63b0ea83b574d8da32e4c4e49f0b88ff470fd9",
+          "bytes": 20193
+        }
+      ]
+    },
+    "onmyoji-arena": {
+      "name": "Onmyoji Arena",
+      "pageUrl": "https://www.codashop.com/id-id/onmyoji-arena",
+      "cover": "/product-assets/codashop/_assets/fdd50508f12da596c317.jpg",
+      "assets": [
+        {
+          "alt": "Onmyoji Arena",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/onmyojiarena_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/fdd50508f12da596c317.jpg",
+          "sha256": "fdd50508f12da596c317bfd90c46bea65489f01f4c1611c2252e839986ed623f",
+          "bytes": 14317
+        }
+      ]
+    },
+    "persona-4-revival": {
+      "name": "Persona 4 Revival",
+      "pageUrl": "https://www.codashop.com/id-id/persona-4-revival",
+      "cover": "/product-assets/codashop/_assets/486ac67c93f524ceeef4.png",
+      "assets": [
+        {
+          "alt": "Persona 4 Revival",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Persona4Revival-Tile-178x178.png",
+          "localPath": "/product-assets/codashop/_assets/486ac67c93f524ceeef4.png",
+          "sha256": "486ac67c93f524ceeef46ddea2a3540141be119ce3e9db36578aa164d1fb092a",
+          "bytes": 9036
+        }
+      ]
+    },
+    "poppo-live": {
+      "name": "Poppo Live",
+      "pageUrl": "https://www.codashop.com/id-id/poppo-live",
+      "cover": "/product-assets/codashop/_assets/5b92c184bf6fcb873add.jpg",
+      "assets": [
+        {
+          "alt": "Poppo Live",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/poppo_live_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/5b92c184bf6fcb873add.jpg",
+          "sha256": "5b92c184bf6fcb873add2a0708da0bd2cd08badc5ed6fc1b2a22f656325f824c",
+          "bytes": 12041
+        }
+      ]
+    },
+    "psn-playstation-card": {
+      "name": "Beli PS Plus Voucher | Promo Terbaru",
+      "pageUrl": "https://www.codashop.com/id-id/psn-playstation-card",
+      "cover": "/product-assets/codashop/_assets/7688a6175985c55aedaf.jpg",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/psn_ccid_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/7688a6175985c55aedaf.jpg",
+          "sha256": "7688a6175985c55aedafdd99e11a1adc910345402f48834f200b0ab5aa4b225b",
+          "bytes": 17926
+        }
+      ]
+    },
+    "pubg-mobile-uc-redeem-code": {
+      "name": "PUBG Mobile UC Redeem Code",
+      "pageUrl": "https://www.codashop.com/id-id/pubg-mobile-uc-redeem-code",
+      "cover": "/product-assets/codashop/_assets/bff00955ac9cabd919ff.jpg",
+      "assets": [
+        {
+          "alt": "PUBG Mobile UC Redeem Code",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/pubgm_tile_aug2024.jpg",
+          "localPath": "/product-assets/codashop/_assets/bff00955ac9cabd919ff.jpg",
+          "sha256": "bff00955ac9cabd919ff67b784ffbc9bd320d679dfc5eef941eadd77fb2812d3",
+          "bytes": 11662
+        }
+      ]
+    },
+    "punishing-gray-raven": {
+      "name": "Punishing: Gray Raven",
+      "pageUrl": "https://www.codashop.com/id-id/punishing-gray-raven",
+      "cover": "/product-assets/codashop/_assets/84235fae5a3a1a8baffb.jpg",
+      "assets": [
+        {
+          "alt": "Punishing: Gray Raven",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/punishinggrayraven_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/84235fae5a3a1a8baffb.jpg",
+          "sha256": "84235fae5a3a1a8baffb5a562c401d44a357413f9be0f0e23625d35cab7ee263",
+          "bytes": 19732
+        }
+      ]
+    },
+    "racing-master": {
+      "name": "Racing Master (IDN)",
+      "pageUrl": "https://www.codashop.com/id-id/racing-master",
+      "cover": "/product-assets/codashop/_assets/9e8a2da4c0f60f388745.jpg",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Netease_Racing_Master_178x178.jpg",
+          "localPath": "/product-assets/codashop/_assets/9e8a2da4c0f60f388745.jpg",
+          "sha256": "9e8a2da4c0f60f3887450c9d5df8aad305beaaa05e4042e6e55efb674e0f8700",
+          "bytes": 39441
+        }
+      ]
+    },
+    "revelation-infinite-journey": {
+      "name": "Revelation: Infinite Journey",
+      "pageUrl": "https://www.codashop.com/id-id/revelation-infinite-journey",
+      "cover": "/product-assets/codashop/_assets/bed5fa20d053c9e3ec80.jpg",
+      "assets": [
+        {
+          "alt": "Revelation: Infinite Journey",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/vng-revelation-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/bed5fa20d053c9e3ec80.jpg",
+          "sha256": "bed5fa20d053c9e3ec80b9c8b1489eeb944e643d0dc9303a8007811183e4d8a9",
+          "bytes": 10227
+        }
+      ]
+    },
+    "shinobi-art-of-vengeance-sega-villains-stage": {
+      "name": "SHINOBI: Art of Vengeance - SEGA Villains Stage",
+      "pageUrl": "https://www.codashop.com/id-id/shinobi-art-of-vengeance-sega-villains-stage",
+      "cover": "/product-assets/codashop/_assets/feb2581b7257c1ff979c.png",
+      "assets": [
+        {
+          "alt": "SHINOBI: Art of Vengeance-SEGA Villains Stage",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Shinobi-Tile-178x178.png",
+          "localPath": "/product-assets/codashop/_assets/feb2581b7257c1ff979c.png",
+          "sha256": "feb2581b7257c1ff979c3129adb3ab1fa35e56ed839dbfc70781d8fc29611f19",
+          "bytes": 53077
+        }
+      ]
+    },
+    "speed-drifters": {
+      "name": "Speed Drifters",
+      "pageUrl": "https://www.codashop.com/id-id/speed-drifters",
+      "cover": "/product-assets/codashop/_assets/7d7bab236a32298d5933.jpg",
+      "assets": [
+        {
+          "alt": "Speed Drifters",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/speed-drifters-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/7d7bab236a32298d5933.jpg",
+          "sha256": "7d7bab236a32298d5933a44a794ea66d0866af793bc25c46577f0a395c6b3c23",
+          "bytes": 11564
+        }
+      ]
+    },
+    "starmaker": {
+      "name": "StarMaker",
+      "pageUrl": "https://www.codashop.com/id-id/starmaker",
+      "cover": "/product-assets/codashop/_assets/44df0df97f6091f25c9f.png",
+      "assets": [
+        {
+          "alt": "StarMaker",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/StarMaker_New_Tile.png",
+          "localPath": "/product-assets/codashop/_assets/44df0df97f6091f25c9f.png",
+          "sha256": "44df0df97f6091f25c9f9ad60cb41b14c8964985f5992a96d2079446b0b969b6",
+          "bytes": 9473
+        }
+      ]
+    },
+    "steam-wallet-code-sea": {
+      "name": "Steam Wallet Code - Indonesia",
+      "pageUrl": "https://www.codashop.com/id-id/steam-wallet-code-sea",
+      "cover": "/product-assets/codashop/_assets/542eb71b0f3c7b54e422.jpg",
+      "assets": [
+        {
+          "alt": "Steam Wallet Code - SEA",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/steam-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/542eb71b0f3c7b54e422.jpg",
+          "sha256": "542eb71b0f3c7b54e422cda53112b150ba3d48f1c9f463c76dd0ffc2a7f3a09b",
+          "bytes": 5133
+        },
+        {
+          "alt": "IDR 12.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763974082301_53314e59-9ac5-4fe4-b089-61ad5ae38dcb.png",
+          "localPath": "/product-assets/codashop/_assets/9f3e5352fa321ec4089b.png",
+          "sha256": "9f3e5352fa321ec4089b3a79e15058c04325945076f2c26768730b61f894f484",
+          "bytes": 32742
+        },
+        {
+          "alt": "IDR 45.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763974123123_0aa0dbd4-347d-4a91-8f03-44d4b963d63a.png",
+          "localPath": "/product-assets/codashop/_assets/181f4efd109fe44a7b86.png",
+          "sha256": "181f4efd109fe44a7b860650ac543fea9d7fa9a4f58514a1aa9c90fccbdd0a97",
+          "bytes": 32307
+        },
+        {
+          "alt": "IDR 60.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763974179769_18717930-5c56-49b8-a7ad-27a66141f040.png",
+          "localPath": "/product-assets/codashop/_assets/1c795d7b401b9dd22e28.png",
+          "sha256": "1c795d7b401b9dd22e287afc178e0096fade2d7db8196cd727c903fb701697fc",
+          "bytes": 31598
+        },
+        {
+          "alt": "IDR 90.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763974221300_e262c1b2-4480-49f5-8319-84467296f0fa.png",
+          "localPath": "/product-assets/codashop/_assets/d053e845bb952504401f.png",
+          "sha256": "d053e845bb952504401fa2aa1121f9722b1d02e9ad21bcd23e0bec87010a6ee9",
+          "bytes": 32296
+        },
+        {
+          "alt": "IDR 120.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763975357727_1f45eb62-a110-4e55-a59b-cbfa7af41ff1.png",
+          "localPath": "/product-assets/codashop/_assets/e4788fce7045328514dd.png",
+          "sha256": "e4788fce7045328514ddee65802fc47ae420bbeb7d53c351e71d752d52e1185a",
+          "bytes": 32738
+        },
+        {
+          "alt": "IDR 250.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763975408450_265fa0cb-1f8a-4035-9253-10ccd1bf13e4.png",
+          "localPath": "/product-assets/codashop/_assets/2606d4d57e37db48200c.png",
+          "sha256": "2606d4d57e37db48200c6a3e36c8e37f6a0aeae52f7a5e7a1851bb31ddac84d6",
+          "bytes": 32394
+        },
+        {
+          "alt": "IDR 400.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763975485724_2325ed79-573c-4e2c-8f33-4a81f06cb374.png",
+          "localPath": "/product-assets/codashop/_assets/d321a580d43da44fd0b7.png",
+          "sha256": "d321a580d43da44fd0b7ea00d82fc1b1e6144045f49a1dc5fa26c443b1ed5453",
+          "bytes": 31508
+        },
+        {
+          "alt": "IDR 600.000 Wallet Code",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4379_b9d47bd7-8855-4e18-97d8-26572550bc6b_97feac218e88d1611fed074760fb5430_product/1763975544879_ac4540db-647c-4ca8-90c9-96df3ca2377e.png",
+          "localPath": "/product-assets/codashop/_assets/dcdd9b4286874ace4000.png",
+          "sha256": "dcdd9b4286874ace400019b30aea89913a5ff3dc8e4284cd6edbfc7aae48010c",
+          "bytes": 32482
+        }
+      ]
+    },
+    "stella-sora": {
+      "name": "Stella Sora",
+      "pageUrl": "https://www.codashop.com/id-id/stella-sora",
+      "cover": "/product-assets/codashop/_assets/f0d6b5b095f1729bb8c2.png",
+      "assets": [
+        {
+          "alt": "Stella Sora",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/stella-sora-tile.png",
+          "localPath": "/product-assets/codashop/_assets/f0d6b5b095f1729bb8c2.png",
+          "sha256": "f0d6b5b095f1729bb8c27cd5a34da38c38132ff4cf9328abc09da5cd48d1bd8e",
+          "bytes": 60478
+        },
+        {
+          "alt": "75 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196616206_3a2031db-6c71-482a-88a3-1ad6e5f252a7.png",
+          "localPath": "/product-assets/codashop/_assets/537f20b7bf531ba9fcf3.png",
+          "sha256": "537f20b7bf531ba9fcf310cf06e4aad73fdbc8c1a727b94405d9afb7b6459e7b",
+          "bytes": 77480
+        },
+        {
+          "alt": "230 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196848813_cb23a45e-0fa4-4112-88c0-211faae973a2.png",
+          "localPath": "/product-assets/codashop/_assets/0b5adeafe93ef3a48059.png",
+          "sha256": "0b5adeafe93ef3a480599ad4f82529e785b6c0f353e49afba148db7539e1d819",
+          "bytes": 87338
+        },
+        {
+          "alt": "490 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196882995_1e45a51b-8445-4009-a6f5-fd8ff688dcb6.png",
+          "localPath": "/product-assets/codashop/_assets/a28b24f1c2c5fc45aa2e.png",
+          "sha256": "a28b24f1c2c5fc45aa2ebff02a19998b06c934cb143179af0737d4f46700ce60",
+          "bytes": 126009
+        },
+        {
+          "alt": "1,015 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196912899_91ee68de-c824-4be7-9ade-074315559ae9.png",
+          "localPath": "/product-assets/codashop/_assets/f433c88f011595a5c386.png",
+          "sha256": "f433c88f011595a5c386477eea5b984702a0671779229d9c521f42f03bb5dd1d",
+          "bytes": 180832
+        },
+        {
+          "alt": "2,200 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196970162_f638cc72-6007-471c-8747-69f6c6a80ebc.png",
+          "localPath": "/product-assets/codashop/_assets/2db32ace6a9354f4275c.png",
+          "sha256": "2db32ace6a9354f4275c9597f3669f47651974e4d97cfd99d12c6f66c4c9094f",
+          "bytes": 201717
+        },
+        {
+          "alt": "4,300 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773196994363_9b5be354-9ee2-40cb-8b75-40b07f389c7b.png",
+          "localPath": "/product-assets/codashop/_assets/9212921f30cd34333a14.png",
+          "sha256": "9212921f30cd34333a1472d896c623571611611d889c5abed36e004f630bcc5b",
+          "bytes": 238861
+        },
+        {
+          "alt": "8,500 Stellanite Lumina",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/547_bd125582-bfbe-467e-bd1b-199803b03ed6_159993b7a33fda90c834d4e62c4c1df7_product/1773197018898_af70ba56-d1a8-411f-8e27-e18b7cdb130c.png",
+          "localPath": "/product-assets/codashop/_assets/f3c0fbb4777f9e24202c.png",
+          "sha256": "f3c0fbb4777f9e24202c1f062cea0d2c7ffcfc5c0e864eafd64d538a44cd92b7",
+          "bytes": 259606
+        }
+      ]
+    },
+    "stranger-than-heaven": {
+      "name": "Stranger Than Heaven",
+      "pageUrl": "https://www.codashop.com/id-id/stranger-than-heaven",
+      "cover": "/product-assets/codashop/_assets/14d68bce6a160668df34.png",
+      "assets": [
+        {
+          "alt": "Stranger Than Heaven",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/StrangerThanHeaven-Tile-178x178.png",
+          "localPath": "/product-assets/codashop/_assets/14d68bce6a160668df34.png",
+          "sha256": "14d68bce6a160668df34da1eb80850a415a98ec72fc147e78c9cd156d1d25eef",
+          "bytes": 59067
+        }
+      ]
+    },
+    "sugo": {
+      "name": "SUGO：Voice Live Chat Party",
+      "pageUrl": "https://www.codashop.com/id-id/sugo",
+      "cover": "/product-assets/codashop/_assets/d3c19643e31a1588bd52.png",
+      "assets": [
+        {
+          "alt": "SUGO",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/sugo-tile.png",
+          "localPath": "/product-assets/codashop/_assets/d3c19643e31a1588bd52.png",
+          "sha256": "d3c19643e31a1588bd5223380dccedd6e947f0a008d2afba70d75a39df8d7238",
+          "bytes": 7676
+        },
+        {
+          "alt": "1200 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/9bf0e09adf4200163493c94be99e3674.png",
+          "localPath": "/product-assets/codashop/_assets/b1f406c4073cf821eee8.png",
+          "sha256": "b1f406c4073cf821eee8153a7b2ec563f707274bcf027b12d60556a0e490c8c5",
+          "bytes": 2474
+        },
+        {
+          "alt": "2400 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/50b08bec8918e86c93cd2ad81ca71a54.png",
+          "localPath": "/product-assets/codashop/_assets/f8857755a08e025fb0b1.png",
+          "sha256": "f8857755a08e025fb0b1464280b105daced1b1284509f824b5bc61caa5fa8af4",
+          "bytes": 3021
+        },
+        {
+          "alt": "6250 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/d2fb8943408c2ff002b7381869d54b96.png",
+          "localPath": "/product-assets/codashop/_assets/f664b96361e5d0ee6eb4.png",
+          "sha256": "f664b96361e5d0ee6eb41966b34e820bc7a9661ba3c20d3fa47604c6698755e0",
+          "bytes": 4088
+        },
+        {
+          "alt": "12500 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/7a64e7cb44abc6a4f6808adf0ff8ae56.png",
+          "localPath": "/product-assets/codashop/_assets/36d96901b4e9fdde501c.png",
+          "sha256": "36d96901b4e9fdde501c143f2347fcd924bcb03478323081034d73e6c3abc119",
+          "bytes": 4831
+        },
+        {
+          "alt": "37500 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/cd02dda5a36a67d6f67ad0fa389110ca.png",
+          "localPath": "/product-assets/codashop/_assets/680e3dafd15af4c19204.png",
+          "sha256": "680e3dafd15af4c19204ffa84f900a7bfb8bdee5bffc534f8e69979c68abcc24",
+          "bytes": 5203
+        },
+        {
+          "alt": "65000 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/82af4e886421df60406c00f750277e31.png",
+          "localPath": "/product-assets/codashop/_assets/ca5fa38746bcfb7a7526.png",
+          "sha256": "ca5fa38746bcfb7a7526d8ab665662c0c3060074b42a7f763801b8917ae5ba33",
+          "bytes": 6756
+        },
+        {
+          "alt": "130000 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_9d68a221-89d8-4442-8d52-53566071fb81_7d8bbe0d621593649f2780fa5ab3418a_image/ea997e7b335f218ff962ec01bff1a882.png",
+          "localPath": "/product-assets/codashop/_assets/7bc4c9b24461aa76d15a.png",
+          "sha256": "7bc4c9b24461aa76d15a8a43e7cd576b108edb82e34256bb5073e5a2c7d91bf4",
+          "bytes": 8145
+        }
+      ]
+    },
+    "super-sus": {
+      "name": "Super Sus",
+      "pageUrl": "https://www.codashop.com/id-id/super-sus",
+      "cover": "/product-assets/codashop/_assets/3dca95810c7900d3acf7.jpg",
+      "assets": [
+        {
+          "alt": "Super Sus",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/supersus-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/3dca95810c7900d3acf7.jpg",
+          "sha256": "3dca95810c7900d3acf7dad55ba8d6f0b74e6100ba65af4e0564f705423505fb",
+          "bytes": 9320
+        }
+      ]
+    },
+    "tinder-voucher-code": {
+      "name": "Tinder Voucher Code",
+      "pageUrl": "https://www.codashop.com/id-id/tinder-voucher-code",
+      "cover": "/product-assets/codashop/_assets/902ee1a8f0bd17466e35.jpg",
+      "assets": [
+        {
+          "alt": "Tinder Voucher Code",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/tinder_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/902ee1a8f0bd17466e35.jpg",
+          "sha256": "902ee1a8f0bd17466e3530ec83442a9b8556ec87995905c1e458df1783f52946",
+          "bytes": 8092
+        }
+      ]
+    },
+    "undawn": {
+      "name": "Undawn",
+      "pageUrl": "https://www.codashop.com/id-id/undawn",
+      "cover": "/product-assets/codashop/_assets/078d892e7a61c0777539.jpg",
+      "assets": [
+        {
+          "alt": "Undawn",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Garena-Undawn-tile-codacash.jpg",
+          "localPath": "/product-assets/codashop/_assets/078d892e7a61c0777539.jpg",
+          "sha256": "078d892e7a61c077753913f5d079f0361ae0f3576ed9e6ddb336cbe60d6c73d1",
+          "bytes": 11581
+        }
+      ]
+    },
+    "valorant": {
+      "name": "VALORANT",
+      "pageUrl": "https://www.codashop.com/id-id/valorant",
+      "cover": "/product-assets/codashop/_assets/f68b93e37013c4ceb846.jpg",
+      "assets": [
+        {
+          "alt": "VALORANT",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/valorant_tile.jpg",
+          "localPath": "/product-assets/codashop/_assets/f68b93e37013c4ceb846.jpg",
+          "sha256": "f68b93e37013c4ceb846af3600c01b1481345726f705ba3b60642321ffcaf435",
+          "bytes": 10436
+        },
+        {
+          "alt": "475 VP",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/420_cb24d54b-97d5-48fe-a3d3-11d91371141d_b2a1734a945f6ba573385051a922d8b3_image/95ca0bd6c1e3b6589e63a173dede3ebf.png",
+          "localPath": "/product-assets/codashop/_assets/6fd5f00605d042a6d1a7.png",
+          "sha256": "6fd5f00605d042a6d1a77853ee42e811319dca7379ac802353b9ff007f9e0bed",
+          "bytes": 2791
+        }
+      ]
+    },
+    "vision-plus": {
+      "name": "Vision+",
+      "pageUrl": "https://www.codashop.com/id-id/vision-plus",
+      "cover": "/product-assets/codashop/_assets/236a0b9e534a63b75c7e.jpg",
+      "assets": [
+        {
+          "alt": "Vision Plus",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/tile-codacash-vision-plus-178x178.jpg",
+          "localPath": "/product-assets/codashop/_assets/236a0b9e534a63b75c7e.jpg",
+          "sha256": "236a0b9e534a63b75c7e927753f4ab2a121f6c9b47ff2730cf399dcca67c6fe1",
+          "bytes": 24377
+        }
+      ]
+    },
+    "webnovel": {
+      "name": "Webnovel",
+      "pageUrl": "https://www.codashop.com/id-id/webnovel",
+      "cover": "/product-assets/codashop/_assets/efdfa9478a2bdd912a9b.png",
+      "assets": [
+        {
+          "alt": "Webnovel",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/webnovel_tile.png",
+          "localPath": "/product-assets/codashop/_assets/efdfa9478a2bdd912a9b.png",
+          "sha256": "efdfa9478a2bdd912a9b0ada42be1a99c093535e301237d9810613da2960d48d",
+          "bytes": 6211
+        }
+      ]
+    },
+    "xena-live--group-voice-chat": {
+      "name": "Xena Live Group Voice Chat",
+      "pageUrl": "https://www.codashop.com/id-id/xena-live--group-voice-chat",
+      "cover": "/product-assets/codashop/_assets/33e2a20ddee0034bcd88.png",
+      "assets": [
+        {
+          "alt": "XENA LIVE -GROUP VOICE CHAT",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/Xena_Live_178x178.png",
+          "localPath": "/product-assets/codashop/_assets/33e2a20ddee0034bcd88.png",
+          "sha256": "33e2a20ddee0034bcd88a7b6ca12536e7609cef5afee26d66034b022a28ee316",
+          "bytes": 30827
+        },
+        {
+          "alt": "3350 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/dc4637b425095b58098a124a6d1bcebd.png",
+          "localPath": "/product-assets/codashop/_assets/6f4bbef22870c0e4c1fa.png",
+          "sha256": "6f4bbef22870c0e4c1fac91554412845bc330725ac0a583bee92c762021546b6",
+          "bytes": 14251
+        },
+        {
+          "alt": "6700 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/e68b8380e69eb9f36f8e0f75c6b231e1.png",
+          "localPath": "/product-assets/codashop/_assets/3e3c70f5b304b18e69f1.png",
+          "sha256": "3e3c70f5b304b18e69f1c789f0cf83d7a967f005c8830b806cc77cf34cee74cd",
+          "bytes": 15372
+        },
+        {
+          "alt": "33500 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/4fa6cd1501a9ee29a31909797ccb2214.png",
+          "localPath": "/product-assets/codashop/_assets/001bc36574d0e24e858a.png",
+          "sha256": "001bc36574d0e24e858ac9ea5956343f47f1235b3787d9da063cf14fa4aeffe1",
+          "bytes": 18339
+        },
+        {
+          "alt": "67500 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/f044ec733e0fcd3e1d93527207b5461b.png",
+          "localPath": "/product-assets/codashop/_assets/1f07753d5a2b2b26674c.png",
+          "sha256": "1f07753d5a2b2b26674cb82fcbd4d18befb78cdbc2c7a897aa2c77da355d1367",
+          "bytes": 22737
+        },
+        {
+          "alt": "202500 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/34251e38edb103a926668067421f24c2.png",
+          "localPath": "/product-assets/codashop/_assets/134145d0d3f0ec3db866.png",
+          "sha256": "134145d0d3f0ec3db8666f33f68610b3eeb184bdaae8bb61a3fd79f44f383279",
+          "bytes": 23809
+        },
+        {
+          "alt": "406800 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/d7a7ba9d9e06c56333a8c9e506a9ed53.png",
+          "localPath": "/product-assets/codashop/_assets/0b9f46e11a9f002b6418.png",
+          "sha256": "0b9f46e11a9f002b641863a8f7dbbf8bf48aec08a51228a5f2a73fb200146e51",
+          "bytes": 24735
+        },
+        {
+          "alt": "680000 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/5088_94ce4af5-ee33-4420-a2c4-364e0b84a894_5b517e0df21a3f460dcb89f0d99d8439_image/38e737d586cf7248c7cd81833f1460f4.png",
+          "localPath": "/product-assets/codashop/_assets/79bcc2ee60adf5418955.png",
+          "sha256": "79bcc2ee60adf54189551ea3e1301dc608fb2cff82ece148aa328d60231996f8",
+          "bytes": 26497
+        }
+      ]
+    },
+    "yalla-live": {
+      "name": "Yalla Live",
+      "pageUrl": "https://www.codashop.com/id-id/yalla-live",
+      "cover": "/product-assets/codashop/_assets/edd3fa6bff9b0bb692a0.png",
+      "assets": [
+        {
+          "alt": "Yalla Live",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/yallalive_tile.png",
+          "localPath": "/product-assets/codashop/_assets/edd3fa6bff9b0bb692a0.png",
+          "sha256": "edd3fa6bff9b0bb692a0371b33e9deb10ba2b5bdb4eb49e940956538f0f9651b",
+          "bytes": 7822
+        },
+        {
+          "alt": "USD 25 (INT)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_96a99590-ddf4-49be-a10b-9715dddbd677_84e4060abb7b5c40aa04f09bd843dfbe_image/39a00f945e924565c2333c28f6adccf2.png",
+          "localPath": "/product-assets/codashop/_assets/27a2d13329fb43f01c22.png",
+          "sha256": "27a2d13329fb43f01c22ee5fe91a76d0a46cc4010858bc4d9d965f8eb41c0d2e",
+          "bytes": 11488
+        },
+        {
+          "alt": "USD 50 (INT)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_96a99590-ddf4-49be-a10b-9715dddbd677_84e4060abb7b5c40aa04f09bd843dfbe_image/137a2ae2a071970f9acd5955ed4b8924.png",
+          "localPath": "/product-assets/codashop/_assets/c47c19ce8bdbede4d85c.png",
+          "sha256": "c47c19ce8bdbede4d85c407d7996a52c9c70edf770e59be287a3917b10a6203e",
+          "bytes": 13358
+        },
+        {
+          "alt": "USD 100 (INT)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_96a99590-ddf4-49be-a10b-9715dddbd677_84e4060abb7b5c40aa04f09bd843dfbe_image/1e46ac6ef79813c571eaa70c19875d81.png",
+          "localPath": "/product-assets/codashop/_assets/7a4a4772c81f8adcc241.png",
+          "sha256": "7a4a4772c81f8adcc241ddd16d7ba32503483b279536372c1f5f64171c8c8154",
+          "bytes": 15984
+        },
+        {
+          "alt": "USD 300 (INT)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_96a99590-ddf4-49be-a10b-9715dddbd677_84e4060abb7b5c40aa04f09bd843dfbe_image/4060c7c961205e479ddb4e1be29979b0.png",
+          "localPath": "/product-assets/codashop/_assets/622ffa748074662b661c.png",
+          "sha256": "622ffa748074662b661cb552be08f55d9b3ab4df283f009e28e1264b8f560621",
+          "bytes": 23743
+        },
+        {
+          "alt": "USD 500 (INT)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_96a99590-ddf4-49be-a10b-9715dddbd677_84e4060abb7b5c40aa04f09bd843dfbe_image/cf350de2e9db916ebce94e2e6c09ae6c.png",
+          "localPath": "/product-assets/codashop/_assets/2262bdfe19ddddd7f23a.png",
+          "sha256": "2262bdfe19ddddd7f23af6c55eb5b3401f3e2bc563acbefc1efb30444dd145d8",
+          "bytes": 27606
+        }
+      ]
+    },
+    "yalla-ludo": {
+      "name": "Yalla Ludo",
+      "pageUrl": "https://www.codashop.com/id-id/yalla-ludo",
+      "cover": "/product-assets/codashop/_assets/177fea506f363665bce8.png",
+      "assets": [
+        {
+          "alt": "Yalla Ludo",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/yallaludo_tile.png",
+          "localPath": "/product-assets/codashop/_assets/177fea506f363665bce8.png",
+          "sha256": "177fea506f363665bce8d9168c00f61e2d0877ceac48896c24c90f13e76ae8cf",
+          "bytes": 15212
+        },
+        {
+          "alt": "USD 2 (INT) - 830 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/8ee319c99f2e729665a00cff5a2420c0.png",
+          "localPath": "/product-assets/codashop/_assets/78753458cc2535d472ed.png",
+          "sha256": "78753458cc2535d472ed0796b791cc10579aed32eccf3294e0e653309f914cac",
+          "bytes": 8791
+        },
+        {
+          "alt": "USD 5 (INT) - 2,320 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/0ace8b41789b3a3ff922e9798db5f854.png",
+          "localPath": "/product-assets/codashop/_assets/7f08ce75017bb7b5e2b6.png",
+          "sha256": "7f08ce75017bb7b5e2b6e8389fab91b2293aa06b29739c1bdcc656dc6fb45ce8",
+          "bytes": 9122
+        },
+        {
+          "alt": "USD 25 (INT) - 13,580 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/1becd3de94e48ad1e5c3aa7da784cc29.png",
+          "localPath": "/product-assets/codashop/_assets/44869f55a3445326f6b7.png",
+          "sha256": "44869f55a3445326f6b74d4d7d3ac3bc588bc06da9351865e85bc78e820fae2a",
+          "bytes": 13883
+        },
+        {
+          "alt": "USD 50 (INT) - 27,640 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/44edec8dd26ad3ebefa1c21a1025de71.png",
+          "localPath": "/product-assets/codashop/_assets/978067ea226065c80a92.png",
+          "sha256": "978067ea226065c80a922c1735946d144e1765ae48846ee860c05b322c4bf13c",
+          "bytes": 15121
+        },
+        {
+          "alt": "USD 100 (INT) - 55,800 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/02da492e347c3747fdb89b79af49b778.png",
+          "localPath": "/product-assets/codashop/_assets/77f08400bb9665e9adea.png",
+          "sha256": "77f08400bb9665e9adea26125a0d9faaacc5939fcc1bd43d17a318230a347aac",
+          "bytes": 19708
+        },
+        {
+          "alt": "USD 300 (INT) - 168,860 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/d1bb3a32c4a4fedbdc128d1b2e4b982f.png",
+          "localPath": "/product-assets/codashop/_assets/b722036a67ef9289fa27.png",
+          "sha256": "b722036a67ef9289fa2755f12c9de3489dff61fac7b7171b9f38c66a95666091",
+          "bytes": 22612
+        },
+        {
+          "alt": "USD 500 (INT) - 283,460 Diamonds",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/3164662eb7b02b33ccb6c0ba44544c11.png",
+          "localPath": "/product-assets/codashop/_assets/43bf890093903b8faf2f.png",
+          "sha256": "43bf890093903b8faf2f675725cb0354d4e44a56c463d900d44021739b26adbe",
+          "bytes": 26542
+        },
+        {
+          "alt": "USD 2 (INT) - 68,500 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/4d820be14dc68fca6164137d8538e66c.png",
+          "localPath": "/product-assets/codashop/_assets/1f90b97f8a2937c5f772.png",
+          "sha256": "1f90b97f8a2937c5f772c386522d15441f6c9e861ca1bcc8a7ca1241589020bd",
+          "bytes": 10741
+        },
+        {
+          "alt": "USD 5 (INT) - 223,700 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/67bf2e21b905fac10a0a12bdb06430e2.png",
+          "localPath": "/product-assets/codashop/_assets/fbf71ccd196162699532.png",
+          "sha256": "fbf71ccd1961626995321933f3676f49771cb212992c731ff65d1a0e932465d0",
+          "bytes": 9029
+        },
+        {
+          "alt": "USD 25 (INT) - 3,666,470 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/03933ccd83e865589551b5d04baf8547.png",
+          "localPath": "/product-assets/codashop/_assets/27a2d13329fb43f01c22.png",
+          "sha256": "27a2d13329fb43f01c22ee5fe91a76d0a46cc4010858bc4d9d965f8eb41c0d2e",
+          "bytes": 11488
+        },
+        {
+          "alt": "USD 50 (INT) - 9,973,990 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/04ce4fbbd911468858d84133e70e9760.png",
+          "localPath": "/product-assets/codashop/_assets/c47c19ce8bdbede4d85c.png",
+          "sha256": "c47c19ce8bdbede4d85c407d7996a52c9c70edf770e59be287a3917b10a6203e",
+          "bytes": 13358
+        },
+        {
+          "alt": "USD 100 (INT) - 25,236,460 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/d9f650a3427cd16d16de1456307debdf.png",
+          "localPath": "/product-assets/codashop/_assets/7a4a4772c81f8adcc241.png",
+          "sha256": "7a4a4772c81f8adcc241ddd16d7ba32503483b279536372c1f5f64171c8c8154",
+          "bytes": 15984
+        },
+        {
+          "alt": "USD 300 (INT) - 76,000,860 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/ee3d369a500ccc61446ee69930cb51bd.png",
+          "localPath": "/product-assets/codashop/_assets/622ffa748074662b661c.png",
+          "sha256": "622ffa748074662b661cb552be08f55d9b3ab4df283f009e28e1264b8f560621",
+          "bytes": 23743
+        },
+        {
+          "alt": "USD 500 (INT) - 126,910,990 Gold",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/4939_c5869927-79b5-47a8-9d32-b81e7bc952f6_b79ba4c75872f0504a6540f82450e19b_image/8f83b1e55e9c0164c52f54c35ea24d94.png",
+          "localPath": "/product-assets/codashop/_assets/2262bdfe19ddddd7f23a.png",
+          "sha256": "2262bdfe19ddddd7f23af6c55eb5b3401f3e2bc563acbefc1efb30444dd145d8",
+          "bytes": 27606
+        }
+      ]
+    },
+    "zenless-zone-zero": {
+      "name": "Zenless Zone Zero",
+      "pageUrl": "https://www.codashop.com/id-id/zenless-zone-zero",
+      "cover": "/product-assets/codashop/_assets/6e84ab2cec60af73607e.png",
+      "assets": [
+        {
+          "alt": "Zenless Zone Zero",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/ZZZ_Zenless-Zone-Zero-Tile.png",
+          "localPath": "/product-assets/codashop/_assets/6e84ab2cec60af73607e.png",
+          "sha256": "6e84ab2cec60af73607e782c18829c58d003a70d7b43a1898a0451376357ce73",
+          "bytes": 42306
+        },
+        {
+          "alt": "Monochrome ×60",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694768_e0461426-a7a2-45f0-9553-38701d2408e5.png",
+          "localPath": "/product-assets/codashop/_assets/13bf93673c223ce4a24a.png",
+          "sha256": "13bf93673c223ce4a24a909f3bf43c0f710e48514b604ee2498e6cf190578482",
+          "bytes": 15346
+        },
+        {
+          "alt": "Monochrome ×300+30",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694731_796b74dc-39d6-49fa-be02-bfd41826be13.png",
+          "localPath": "/product-assets/codashop/_assets/75241ceacabfcad86520.png",
+          "sha256": "75241ceacabfcad86520e921f309be4e6107a408343630f5c46cdb29fec7022c",
+          "bytes": 22418
+        },
+        {
+          "alt": "Inter-Knot Membership",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694551_c52fa524-ad82-4b37-ae9b-35ca58546424.png",
+          "localPath": "/product-assets/codashop/_assets/e7e26bb1da79de06ba8c.png",
+          "sha256": "e7e26bb1da79de06ba8c74c23b31524f6e72b17048ec4875762c78d795f37231",
+          "bytes": 30120
+        },
+        {
+          "alt": "Monochrome ×980+110",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694695_0b17900e-66c3-465c-af45-ea1076a59b60.png",
+          "localPath": "/product-assets/codashop/_assets/f0dcf286465c18a1bcfd.png",
+          "sha256": "f0dcf286465c18a1bcfd3269ce1e1179d3ffe1914b91fe6c51b41b865c1c72d8",
+          "bytes": 26924
+        },
+        {
+          "alt": "Monochrome ×1980+260",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694659_1421eebd-3643-4477-bc7a-2678bf1201e2.png",
+          "localPath": "/product-assets/codashop/_assets/d40654f823f22b72e56b.png",
+          "sha256": "d40654f823f22b72e56b4476dc9e90c2ee996abfd0d4d488845acf8e12f83179",
+          "bytes": 24166
+        },
+        {
+          "alt": "Monochrome ×3280+600",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694623_e6ec5ee5-647c-45c2-a7d4-91cbc55ff9be.png",
+          "localPath": "/product-assets/codashop/_assets/f24e590d71944943900c.png",
+          "sha256": "f24e590d71944943900ce5570866592eb97fc416602e64e1e03c8d1fa895ad4e",
+          "bytes": 21636
+        },
+        {
+          "alt": "Monochrome ×6480+1600",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694587_7bceef18-591c-46bf-98d9-78a5d0305ffb.png",
+          "localPath": "/product-assets/codashop/_assets/9cb9d555f7668aff9b1d.png",
+          "sha256": "9cb9d555f7668aff9b1d79fb3e650a468f8b3b596042268af357821f940e19f4",
+          "bytes": 26336
+        }
+      ]
+    },
+    "zepeto": {
+      "name": "ZEPETO",
+      "pageUrl": "https://www.codashop.com/id-id/zepeto",
+      "cover": "/product-assets/codashop/_assets/743e7958fc1432041989.jpg",
+      "assets": [
+        {
+          "alt": "ZEPETO",
+          "kind": "cover",
+          "sourceUrl": "https://cdn1.codashop.com/S/content/mobile/images/product-tiles/zepeto-tile-codacash-new.jpg",
+          "localPath": "/product-assets/codashop/_assets/743e7958fc1432041989.jpg",
+          "sha256": "743e7958fc1432041989dee209fe5604b5c91acd5463b7c6f571e6554da13561",
+          "bytes": 9764
+        },
+        {
+          "alt": "7 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806801_934f8b69-bcfc-47a3-a48c-7c7c9aace918.png",
+          "localPath": "/product-assets/codashop/_assets/aa1ead7a86059a02c2a5.png",
+          "sha256": "aa1ead7a86059a02c2a5841a9981b8f6970d39587be0fe89b8704527d8bb08ef",
+          "bytes": 2676
+        },
+        {
+          "alt": "14 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806753_613b6007-91d0-4e57-a913-4d881d2345c1.png",
+          "localPath": "/product-assets/codashop/_assets/fc56c2556255399365f2.png",
+          "sha256": "fc56c2556255399365f2b693e03041ccc438191710c9495922bc5448baba0b0d",
+          "bytes": 3756
+        },
+        {
+          "alt": "28 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806682_628d89f2-1f92-4d57-88b1-8c06e314c56d.png",
+          "localPath": "/product-assets/codashop/_assets/b4b55ecda1bdb2c6cf8a.png",
+          "sha256": "b4b55ecda1bdb2c6cf8ab4c100971232513027fe1ba9558197c0220abff504a4",
+          "bytes": 4205
+        },
+        {
+          "alt": "58 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806304_b11f7815-2db6-41cf-bee7-1a65cd6c5d40.png",
+          "localPath": "/product-assets/codashop/_assets/5e322158d802c91b662a.png",
+          "sha256": "5e322158d802c91b662adbebfa96f3c4fd74cdaf808e24a02e620f593dda0f7b",
+          "bytes": 4182
+        },
+        {
+          "alt": "128 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806281_b581b620-6335-4310-b9c2-01d08e03a5ef.png",
+          "localPath": "/product-assets/codashop/_assets/2efa62ef73577271705e.png",
+          "sha256": "2efa62ef73577271705efc3a3b5440bd1db4b51b88b5c8d8a178fb5fbb77ceaa",
+          "bytes": 4904
+        },
+        {
+          "alt": "323 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806256_81262565-2325-4622-8e10-fab67aea3dd3.png",
+          "localPath": "/product-assets/codashop/_assets/49d11a8e77bea5a72a02.png",
+          "sha256": "49d11a8e77bea5a72a022192525e37a2431a7e24a1b2f0e1b0beeee4ae3cd443",
+          "bytes": 6628
+        },
+        {
+          "alt": "1,000 ZEMs",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806233_3e8b9a64-4809-4763-94a9-857375eb1d91.png",
+          "localPath": "/product-assets/codashop/_assets/533c7eef425ae05651e2.png",
+          "sha256": "533c7eef425ae05651e2907d97615f4ec0095ce4c89a34608356ded2d54f5e89",
+          "bytes": 20653
+        },
+        {
+          "alt": "4,680 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806128_abc70df6-8ec4-4abf-b717-fac49c2dc4ab.png",
+          "localPath": "/product-assets/codashop/_assets/911ce295804bccb149d8.png",
+          "sha256": "911ce295804bccb149d8e59dfcb47b20d7553b6e97d1c04e282edabd0293efa9",
+          "bytes": 2225
+        },
+        {
+          "alt": "9,700 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806104_aaf74297-24e9-42f1-bd2d-c796595fd19d.png",
+          "localPath": "/product-assets/codashop/_assets/b189d78fce4c309105cd.png",
+          "sha256": "b189d78fce4c309105cd126eb160a9949370f2c9ccbc56a4cb934c99608aa0b2",
+          "bytes": 5700
+        },
+        {
+          "alt": "25,200 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806080_55743f76-586a-49cc-a8d0-a46ed7e724aa.png",
+          "localPath": "/product-assets/codashop/_assets/309da5ff96207770d27e.png",
+          "sha256": "309da5ff96207770d27ee8c0acff3331b5a0a83023e8232563bd0e9ba8ea9c95",
+          "bytes": 5571
+        },
+        {
+          "alt": "40,700 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806056_9935ff6d-b9c1-4648-af05-09bc110391a3.png",
+          "localPath": "/product-assets/codashop/_assets/308d606e1a3347e98962.png",
+          "sha256": "308d606e1a3347e989623d9ed5f49d4ca5ab7ccbbe9d135479de7d9de7b9d920",
+          "bytes": 5016
+        },
+        {
+          "alt": "110,000 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806032_86208f1e-c120-4f37-9ed0-51e736466d3e.png",
+          "localPath": "/product-assets/codashop/_assets/4114199453b97998b884.png",
+          "sha256": "4114199453b97998b884ab942d90bb7789c6da6d19ddec8901c3c53a9e297c7d",
+          "bytes": 4817
+        },
+        {
+          "alt": "300,000 Coins",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758468806008_db560cc7-9943-4b56-a9ba-22b0bcb23477.png",
+          "localPath": "/product-assets/codashop/_assets/d6afe98f0bd218447b63.png",
+          "sha256": "d6afe98f0bd218447b637d881472bea42db5a35b0ca75a8cb62534ebd81467cd",
+          "bytes": 5556
+        },
+        {
+          "alt": "Premium (1M)",
+          "kind": "nominal",
+          "sourceUrl": "https://cdn1.codashop.com/images/600_e1a0e531-2c0f-4902-8ca0-a1a14ac060ed_product/1758469017648_76e7fce1-1c58-4a6b-a81c-cd0d224aee31.png",
+          "localPath": "/product-assets/codashop/_assets/44afbc7b29fb179878c8.png",
+          "sha256": "44afbc7b29fb179878c898c1a63d439913882e386808bed469a1f7c15b86dcaa",
+          "bytes": 10509
+        }
+      ]
+    }
+  }
+}
