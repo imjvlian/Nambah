@@ -1,0 +1,19 @@
+{
+  "startedAt": "2026-09-01T18:33:13.523Z",
+  "finishedAt": "2026-09-01T18:33:49.123Z",
+  "stats": {
+    "discoveredProductPages": 70,
+    "productsWithAssets": 65,
+    "uniqueSourceUrls": 275,
+    "uniqueContentFiles": 241,
+    "totalReferencedBytes": 6757793
+  },
+  "homepageErrors": [],
+  "productFailures": [
+    {
+      "pageUrl": "https://www.codashop.com/id-id/coda-rewards",
+      "error": "Error: HTTP 404"
+    }
+  ],
+  "downloadFailures": []
+}
