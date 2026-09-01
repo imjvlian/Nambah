@@ -1,8 +1,12 @@
 import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
+import { resolveProductCover } from "@/lib/product-asset-resolver";
 
 export default async function Home() {
   const catalog = await getPublicCatalog();
+  const artworkByGameId = Object.fromEntries(
+    catalog.games.map((game) => [game.id, resolveProductCover(game)]),
+  );
 
   return (
     <main className="home-v2 home-oura-refine">
@@ -71,7 +75,10 @@ export default async function Home() {
       </section>
 
       <div className="shell">
-        <CategorizedTopupExperience games={catalog.games} />
+        <CategorizedTopupExperience
+          games={catalog.games}
+          artworkByGameId={artworkByGameId}
+        />
       </div>
 
       <section className="how-section shell home-how-section" id="how-it-works">
