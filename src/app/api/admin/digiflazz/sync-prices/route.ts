@@ -18,8 +18,12 @@ type SupplierProductRow = {
 
 type ProductRow = {
   id: string;
+  game_id: string;
   label: string;
+  note: string | null;
   selling_price: number | string;
+  reference_price: number | string;
+  active: boolean;
 };
 
 type PricingRuleRow = {
@@ -28,6 +32,9 @@ type PricingRuleRow = {
 
 type SupplierCatalogRow = {
   supplier_sku: string;
+  product_name: string;
+  brand: string;
+  type: string;
   supplier_cost: number | string;
   buyer_active: boolean;
   seller_active: boolean;
@@ -49,7 +56,7 @@ async function loadLatestCatalogRows(latestScanAt: string) {
   while (true) {
     const page = await supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
       select:
-        "supplier_sku,supplier_cost,buyer_active,seller_active,stock,unlimited_stock,last_seen_at",
+        "supplier_sku,product_name,brand,type,supplier_cost,buyer_active,seller_active,stock,unlimited_stock,last_seen_at",
       filters: {
         supplier_id: "eq.digiflazz",
         last_seen_at: `eq.${latestScanAt}`,
@@ -68,6 +75,29 @@ async function loadLatestCatalogRows(latestScanAt: string) {
   }
 
   return rows;
+}
+
+function cleanProductLabel(productName: string, brand: string) {
+  const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withoutBrand = productName
+    .replace(new RegExp(`^${escaped}\\s*[-–—:|]?\\s*`, "i"), "")
+    .trim();
+  return withoutBrand || productName.trim();
+}
+
+function roundUpToHundred(value: number) {
+  return Math.ceil(Math.max(0, value) / 100) * 100;
+}
+
+function supplierItemIsAvailable(item: SupplierCatalogRow) {
+  const stock = item.stock === null ? null : Number(item.stock);
+  const hasStock = Boolean(item.unlimited_stock) || stock === null || stock > 0;
+  return Boolean(item.buyer_active && item.seller_active && hasStock);
+}
+
+function canonicalNote(item: SupplierCatalogRow) {
+  const value = item.type?.trim() ?? "";
+  return value && value !== "-" ? value : null;
 }
 
 export async function POST(request: Request) {
@@ -102,8 +132,7 @@ export async function POST(request: Request) {
         },
       }),
       supabaseSelect<ProductRow>("products", {
-        select: "id,label,selling_price",
-        filters: { active: "eq.true" },
+        select: "id,game_id,label,note,selling_price,reference_price,active",
       }),
       supabaseSelect<PricingRuleRow>("pricing_rules", {
         select: "minimum_nambah_profit",
@@ -159,49 +188,86 @@ export async function POST(request: Request) {
       if (!item) {
         return {
           productId: row.product_id,
+          gameId: product?.game_id ?? null,
           supplierSku: row.supplier_sku,
           status: "missing" as const,
           previousCost: Number(row.supplier_cost),
           currentCost: null,
           costChanged: false,
-          active: row.active,
+          activeBefore: row.active,
+          active: false,
+          productActiveBefore: product?.active ?? null,
+          productLabelBefore: product?.label ?? null,
           productLabel: product?.label ?? null,
+          labelChanged: false,
+          sellingPriceBefore: product ? Number(product.selling_price) : null,
           sellingPrice: product ? Number(product.selling_price) : null,
+          priceRaised: false,
           grossMarginBeforePaymentFees: null,
           minimumProfitBuffer: null,
+          stock: null,
+          unlimitedStock: false,
+          buyerActive: false,
+          sellerActive: false,
+          stockAvailable: false,
+          productMissing: !product,
         };
       }
 
       const currentCost = Number(item.supplier_cost);
-      const active = Boolean(item.buyer_active && item.seller_active);
-      const sellingPrice = product ? Number(product.selling_price) : null;
-      const grossMargin = sellingPrice === null ? null : sellingPrice - currentCost;
+      const active = supplierItemIsAvailable(item);
+      const stock = item.stock === null ? null : Number(item.stock);
+      const stockAvailable = Boolean(item.unlimited_stock) || stock === null || stock > 0;
+      const canonicalLabel = cleanProductLabel(item.product_name, item.brand);
+      const note = canonicalNote(item);
+      const sellingPriceBefore = product ? Number(product.selling_price) : null;
+      const minimumSellingPrice = roundUpToHundred(currentCost + minimumNambahProfit);
+      const sellingPrice =
+        sellingPriceBefore === null
+          ? minimumSellingPrice
+          : Math.max(sellingPriceBefore, minimumSellingPrice);
+      const referencePrice = product
+        ? Math.max(Number(product.reference_price), sellingPrice)
+        : sellingPrice;
+      const grossMargin = sellingPrice - currentCost;
 
       return {
         productId: row.product_id,
+        gameId: product?.game_id ?? null,
         supplierSku: item.supplier_sku,
         status: "found" as const,
         previousCost: Number(row.supplier_cost),
         currentCost,
         costChanged: Number(row.supplier_cost) !== currentCost,
+        activeBefore: row.active,
         active,
-        productLabel: product?.label ?? null,
+        productActiveBefore: product?.active ?? null,
+        productLabelBefore: product?.label ?? null,
+        productLabel: canonicalLabel,
+        productNote: note,
+        labelChanged: Boolean(product && product.label !== canonicalLabel),
+        noteChanged: Boolean(product && product.note !== note),
+        sellingPriceBefore,
         sellingPrice,
+        referencePrice,
+        priceRaised: sellingPriceBefore !== null && sellingPrice > sellingPriceBefore,
         grossMarginBeforePaymentFees: grossMargin,
-        minimumProfitBuffer:
-          grossMargin === null ? null : grossMargin - minimumNambahProfit,
-        stock: item.stock === null ? null : Number(item.stock),
+        minimumProfitBuffer: grossMargin - minimumNambahProfit,
+        stock,
         unlimitedStock: Boolean(item.unlimited_stock),
         buyerActive: Boolean(item.buyer_active),
         sellerActive: Boolean(item.seller_active),
+        stockAvailable,
+        productMissing: !product,
       };
     });
 
     const foundResults = results.filter((item) => item.status === "found");
+    const missingResults = results.filter((item) => item.status === "missing");
 
-    if (!dryRun && foundResults.length > 0) {
-      await Promise.all(
-        foundResults.map((result) =>
+    if (!dryRun) {
+      await Promise.all([
+        ...foundResults.map((result) =>
           supabaseUpdate(
             "supplier_products",
             {
@@ -218,22 +284,86 @@ export async function POST(request: Request) {
             },
           ),
         ),
+        ...missingResults.map((result) =>
+          supabaseUpdate(
+            "supplier_products",
+            {
+              active: false,
+              last_synced_at: syncedAt,
+              updated_at: syncedAt,
+            },
+            {
+              filters: {
+                supplier_id: "eq.digiflazz",
+                product_id: `eq.${result.productId}`,
+              },
+            },
+          ),
+        ),
+      ]);
+
+      await Promise.all([
+        ...foundResults
+          .filter((result) => !result.productMissing)
+          .map((result) =>
+            supabaseUpdate(
+              "products",
+              {
+                label: result.productLabel,
+                note: result.productNote,
+                selling_price: result.sellingPrice,
+                reference_price: result.referencePrice,
+                active: result.active,
+                updated_at: syncedAt,
+              },
+              { filters: { id: `eq.${result.productId}` } },
+            ),
+          ),
+        ...missingResults
+          .filter((result) => !result.productMissing)
+          .map((result) =>
+            supabaseUpdate(
+              "products",
+              { active: false, updated_at: syncedAt },
+              { filters: { id: `eq.${result.productId}` } },
+            ),
+          ),
+      ]);
+
+      const gameIdsToReactivate = Array.from(
+        new Set(
+          foundResults
+            .filter((result) => result.active && result.gameId)
+            .map((result) => result.gameId as string),
+        ),
       );
 
-      await supabaseInsert(
-        "supplier_price_snapshots",
-        foundResults.map((result) => ({
-          supplier_id: "digiflazz",
-          product_id: result.productId,
-          supplier_sku: result.supplierSku,
-          supplier_cost: result.currentCost,
-          buyer_active: result.buyerActive,
-          seller_active: result.sellerActive,
-          stock: result.stock,
-          unlimited_stock: result.unlimitedStock,
-          synced_at: syncedAt,
-        })),
+      await Promise.all(
+        gameIdsToReactivate.map((gameId) =>
+          supabaseUpdate(
+            "games",
+            { active: true, updated_at: syncedAt },
+            { filters: { id: `eq.${gameId}` } },
+          ),
+        ),
       );
+
+      if (foundResults.length > 0) {
+        await supabaseInsert(
+          "supplier_price_snapshots",
+          foundResults.map((result) => ({
+            supplier_id: "digiflazz",
+            product_id: result.productId,
+            supplier_sku: result.supplierSku,
+            supplier_cost: result.currentCost,
+            buyer_active: result.buyerActive,
+            seller_active: result.sellerActive,
+            stock: result.stock,
+            unlimited_stock: result.unlimitedStock,
+            synced_at: syncedAt,
+          })),
+        );
+      }
     }
 
     return Response.json({
@@ -245,19 +375,27 @@ export async function POST(request: Request) {
       summary: {
         mapped: selectedRows.length,
         found: foundResults.length,
-        missing: results.filter((item) => item.status === "missing").length,
+        missing: missingResults.length,
         costChanged: foundResults.filter((item) => item.costChanged).length,
-        inactive: foundResults.filter((item) => !item.active).length,
-        thinBaseMargin: foundResults.filter(
-          (item) => item.minimumProfitBuffer !== null && item.minimumProfitBuffer < 0,
+        relabeled: foundResults.filter((item) => item.labelChanged || item.noteChanged).length,
+        priceRaised: foundResults.filter((item) => item.priceRaised).length,
+        activated: foundResults.filter(
+          (item) => item.active && (!item.activeBefore || item.productActiveBefore === false),
         ).length,
+        deactivated: results.filter(
+          (item) => !item.active && (item.activeBefore || item.productActiveBefore === true),
+        ).length,
+        unavailable: foundResults.filter((item) => !item.active).length,
+        outOfStock: foundResults.filter((item) => !item.stockAvailable).length,
+        orphanedMappings: results.filter((item) => item.productMissing).length,
+        thinBaseMargin: foundResults.filter((item) => item.minimumProfitBuffer < 0).length,
       },
       products: results,
     });
   } catch (error) {
-    console.error("Digiflazz cached price sync failed", error);
+    console.error("Digiflazz cached catalog sync failed", error);
     return Response.json(
-      { error: "Sinkronisasi harga dari cache katalog Digiflazz gagal dijalankan." },
+      { error: "Sinkronisasi katalog dari cache Digiflazz gagal dijalankan." },
       { status: 502 },
     );
   }
