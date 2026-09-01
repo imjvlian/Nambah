@@ -16,6 +16,8 @@ type UsernameCheckStatus = "idle" | "loading" | "success" | "pending" | "error";
 type UsernameCheckState = {
   status: UsernameCheckStatus;
   nickname?: string;
+  server?: string;
+  region?: string | null;
   message?: string;
 };
 type NominalSectionId = "special" | "first-top-up" | "weekly-monthly" | "top-up";
@@ -247,14 +249,102 @@ export default function TopupExperience({
     appliedReferralCode,
   ]);
 
+  useEffect(() => {
+    const normalizedUserId = userId.trim();
+    const normalizedServerId = serverId.trim();
+    const validInput =
+      canCheckUsername &&
+      /^\d{4,20}$/.test(normalizedUserId) &&
+      /^\d{1,10}$/.test(normalizedServerId);
+
+    if (!validInput) {
+      setUsernameCheck({ status: "idle" });
+      return;
+    }
+
+    const controller = new AbortController();
+    let mounted = true;
+
+    const timer = window.setTimeout(async () => {
+      setUsernameCheck({ status: "loading", message: "Memeriksa akun..." });
+
+      try {
+        const response = await fetch("/api/game-account/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gameId: selectedGame.id,
+            userId: normalizedUserId,
+            serverId: normalizedServerId,
+          }),
+          signal: controller.signal,
+        });
+
+        const data = (await response.json()) as {
+          nickname?: string;
+          server?: string;
+          region?: string | null;
+          message?: string;
+          error?: string;
+          pending?: boolean;
+          verified?: boolean;
+        };
+
+        if (!mounted) return;
+
+        if (response.status === 202 || data.pending) {
+          setUsernameCheck({
+            status: "pending",
+            message: data.message ?? "Pengecekan akun masih diproses.",
+          });
+          return;
+        }
+
+        if (!response.ok) {
+          setUsernameCheck({
+            status: "error",
+            message: data.error ?? "ID atau Server tidak valid.",
+          });
+          return;
+        }
+
+        if (data.nickname) {
+          setUsernameCheck({
+            status: "success",
+            nickname: data.nickname,
+            server: data.server ?? normalizedServerId,
+            region: data.region ?? null,
+            message: "Akun ditemukan.",
+          });
+          return;
+        }
+
+        setUsernameCheck({
+          status: data.verified ? "success" : "error",
+          server: data.server ?? normalizedServerId,
+          region: data.region ?? null,
+          message: data.message ?? "Akun ditemukan, tetapi nickname tidak tersedia.",
+        });
+      } catch (error) {
+        if (!mounted || (error instanceof DOMException && error.name === "AbortError")) return;
+        setUsernameCheck({
+          status: "error",
+          message: "Pengecekan akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
+        });
+      }
+    }, 700);
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [canCheckUsername, selectedGame.id, userId, serverId]);
+
   function resetPricingMessages() {
     setNotice("");
     setPromoMessage("");
     setReferralMessage("");
-  }
-
-  function resetUsernameCheck() {
-    setUsernameCheck({ status: "idle" });
   }
 
   function chooseGame(gameId: string) {
@@ -263,81 +353,11 @@ export default function TopupExperience({
     setSelectedPackageId(nextGame.packages[0]!.id);
     setUserId("");
     setServerId("");
-    resetUsernameCheck();
+    setUsernameCheck({ status: "idle" });
     resetPricingMessages();
     requestAnimationFrame(() => {
       document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }
-
-  async function checkUsername() {
-    const normalizedUserId = userId.trim();
-    const normalizedServerId = serverId.trim();
-
-    if (!normalizedUserId || !normalizedServerId) {
-      setUsernameCheck({
-        status: "error",
-        message: "Isi User ID dan Server / Zone ID terlebih dahulu.",
-      });
-      return;
-    }
-
-    setUsernameCheck({ status: "loading", message: "Mengecek akun..." });
-
-    try {
-      const response = await fetch("/api/game-account/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gameId: selectedGame.id,
-          userId: normalizedUserId,
-          serverId: normalizedServerId,
-        }),
-      });
-
-      const data = (await response.json()) as {
-        nickname?: string;
-        message?: string;
-        error?: string;
-        pending?: boolean;
-        verified?: boolean;
-      };
-
-      if (response.status === 202 || data.pending) {
-        setUsernameCheck({
-          status: "pending",
-          message: data.message ?? "Checker masih memproses akun. Coba lagi sebentar.",
-        });
-        return;
-      }
-
-      if (!response.ok) {
-        setUsernameCheck({
-          status: "error",
-          message: data.error ?? "Username tidak dapat diperiksa.",
-        });
-        return;
-      }
-
-      if (data.nickname) {
-        setUsernameCheck({
-          status: "success",
-          nickname: data.nickname,
-          message: "Akun ditemukan.",
-        });
-        return;
-      }
-
-      setUsernameCheck({
-        status: data.verified ? "success" : "error",
-        message: data.message ?? "Akun ditemukan, tetapi nickname tidak tersedia.",
-      });
-    } catch {
-      setUsernameCheck({
-        status: "error",
-        message: "Tidak bisa terhubung ke username checker. Coba lagi.",
-      });
-    }
   }
 
   function applyPromo() {
@@ -486,7 +506,7 @@ export default function TopupExperience({
           <div className="form-block account-form-block">
             <div className="form-label">
               <span className="step-number">1</span>
-              <div><strong>Data akun</strong><small>Pastikan ID yang dimasukkan benar.</small></div>
+              <div><strong>Data akun</strong><small>Nickname dicek otomatis setelah ID dan Server valid.</small></div>
             </div>
             <div className={selectedGame.requiresServer ? "input-grid two" : "input-grid"}>
               <label>
@@ -496,59 +516,64 @@ export default function TopupExperience({
                   placeholder="Masukkan User ID"
                   value={userId}
                   onChange={(event) => {
-                    setUserId(event.target.value);
-                    resetUsernameCheck();
+                    setUserId(event.target.value.replace(/\D/g, ""));
+                    setUsernameCheck({ status: "idle" });
                   }}
                 />
               </label>
               {selectedGame.requiresServer && (
                 <label>
-                  <span>Server / Zone ID</span>
+                  <span>{canCheckUsername ? "Server / Zone ID" : "Server / Zone ID"}</span>
                   <input
                     inputMode="numeric"
                     placeholder="Contoh: 1234"
                     value={serverId}
                     onChange={(event) => {
-                      setServerId(event.target.value);
-                      resetUsernameCheck();
+                      setServerId(event.target.value.replace(/\D/g, ""));
+                      setUsernameCheck({ status: "idle" });
                     }}
                   />
                 </label>
               )}
             </div>
 
-            {canCheckUsername && (
-              <div className="username-checker">
-                <button
-                  className="username-checker-button"
-                  type="button"
-                  disabled={usernameCheck.status === "loading" || !userId.trim() || !serverId.trim()}
-                  onClick={() => void checkUsername()}
-                >
-                  <span aria-hidden="true">◎</span>
-                  {usernameCheck.status === "loading" ? "Mengecek..." : "Cek username"}
-                </button>
-
-                <div className={`username-checker-result ${usernameCheck.status}`} role="status">
-                  {usernameCheck.status === "success" ? (
+            {canCheckUsername && usernameCheck.status !== "idle" && (
+              <div className="account-auto-check" aria-live="polite">
+                <div className={`account-check-banner ${usernameCheck.status}`} role="status">
+                  {usernameCheck.status === "loading" ? (
                     <>
-                      <span className="username-checker-status" aria-hidden="true">✓</span>
-                      <span><small>Username</small><strong>{usernameCheck.nickname ?? "Akun terverifikasi"}</strong></span>
+                      <span className="account-check-icon" aria-hidden="true">↻</span>
+                      <span className="account-check-copy">
+                        <strong>Memeriksa akun...</strong>
+                        <small>ID dan Server sedang divalidasi.</small>
+                      </span>
+                    </>
+                  ) : usernameCheck.status === "success" ? (
+                    <>
+                      <span className="account-check-icon" aria-hidden="true">✓</span>
+                      <span className="account-check-copy">
+                        <span>Akun kamu <strong>{usernameCheck.nickname ?? "terverifikasi"}</strong>.</span>
+                        <small>
+                          {usernameCheck.region ? `${usernameCheck.region} · ` : ""}
+                          Server / Zone {usernameCheck.server ?? serverId}
+                        </small>
+                      </span>
                     </>
                   ) : usernameCheck.status === "pending" ? (
                     <>
-                      <span className="username-checker-status" aria-hidden="true">…</span>
-                      <span><small>Masih diproses</small><strong>{usernameCheck.message}</strong></span>
-                    </>
-                  ) : usernameCheck.status === "error" ? (
-                    <>
-                      <span className="username-checker-status" aria-hidden="true">!</span>
-                      <span><small>Belum terverifikasi</small><strong>{usernameCheck.message}</strong></span>
+                      <span className="account-check-icon" aria-hidden="true">…</span>
+                      <span className="account-check-copy">
+                        <strong>Masih diproses</strong>
+                        <small>{usernameCheck.message}</small>
+                      </span>
                     </>
                   ) : (
                     <>
-                      <span className="username-checker-status" aria-hidden="true">?</span>
-                      <span><small>Opsional</small><strong>Cek nickname sebelum lanjut.</strong></span>
+                      <span className="account-check-icon" aria-hidden="true">!</span>
+                      <span className="account-check-copy">
+                        <strong>Belum terverifikasi</strong>
+                        <small>{usernameCheck.message}</small>
+                      </span>
                     </>
                   )}
                 </div>

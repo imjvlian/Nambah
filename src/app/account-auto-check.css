@@ -1,0 +1,98 @@
+.account-auto-check {
+  margin-top: 12px;
+}
+
+.account-check-banner {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #9da49a;
+}
+
+.account-check-banner.loading {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.account-check-banner.success {
+  border-color: rgba(98, 214, 111, 0.42);
+  background: rgba(60, 154, 75, 0.12);
+  color: #dce7d9;
+}
+
+.account-check-banner.error {
+  border-color: rgba(231, 106, 106, 0.34);
+  background: rgba(187, 63, 63, 0.08);
+  color: #d8b2b2;
+}
+
+.account-check-icon {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 900;
+  opacity: 0.82;
+}
+
+.account-check-banner.loading .account-check-icon {
+  border-style: dashed;
+  animation: account-check-spin 900ms linear infinite;
+}
+
+.account-check-copy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.account-check-copy strong {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.account-check-banner.success .account-check-copy strong {
+  color: #7ee08d;
+}
+
+.account-check-copy small {
+  color: #8d9589;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.account-check-banner.success .account-check-copy small {
+  color: #a7b7a3;
+}
+
+@keyframes account-check-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 620px) {
+  .account-check-banner {
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+
+  .account-check-copy {
+    display: grid;
+    gap: 2px;
+  }
+}
