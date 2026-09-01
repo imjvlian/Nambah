@@ -27,6 +27,11 @@ type ProductRow = {
   sort_order: number;
 };
 
+type SupplierAvailabilityRow = {
+  product_id: string;
+  active: boolean;
+};
+
 type PaymentMethodRow = {
   id: string;
   name: string;
@@ -134,29 +139,41 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     };
   }
 
-  const [gameRows, productRows, paymentRows, recentOrders] = await Promise.all([
-    supabaseSelect<GameRow>("games", {
-      select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
-      filters: { active: "eq.true" },
-      order: "sort_order.asc",
-    }),
-    supabaseSelect<ProductRow>("products", {
-      select: "id,game_id,label,note,selling_price,reference_price,sort_order",
-      filters: { active: "eq.true" },
-      order: "sort_order.asc",
-    }),
-    supabaseSelect<PaymentMethodRow>("payment_methods", {
-      select: "id,name,detail,sort_order",
-      filters: { active: "eq.true" },
-      order: "sort_order.asc",
-    }),
-    supabaseSelect<OrderPopularityRow>("orders", {
-      select: "product_id",
-      filters: { status: "in.(paid,processing,success)" },
-      order: "created_at.desc",
-      limit: 1000,
-    }),
-  ]);
+  const [gameRows, productRows, supplierAvailabilityRows, paymentRows, recentOrders] =
+    await Promise.all([
+      supabaseSelect<GameRow>("games", {
+        select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
+        filters: { active: "eq.true" },
+        order: "sort_order.asc",
+      }),
+      supabaseSelect<ProductRow>("products", {
+        select: "id,game_id,label,note,selling_price,reference_price,sort_order",
+        filters: { active: "eq.true" },
+        order: "sort_order.asc",
+      }),
+      supabaseSelect<SupplierAvailabilityRow>("supplier_products", {
+        select: "product_id,active",
+        filters: {
+          supplier_id: "eq.digiflazz",
+          supplier_sku: "not.is.null",
+        },
+      }),
+      supabaseSelect<PaymentMethodRow>("payment_methods", {
+        select: "id,name,detail,sort_order",
+        filters: { active: "eq.true" },
+        order: "sort_order.asc",
+      }),
+      supabaseSelect<OrderPopularityRow>("orders", {
+        select: "product_id",
+        filters: { status: "in.(paid,processing,success)" },
+        order: "created_at.desc",
+        limit: 1000,
+      }),
+    ]);
+
+  const supplierAvailability = new Map(
+    supplierAvailabilityRows.map((row) => [row.product_id, Boolean(row.active)]),
+  );
 
   const popularity = new Map<string, number>();
   for (const order of recentOrders) {
@@ -173,7 +190,11 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
       initials: game.initials,
       requiresServer: game.requires_server,
       packages: productRows
-        .filter((product) => product.game_id === game.id)
+        .filter(
+          (product) =>
+            product.game_id === game.id &&
+            (supplierAvailability.get(product.id) ?? true),
+        )
         .map((product) => ({
           id: product.id,
           label: product.label,
