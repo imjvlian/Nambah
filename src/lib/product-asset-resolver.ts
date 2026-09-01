@@ -17,6 +17,32 @@ type ProductAssetManifest = {
   products: Record<string, ProductAssetEntry>;
 };
 
+type UnitFamily =
+  | "diamond"
+  | "uc"
+  | "robux"
+  | "crystal"
+  | "token"
+  | "point"
+  | "shell"
+  | "coin"
+  | "credit"
+  | "coupon"
+  | "idr";
+
+type SpecialIntent =
+  | "weekly-diamond-pass"
+  | "weekly-membership"
+  | "monthly-membership"
+  | "welkin"
+  | "twilight-pass"
+  | "starlight"
+  | "booyah-pass"
+  | "battle-pass"
+  | "weekly-pack"
+  | "monthly-pack"
+  | "first-top-up";
+
 const manifest = manifestJson as unknown as ProductAssetManifest;
 
 const STOP_WORDS = new Set([
@@ -35,17 +61,29 @@ const STOP_WORDS = new Set([
   "instan",
   "pack",
   "paket",
+  "code",
 ]);
 
 const PRODUCT_ALIASES: Record<string, string[]> = {
   "mobile-legends": ["mobile legends", "mobile legends bang bang", "mlbb"],
-  "free-fire": ["free fire", "garena free fire", "ff"],
+  "free-fire": ["free fire", "garena free fire"],
   "pubg-mobile": ["pubg mobile", "playerunknown battleground mobile", "pubg"],
-  valorant: ["valorant", "valorant points", "vp"],
-  "honor-of-kings": ["honor of kings", "hok"],
+  valorant: ["valorant", "valorant points"],
+  "honor-of-kings": ["honor of kings"],
   "genshin-impact": ["genshin impact", "genshin"],
   roblox: ["roblox", "robux"],
-  "steam-wallet": ["steam wallet", "steam"],
+  "steam-wallet": ["steam wallet", "steam wallet code indonesia"],
+};
+
+const PRODUCT_SLUG_ALIASES: Record<string, string[]> = {
+  "mobile-legends": ["mobile-legends"],
+  "free-fire": ["free-fire"],
+  "pubg-mobile": ["pubg-mobile"],
+  valorant: ["valorant"],
+  "honor-of-kings": ["honor-of-kings"],
+  "genshin-impact": ["genshin-impact"],
+  roblox: ["roblox"],
+  "steam-wallet": ["steam-wallet", "steam-wallet-code-indonesia"],
 };
 
 function normalize(value: string) {
@@ -67,8 +105,67 @@ function tokens(value: string): string[] {
     .filter((token) => token && !STOP_WORDS.has(token));
 }
 
-function numericTokens(value: string): string[] {
-  return normalize(value).match(/\d+/g) ?? [];
+function numberValues(value: string): number[] {
+  const matches = value.match(/\d{1,3}(?:[.,]\d{3})+|\d+/g) ?? [];
+  return matches
+    .map((match) => Number(match.replace(/[.,]/g, "")))
+    .filter((number) => Number.isFinite(number));
+}
+
+function sameNumbers(left: number[], right: number[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function unitFamilies(value: string): Set<UnitFamily> {
+  const text = normalize(value);
+  const families = new Set<UnitFamily>();
+
+  if (/\bdiamonds?\b/.test(text)) families.add("diamond");
+  if (/\buc\b|unknown cash/.test(text)) families.add("uc");
+  if (/\brobux\b/.test(text)) families.add("robux");
+  if (/\b(?:genesis\s+)?crystals?\b/.test(text)) families.add("crystal");
+  if (/\btokens?\b/.test(text)) families.add("token");
+  if (/\bpoints?\b|\bvp\b|\brp\b/.test(text)) families.add("point");
+  if (/\bshells?\b/.test(text)) families.add("shell");
+  if (/\bcoins?\b/.test(text)) families.add("coin");
+  if (/\bcredits?\b/.test(text)) families.add("credit");
+  if (/\bcoupons?\b/.test(text)) families.add("coupon");
+  if (/\bidr\b/.test(text)) families.add("idr");
+
+  return families;
+}
+
+function compatibleUnits(left: Set<UnitFamily>, right: Set<UnitFamily>) {
+  if (left.size === 0) return true;
+  if (right.size === 0) return false;
+  return [...left].some((family) => right.has(family));
+}
+
+function specialIntent(value: string): SpecialIntent | null {
+  const text = normalize(value);
+
+  if (/weekly diamond pass/.test(text)) return "weekly-diamond-pass";
+  if (/weekly membership/.test(text)) return "weekly-membership";
+  if (/monthly membership/.test(text)) return "monthly-membership";
+  if (/welkin/.test(text)) return "welkin";
+  if (/twilight pass/.test(text)) return "twilight-pass";
+  if (/starlight/.test(text)) return "starlight";
+  if (/booyah pass/.test(text)) return "booyah-pass";
+  if (/battle pass/.test(text)) return "battle-pass";
+  if (/weekly (?:elite|epic)? ?pack|paket mingguan/.test(text)) return "weekly-pack";
+  if (/monthly (?:elite|epic)? ?(?:pack|bundle)|paket bulanan/.test(text)) return "monthly-pack";
+  if (
+    /first top up|first topup|first recharge|top up pertama|topup pertama|pengisian pertama|double diamond|double bonus/.test(
+      text,
+    )
+  ) {
+    return "first-top-up";
+  }
+
+  return null;
 }
 
 function productCandidates(game: Game): string[] {
@@ -78,96 +175,123 @@ function productCandidates(game: Game): string[] {
     .filter(Boolean);
 }
 
+function exactProductBySlug(game: Game) {
+  const candidates = [game.id, ...(PRODUCT_SLUG_ALIASES[game.id] ?? [])];
+  for (const candidate of candidates) {
+    const product = manifest.products[candidate];
+    if (product) return product;
+  }
+  return null;
+}
+
 function scoreProduct(game: Game, slug: string, product: ProductAssetEntry) {
   const candidates = productCandidates(game);
   const slugNormalized = normalize(slug);
   const nameNormalized = normalize(product.name);
   const slugCompact = compact(slug);
   const nameCompact = compact(product.name);
+  const productTokens = new Set(tokens(`${slug} ${product.name}`));
 
   let score = 0;
   for (const candidate of candidates) {
-    const candidateCompact = candidate.replace(/\s+/g, "");
+    const candidateCompact = compact(candidate);
+    const candidateTokens = tokens(candidate);
 
-    if (slugNormalized === candidate || nameNormalized === candidate) score = Math.max(score, 120);
-    if (slugCompact === candidateCompact || nameCompact === candidateCompact) score = Math.max(score, 115);
-    if (slugNormalized.includes(candidate) || nameNormalized.includes(candidate)) score = Math.max(score, 95);
-    if (candidate.includes(slugNormalized) || candidate.includes(nameNormalized)) score = Math.max(score, 85);
+    if (slugNormalized === candidate || nameNormalized === candidate) {
+      score = Math.max(score, 200);
+      continue;
+    }
+    if (slugCompact === candidateCompact || nameCompact === candidateCompact) {
+      score = Math.max(score, 190);
+      continue;
+    }
+
+    // Do not fuzzy-match short aliases such as FF/VP/RB. They are too easy to
+    // collide with unrelated product names.
+    if (candidateTokens.length < 2) continue;
+
+    const overlap = candidateTokens.filter((token) => productTokens.has(token)).length;
+    const coverage = overlap / candidateTokens.length;
+    if (coverage === 1) score = Math.max(score, 125 + candidateTokens.length * 5);
+    else if (coverage >= 0.75) score = Math.max(score, 100 + overlap * 4);
   }
-
-  const gameTokens = new Set<string>(tokens(`${game.name} ${game.shortName}`));
-  const productTokens = new Set<string>(tokens(`${slug} ${product.name}`));
-  const overlap = [...gameTokens].filter((token) => productTokens.has(token)).length;
-  score += overlap * 8;
 
   return score;
 }
 
 function findProduct(game: Game) {
-  let best: { slug: string; product: ProductAssetEntry; score: number } | null = null;
+  const exact = exactProductBySlug(game);
+  if (exact) return exact;
 
+  let best: { product: ProductAssetEntry; score: number } | null = null;
   for (const [slug, product] of Object.entries(manifest.products)) {
     const score = scoreProduct(game, slug, product);
-    if (!best || score > best.score) best = { slug, product, score };
+    if (!best || score > best.score) best = { product, score };
   }
 
-  return best && best.score >= 70 ? best.product : null;
+  return best && best.score >= 125 ? best.product : null;
 }
 
-function specialIntent(value: string): string[] {
-  const normalized = normalize(value);
-  if (/weekly diamond pass|weekly pass/.test(normalized)) return ["weekly", "diamond", "pass"];
-  if (/weekly membership/.test(normalized)) return ["weekly", "membership"];
-  if (/monthly membership/.test(normalized)) return ["monthly", "membership"];
-  if (/welkin/.test(normalized)) return ["welkin"];
-  if (/twilight pass/.test(normalized)) return ["twilight", "pass"];
-  if (/starlight/.test(normalized)) return ["starlight"];
-  if (/booyah pass/.test(normalized)) return ["booyah", "pass"];
-  if (/battle pass/.test(normalized)) return ["battle", "pass"];
-  if (/first top up|first topup|first recharge|double diamond/.test(normalized)) {
-    return ["first", "top", "up", "double"];
-  }
-  return [];
-}
-
-function scoreAsset(item: GamePackage, asset: ProductAsset) {
-  if (asset.kind !== "nominal") return -1;
+function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | null {
+  if (asset.kind !== "nominal" || !asset.alt) return null;
 
   const label = normalize(item.label);
-  const alt = normalize(asset.alt ?? "");
-  if (!alt) return 0;
+  const alt = normalize(asset.alt);
+  if (!label || !alt) return null;
 
-  if (label === alt) return 200;
-  if (compact(label) === compact(alt)) return 195;
+  if (label === alt) return 1000;
+  if (compact(label) === compact(alt)) return 990;
 
-  let score = 0;
-  const labelNumbers = numericTokens(label);
-  const altNumbers = numericTokens(alt);
+  const itemIntent = specialIntent(label);
+  const assetIntent = specialIntent(alt);
+  const itemNumbers = numberValues(item.label);
+  const assetNumbers = numberValues(asset.alt);
+  const itemUnits = unitFamilies(label);
+  const assetUnits = unitFamilies(alt);
 
-  if (labelNumbers.length > 0) {
-    const exactNumeric =
-      labelNumbers.length === altNumbers.length &&
-      labelNumbers.every((value, index) => value === altNumbers[index]);
-    if (exactNumeric) score += 70;
-    else if (labelNumbers.some((value) => altNumbers.includes(value))) score += 32;
-    else score -= 24;
+  // Special products are matched by their semantic intent first. A weekly
+  // pass must never become a monthly pack, first-top-up bundle, etc.
+  if (itemIntent || assetIntent) {
+    if (!itemIntent || itemIntent !== assetIntent) return null;
+    if (!compatibleUnits(itemUnits, assetUnits)) return null;
+
+    // First-top-up artwork often contains bonus breakdowns such as
+    // "100 Diamonds (50+50)" while Nambah may only say "100 Diamonds".
+    if (itemNumbers.length > 0 && assetNumbers.length > 0) {
+      if (itemIntent === "first-top-up") {
+        if (itemNumbers[0] !== assetNumbers[0]) return null;
+      } else if (!sameNumbers(itemNumbers, assetNumbers)) {
+        return null;
+      }
+    }
+
+    const overlap = tokens(label).filter((token) => new Set(tokens(alt)).has(token)).length;
+    return 700 + overlap * 10;
   }
 
-  const labelTokens = new Set<string>(tokens(label));
-  const altTokens = new Set<string>(tokens(alt));
-  const overlap = [...labelTokens].filter((token) => altTokens.has(token)).length;
-  score += overlap * 18;
+  // Normal denominations are intentionally strict. Matching 86 Diamonds to
+  // 85 Diamonds (or 300+30 Crystals to 300 Crystals) is visually misleading.
+  if (itemNumbers.length === 0 || assetNumbers.length === 0) return null;
+  if (!sameNumbers(itemNumbers, assetNumbers)) return null;
+  if (!compatibleUnits(itemUnits, assetUnits)) return null;
 
-  const intent = specialIntent(label);
-  if (intent.length > 0) {
-    const intentMatches = intent.filter((token) => alt.includes(token)).length;
-    score += intentMatches * 24;
-    if (intentMatches === 0) score -= 35;
+  const itemTokens = new Set(tokens(label));
+  const assetTokens = new Set(tokens(alt));
+  const overlap = [...itemTokens].filter((token) => assetTokens.has(token)).length;
+
+  return 500 + overlap * 10;
+}
+
+function findNominalAsset(product: ProductAssetEntry, item: GamePackage) {
+  let best: { asset: ProductAsset; score: number } | null = null;
+
+  for (const asset of product.assets) {
+    const score = scoreNominalAsset(item, asset);
+    if (score === null) continue;
+    if (!best || score > best.score) best = { asset, score };
   }
 
-  if (alt.includes(label) || label.includes(alt)) score += 30;
-
-  return score;
+  return best?.asset ?? null;
 }
 
 export type ResolvedProductAsset = {
@@ -184,22 +308,19 @@ export function resolveProductAsset(
   if (!product) return null;
 
   if (item) {
-    let best: { asset: ProductAsset; score: number } | null = null;
-    for (const asset of product.assets) {
-      const score = scoreAsset(item, asset);
-      if (!best || score > best.score) best = { asset, score };
-    }
+    const nominal = findNominalAsset(product, item);
+    if (!nominal) return null;
 
-    if (best && best.score >= 28) {
-      return {
-        src: best.asset.localPath,
-        alt: best.asset.alt ?? item.label,
-        kind: "nominal",
-      };
-    }
+    return {
+      src: nominal.localPath,
+      alt: nominal.alt ?? item.label,
+      kind: "nominal",
+    };
   }
 
-  const cover = product.cover || product.assets.find((asset) => asset.kind === "cover")?.localPath;
+  const cover =
+    product.cover ||
+    product.assets.find((asset) => asset.kind === "cover")?.localPath;
   if (!cover) return null;
 
   return {
