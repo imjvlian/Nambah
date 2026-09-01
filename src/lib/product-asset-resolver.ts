@@ -61,17 +61,17 @@ function compact(value: string) {
   return normalize(value).replace(/\s+/g, "");
 }
 
-function tokens(value: string) {
+function tokens(value: string): string[] {
   return normalize(value)
     .split(" ")
     .filter((token) => token && !STOP_WORDS.has(token));
 }
 
-function numericTokens(value: string) {
+function numericTokens(value: string): string[] {
   return normalize(value).match(/\d+/g) ?? [];
 }
 
-function productCandidates(game: Game) {
+function productCandidates(game: Game): string[] {
   const aliases = PRODUCT_ALIASES[game.id] ?? [];
   return [game.id, game.name, game.shortName, ...aliases]
     .map(normalize)
@@ -95,8 +95,8 @@ function scoreProduct(game: Game, slug: string, product: ProductAssetEntry) {
     if (candidate.includes(slugNormalized) || candidate.includes(nameNormalized)) score = Math.max(score, 85);
   }
 
-  const gameTokens = new Set(tokens(`${game.name} ${game.shortName}`));
-  const productTokens = new Set(tokens(`${slug} ${product.name}`));
+  const gameTokens = new Set<string>(tokens(`${game.name} ${game.shortName}`));
+  const productTokens = new Set<string>(tokens(`${slug} ${product.name}`));
   const overlap = [...gameTokens].filter((token) => productTokens.has(token)).length;
   score += overlap * 8;
 
@@ -153,8 +153,8 @@ function scoreAsset(item: GamePackage, asset: ProductAsset) {
     else score -= 24;
   }
 
-  const labelTokens = new Set(tokens(label));
-  const altTokens = new Set(tokens(alt));
+  const labelTokens = new Set<string>(tokens(label));
+  const altTokens = new Set<string>(tokens(alt));
   const overlap = [...labelTokens].filter((token) => altTokens.has(token)).length;
   score += overlap * 18;
 
