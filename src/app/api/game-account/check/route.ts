@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -10,43 +11,55 @@ type GameRow = {
   active: boolean;
 };
 
-type CodashopResponse = {
-  success?: boolean;
-  errorMsg?: string | null;
-  errorCode?: string | number | null;
-  RESULT_CODE?: string | number | null;
-  confirmationFields?: {
-    username?: string | null;
-    roles?: Array<{ role?: string | null }>;
-  };
-  result?: string | null;
+type MimihQuota = {
+  plan?: string | null;
+  used?: number | null;
+  limit?: number | null;
+  remaining?: number | null;
+  expires_at?: string | null;
+};
+
+type MimihRegionData = {
+  ref_id?: string;
+  status?: string;
+  nickname?: string | null;
+  region?: string | null;
+  country_code?: string | null;
+  allowed_product_types?: string[];
+  cached?: boolean;
+  sandbox?: boolean;
+  quota?: MimihQuota | null;
+  rc?: string | number;
+  message?: string;
+};
+
+type MimihRegionResponse = {
+  data?: MimihRegionData;
+  message?: string;
 };
 
 type CachedAccount = {
   nickname: string;
   server: string;
+  region: string | null;
+  countryCode: string | null;
   expiresAt: number;
 };
 
-class AccountCheckError extends Error {
-  readonly status: number;
-  readonly retryable: boolean;
+type PendingAccount = {
+  refId: string;
+  startedAt: number;
+};
 
-  constructor(message: string, status: number, retryable = false) {
-    super(message);
-    this.name = "AccountCheckError";
-    this.status = status;
-    this.retryable = retryable;
-  }
-}
-
-const CODASHOP_CHECK_URL = "https://order-sg.codashop.com/initPayment.action";
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const MIMIH_REGION_URL = "https://mimihmarket.com/api/v1/ml-region";
+const CACHE_TTL_MS = 15 * 60 * 1000;
+const PENDING_TTL_MS = 2 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const RATE_LIMIT_MAX = 30;
-const CHECK_TIMEOUT_MS = 10_000;
+const RATE_LIMIT_MAX = 20;
+const CHECK_TIMEOUT_MS = 12_000;
 
 const accountCache = new Map<string, CachedAccount>();
+const pendingChecks = new Map<string, PendingAccount>();
 const rateLimits = new Map<string, number[]>();
 
 function normalize(value: string) {
@@ -55,6 +68,11 @@ function normalize(value: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeRc(value: string | number | undefined) {
+  if (value === undefined || value === null) return "";
+  return String(value).trim().padStart(2, "0");
 }
 
 function getClientKey(request: Request) {
@@ -82,119 +100,155 @@ function rateLimitExceeded(clientKey: string) {
   return false;
 }
 
-function mobileLegendsPayload(userId: string, serverId: string) {
-  return {
-    "voucherPricePoint.id": 27684,
-    "voucherPricePoint.price": 527250.0,
-    "voucherPricePoint.variablePrice": 0,
-    "user.userId": userId,
-    "user.zoneId": serverId,
-    voucherTypeName: "MOBILE_LEGENDS",
-    lvtId: "",
-    shopLang: "id_ID",
-    dynamicSkuToken: "",
-    pricePointDynamicSkuToken: "",
-    voucherTypeId: "",
-  };
+function getMimihCredentials() {
+  const username = process.env.GEMPAY_API_USERNAME?.trim() ?? "";
+  const secret = process.env.GEMPAY_API_SECRET?.trim() ?? "";
+  return { username, secret };
 }
 
-async function checkMobileLegendsWithCodashop(userId: string, serverId: string) {
+function makeRefId() {
+  return `nmb-ml-${Date.now().toString(36)}-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+}
+
+function makeSignature(username: string, secret: string, refId: string) {
+  return createHash("md5")
+    .update(`${username}${secret}${refId}`, "utf8")
+    .digest("hex");
+}
+
+async function callMimihRegionApi(input: {
+  username: string;
+  secret: string;
+  refId: string;
+  userId: string;
+  serverId: string;
+}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
 
   try {
-    const response = await fetch(CODASHOP_CHECK_URL, {
+    const response = await fetch(MIMIH_REGION_URL, {
       method: "POST",
       headers: {
-        Accept: "application/json, text/plain, */*",
+        Accept: "application/json",
         "Content-Type": "application/json",
-        Origin: "https://www.codashop.com",
-        Referer: "https://www.codashop.com/",
-        "User-Agent":
-          "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
       },
-      body: JSON.stringify(mobileLegendsPayload(userId, serverId)),
+      body: JSON.stringify({
+        username: input.username,
+        ref_id: input.refId,
+        sign: makeSignature(input.username, input.secret, input.refId),
+        user_id: input.userId,
+        zone_id: input.serverId,
+      }),
       cache: "no-store",
       signal: controller.signal,
     });
 
     const raw = await response.text();
-    let payload: CodashopResponse;
+    let payload: MimihRegionResponse;
 
     try {
-      payload = raw ? (JSON.parse(raw) as CodashopResponse) : {};
+      payload = raw ? (JSON.parse(raw) as MimihRegionResponse) : {};
     } catch {
-      throw new AccountCheckError(
-        "Pengecekan akun sedang tidak tersedia. Coba lagi beberapa saat.",
-        503,
-        true,
-      );
+      return {
+        httpStatus: response.status,
+        data: undefined,
+        parseError: true,
+      };
     }
 
-    if (response.status === 429 || String(payload.RESULT_CODE ?? "") === "10001") {
-      throw new AccountCheckError(
-        "Pengecekan akun sedang mencapai batas request. Coba lagi sebentar.",
-        429,
-        true,
-      );
-    }
-
-    if (String(payload.errorCode ?? "") === "-200") {
-      throw new AccountCheckError(
-        "ID ditemukan, tetapi Server / Zone tidak sesuai. Periksa kembali datanya.",
-        422,
-      );
-    }
-
-    if (!response.ok && response.status >= 500) {
-      throw new AccountCheckError(
-        "Pengecekan akun sedang mengalami gangguan sementara.",
-        503,
-        true,
-      );
-    }
-
-    if (!payload.success || payload.errorMsg) {
-      throw new AccountCheckError(
-        "User ID / Server tidak ditemukan. Periksa kembali data akun.",
-        422,
-      );
-    }
-
-    const nickname =
-      payload.confirmationFields?.username?.trim() ||
-      payload.confirmationFields?.roles?.[0]?.role?.trim() ||
-      payload.result?.trim() ||
-      "";
-
-    if (!nickname) {
-      throw new AccountCheckError(
-        "Akun terdeteksi, tetapi nickname tidak tersedia dari provider.",
-        502,
-        true,
-      );
-    }
-
-    return { nickname };
-  } catch (error) {
-    if (error instanceof AccountCheckError) throw error;
-
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new AccountCheckError(
-        "Pengecekan akun timeout. Coba lagi beberapa saat.",
-        503,
-        true,
-      );
-    }
-
-    console.error("Codashop account checker failed", error);
-    throw new AccountCheckError(
-      "Tidak bisa terhubung ke layanan pengecekan akun.",
-      503,
-      true,
-    );
+    return {
+      httpStatus: response.status,
+      data: payload.data,
+      parseError: false,
+    };
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function businessError(rc: string, message?: string) {
+  switch (rc) {
+    case "40":
+      return Response.json(
+        { error: "Format request pengecekan akun ditolak provider.", source: "mimih" },
+        { status: 400 },
+      );
+    case "41":
+      return Response.json(
+        {
+          error: "Kredensial API Mimih Market belum valid. Periksa username, secret, dan status key.",
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    case "42":
+      return Response.json(
+        {
+          error: "IP server Nambah belum diizinkan di API Mimih Market.",
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    case "43":
+      return Response.json(
+        {
+          error: "Batas request username checker sedang tercapai. Coba lagi sebentar.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 429 },
+      );
+    case "53":
+      return Response.json(
+        {
+          error: "Provider validasi akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    case "54":
+      return Response.json(
+        {
+          error: "User ID / Server tidak ditemukan. Periksa kembali data akun.",
+          source: "mimih",
+        },
+        { status: 422 },
+      );
+    case "57":
+      return Response.json(
+        {
+          error: "Paket API Cek Region Mimih Market belum aktif pada key produksi.",
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    case "58":
+      return Response.json(
+        {
+          error: "Kuota API Cek Region Mimih Market sudah habis.",
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    case "99":
+      return Response.json(
+        {
+          error: "Hasil pengecekan belum pasti. Coba lagi beberapa saat.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    default:
+      return Response.json(
+        {
+          error: message?.trim() || "Pengecekan akun gagal diproses oleh provider.",
+          source: "mimih",
+        },
+        { status: 502 },
+      );
   }
 }
 
@@ -238,7 +292,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Game ID tidak valid." }, { status: 400 });
   }
 
-  if (!/^\d{4,20}$/.test(userId) || !/^\d{1,10}$/.test(serverId)) {
+  if (!/^\d{5,12}$/.test(userId) || !/^\d{3,5}$/.test(serverId)) {
     return Response.json(
       { error: "Format User ID atau Server / Zone ID tidak valid." },
       { status: 400 },
@@ -263,14 +317,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const { username, secret } = getMimihCredentials();
+  if (!username || !secret) {
+    return Response.json(
+      {
+        error: "API Cek Region Mimih Market belum dikonfigurasi di server Nambah.",
+        source: "mimih",
+      },
+      { status: 503 },
+    );
+  }
+
   const cacheKey = `${game.id}:${userId}:${serverId}`;
   const cached = accountCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return Response.json({
       nickname: cached.nickname,
       server: cached.server,
+      region: cached.region,
+      countryCode: cached.countryCode,
       cached: true,
-      source: "codashop",
+      source: "mimih",
     });
   }
   if (cached) accountCache.delete(cacheKey);
@@ -282,37 +349,128 @@ export async function POST(request: Request) {
     );
   }
 
+  const existingPending = pendingChecks.get(cacheKey);
+  const pendingStillValid =
+    existingPending && Date.now() - existingPending.startedAt < PENDING_TTL_MS;
+  const refId = pendingStillValid ? existingPending.refId : makeRefId();
+  if (existingPending && !pendingStillValid) pendingChecks.delete(cacheKey);
+
   try {
-    const result = await checkMobileLegendsWithCodashop(userId, serverId);
+    const result = await callMimihRegionApi({
+      username,
+      secret,
+      refId,
+      userId,
+      serverId,
+    });
+
+    if (result.parseError) {
+      return Response.json(
+        {
+          error: "API Mimih Market mengembalikan response yang tidak dapat dibaca.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    }
+
+    if (result.httpStatus >= 500) {
+      return Response.json(
+        {
+          error: "API Mimih Market sedang mengalami gangguan sementara.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 503 },
+      );
+    }
+
+    const data = result.data;
+    const rc = normalizeRc(data?.rc);
+
+    if (rc === "03") {
+      pendingChecks.set(cacheKey, {
+        refId,
+        startedAt: existingPending?.startedAt ?? Date.now(),
+      });
+      return Response.json(
+        {
+          pending: true,
+          message: data?.message?.trim() || "Pengecekan akun masih diproses.",
+          source: "mimih",
+        },
+        { status: 202 },
+      );
+    }
+
+    if (rc !== "00") {
+      if (rc === "99") {
+        pendingChecks.set(cacheKey, {
+          refId,
+          startedAt: existingPending?.startedAt ?? Date.now(),
+        });
+      } else {
+        pendingChecks.delete(cacheKey);
+      }
+      return businessError(rc, data?.message);
+    }
+
+    pendingChecks.delete(cacheKey);
+
+    const nickname = data?.nickname?.trim() ?? "";
+    if (!nickname) {
+      return Response.json(
+        {
+          error: "Akun ditemukan, tetapi nickname tidak tersedia dari provider.",
+          retryable: true,
+          source: "mimih",
+        },
+        { status: 502 },
+      );
+    }
+
+    const region = data?.region?.trim() || null;
+    const countryCode = data?.country_code?.trim().toUpperCase() || null;
 
     accountCache.set(cacheKey, {
-      nickname: result.nickname,
+      nickname,
       server: serverId,
+      region,
+      countryCode,
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
     return Response.json({
-      nickname: result.nickname,
+      nickname,
       server: serverId,
+      region,
+      countryCode,
+      allowedProductTypes: data?.allowed_product_types ?? [],
+      providerCached: Boolean(data?.cached),
       cached: false,
-      source: "codashop",
+      source: "mimih",
     });
   } catch (error) {
-    if (error instanceof AccountCheckError) {
+    if (error instanceof Error && error.name === "AbortError") {
       return Response.json(
         {
-          error: error.message,
-          retryable: error.retryable,
-          source: "codashop",
+          error: "Pengecekan akun timeout. Checkout tetap bisa dilanjutkan.",
+          retryable: true,
+          source: "mimih",
         },
-        { status: error.status },
+        { status: 503 },
       );
     }
 
-    console.error("Account checker failed", error);
+    console.error("Mimih Market account checker failed", error);
     return Response.json(
-      { error: "Pengecekan akun gagal diproses." },
-      { status: 502 },
+      {
+        error: "Tidak bisa terhubung ke API Cek Region Mimih Market.",
+        retryable: true,
+        source: "mimih",
+      },
+      { status: 503 },
     );
   }
 }
