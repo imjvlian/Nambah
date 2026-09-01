@@ -5,8 +5,8 @@
     "https://www.codashop.com/id-id/",
     "https://app.codashop.com/id-id/"
   ],
-  "generatedAt": "2026-09-01T18:33:49.123Z",
-  "previousGeneratedAt": null,
+  "generatedAt": "2026-09-01T18:42:55.985Z",
+  "previousGeneratedAt": "2026-09-01T18:33:49.123Z",
   "stats": {
     "discoveredProductPages": 70,
     "productsWithAssets": 65,
@@ -873,7 +873,7 @@
           "bytes": 25276
         },
         {
-          "alt": "1,980 Chronal Nexus",
+          "alt": "1.980 Chronal Nexus",
           "kind": "nominal",
           "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/d90c280572f9859be0b190cb699f5bd2.png",
           "localPath": "/product-assets/codashop/_assets/ce731b8d4683c0b80e51.png",
@@ -881,7 +881,7 @@
           "bytes": 35818
         },
         {
-          "alt": "3,280 Chronal Nexus",
+          "alt": "3.280 Chronal Nexus",
           "kind": "nominal",
           "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/09901cba8a61a58c156903f37f63ec72.png",
           "localPath": "/product-assets/codashop/_assets/6feae6bef9b13cdef4cb.png",
@@ -889,7 +889,7 @@
           "bytes": 44108
         },
         {
-          "alt": "6,480 Chronal Nexus",
+          "alt": "6.480 Chronal Nexus",
           "kind": "nominal",
           "sourceUrl": "https://cdn1.codashop.com/images/701_5cc555dc-845f-4c12-83c7-55a057421480_e3428999cf627d04b9f64e754dddbcf4_image/7e27ce14e412a591c9a7e49c5aa1a02b.png",
           "localPath": "/product-assets/codashop/_assets/7bc5b4bfbf9f5e1c2358.png",
@@ -2606,7 +2606,7 @@
           "bytes": 22418
         },
         {
-          "alt": "Inter-Knot Membership",
+          "alt": "Keanggotaan Inter-Knot",
           "kind": "nominal",
           "sourceUrl": "https://cdn1.codashop.com/images/701_836053fa-615d-4479-aed5-1226cdbd6eb0_product/1759167694551_c52fa524-ad82-4b37-ae9b-35ca58546424.png",
           "localPath": "/product-assets/codashop/_assets/e7e26bb1da79de06ba8c.png",
