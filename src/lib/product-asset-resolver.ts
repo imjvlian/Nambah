@@ -53,6 +53,12 @@ type NominalAssetMatch = {
   mode: "strict" | "range";
 };
 
+export type ResolvedProductAsset = {
+  src: string;
+  alt: string;
+  kind: "nominal" | "cover";
+};
+
 const manifest = manifestJson as unknown as ProductAssetManifest;
 
 const STOP_WORDS = new Set([
@@ -75,7 +81,7 @@ const STOP_WORDS = new Set([
 ]);
 
 const PRODUCT_ALIASES: Record<string, string[]> = {
-  "mobile-legends": ["mobile legends", "mobile legends bang bang", "mlbb"],
+  "mobile-legends": ["mobile legends", "mobile legends bang bang", "mobilelegend", "mlbb"],
   "free-fire": ["free fire", "garena free fire"],
   "pubg-mobile": ["pubg mobile", "playerunknown battleground mobile", "pubg"],
   valorant: ["valorant", "valorant points"],
@@ -83,6 +89,8 @@ const PRODUCT_ALIASES: Record<string, string[]> = {
   "genshin-impact": ["genshin impact", "genshin"],
   roblox: ["roblox", "robux"],
   "steam-wallet": ["steam wallet", "steam wallet code indonesia"],
+  "magic-chess": ["magic chess", "magic chess go go", "magic chess gogo", "mcgg"],
+  "magic-chess-go-go": ["magic chess", "magic chess go go", "magic chess gogo", "mcgg"],
 };
 
 const PRODUCT_SLUG_ALIASES: Record<string, string[]> = {
@@ -94,6 +102,8 @@ const PRODUCT_SLUG_ALIASES: Record<string, string[]> = {
   "genshin-impact": ["genshin-impact"],
   roblox: ["roblox"],
   "steam-wallet": ["steam-wallet", "steam-wallet-code-indonesia"],
+  "magic-chess": ["magic-chess-go-go"],
+  "magic-chess-go-go": ["magic-chess-go-go"],
 };
 
 function normalize(value: string) {
@@ -124,6 +134,24 @@ function numberValues(value: string): number[] {
 
 function primaryNumber(value: string) {
   return numberValues(value)[0] ?? null;
+}
+
+function firstTopUpTotal(value: string) {
+  const numbers = numberValues(value);
+  if (numbers.length === 0) return null;
+
+  const bonusPair = value.match(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*\+\s*(\d{1,3}(?:[.,]\d{3})+|\d+)/);
+  if (!bonusPair) return numbers[0] ?? null;
+
+  const base = Number(bonusPair[1]!.replace(/[.,]/g, ""));
+  const bonus = Number(bonusPair[2]!.replace(/[.,]/g, ""));
+  const summed = base + bonus;
+  if (!Number.isFinite(summed)) return numbers[0] ?? null;
+
+  // Codashop can write "100 Diamonds (50+50)" while Digiflazz writes
+  // "First Recharge 50+50 Diamonds". Both represent the same 100-Diamond tier.
+  if (numbers.length >= 3 && numbers[0] === summed) return numbers[0];
+  return summed;
 }
 
 function sameNumbers(left: number[], right: number[]) {
@@ -166,7 +194,9 @@ function specialIntent(value: string): SpecialIntent | null {
   if (/monthly membership/.test(text)) return "monthly-membership";
   if (/welkin/.test(text)) return "welkin";
   if (/twilight pass/.test(text)) return "twilight-pass";
-  if (/starlight/.test(text)) return "starlight";
+  // Digiflazz currently exposes both the correct "Starlight" spelling and the
+  // legacy typo "Startlight" in product names.
+  if (/star(?:t)?light/.test(text)) return "starlight";
   if (/booyah pass/.test(text)) return "booyah-pass";
   if (/battle pass/.test(text)) return "battle-pass";
   if (/royale pass/.test(text)) return "royale-pass";
@@ -177,7 +207,7 @@ function specialIntent(value: string): SpecialIntent | null {
   if (/weekly (?:elite|epic)? ?pack|paket mingguan/.test(text)) return "weekly-pack";
   if (/monthly (?:elite|epic)? ?(?:pack|bundle)|paket bulanan/.test(text)) return "monthly-pack";
   if (
-    /first top up|first topup|first recharge|top up pertama|topup pertama|pengisian pertama|double diamond|double bonus/.test(
+    /first top up|first topup|first recharge|top up pertama|topup pertama|pengisian pertama|double diamond|double diamonds|double bonus|2x recharge/.test(
       text,
     )
   ) {
@@ -185,6 +215,15 @@ function specialIntent(value: string): SpecialIntent | null {
   }
 
   return null;
+}
+
+function gameIdentity(game: Game) {
+  return normalize(`${game.id} ${game.name} ${game.shortName}`);
+}
+
+function isMobileLegends(game: Game) {
+  const identity = gameIdentity(game);
+  return /mobile legends|mobilelegend|mlbb/.test(identity);
 }
 
 function productCandidates(game: Game): string[] {
@@ -251,6 +290,24 @@ function findProduct(game: Game) {
   return best && best.score >= 125 ? best.product : null;
 }
 
+function resolveSpecialOverride(game: Game, item: GamePackage): ResolvedProductAsset | null {
+  const intent = specialIntent(item.label);
+
+  // Codashop does not sell Starlight Membership as a direct SKU, so their
+  // product manifest has no Starlight nominal image. Keep a dedicated local
+  // artwork instead of falling back to the generic Nambah symbol or a wrong
+  // Diamond/pass image.
+  if (intent === "starlight" && isMobileLegends(game)) {
+    return {
+      src: "/product-assets/special/mlbb-starlight.svg",
+      alt: item.label,
+      kind: "nominal",
+    };
+  }
+
+  return null;
+}
+
 function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | null {
   if (asset.kind !== "nominal" || !asset.alt) return null;
 
@@ -268,20 +325,22 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
   const itemUnits = unitFamilies(label);
   const assetUnits = unitFamilies(alt);
 
-  // Special products are matched by semantic intent first. A weekly
+  // Special products are matched by their semantic intent first. A weekly
   // pass must never become a monthly pack, first-top-up bundle, etc.
   if (itemIntent || assetIntent) {
     if (!itemIntent || itemIntent !== assetIntent) return null;
     if (!compatibleUnits(itemUnits, assetUnits)) return null;
 
-    // First-top-up artwork often contains bonus breakdowns such as
-    // "100 Diamonds (50+50)" while Nambah may only say "100 Diamonds".
-    if (itemNumbers.length > 0 && assetNumbers.length > 0) {
-      if (itemIntent === "first-top-up") {
-        if (itemNumbers[0] !== assetNumbers[0]) return null;
-      } else if (!sameNumbers(itemNumbers, assetNumbers)) {
-        return null;
-      }
+    if (itemIntent === "first-top-up") {
+      const itemTotal = firstTopUpTotal(item.label);
+      const assetTotal = firstTopUpTotal(asset.alt);
+      if (itemTotal !== null && assetTotal !== null && itemTotal !== assetTotal) return null;
+    } else if (
+      itemNumbers.length > 0 &&
+      assetNumbers.length > 0 &&
+      !sameNumbers(itemNumbers, assetNumbers)
+    ) {
+      return null;
     }
 
     const altTokens = new Set(tokens(alt));
@@ -376,16 +435,15 @@ function findNominalAsset(product: ProductAssetEntry, item: GamePackage): Nomina
   return ranged ? { asset: ranged, mode: "range" } : null;
 }
 
-export type ResolvedProductAsset = {
-  src: string;
-  alt: string;
-  kind: "nominal" | "cover";
-};
-
 export function resolveProductAsset(
   game: Game,
   item?: GamePackage,
 ): ResolvedProductAsset | null {
+  if (item) {
+    const override = resolveSpecialOverride(game, item);
+    if (override) return override;
+  }
+
   const product = findProduct(game);
   if (!product) return null;
 
