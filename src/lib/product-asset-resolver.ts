@@ -39,9 +39,19 @@ type SpecialIntent =
   | "starlight"
   | "booyah-pass"
   | "battle-pass"
+  | "royale-pass"
+  | "weekly-card"
+  | "monthly-card"
+  | "weekly-pass"
+  | "monthly-pass"
   | "weekly-pack"
   | "monthly-pack"
   | "first-top-up";
+
+type NominalAssetMatch = {
+  asset: ProductAsset;
+  mode: "strict" | "range";
+};
 
 const manifest = manifestJson as unknown as ProductAssetManifest;
 
@@ -112,6 +122,10 @@ function numberValues(value: string): number[] {
     .filter((number) => Number.isFinite(number));
 }
 
+function primaryNumber(value: string) {
+  return numberValues(value)[0] ?? null;
+}
+
 function sameNumbers(left: number[], right: number[]) {
   return (
     left.length === right.length &&
@@ -155,6 +169,11 @@ function specialIntent(value: string): SpecialIntent | null {
   if (/starlight/.test(text)) return "starlight";
   if (/booyah pass/.test(text)) return "booyah-pass";
   if (/battle pass/.test(text)) return "battle-pass";
+  if (/royale pass/.test(text)) return "royale-pass";
+  if (/weekly card/.test(text)) return "weekly-card";
+  if (/monthly card/.test(text)) return "monthly-card";
+  if (/weekly pass/.test(text)) return "weekly-pass";
+  if (/monthly pass/.test(text)) return "monthly-pass";
   if (/weekly (?:elite|epic)? ?pack|paket mingguan/.test(text)) return "weekly-pack";
   if (/monthly (?:elite|epic)? ?(?:pack|bundle)|paket bulanan/.test(text)) return "monthly-pack";
   if (
@@ -249,7 +268,7 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
   const itemUnits = unitFamilies(label);
   const assetUnits = unitFamilies(alt);
 
-  // Special products are matched by their semantic intent first. A weekly
+  // Special products are matched by semantic intent first. A weekly
   // pass must never become a monthly pack, first-top-up bundle, etc.
   if (itemIntent || assetIntent) {
     if (!itemIntent || itemIntent !== assetIntent) return null;
@@ -265,12 +284,13 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
       }
     }
 
-    const overlap = tokens(label).filter((token) => new Set(tokens(alt)).has(token)).length;
+    const altTokens = new Set(tokens(alt));
+    const overlap = tokens(label).filter((token) => altTokens.has(token)).length;
     return 700 + overlap * 10;
   }
 
-  // Normal denominations are intentionally strict. Matching 86 Diamonds to
-  // 85 Diamonds (or 300+30 Crystals to 300 Crystals) is visually misleading.
+  // Keep exact denomination matching as the first choice. Range matching is
+  // applied only when no exact/same-number artwork exists.
   if (itemNumbers.length === 0 || assetNumbers.length === 0) return null;
   if (!sameNumbers(itemNumbers, assetNumbers)) return null;
   if (!compatibleUnits(itemUnits, assetUnits)) return null;
@@ -282,7 +302,66 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
   return 500 + overlap * 10;
 }
 
-function findNominalAsset(product: ProductAssetEntry, item: GamePackage) {
+function findRangeNominalAsset(product: ProductAssetEntry, item: GamePackage) {
+  const label = normalize(item.label);
+  const target = primaryNumber(item.label);
+  const itemUnits = unitFamilies(label);
+
+  // Special products continue to use semantic matching only. Range fallback is
+  // for ordinary denominations such as Diamonds, UC, Robux, Points and Crystals.
+  if (specialIntent(label) || target === null || itemUnits.size === 0) return null;
+
+  const itemTokens = new Set(tokens(label));
+  const byValue = new Map<
+    number,
+    { asset: ProductAsset; value: number; tokenOverlap: number }
+  >();
+
+  for (const asset of product.assets) {
+    if (asset.kind !== "nominal" || !asset.alt) continue;
+
+    const alt = normalize(asset.alt);
+    if (!alt || specialIntent(alt)) continue;
+
+    const assetUnits = unitFamilies(alt);
+    if (!compatibleUnits(itemUnits, assetUnits)) continue;
+
+    const value = primaryNumber(asset.alt);
+    if (value === null) continue;
+
+    const assetTokens = new Set(tokens(alt));
+    const tokenOverlap = [...itemTokens].filter((token) => assetTokens.has(token)).length;
+    const existing = byValue.get(value);
+
+    // When multiple artworks represent the same denomination, keep the one
+    // whose wording is closest to the Nambah item label.
+    if (!existing || tokenOverlap > existing.tokenOverlap) {
+      byValue.set(value, { asset, value, tokenOverlap });
+    }
+  }
+
+  const candidates = [...byValue.values()].sort((left, right) => left.value - right.value);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!.asset;
+
+  // Each available supplier artwork becomes the representative for a numeric
+  // range. Boundaries are the midpoint between neighbouring denominations.
+  // Example: assets 85 and 170 represent <=127.5 and >127.5 respectively,
+  // so Nambah 86 -> 85 artwork and 172 -> 170 artwork.
+  for (let index = 0; index < candidates.length; index += 1) {
+    const current = candidates[index]!;
+    const previous = candidates[index - 1];
+    const next = candidates[index + 1];
+    const lowerBound = previous ? (previous.value + current.value) / 2 : -Infinity;
+    const upperBound = next ? (current.value + next.value) / 2 : Infinity;
+
+    if (target > lowerBound && target <= upperBound) return current.asset;
+  }
+
+  return candidates[candidates.length - 1]!.asset;
+}
+
+function findNominalAsset(product: ProductAssetEntry, item: GamePackage): NominalAssetMatch | null {
   let best: { asset: ProductAsset; score: number } | null = null;
 
   for (const asset of product.assets) {
@@ -291,7 +370,10 @@ function findNominalAsset(product: ProductAssetEntry, item: GamePackage) {
     if (!best || score > best.score) best = { asset, score };
   }
 
-  return best?.asset ?? null;
+  if (best) return { asset: best.asset, mode: "strict" };
+
+  const ranged = findRangeNominalAsset(product, item);
+  return ranged ? { asset: ranged, mode: "range" } : null;
 }
 
 export type ResolvedProductAsset = {
@@ -312,8 +394,10 @@ export function resolveProductAsset(
     if (!nominal) return null;
 
     return {
-      src: nominal.localPath,
-      alt: nominal.alt ?? item.label,
+      src: nominal.asset.localPath,
+      // A range match deliberately reuses representative artwork from a nearby
+      // denomination. Accessibility text must still describe the actual item.
+      alt: nominal.mode === "range" ? item.label : nominal.asset.alt ?? item.label,
       kind: "nominal",
     };
   }
