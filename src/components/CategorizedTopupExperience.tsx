@@ -6,6 +6,11 @@ import type { Game } from "@/lib/catalog";
 
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
+type ProductArtwork = {
+  src: string;
+  alt: string;
+  kind: "nominal" | "cover";
+};
 
 type CatalogCategoryId =
   | "games"
@@ -26,6 +31,7 @@ type CatalogCategory = {
 
 type CategorizedTopupExperienceProps = {
   games: Game[];
+  artworkByGameId?: Record<string, ProductArtwork | null>;
 };
 
 const CATEGORY_META: Record<
@@ -139,8 +145,37 @@ function popularityScore(game: Game) {
   );
 }
 
+function ProductArtworkMark({
+  game,
+  artwork,
+  className,
+}: {
+  game: Game;
+  artwork?: ProductArtwork | null;
+  className: string;
+}) {
+  return (
+    <span
+      className={`${className} app-artwork`}
+      style={{ background: game.accent, overflow: "hidden" }}
+    >
+      {artwork ? (
+        <img
+          src={artwork.src}
+          alt={artwork.alt}
+          loading="lazy"
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      ) : (
+        game.initials
+      )}
+    </span>
+  );
+}
+
 export default function CategorizedTopupExperience({
   games,
+  artworkByGameId = {},
 }: CategorizedTopupExperienceProps) {
   const router = useRouter();
   const categories = useMemo(() => buildCategories(games), [games]);
@@ -234,7 +269,11 @@ export default function CategorizedTopupExperience({
               return (
                 <button className="home-popular-card" key={game.id} type="button" onClick={() => openProduct(game)}>
                   <span className="home-popular-rank">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="home-popular-icon app-artwork" style={{ background: game.accent }}>{game.initials}</span>
+                  <ProductArtworkMark
+                    game={game}
+                    artwork={artworkByGameId[game.id]}
+                    className="home-popular-icon"
+                  />
                   <span className="home-popular-copy">
                     <strong>{game.name}</strong>
                     <small>{category.label}</small>
@@ -293,7 +332,11 @@ export default function CategorizedTopupExperience({
               const category = CATEGORY_META[getCatalogCategoryId(game)];
               return (
                 <button className="game-card" key={game.id} type="button" onClick={() => openProduct(game)}>
-                  <span className="game-mark app-artwork" style={{ background: game.accent }}>{game.initials}</span>
+                  <ProductArtworkMark
+                    game={game}
+                    artwork={artworkByGameId[game.id]}
+                    className="game-mark"
+                  />
                   <span className="game-copy">
                     <strong>{game.name}</strong>
                     <small>{category.label}</small>

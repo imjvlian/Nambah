@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import type { Game } from "@/lib/catalog";
+import {
+  resolveProductAsset,
+  resolveProductCover,
+} from "@/lib/product-asset-resolver";
 
 function searchableProductText(game: Game) {
   return [
@@ -36,6 +40,11 @@ export default async function ProductPage({
   if (!game) notFound();
 
   const category = categoryLabel(game);
+  const productArtwork = resolveProductCover(game);
+  const artworkByGameId = { [game.id]: productArtwork };
+  const artworkByPackageId = Object.fromEntries(
+    game.packages.map((item) => [item.id, resolveProductAsset(game, item)]),
+  );
 
   return (
     <main className="product-page">
@@ -53,8 +62,19 @@ export default async function ProductPage({
       </header>
 
       <section className="shell product-hero">
-        <div className="product-hero-art app-artwork" style={{ background: game.accent }}>
-          {game.initials}
+        <div
+          className="product-hero-art app-artwork"
+          style={{ background: game.accent, overflow: "hidden" }}
+        >
+          {productArtwork ? (
+            <img
+              src={productArtwork.src}
+              alt={productArtwork.alt}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          ) : (
+            game.initials
+          )}
         </div>
         <div className="product-hero-copy">
           <a className="product-back-link" href="/">← Kembali ke katalog</a>
@@ -89,6 +109,8 @@ export default async function ProductPage({
           games={[game]}
           paymentMethods={catalog.paymentMethods}
           catalogSource={catalog.source}
+          artworkByGameId={artworkByGameId}
+          artworkByPackageId={artworkByPackageId}
         />
       </section>
 

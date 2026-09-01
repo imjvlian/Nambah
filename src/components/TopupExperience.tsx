@@ -12,6 +12,11 @@ import {
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
+type ProductArtwork = {
+  src: string;
+  alt: string;
+  kind: "nominal" | "cover";
+};
 type UsernameCheckStatus = "idle" | "loading" | "success" | "pending" | "error";
 type UsernameCheckState = {
   status: UsernameCheckStatus;
@@ -26,6 +31,8 @@ type TopupExperienceProps = {
   games: Game[];
   paymentMethods: PublicPaymentMethod[];
   catalogSource: "static" | "supabase";
+  artworkByGameId?: Record<string, ProductArtwork | null>;
+  artworkByPackageId?: Record<string, ProductArtwork | null>;
 };
 
 const GROUP_OPTIONS: Array<{ id: ProductGroup; label: string }> = [
@@ -131,6 +138,8 @@ export default function TopupExperience({
   games,
   paymentMethods,
   catalogSource,
+  artworkByGameId = {},
+  artworkByPackageId = {},
 }: TopupExperienceProps) {
   const router = useRouter();
   const defaultGame = games[0]!;
@@ -184,6 +193,7 @@ export default function TopupExperience({
   const paymentMethod =
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
   const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
+  const selectedGameArtwork = artworkByGameId[selectedGame.id];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -458,16 +468,33 @@ export default function TopupExperience({
         </div>
 
         <div className="game-grid">
-          {filteredGames.map((game) => (
-            <button className="game-card" key={game.id} type="button" onClick={() => chooseGame(game.id)}>
-              <span className="game-mark app-artwork" style={{ background: game.accent }}>{game.initials}</span>
-              <span className="game-copy">
-                <strong>{game.name}</strong>
-                <small>{game.category === "game" ? "Top up instan" : "Voucher digital"}</small>
-              </span>
-              <span className="card-arrow" aria-hidden="true">↗</span>
-            </button>
-          ))}
+          {filteredGames.map((game) => {
+            const artwork = artworkByGameId[game.id];
+            return (
+              <button className="game-card" key={game.id} type="button" onClick={() => chooseGame(game.id)}>
+                <span
+                  className="game-mark app-artwork"
+                  style={{ background: game.accent, overflow: "hidden" }}
+                >
+                  {artwork ? (
+                    <img
+                      src={artwork.src}
+                      alt={artwork.alt}
+                      loading="lazy"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    game.initials
+                  )}
+                </span>
+                <span className="game-copy">
+                  <strong>{game.name}</strong>
+                  <small>{game.category === "game" ? "Top up instan" : "Voucher digital"}</small>
+                </span>
+                <span className="card-arrow" aria-hidden="true">↗</span>
+              </button>
+            );
+          })}
         </div>
 
         {filteredGames.length === 0 && (
@@ -494,7 +521,20 @@ export default function TopupExperience({
         <form className="order-card" onSubmit={submitOrder}>
           <div className="order-head">
             <div className="selected-product">
-              <span className="selected-mark app-artwork" style={{ background: selectedGame.accent }}>{selectedGame.initials}</span>
+              <span
+                className="selected-mark app-artwork"
+                style={{ background: selectedGame.accent, overflow: "hidden" }}
+              >
+                {selectedGameArtwork ? (
+                  <img
+                    src={selectedGameArtwork.src}
+                    alt={selectedGameArtwork.alt}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                ) : (
+                  selectedGame.initials
+                )}
+              </span>
               <div>
                 <small>Produk dipilih</small>
                 <strong>{selectedGame.name}</strong>
@@ -606,6 +646,7 @@ export default function TopupExperience({
                       const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
                       const groups = groupsOf(item);
                       const visualKind = getPackageVisualKind(selectedGame, item);
+                      const artwork = artworkByPackageId[item.id];
                       const active = selectedPackageId === item.id;
 
                       return (
@@ -622,8 +663,21 @@ export default function TopupExperience({
                           <span className="package-card-v3-title">{item.label}</span>
 
                           <span className="package-card-v3-main">
-                            <span className={`package-item-visual ${visualKind}`} aria-hidden="true">
-                              {packageVisualLabel(visualKind)}
+                            <span
+                              className={`package-item-visual ${visualKind}`}
+                              aria-hidden={artwork ? undefined : true}
+                              style={artwork ? { overflow: "hidden", padding: 4 } : undefined}
+                            >
+                              {artwork ? (
+                                <img
+                                  src={artwork.src}
+                                  alt={artwork.alt}
+                                  loading="lazy"
+                                  style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                                />
+                              ) : (
+                                packageVisualLabel(visualKind)
+                              )}
                             </span>
                             <span className="package-card-v3-price">
                               <strong className="package-current-price">{formatIDR(item.sellingPrice)}</strong>
