@@ -125,51 +125,74 @@ function enrichGame(game: Game, popularity: Map<string, number>): Game {
   };
 }
 
-export async function getPublicCatalog(): Promise<PublicCatalogResult> {
-  if (!isSupabaseConfigured()) {
-    const popularity = new Map<string, number>();
-    return {
-      games: staticGames.map((game) => withGameIcon(enrichGame(game, popularity))),
-      paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
-        id,
-        name,
-        detail,
-      })),
-      source: "static",
-    };
-  }
+function getStaticCatalog(): PublicCatalogResult {
+  const popularity = new Map<string, number>();
+  return {
+    games: staticGames.map((game) => withGameIcon(enrichGame(game, popularity))),
+    paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
+      id,
+      name,
+      detail,
+    })),
+    source: "static",
+  };
+}
 
-  const [gameRows, productRows, supplierAvailabilityRows, paymentRows, recentOrders] =
-    await Promise.all([
-      supabaseSelect<GameRow>("games", {
-        select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
-        filters: { active: "eq.true" },
-        order: "sort_order.asc",
-      }),
-      supabaseSelect<ProductRow>("products", {
-        select: "id,game_id,label,note,selling_price,reference_price,sort_order",
-        filters: { active: "eq.true" },
-        order: "sort_order.asc",
-      }),
-      supabaseSelect<SupplierAvailabilityRow>("supplier_products", {
-        select: "product_id,active",
-        filters: {
-          supplier_id: "eq.digiflazz",
-          supplier_sku: "not.is.null",
-        },
-      }),
-      supabaseSelect<PaymentMethodRow>("payment_methods", {
-        select: "id,name,detail,sort_order",
-        filters: { active: "eq.true" },
-        order: "sort_order.asc",
-      }),
-      supabaseSelect<OrderPopularityRow>("orders", {
-        select: "product_id",
-        filters: { status: "in.(paid,processing,success)" },
-        order: "created_at.desc",
-        limit: 1000,
-      }),
-    ]);
+function isTransientSupabaseJwtError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /PGRST303|JWT issued at future|JWT[^\n]*future|JWT not yet valid/i.test(message);
+}
+
+export async function getPublicCatalog(): Promise<PublicCatalogResult> {
+  if (!isSupabaseConfigured()) return getStaticCatalog();
+
+  let gameRows: GameRow[];
+  let productRows: ProductRow[];
+  let supplierAvailabilityRows: SupplierAvailabilityRow[];
+  let paymentRows: PaymentMethodRow[];
+  let recentOrders: OrderPopularityRow[];
+
+  try {
+    [gameRows, productRows, supplierAvailabilityRows, paymentRows, recentOrders] =
+      await Promise.all([
+        supabaseSelect<GameRow>("games", {
+          select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
+          filters: { active: "eq.true" },
+          order: "sort_order.asc",
+        }),
+        supabaseSelect<ProductRow>("products", {
+          select: "id,game_id,label,note,selling_price,reference_price,sort_order",
+          filters: { active: "eq.true" },
+          order: "sort_order.asc",
+        }),
+        supabaseSelect<SupplierAvailabilityRow>("supplier_products", {
+          select: "product_id,active",
+          filters: {
+            supplier_id: "eq.digiflazz",
+            supplier_sku: "not.is.null",
+          },
+        }),
+        supabaseSelect<PaymentMethodRow>("payment_methods", {
+          select: "id,name,detail,sort_order",
+          filters: { active: "eq.true" },
+          order: "sort_order.asc",
+        }),
+        supabaseSelect<OrderPopularityRow>("orders", {
+          select: "product_id",
+          filters: { status: "in.(paid,processing,success)" },
+          order: "created_at.desc",
+          limit: 1000,
+        }),
+      ]);
+  } catch (error) {
+    if (!isTransientSupabaseJwtError(error)) throw error;
+
+    console.warn(
+      "Supabase catalog read hit a temporary JWT validation error; using static catalog fallback.",
+      error instanceof Error ? error.message : String(error),
+    );
+    return getStaticCatalog();
+  }
 
   const supplierAvailability = new Map(
     supplierAvailabilityRows.map((row) => [row.product_id, Boolean(row.active)]),
