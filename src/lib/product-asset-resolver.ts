@@ -2,7 +2,7 @@ import manifestJson from "../../public/product-assets/codashop/manifest.json";
 import type { Game, GamePackage } from "@/lib/catalog";
 
 type ProductAsset = {
-  alt: string;
+  alt: string | null;
   kind: "cover" | "nominal" | string | null;
   localPath: string;
 };
@@ -17,7 +17,7 @@ type ProductAssetManifest = {
   products: Record<string, ProductAssetEntry>;
 };
 
-const manifest = manifestJson as ProductAssetManifest;
+const manifest = manifestJson as unknown as ProductAssetManifest;
 
 const STOP_WORDS = new Set([
   "top",
@@ -114,7 +114,7 @@ function findProduct(game: Game) {
   return best && best.score >= 70 ? best.product : null;
 }
 
-function specialIntent(value: string) {
+function specialIntent(value: string): string[] {
   const normalized = normalize(value);
   if (/weekly diamond pass|weekly pass/.test(normalized)) return ["weekly", "diamond", "pass"];
   if (/weekly membership/.test(normalized)) return ["weekly", "membership"];
@@ -134,7 +134,7 @@ function scoreAsset(item: GamePackage, asset: ProductAsset) {
   if (asset.kind !== "nominal") return -1;
 
   const label = normalize(item.label);
-  const alt = normalize(asset.alt || "");
+  const alt = normalize(asset.alt ?? "");
   if (!alt) return 0;
 
   if (label === alt) return 200;
@@ -193,7 +193,7 @@ export function resolveProductAsset(
     if (best && best.score >= 28) {
       return {
         src: best.asset.localPath,
-        alt: best.asset.alt || item.label,
+        alt: best.asset.alt ?? item.label,
         kind: "nominal",
       };
     }
