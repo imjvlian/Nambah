@@ -3,6 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Game, PaymentMethod } from "@/lib/catalog";
+import {
+  getGameAccountSchema,
+  sanitizeAccountField,
+  validateGameAccountTarget,
+} from "@/lib/game-account";
 import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
 import {
   createPublicPricingFallback,
@@ -174,9 +179,8 @@ export default function TopupExperience({
   }, [games, query]);
 
   const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
-  const canCheckUsername =
-    selectedGame.requiresServer &&
-    /mobile\s*legends?/i.test(`${selectedGame.name} ${selectedGame.shortName}`);
+  const accountSchema = getGameAccountSchema(selectedGame);
+  const canCheckUsername = accountSchema.checker === "mobile-legends";
 
   const nominalSections = useMemo(
     () =>
@@ -260,18 +264,14 @@ export default function TopupExperience({
   ]);
 
   useEffect(() => {
-    const normalizedUserId = userId.trim();
-    const normalizedServerId = serverId.trim();
-    const validInput =
-      canCheckUsername &&
-      /^\d{4,20}$/.test(normalizedUserId) &&
-      /^\d{1,10}$/.test(normalizedServerId);
-
-    if (!validInput) {
+    const account = validateGameAccountTarget(selectedGame, userId, serverId);
+    if (!canCheckUsername || !account.ok || !account.serverId) {
       setUsernameCheck({ status: "idle" });
       return;
     }
 
+    const normalizedUserId = account.userId;
+    const normalizedServerId = account.serverId;
     const controller = new AbortController();
     let mounted = true;
 
@@ -349,7 +349,7 @@ export default function TopupExperience({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [canCheckUsername, selectedGame.id, userId, serverId]);
+  }, [canCheckUsername, selectedGame, userId, serverId]);
 
   function resetPricingMessages() {
     setNotice("");
@@ -402,12 +402,9 @@ export default function TopupExperience({
     event.preventDefault();
     setNotice("");
 
-    if (!userId.trim()) {
-      setNotice("Masukkan User ID terlebih dahulu.");
-      return;
-    }
-    if (selectedGame.requiresServer && !serverId.trim()) {
-      setNotice("Masukkan Server / Zone ID terlebih dahulu.");
+    const account = validateGameAccountTarget(selectedGame, userId, serverId);
+    if (!account.ok) {
+      setNotice(account.error);
       return;
     }
     if (!serverPricing) {
@@ -428,8 +425,8 @@ export default function TopupExperience({
           gameId: selectedGame.id,
           packageId: selectedPackage.id,
           paymentId: paymentMethod.id,
-          targetUserId: userId.trim(),
-          targetServerId: selectedGame.requiresServer ? serverId.trim() : undefined,
+          targetUserId: account.userId,
+          targetServerId: account.serverId,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
         }),
@@ -546,30 +543,35 @@ export default function TopupExperience({
           <div className="form-block account-form-block">
             <div className="form-label">
               <span className="step-number">1</span>
-              <div><strong>Data akun</strong><small>Nickname dicek otomatis setelah ID dan Server valid.</small></div>
+              <div>
+                <strong>Data akun</strong>
+                <small>{accountSchema.helper}</small>
+              </div>
             </div>
-            <div className={selectedGame.requiresServer ? "input-grid two" : "input-grid"}>
+            <div className={accountSchema.server ? "input-grid two" : "input-grid"}>
               <label>
-                <span>User ID</span>
+                <span>{accountSchema.user.label}</span>
                 <input
-                  inputMode="numeric"
-                  placeholder="Masukkan User ID"
+                  inputMode={accountSchema.user.inputMode}
+                  maxLength={accountSchema.user.maxLength}
+                  placeholder={accountSchema.user.placeholder}
                   value={userId}
                   onChange={(event) => {
-                    setUserId(event.target.value.replace(/\D/g, ""));
+                    setUserId(sanitizeAccountField(event.target.value, accountSchema.user));
                     setUsernameCheck({ status: "idle" });
                   }}
                 />
               </label>
-              {selectedGame.requiresServer && (
+              {accountSchema.server && (
                 <label>
-                  <span>{canCheckUsername ? "Server / Zone ID" : "Server / Zone ID"}</span>
+                  <span>{accountSchema.server.label}</span>
                   <input
-                    inputMode="numeric"
-                    placeholder="Contoh: 1234"
+                    inputMode={accountSchema.server.inputMode}
+                    maxLength={accountSchema.server.maxLength}
+                    placeholder={accountSchema.server.placeholder}
                     value={serverId}
                     onChange={(event) => {
-                      setServerId(event.target.value.replace(/\D/g, ""));
+                      setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
                       setUsernameCheck({ status: "idle" });
                     }}
                   />
@@ -585,7 +587,7 @@ export default function TopupExperience({
                       <span className="account-check-icon" aria-hidden="true">↻</span>
                       <span className="account-check-copy">
                         <strong>Memeriksa akun...</strong>
-                        <small>ID dan Server sedang divalidasi.</small>
+                        <small>ID dan Zone sedang divalidasi.</small>
                       </span>
                     </>
                   ) : usernameCheck.status === "success" ? (
@@ -595,7 +597,7 @@ export default function TopupExperience({
                         <span>Akun kamu <strong>{usernameCheck.nickname ?? "terverifikasi"}</strong>.</span>
                         <small>
                           {usernameCheck.region ? `${usernameCheck.region} · ` : ""}
-                          Server / Zone {usernameCheck.server ?? serverId}
+                          Zone {usernameCheck.server ?? serverId}
                         </small>
                       </span>
                     </>
