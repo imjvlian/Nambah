@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { getGameAccountSchema, validateGameAccountTarget } from "@/lib/game-account";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -61,14 +62,6 @@ const CHECK_TIMEOUT_MS = 12_000;
 const accountCache = new Map<string, CachedAccount>();
 const pendingChecks = new Map<string, PendingAccount>();
 const rateLimits = new Map<string, number[]>();
-
-function normalize(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function normalizeRc(value: string | number | undefined) {
   if (value === undefined || value === null) return "";
@@ -278,25 +271,15 @@ export async function POST(request: Request) {
   };
 
   const gameId = typeof payload.gameId === "string" ? payload.gameId.trim() : "";
-  const userId = typeof payload.userId === "string" ? payload.userId.trim() : "";
-  const serverId = typeof payload.serverId === "string" ? payload.serverId.trim() : "";
+  const rawUserId = typeof payload.userId === "string" ? payload.userId : "";
+  const rawServerId = typeof payload.serverId === "string" ? payload.serverId : "";
 
-  if (!gameId || !userId || !serverId) {
-    return Response.json(
-      { error: "Game, User ID, dan Server / Zone ID wajib diisi." },
-      { status: 400 },
-    );
+  if (!gameId) {
+    return Response.json({ error: "Game wajib diisi." }, { status: 400 });
   }
 
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(gameId)) {
     return Response.json({ error: "Game ID tidak valid." }, { status: 400 });
-  }
-
-  if (!/^\d{5,12}$/.test(userId) || !/^\d{3,5}$/.test(serverId)) {
-    return Response.json(
-      { error: "Format User ID atau Server / Zone ID tidak valid." },
-      { status: 400 },
-    );
   }
 
   const [game] = await supabaseSelect<GameRow>("games", {
@@ -309,12 +292,30 @@ export async function POST(request: Request) {
     return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
   }
 
-  const gameText = normalize(`${game.name} ${game.short_name}`);
-  if (!game.requires_server || !gameText.includes("mobile legends")) {
+  const gameDescriptor = {
+    id: game.id,
+    name: game.name,
+    shortName: game.short_name,
+    requiresServer: game.requires_server,
+  };
+  const schema = getGameAccountSchema(gameDescriptor);
+
+  if (schema.checker !== "mobile-legends") {
     return Response.json(
       { error: "Auto check saat ini baru tersedia untuk Mobile Legends." },
       { status: 422 },
     );
+  }
+
+  const account = validateGameAccountTarget(gameDescriptor, rawUserId, rawServerId);
+  if (!account.ok) {
+    return Response.json({ error: account.error }, { status: 400 });
+  }
+
+  const userId = account.userId;
+  const serverId = account.serverId;
+  if (!serverId) {
+    return Response.json({ error: "Zone ID wajib diisi." }, { status: 400 });
   }
 
   const { username, secret } = getMimihCredentials();

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { validateGameAccountTarget } from "@/lib/game-account";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
 import { getPublicOrder } from "@/lib/order-service";
 import { calculatePricing } from "@/lib/pricing";
@@ -17,7 +18,10 @@ type CreateOrderBody = {
   referralCode?: string;
 };
 
-type RequiresServerRow = {
+type GameAccountRow = {
+  id: string;
+  name: string;
+  short_name: string;
   requires_server: boolean;
 };
 
@@ -62,10 +66,6 @@ export async function POST(request: Request) {
   const targetUserId = clean(body.targetUserId, 64);
   const targetServerId = clean(body.targetServerId, 64);
 
-  if (!targetUserId) {
-    return Response.json({ error: "User ID wajib diisi." }, { status: 400 });
-  }
-
   const pricingContext = await getPricingContext({
     gameId: body.gameId,
     packageId: body.packageId,
@@ -94,14 +94,29 @@ export async function POST(request: Request) {
     minimumNambahProfit,
   } = pricingContext.context;
 
-  const [gameConfig] = await supabaseSelect<RequiresServerRow>("games", {
-    select: "requires_server",
-    filters: { id: `eq.${game.id}` },
+  const [gameConfig] = await supabaseSelect<GameAccountRow>("games", {
+    select: "id,name,short_name,requires_server",
+    filters: { id: `eq.${game.id}`, active: "eq.true" },
     limit: 1,
   });
 
-  if (gameConfig?.requires_server && !targetServerId) {
-    return Response.json({ error: "Server / Zone ID wajib diisi." }, { status: 400 });
+  if (!gameConfig) {
+    return Response.json({ error: "Konfigurasi akun produk tidak ditemukan." }, { status: 409 });
+  }
+
+  const account = validateGameAccountTarget(
+    {
+      id: gameConfig.id,
+      name: gameConfig.name,
+      shortName: gameConfig.short_name,
+      requiresServer: gameConfig.requires_server,
+    },
+    targetUserId,
+    targetServerId,
+  );
+
+  if (!account.ok) {
+    return Response.json({ error: account.error }, { status: 400 });
   }
 
   const enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id];
@@ -140,8 +155,8 @@ export async function POST(request: Request) {
       game_id: game.id,
       product_id: selectedPackage.id,
       payment_method_id: paymentMethod.id,
-      target_user_id: targetUserId,
-      target_server_id: targetServerId || null,
+      target_user_id: account.userId,
+      target_server_id: account.serverId ?? null,
       promotion_code: pricing.promoCode,
       affiliate_code: pricing.referralCode,
       supplier_id: "digiflazz",
