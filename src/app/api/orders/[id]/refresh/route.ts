@@ -1,6 +1,6 @@
 import { getMidtransTransactionStatus } from "@/lib/midtrans/client";
 import { applyMidtransStatus, getPublicOrder } from "@/lib/order-service";
-import { verifyOrderAccess } from "@/lib/order-access";
+import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -19,16 +19,12 @@ export async function POST(
     return Response.json({ error: "Order ID tidak valid." }, { status: 400 });
   }
 
-  const url = new URL(request.url);
-  const token =
-    request.headers.get("x-order-access-token") ??
-    url.searchParams.get("access_token");
-
-  if (!token || !verifyOrderAccess(orderId, token)) {
-    return Response.json({ error: "Akses tidak sah." }, { status: 401 });
-  }
-
   try {
+    const token = readOrderAccessToken(request);
+    if (!token || !(await verifyOrderAccess(orderId, token))) {
+      return Response.json({ error: "Akses tidak sah." }, { status: 401 });
+    }
+
     const existing = await getPublicOrder(orderId);
     if (!existing) {
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });
