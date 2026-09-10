@@ -1,40 +1,72 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { supabaseSelect } from "@/lib/supabase/server";
 
-const SECRET_ENV = "NAMBAH_ORDER_ACCESS_TOKEN_SECRET";
+const ORDER_ACCESS_COOKIE = "nambah_order_access";
+const ORDER_ACCESS_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
-/**
- * Returns the server-only secret used to sign order access tokens.
- * Throws at startup if the secret is not configured, so a missing
- * configuration is loud instead of silently allowing unauthenticated access.
- */
-export function getOrderAccessSecret(): string {
-  const secret = process.env[SECRET_ENV]?.trim();
-  if (!secret) {
-    throw new Error(`Order access token secret is not configured: ${SECRET_ENV}`);
-  }
-  return secret;
+type OrderAccessRow = {
+  access_token_hash: string | null;
+};
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
 }
 
-/**
- * Signs an order ID into a base64url HMAC-SHA256 token.
- * The token is deterministic and stateless — no database lookup required.
- */
-export function signOrderAccess(orderId: string): string {
-  return createHmac("sha256", getOrderAccessSecret())
-    .update(orderId)
-    .digest("base64url");
+function safeEqualHash(left: string, right: string) {
+  if (!/^[a-f0-9]{64}$/i.test(left) || !/^[a-f0-9]{64}$/i.test(right)) return false;
+  const leftBuffer = Buffer.from(left, "hex");
+  const rightBuffer = Buffer.from(right, "hex");
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-/**
- * Verifies an order access token against the expected HMAC.
- * Uses timingSafeEqual to prevent timing attacks.
- */
-export function verifyOrderAccess(orderId: string, token: string): boolean {
-  if (!token) return false;
-  try {
-    const expected = signOrderAccess(orderId);
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(token.trim()));
-  } catch {
-    return false;
+export function createOrderAccessCredential() {
+  const token = randomBytes(32).toString("base64url");
+  return {
+    token,
+    tokenHash: hashToken(token),
+  };
+}
+
+export function createOrderAccessCookie(orderId: string, token: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const path = `/api/orders/${encodeURIComponent(orderId)}`;
+  return `${ORDER_ACCESS_COOKIE}=${encodeURIComponent(token)}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${ORDER_ACCESS_MAX_AGE_SECONDS}${secure}`;
+}
+
+function readCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  for (const item of cookieHeader.split(";")) {
+    const [rawName, ...rawValue] = item.trim().split("=");
+    if (rawName !== name) continue;
+    try {
+      return decodeURIComponent(rawValue.join("="));
+    } catch {
+      return rawValue.join("=");
+    }
   }
+  return "";
+}
+
+export function readOrderAccessToken(request: Request) {
+  const url = new URL(request.url);
+  return (
+    request.headers.get("x-order-access-token")?.trim() ||
+    url.searchParams.get("access_token")?.trim() ||
+    readCookie(request, ORDER_ACCESS_COOKIE).trim() ||
+    ""
+  );
+}
+
+export async function verifyOrderAccess(orderId: string, token: string) {
+  if (!orderId || !token) return false;
+
+  const [order] = await supabaseSelect<OrderAccessRow>("orders", {
+    select: "access_token_hash",
+    filters: { id: `eq.${orderId}` },
+    limit: 1,
+  });
+
+  if (!order?.access_token_hash) return false;
+  return safeEqualHash(order.access_token_hash, hashToken(token.trim()));
 }
