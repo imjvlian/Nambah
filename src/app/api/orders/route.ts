@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
 import { getPublicOrder } from "@/lib/order-service";
+import {
+  createOrderAccessCookie,
+  createOrderAccessCredential,
+} from "@/lib/order-access";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
 import { isSupabaseConfigured, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
@@ -148,6 +152,8 @@ export async function POST(request: Request) {
 
   const orderId = createOrderId();
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const access = createOrderAccessCredential();
 
   try {
     await supabaseInsert("orders", {
@@ -173,8 +179,12 @@ export async function POST(request: Request) {
       affiliate_rate: pricing.affiliateRate,
       affiliate_commission: pricing.affiliateCommission,
       nambah_profit: pricing.nambahProfit,
+      access_token_hash: access.tokenHash,
       created_at: now,
       updated_at: now,
+      expires_at: expiresAt,
+      status_changed_at: now,
+      terminal_at: null,
     });
 
     await supabaseInsert("payments", {
@@ -227,7 +237,15 @@ export async function POST(request: Request) {
     const order = await getPublicOrder(orderId);
     if (!order) throw new Error("Order tidak ditemukan setelah dibuat.");
 
-    return Response.json({ order }, { status: 201 });
+    return Response.json(
+      { order, accessToken: access.token },
+      {
+        status: 201,
+        headers: {
+          "Set-Cookie": createOrderAccessCookie(orderId, access.token),
+        },
+      },
+    );
   } catch (error) {
     console.error("Midtrans Sandbox order creation failed", error);
     return Response.json(

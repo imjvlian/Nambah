@@ -1,10 +1,11 @@
 import { getPublicOrder } from "@/lib/order-service";
+import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isSupabaseConfigured()) {
@@ -18,6 +19,11 @@ export async function GET(
   }
 
   try {
+    const token = readOrderAccessToken(request);
+    if (!token || !(await verifyOrderAccess(orderId, token))) {
+      return Response.json({ error: "Akses tidak sah." }, { status: 401 });
+    }
+
     const order = await getPublicOrder(orderId);
     if (!order) {
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });

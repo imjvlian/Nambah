@@ -11,6 +11,9 @@ export type PublicOrder = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string | null;
+  statusChangedAt?: string | null;
+  terminalAt?: string | null;
   mode: "midtrans-sandbox";
   status: PublicOrderStatus;
   product: {

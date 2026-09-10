@@ -1,11 +1,12 @@
 import { getMidtransTransactionStatus } from "@/lib/midtrans/client";
 import { applyMidtransStatus, getPublicOrder } from "@/lib/order-service";
+import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isSupabaseConfigured()) {
@@ -19,6 +20,11 @@ export async function POST(
   }
 
   try {
+    const token = readOrderAccessToken(request);
+    if (!token || !(await verifyOrderAccess(orderId, token))) {
+      return Response.json({ error: "Akses tidak sah." }, { status: 401 });
+    }
+
     const existing = await getPublicOrder(orderId);
     if (!existing) {
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });

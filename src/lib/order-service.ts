@@ -1,6 +1,7 @@
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { isTerminalStatus } from "./order-status";
 
 type OrderRow = {
   id: string;
@@ -113,7 +114,7 @@ function nextOrderStatus(
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -206,7 +207,7 @@ export async function applyMidtransStatus(
 
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -222,6 +223,22 @@ export async function applyMidtransStatus(
   const paymentStatus = normalizePaymentStatus(payload.transaction_status);
   const orderStatus = nextOrderStatus(order.status, payload);
   const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+
+  // Update timestamps for status changes
+  const updatePayload: Record<string, unknown> = {};
+  if (orderStatus !== order.status) {
+    updatePayload.status = orderStatus;
+    updatePayload.status_changed_at = now;
+    if (isTerminalStatus(orderStatus)) {
+      updatePayload.terminal_at = now;
+    }
+    if (orderStatus === "paid" && (order.status === "pending_payment" || order.status === null)) {
+      updatePayload.paid_at = payload.settlement_time ?? now;
+    }
+    updatePayload.updated_at = now;
+  } else {
+    updatePayload.updated_at = now;
+  }
 
   const paymentUpdate = await supabaseUpdate<PaymentRow>(
     "payments",
@@ -245,15 +262,16 @@ export async function applyMidtransStatus(
   }
 
   if (orderStatus !== order.status) {
-    await supabaseUpdate(
-      "orders",
-      {
-        status: orderStatus,
-        ...(orderStatus === "paid" ? { paid_at: payload.settlement_time ?? now } : {}),
-        updated_at: now,
-      },
-      { filters: { id: `eq.${orderId}` } },
-    );
+    const orderUpdatePayload: Record<string, unknown> = { status: orderStatus, updated_at: now };
+    if (orderStatus === "paid") {
+      orderUpdatePayload.paid_at = payload.settlement_time ?? now;
+    }
+    if (isTerminalStatus(orderStatus)) {
+      orderUpdatePayload.terminal_at = now;
+    }
+    orderUpdatePayload.status_changed_at = now;
+
+    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
   }
 
   await supabaseInsert("midtrans_payment_events", {
