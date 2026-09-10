@@ -431,12 +431,13 @@ export default function TopupExperience({
           referralCode: appliedReferralCode,
         }),
       });
-      const data = (await response.json()) as { error?: string; order?: { id: string } };
+      const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
         return;
       }
-      router.push(`/order/${encodeURIComponent(data.order.id)}`);
+      const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
+      router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
       setNotice("Tidak bisa menyiapkan pembayaran Sandbox. Coba lagi.");
     } finally {
