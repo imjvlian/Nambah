@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { getGameAccountSchema, validateGameAccountTarget } from "@/lib/game-account";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
+import { checkVolseverGame } from "@/lib/volsever/client";
 
 export const runtime = "nodejs";
 
@@ -12,31 +13,18 @@ type GameRow = {
   active: boolean;
 };
 
-type MimihQuota = {
-  plan?: string | null;
-  used?: number | null;
-  limit?: number | null;
-  remaining?: number | null;
-  expires_at?: string | null;
-};
-
 type MimihRegionData = {
-  ref_id?: string;
-  status?: string;
   nickname?: string | null;
   region?: string | null;
   country_code?: string | null;
   allowed_product_types?: string[];
   cached?: boolean;
-  sandbox?: boolean;
-  quota?: MimihQuota | null;
   rc?: string | number;
   message?: string;
 };
 
 type MimihRegionResponse = {
   data?: MimihRegionData;
-  message?: string;
 };
 
 type CachedAccount = {
@@ -44,6 +32,7 @@ type CachedAccount = {
   server: string;
   region: string | null;
   countryCode: string | null;
+  source: "volsever" | "mimih";
   expiresAt: number;
 };
 
@@ -94,9 +83,10 @@ function rateLimitExceeded(clientKey: string) {
 }
 
 function getMimihCredentials() {
-  const username = process.env.GEMPAY_API_USERNAME?.trim() ?? "";
-  const secret = process.env.GEMPAY_API_SECRET?.trim() ?? "";
-  return { username, secret };
+  return {
+    username: process.env.GEMPAY_API_USERNAME?.trim() ?? "",
+    secret: process.env.GEMPAY_API_SECRET?.trim() ?? "",
+  };
 }
 
 function makeRefId() {
@@ -138,16 +128,11 @@ async function callMimihRegionApi(input: {
     });
 
     const raw = await response.text();
-    let payload: MimihRegionResponse;
-
+    let payload: MimihRegionResponse = {};
     try {
       payload = raw ? (JSON.parse(raw) as MimihRegionResponse) : {};
     } catch {
-      return {
-        httpStatus: response.status,
-        data: undefined,
-        parseError: true,
-      };
+      return { httpStatus: response.status, data: undefined, parseError: true };
     }
 
     return {
@@ -160,7 +145,7 @@ async function callMimihRegionApi(input: {
   }
 }
 
-function businessError(rc: string, message?: string) {
+function mimihBusinessError(rc: string, message?: string) {
   switch (rc) {
     case "40":
       return Response.json(
@@ -168,17 +153,13 @@ function businessError(rc: string, message?: string) {
         { status: 400 },
       );
     case "41":
-      return Response.json(
-        {
-          error: "Kredensial API Mimih Market belum valid. Periksa username, secret, dan status key.",
-          source: "mimih",
-        },
-        { status: 503 },
-      );
     case "42":
+    case "57":
+    case "58":
       return Response.json(
         {
-          error: "IP server Nambah belum diizinkan di API Mimih Market.",
+          error: "Fallback checker Mimih belum tersedia. Periksa konfigurasi provider.",
+          retryable: true,
           source: "mimih",
         },
         { status: 503 },
@@ -186,13 +167,14 @@ function businessError(rc: string, message?: string) {
     case "43":
       return Response.json(
         {
-          error: "Batas request username checker sedang tercapai. Coba lagi sebentar.",
+          error: "Batas request checker sedang tercapai. Coba lagi sebentar.",
           retryable: true,
           source: "mimih",
         },
         { status: 429 },
       );
     case "53":
+    case "99":
       return Response.json(
         {
           error: "Provider validasi akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
@@ -208,31 +190,6 @@ function businessError(rc: string, message?: string) {
           source: "mimih",
         },
         { status: 422 },
-      );
-    case "57":
-      return Response.json(
-        {
-          error: "Paket API Cek Region Mimih Market belum aktif pada key produksi.",
-          source: "mimih",
-        },
-        { status: 503 },
-      );
-    case "58":
-      return Response.json(
-        {
-          error: "Kuota API Cek Region Mimih Market sudah habis.",
-          source: "mimih",
-        },
-        { status: 503 },
-      );
-    case "99":
-      return Response.json(
-        {
-          error: "Hasil pengecekan belum pasti. Coba lagi beberapa saat.",
-          retryable: true,
-          source: "mimih",
-        },
-        { status: 503 },
       );
     default:
       return Response.json(
@@ -274,11 +231,7 @@ export async function POST(request: Request) {
   const rawUserId = typeof payload.userId === "string" ? payload.userId : "";
   const rawServerId = typeof payload.serverId === "string" ? payload.serverId : "";
 
-  if (!gameId) {
-    return Response.json({ error: "Game wajib diisi." }, { status: 400 });
-  }
-
-  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(gameId)) {
+  if (!gameId || !/^[a-zA-Z0-9_-]{1,100}$/.test(gameId)) {
     return Response.json({ error: "Game ID tidak valid." }, { status: 400 });
   }
 
@@ -302,7 +255,7 @@ export async function POST(request: Request) {
 
   if (schema.checker !== "mobile-legends") {
     return Response.json(
-      { error: "Auto check saat ini baru tersedia untuk Mobile Legends." },
+      { error: "Auto check Volsever tahap awal baru diaktifkan untuk Mobile Legends." },
       { status: 422 },
     );
   }
@@ -318,17 +271,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Zone ID wajib diisi." }, { status: 400 });
   }
 
-  const { username, secret } = getMimihCredentials();
-  if (!username || !secret) {
-    return Response.json(
-      {
-        error: "API Cek Region Mimih Market belum dikonfigurasi di server Nambah.",
-        source: "mimih",
-      },
-      { status: 503 },
-    );
-  }
-
   const cacheKey = `${game.id}:${userId}:${serverId}`;
   const cached = accountCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -337,8 +279,10 @@ export async function POST(request: Request) {
       server: cached.server,
       region: cached.region,
       countryCode: cached.countryCode,
+      verified: true,
+      regionVerified: Boolean(cached.region),
       cached: true,
-      source: "mimih",
+      source: cached.source,
     });
   }
   if (cached) accountCache.delete(cacheKey);
@@ -347,6 +291,66 @@ export async function POST(request: Request) {
     return Response.json(
       { error: "Terlalu banyak pengecekan akun. Coba lagi beberapa menit." },
       { status: 429 },
+    );
+  }
+
+  let volseverUnavailable = false;
+  try {
+    const result = await checkVolseverGame({
+      routeSlug: "mobile-legends-wr",
+      userId,
+      serverId,
+    });
+
+    if (result.configured && result.ok && result.nickname) {
+      accountCache.set(cacheKey, {
+        nickname: result.nickname,
+        server: result.server ?? serverId,
+        region: result.region,
+        countryCode: result.countryCode,
+        source: "volsever",
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+
+      return Response.json({
+        nickname: result.nickname,
+        server: result.server ?? serverId,
+        region: result.region,
+        countryCode: result.countryCode,
+        verified: true,
+        regionVerified: Boolean(result.region),
+        cached: false,
+        source: "volsever",
+      });
+    }
+
+    if (result.configured && result.invalidAccount) {
+      return Response.json(
+        {
+          error: "User ID / Zone ID tidak ditemukan. Periksa kembali data akun.",
+          source: "volsever",
+        },
+        { status: 422 },
+      );
+    }
+
+    volseverUnavailable = result.configured;
+  } catch (error) {
+    volseverUnavailable = true;
+    console.error("Volsever account checker failed", error);
+  }
+
+  const { username, secret } = getMimihCredentials();
+  if (!username || !secret) {
+    return Response.json(
+      {
+        error: volseverUnavailable
+          ? "Volsever sedang tidak tersedia dan fallback checker belum dikonfigurasi. Checkout tetap bisa dilanjutkan."
+          : "Volsever belum dikonfigurasi. Tambahkan VOLSEVER_API_KEY di server Nambah.",
+        retryable: volseverUnavailable,
+        source: "volsever",
+      },
+      { status: 503 },
     );
   }
 
@@ -365,21 +369,10 @@ export async function POST(request: Request) {
       serverId,
     });
 
-    if (result.parseError) {
+    if (result.parseError || result.httpStatus >= 500) {
       return Response.json(
         {
-          error: "API Mimih Market mengembalikan response yang tidak dapat dibaca.",
-          retryable: true,
-          source: "mimih",
-        },
-        { status: 503 },
-      );
-    }
-
-    if (result.httpStatus >= 500) {
-      return Response.json(
-        {
-          error: "API Mimih Market sedang mengalami gangguan sementara.",
+          error: "Checker akun sedang mengalami gangguan sementara. Checkout tetap bisa dilanjutkan.",
           retryable: true,
           source: "mimih",
         },
@@ -414,7 +407,7 @@ export async function POST(request: Request) {
       } else {
         pendingChecks.delete(cacheKey);
       }
-      return businessError(rc, data?.message);
+      return mimihBusinessError(rc, data?.message);
     }
 
     pendingChecks.delete(cacheKey);
@@ -439,6 +432,7 @@ export async function POST(request: Request) {
       server: serverId,
       region,
       countryCode,
+      source: "mimih",
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
@@ -449,8 +443,11 @@ export async function POST(request: Request) {
       countryCode,
       allowedProductTypes: data?.allowed_product_types ?? [],
       providerCached: Boolean(data?.cached),
+      verified: true,
+      regionVerified: Boolean(region),
       cached: false,
       source: "mimih",
+      fallbackFrom: "volsever",
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -467,7 +464,7 @@ export async function POST(request: Request) {
     console.error("Mimih Market account checker failed", error);
     return Response.json(
       {
-        error: "Tidak bisa terhubung ke API Cek Region Mimih Market.",
+        error: "Tidak bisa terhubung ke provider pengecekan akun. Checkout tetap bisa dilanjutkan.",
         retryable: true,
         source: "mimih",
       },
