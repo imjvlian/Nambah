@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PublicOrder } from "@/lib/order-public";
 import {
   previewOrderStorageKey,
@@ -252,7 +252,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         embedId: SNAP_EMBED_ID,
         ...snapCallbacks(order.id),
       });
-      setNotice("Pembayaran Midtrans dimuat langsung di halaman Nambah.");
+      setNotice("Pembayaran Midtrans siap digunakan.");
     } catch {
       embeddedOrderRef.current = null;
       setNotice("Embedded Midtrans belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
@@ -264,7 +264,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     if (!id) return;
     try {
       await navigator.clipboard.writeText(id);
-      setNotice("Order ID disalin ke clipboard.");
+      setNotice("Order ID disalin.");
     } catch {
       setNotice("Gagal menyalin Order ID.");
     }
@@ -276,6 +276,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       return;
     }
     setNotice("URL pembayaran cadangan belum tersedia.");
+  }
+
+  function focusPayment() {
+    const paymentContainer = document.getElementById(SNAP_EMBED_ID);
+    if (paymentContainer) {
+      paymentContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    openFallbackPayment();
   }
 
   async function createSandboxOrder() {
@@ -314,7 +323,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         ? `?access_token=${encodeURIComponent(data.accessToken)}`
         : "";
       router.replace(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
-      setNotice("Order Sandbox dibuat. Pembayaran akan dimuat di halaman ini.");
+      setNotice("Order Sandbox dibuat. Pembayaran sedang dimuat.");
     } catch {
       setNotice("Tidak dapat menghubungi server pembayaran.");
     } finally {
@@ -332,7 +341,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
 
     void navigator.clipboard.writeText(url).then(() => {
-      setNotice("Link status disalin ke clipboard.");
+      setNotice("Link status disalin.");
     });
   }
 
@@ -391,7 +400,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const timelineIndex = isPreview
     ? 0
     : Math.max(0, TIMELINE_STEPS.findIndex((step) => step.status === liveStatus));
-  const statusActions = isPreview ? [] : STATUS_CTA[liveStatus];
+  const statusActions = isPreview
+    ? []
+    : STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy");
 
   const paymentType = order?.payment.paymentType ?? null;
   const redirectUrl = order?.payment.redirectUrl ?? null;
@@ -420,22 +431,24 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <section className="order-status-shell shell">
         <div className="order-status-title">
           <div>
-            <span className="eyebrow">{isPreview ? "Checkout preview" : "Midtrans Embedded"}</span>
+            <span className="eyebrow">{isPreview ? "Checkout preview" : "Status pesanan"}</span>
             <h1>{isPreview ? "Siap membuat pembayaran." : STATUS_LABEL[liveStatus]}</h1>
             <p>
               {isPreview
                 ? "Harga akan divalidasi ulang di server sebelum order dan token pembayaran dibuat."
                 : STATUS_DESCRIPTION[liveStatus]}
             </p>
-            {lastChecked && <span className="order-last-checked">Terakhir diperiksa: {lastChecked}</span>}
-            {!isPreview && liveStatus === "pending_payment" && countdown.totalSeconds > 0 && !countdown.isExpired && (
-              <span className="order-countdown">Waktu habis: {countdown.display}</span>
-            )}
-            {!isPreview && countdown.isExpired && (
-              <span className="order-countdown expired">Waktu habis</span>
+            {!isPreview && (
+              <div className="order-status-meta">
+                {liveStatus === "pending_payment" && countdown.totalSeconds > 0 && !countdown.isExpired && (
+                  <span className="order-countdown">Sisa waktu {countdown.display}</span>
+                )}
+                {countdown.isExpired && <span className="order-countdown expired">Waktu habis</span>}
+                {lastChecked && <span className="order-last-checked">Diperiksa {lastChecked}</span>}
+              </div>
             )}
           </div>
-          <span className="order-mode-badge">{isPreview ? "PREVIEW" : "SANDBOX · EMBEDDED"}</span>
+          <span className="order-mode-badge">{isPreview ? "PREVIEW" : "SANDBOX"}</span>
         </div>
 
         <div className="order-status-grid">
@@ -456,18 +469,20 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </div>
 
             <div className="order-id-row">
-              <div>
+              <div className="order-id-primary">
                 <small>Order ID</small>
-                <strong>{displayId}</strong>
-                <button className="copy-order-id-button" type="button" onClick={() => void copyOrderId()}>
-                  Salin
-                </button>
+                <div className="order-id-copy-line">
+                  <strong>{displayId}</strong>
+                  <button className="copy-order-id-button" type="button" onClick={() => void copyOrderId()}>
+                    Salin
+                  </button>
+                </div>
               </div>
               <div>
                 <small>Dibuat</small>
                 <strong>{formatOrderTime(createdAt)}</strong>
               </div>
-              {order?.statusChangedAt && (
+              {order?.statusChangedAt && liveStatus !== "pending_payment" && (
                 <div>
                   <small>Status diubah</small>
                   <strong>{formatOrderTime(order.statusChangedAt)}</strong>
@@ -521,7 +536,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <div id={SNAP_EMBED_ID} className="midtrans-snap-container" />
 
                 <div className="midtrans-native-footer">
-                  <span>Pembayaran tetap diverifikasi server-side.</span>
+                  <span>Pembayaran diverifikasi langsung oleh server Nambah.</span>
                   {(!midtransClientKey || !snapReady) && redirectUrl && (
                     <button type="button" onClick={openFallbackPayment}>Buka pembayaran cadangan</button>
                   )}
@@ -543,7 +558,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
           <aside className="order-summary-card">
             <div className="order-summary-head">
-              <span>Ringkasan</span>
+              <div>
+                <span>Ringkasan pesanan</span>
+                <small>{displayId}</small>
+              </div>
               <small>{isPreview ? "Preview" : "Sandbox"}</small>
             </div>
 
@@ -554,55 +572,51 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               {account.serverId && <div><dt>Server / Zone</dt><dd>{account.serverId}</dd></div>}
               {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
               {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
-              {paymentType && <div><dt>Channel Midtrans</dt><dd>{paymentType}</dd></div>}
+              {paymentType && <div><dt>Channel</dt><dd>{paymentType}</dd></div>}
             </dl>
 
             <div className="order-price-breakdown">
-              <div><span>Harga Nambah</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
+              <div><span>Harga</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
               {pricing.promotionDiscount > 0 && (
                 <div className="saving"><span>Promo</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
               )}
               {pricing.referralDiscount > 0 && (
-                <div className="referral-saving"><span>Benefit referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
+                <div className="referral-saving"><span>Referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
               )}
               <div><span>Biaya pembayaran</span><strong>{formatIDR(pricing.customerPaymentFee)}</strong></div>
             </div>
 
             <div className="order-grand-total">
-              <span>Total</span>
+              <span>Total pembayaran</span>
               <strong>{formatIDR(pricing.finalPrice)}</strong>
             </div>
 
             {!isPreview && statusActions.length > 0 && (
               <div className="order-summary-actions">
-                {statusActions.map((cta) => (
+                {statusActions.map((cta, index) => (
                   <button
                     key={`${cta.action}-${cta.label}`}
-                    className={`cta-button ${["pay", "new_order", "refresh"].includes(cta.action) ? "primary-button" : "text-link"}`}
+                    className={`order-action-button ${index === 0 ? "primary" : "secondary"}`}
                     type="button"
                     disabled={busy}
                     onClick={() => {
-                      if (cta.action === "copy") void copyOrderId();
-                      if (cta.action === "pay") openFallbackPayment();
+                      if (cta.action === "pay") focusPayment();
                       if (cta.action === "refresh" && order) void refreshStatus(order.id);
                       if (cta.action === "new_order") router.push("/#topup");
                       if (cta.action === "support") window.open("mailto:support@nambah.com?subject=Order%20Inquiry");
                     }}
                   >
-                    {cta.label}
+                    {busy && cta.action === "refresh" ? "Memeriksa..." : cta.label}
                   </button>
                 ))}
               </div>
             )}
 
-            {!isPreview && liveStatus === "pending_payment" && order && (
-              <button className="primary-button full" type="button" disabled={busy} onClick={() => void refreshStatus(order.id)}>
-                Cek status Midtrans <span>↻</span>
-              </button>
-            )}
-
             <div className="order-secondary-links">
-              <Link className="order-secondary-link" href="/#topup">Buat pesanan lain</Link>
+              <button className="order-secondary-link" type="button" onClick={() => void copyOrderId()}>
+                Salin Order ID
+              </button>
+              <Link className="order-secondary-link" href="/#topup">Pesanan baru</Link>
               {order && accessToken && (
                 <button className="order-secondary-link" type="button" onClick={shareOrder}>
                   Bagikan status
