@@ -10,9 +10,14 @@ import {
   type PreviewOrder,
 } from "@/lib/order-preview";
 import { formatIDR } from "@/lib/pricing";
-import { STATUS_LABEL, STATUS_DESCRIPTION, STATUS_CTA, TIMELINE_STEPS, isTerminalStatus, calculateCountdown } from "@/lib/order-status";
+import {
+  STATUS_CTA,
+  STATUS_DESCRIPTION,
+  STATUS_LABEL,
+  TIMELINE_STEPS,
+  calculateCountdown,
+} from "@/lib/order-status";
 
-/** Midtrans Snap callbacks type */
 type SnapCallbacks = {
   onSuccess?: (result: unknown) => void;
   onPending?: (result: unknown) => void;
@@ -21,7 +26,12 @@ type SnapCallbacks = {
   language?: "id" | "en";
 };
 
-/** Global Midtrans Snap injection */
+type OrderApiResponse = {
+  error?: string;
+  order?: PublicOrder;
+  accessToken?: string;
+};
+
 declare global {
   interface Window {
     snap?: {
@@ -48,70 +58,39 @@ function formatOrderTime(value: string) {
   }).format(date);
 }
 
-function parseISOOrFallback(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getStatusTimeDisplay(order: PublicOrder | null) {
-  if (!order) return null;
-
-  // Prefer terminal_at, fallback to status_changed_at, then paid_at, then created_at
-  const times = [
-    { status: "success", label: "Selesai", at: order.terminalAt || order.statusChangedAt || order.payment.paidAt || order.createdAt },
-    { status: "failed", label: "Gagal", at: order.terminalAt || order.statusChangedAt || order.createdAt },
-    { status: "refunded", label: "Dikembalikan", at: order.terminalAt || order.statusChangedAt || order.createdAt },
-    { status: "cancelled", label: "Dibatalkan", at: order.terminalAt || order.statusChangedAt || order.createdAt },
-    { status: "paid", label: "Dibayar", at: order.payment.paidAt || order.createdAt },
-  ];
-
-  const active = times.find((t) => {
-    if (t.status === "paid") return order.status === "paid" || order.status === "processing" || order.status === "success";
-    return order.status === t.status;
-  });
-
-  if (!active?.at) return null;
-
-  return {
-    label: active.label,
-    at: active.at,
-  };
-}
-
 export default function OrderStatusView({ orderId }: { orderId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    searchParams.get("access_token"),
+  );
   const [preview, setPreview] = useState<PreviewOrder | null | undefined>(undefined);
   const [order, setOrder] = useState<PublicOrder | null | undefined>(undefined);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [snapReady, setSnapReady] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [countdown, setCountdown] = useState(() => calculateCountdown(null));
   const embeddedOrderRef = useRef<string | null>(null);
   const midtransClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
 
-  // Order access token for secure sharing
-  const searchParams = useSearchParams();
-  const [accessToken, setAccessToken] = useState<string | null>(() => searchParams.get("access_token"));
-
-  async function loadLiveOrder(id: string, token?: string | null) {
+  async function loadLiveOrder(id: string, token = accessToken) {
     const url = new URL(`/api/orders/${encodeURIComponent(id)}`, window.location.origin);
-    const activeToken = token ?? accessToken;
-
-    if (activeToken) {
-      url.searchParams.set("access_token", activeToken);
-    }
+    if (token) url.searchParams.set("access_token", token);
 
     const response = await fetch(url.toString(), {
       cache: "no-store",
+      credentials: "same-origin",
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        setNotice("Akses tidak sah. Gunakan link yang benar atau minta akses baru.");
-      }
+      if (response.status === 401) setAccessDenied(true);
       return null;
     }
-    const data = (await response.json()) as { order?: PublicOrder };
+
+    setAccessDenied(false);
+    const data = (await response.json()) as OrderApiResponse;
     return data.order ?? null;
   }
 
@@ -121,13 +100,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
     try {
       const url = new URL(`/api/orders/${encodeURIComponent(id)}/refresh`, window.location.origin);
-      if (accessToken) {
-        url.searchParams.set("access_token", accessToken);
-      }
+      if (accessToken) url.searchParams.set("access_token", accessToken);
+
       const response = await fetch(url.toString(), {
         method: "POST",
+        credentials: "same-origin",
       });
-      const data = (await response.json()) as { error?: string; order?: PublicOrder };
+      const data = (await response.json()) as OrderApiResponse;
 
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Status Midtrans belum dapat diperbarui.");
@@ -135,6 +114,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       }
 
       setOrder(data.order);
+      setLastChecked(new Date().toLocaleTimeString("id-ID"));
       setNotice(`Status diperbarui: ${STATUS_LABEL[data.order.status]}.`);
     } catch {
       setNotice("Tidak dapat memeriksa status pembayaran.");
@@ -164,33 +144,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     };
   }
 
-  // Fetch access token if missing (e.g. direct navigation)
-  useEffect(() => {
-    if (!orderId || accessToken) return;
-
-    let mounted = true;
-    async function fetchToken() {
-      try {
-        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/token`);
-        if (!response.ok) return;
-        const data = await response.json() as { token?: string };
-        if (mounted && data.token) {
-          setAccessToken(data.token);
-          // Re-trigger load with the new token
-          const liveOrder = await loadLiveOrder(orderId, data.token);
-          if (mounted && liveOrder) {
-            setOrder(liveOrder);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch access token", error);
-      }
-    }
-    void fetchToken();
-    return () => { mounted = false; };
-  }, [orderId, accessToken]);
-
-  // Load order data
   useEffect(() => {
     let mounted = true;
 
@@ -198,14 +151,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       try {
         const liveOrder = await loadLiveOrder(orderId);
         if (!mounted) return;
-
         if (liveOrder) {
           setOrder(liveOrder);
           setPreview(null);
           return;
         }
       } catch {
-        // Backward-compatible local preview fallback.
+        // Continue to the backwards-compatible local preview below.
       }
 
       try {
@@ -245,69 +197,38 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     };
   }, [orderId]);
 
-  // Countdown timer for pending_payment
-  const [countdown, setCountdown] = useState(() => calculateCountdown(order?.expiresAt));
-  const [pollingInterval, setPollingInterval] = useState(5000);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
-    if (order?.expiresAt) {
-      setCountdown(calculateCountdown(order.expiresAt));
-    }
-  }, [order?.expiresAt]);
-
-  useEffect(() => {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
+    if (!order?.expiresAt || order.status !== "pending_payment") {
+      setCountdown(calculateCountdown(order?.expiresAt));
+      return;
     }
 
-    if (order?.status === "pending_payment" && !countdown.isExpired) {
-      countdownIntervalRef.current = setInterval(() => {
-        const newCountdown = calculateCountdown(order.expiresAt);
-        setCountdown(newCountdown);
-        if (newCountdown.isExpired) {
-          setNotice("Waktu pembayaran habis. Silakan buat pesanan baru.");
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
+    setCountdown(calculateCountdown(order.expiresAt));
+    const timer = window.setInterval(() => {
+      const next = calculateCountdown(order.expiresAt);
+      setCountdown(next);
+      if (next.isExpired) {
+        setNotice("Waktu pembayaran habis. Silakan buat pesanan baru.");
       }
-    };
-  }, [order?.status, order?.expiresAt, countdown.isExpired]);
+    }, 1000);
 
-  // Enhanced polling with exponential backoff
-  const [lastChecked, setLastChecked] = useState<string | null>(null);
+    return () => window.clearInterval(timer);
+  }, [order?.expiresAt, order?.status]);
 
   useEffect(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-    }
+    if (!order || !["pending_payment", "paid", "processing"].includes(order.status)) return;
 
-    if (order?.status === "pending_payment") {
-      pollingIntervalRef.current = setInterval(() => {
-        void loadLiveOrder(order.id).then((fresh) => {
-          if (fresh) {
-            setOrder(fresh);
-            setLastChecked(new Date().toLocaleTimeString("id-ID"));
-            // Reset polling interval on status change
-            setPollingInterval(5000);
-          }
-        });
-      }, pollingInterval);
-    }
+    const timer = window.setInterval(() => {
+      void loadLiveOrder(order.id).then((fresh) => {
+        if (!fresh) return;
+        setOrder(fresh);
+        setLastChecked(new Date().toLocaleTimeString("id-ID"));
+      });
+    }, 5000);
 
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [order?.id, order?.status, pollingInterval]);
+    return () => window.clearInterval(timer);
+  }, [order?.id, order?.status, accessToken]);
 
-  // Midtrans embedded payment
   useEffect(() => {
     if (
       !order ||
@@ -336,14 +257,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       embeddedOrderRef.current = null;
       setNotice("Embedded Midtrans belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
     }
-  }, [order?.id, order?.status, order?.payment.snapToken, snapReady]);
-
-  // Shareable URL for sharing
-  const shareableUrl = `${window.location.origin}/order/${order?.id}${accessToken ? `?access_token=${accessToken}` : ""}`;
+  }, [order?.id, order?.status, order?.payment.snapToken, snapReady, accessToken]);
 
   async function copyOrderId() {
+    const id = order?.id ?? preview?.id ?? "";
+    if (!id) return;
     try {
-      await navigator.clipboard.writeText(order?.id || "");
+      await navigator.clipboard.writeText(id);
       setNotice("Order ID disalin ke clipboard.");
     } catch {
       setNotice("Gagal menyalin Order ID.");
@@ -367,6 +287,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           gameId: preview.product.gameId,
           packageId: preview.product.packageId,
@@ -378,7 +299,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         }),
       });
 
-      const data = (await response.json()) as { error?: string; order?: PublicOrder };
+      const data = (await response.json()) as OrderApiResponse;
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
         return;
@@ -387,7 +308,11 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       window.localStorage.removeItem(previewOrderStorageKey(preview.id));
       setPreview(null);
       setOrder(data.order);
-      const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
+      setAccessToken(data.accessToken ?? null);
+
+      const tokenParam = data.accessToken
+        ? `?access_token=${encodeURIComponent(data.accessToken)}`
+        : "";
       router.replace(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
       setNotice("Order Sandbox dibuat. Pembayaran akan dimuat di halaman ini.");
     } catch {
@@ -397,18 +322,19 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
   }
 
-  // Determine current status display
-  const isPreview = Boolean(preview);
-  const liveStatus = order?.status ?? "pending_payment";
-  const currentStatus = isPreview ? "pending_payment" : liveStatus;
-  const isTerminal = isTerminalStatus(currentStatus);
-  const statusCTAs = STATUS_CTA[currentStatus];
+  function shareOrder() {
+    if (!order || !accessToken) return;
+    const url = `${window.location.origin}/order/${encodeURIComponent(order.id)}?access_token=${encodeURIComponent(accessToken)}`;
 
-  // Timeline index based on actual reached status
-  const timelineIndex = useMemo(() => {
-    if (isPreview) return 0;
-    return TIMELINE_STEPS.findIndex((step) => step.status === liveStatus);
-  }, [liveStatus, isPreview]);
+    if (navigator.share) {
+      void navigator.share({ title: "Order Nambah", text: `Order ${order.id}`, url });
+      return;
+    }
+
+    void navigator.clipboard.writeText(url).then(() => {
+      setNotice("Link status disalin ke clipboard.");
+    });
+  }
 
   if (preview === undefined || order === undefined) {
     return (
@@ -438,9 +364,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         </header>
         <section className="order-status-shell shell">
           <div className="order-empty-card">
-            <span className="eyebrow">Pesanan tidak ditemukan</span>
-            <h1>Order ini tidak tersedia.</h1>
-            <p>Buat pesanan baru dari halaman utama untuk melanjutkan ke Midtrans Sandbox.</p>
+            <span className="eyebrow">{accessDenied ? "AKSES PESANAN DITOLAK" : "PESANAN TIDAK DITEMUKAN"}</span>
+            <h1>{accessDenied ? "Link order tidak memiliki akses." : "Order ini tidak tersedia."}</h1>
+            <p>
+              {accessDenied
+                ? "Gunakan link order yang dibuat saat checkout. Order baru juga menyimpan akses aman di browser ini."
+                : "Buat pesanan baru dari halaman utama untuk melanjutkan ke Midtrans Sandbox."}
+            </p>
             <Link className="primary-button" href="/#topup">Buat pesanan baru <span>→</span></Link>
           </div>
         </section>
@@ -448,9 +378,27 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     );
   }
 
+  const isPreview = Boolean(preview);
+  const product = preview?.product ?? order!.product;
+  const account = preview?.account ?? order!.account;
+  const payment = preview?.payment ?? order!.payment;
+  const pricing = preview?.pricing ?? order!.pricing;
+  const promoCode = preview?.promoCode ?? order?.promoCode;
+  const referralCode = preview?.referralCode ?? order?.referralCode;
+  const displayId = preview?.id ?? order!.id;
+  const createdAt = preview?.createdAt ?? order!.createdAt;
+  const liveStatus = order?.status ?? "pending_payment";
+  const timelineIndex = isPreview
+    ? 0
+    : Math.max(0, TIMELINE_STEPS.findIndex((step) => step.status === liveStatus));
+  const statusActions = isPreview ? [] : STATUS_CTA[liveStatus];
+
+  const paymentType = order?.payment.paymentType ?? null;
+  const redirectUrl = order?.payment.redirectUrl ?? null;
+
   return (
     <main>
-      {midtransClientKey && (
+      {midtransClientKey && order && (
         <Script
           id="midtrans-snap-sandbox"
           src="https://app.sandbox.midtrans.com/snap/snap.js"
@@ -472,40 +420,34 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <section className="order-status-shell shell">
         <div className="order-status-title">
           <div>
-            <span className="eyebrow">Midtrans Embedded</span>
+            <span className="eyebrow">{isPreview ? "Checkout preview" : "Midtrans Embedded"}</span>
             <h1>{isPreview ? "Siap membuat pembayaran." : STATUS_LABEL[liveStatus]}</h1>
             <p>
               {isPreview
                 ? "Harga akan divalidasi ulang di server sebelum order dan token pembayaran dibuat."
                 : STATUS_DESCRIPTION[liveStatus]}
             </p>
-            {lastChecked && (
-              <span className="order-last-checked">Terakhir diperiksa: {lastChecked}</span>
+            {lastChecked && <span className="order-last-checked">Terakhir diperiksa: {lastChecked}</span>}
+            {!isPreview && liveStatus === "pending_payment" && countdown.totalSeconds > 0 && !countdown.isExpired && (
+              <span className="order-countdown">Waktu habis: {countdown.display}</span>
             )}
-            {countdown.totalSeconds > 0 && !countdown.isExpired && !isPreview && (
-              <span className={`order-countdown ${countdown.isExpired ? "expired" : ""}`}>
-                Waktu habis: {countdown.display}
-              </span>
-            )}
-            {countdown.isExpired && !isPreview && (
+            {!isPreview && countdown.isExpired && (
               <span className="order-countdown expired">Waktu habis</span>
             )}
           </div>
-          <span className="order-mode-badge">
-            SANDBOX · EMBEDDED
-          </span>
+          <span className="order-mode-badge">{isPreview ? "PREVIEW" : "SANDBOX · EMBEDDED"}</span>
         </div>
 
         <div className="order-status-grid">
           <article className="order-main-card">
             <div className="order-main-head">
               <div className="order-product-identity">
-                <span className="order-product-mark" style={{ background: order?.product.accent }}>
-                  {order?.product.initials}
+                <span className="order-product-mark" style={{ background: product.accent }}>
+                  {product.initials}
                 </span>
                 <div>
-                  <small>{order?.product.shortName}</small>
-                  <strong>{order?.product.packageLabel}</strong>
+                  <small>{product.shortName}</small>
+                  <strong>{product.packageLabel}</strong>
                 </div>
               </div>
               <span className="order-status-pill">
@@ -516,18 +458,14 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <div className="order-id-row">
               <div>
                 <small>Order ID</small>
-                <strong>{order?.id}</strong>
-                <button
-                  className="copy-order-id-button"
-                  onClick={copyOrderId}
-                  title="Salin Order ID"
-                >
+                <strong>{displayId}</strong>
+                <button className="copy-order-id-button" type="button" onClick={() => void copyOrderId()}>
                   Salin
                 </button>
               </div>
               <div>
                 <small>Dibuat</small>
-                <strong>{order?.createdAt ? formatOrderTime(order.createdAt) : "-"}</strong>
+                <strong>{formatOrderTime(createdAt)}</strong>
               </div>
               {order?.statusChangedAt && (
                 <div>
@@ -535,42 +473,26 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <strong>{formatOrderTime(order.statusChangedAt)}</strong>
                 </div>
               )}
-              {order?.terminalAt && (
-                <div>
-                  <small>Terminal</small>
-                  <strong>{formatOrderTime(order.terminalAt)}</strong>
-                </div>
-              )}
             </div>
 
-            {/* Timeline Section */}
             <div className="order-timeline">
-              {TIMELINE_STEPS.map((item, index) => {
-                const isCompleted = !isPreview && index <= timelineIndex;
-                return (
-                  <div
-                    className={`order-timeline-item ${isCompleted ? "current" : "upcoming"}`}
-                    key={item.title}
-                  >
-                    <div className="timeline-marker">
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                    </div>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.description}</p>
-                    </div>
-                  </div>
-                );
-              })}
+              {TIMELINE_STEPS.map((item, index) => (
+                <div
+                  className={`order-timeline-item ${index <= timelineIndex ? "current" : "upcoming"}`}
+                  key={item.title}
+                >
+                  <div className="timeline-marker"><span>{String(index + 1).padStart(2, "0")}</span></div>
+                  <div><strong>{item.title}</strong><p>{item.description}</p></div>
+                </div>
+              ))}
             </div>
 
-            {/* Payment Section */}
             {isPreview ? (
               <div className="order-payment-preview">
                 <div>
                   <small>Metode pembayaran</small>
-                  <strong>{order?.payment.name}</strong>
-                  <p>{order?.payment.detail}</p>
+                  <strong>{payment.name}</strong>
+                  <p>{payment.detail}</p>
                 </div>
                 <button type="button" disabled={busy} onClick={() => void createSandboxOrder()}>
                   {busy ? "Memproses..." : "Buat pembayaran Sandbox"}
@@ -581,8 +503,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <div className="midtrans-native-head">
                   <div>
                     <small>Pembayaran</small>
-                    <strong>{order?.payment.name}</strong>
-                    <p>{order?.payment.detail}</p>
+                    <strong>{payment.name}</strong>
+                    <p>{payment.detail}</p>
                   </div>
                   <span>Midtrans Sandbox</span>
                 </div>
@@ -592,7 +514,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     NEXT_PUBLIC_MIDTRANS_CLIENT_KEY belum tersedia. Embedded checkout tidak dapat dimuat.
                   </div>
                 )}
-
                 {midtransClientKey && !snapReady && (
                   <div className="midtrans-native-loading">Memuat pembayaran Midtrans...</div>
                 )}
@@ -601,7 +522,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
                 <div className="midtrans-native-footer">
                   <span>Pembayaran tetap diverifikasi server-side.</span>
-                  {(!midtransClientKey || !snapReady) && order?.payment.redirectUrl && (
+                  {(!midtransClientKey || !snapReady) && redirectUrl && (
                     <button type="button" onClick={openFallbackPayment}>Buka pembayaran cadangan</button>
                   )}
                 </div>
@@ -610,8 +531,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               <div className="order-payment-preview">
                 <div>
                   <small>Metode pembayaran</small>
-                  <strong>{order?.payment.name}</strong>
-                  <p>{order?.payment.detail}</p>
+                  <strong>{payment.name}</strong>
+                  <p>{payment.detail}</p>
                 </div>
                 <button type="button" disabled>{STATUS_LABEL[liveStatus]}</button>
               </div>
@@ -627,72 +548,54 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </div>
 
             <dl className="order-detail-list">
-              <div><dt>Produk</dt><dd>{order?.product.gameName}</dd></div>
-              <div><dt>Nominal</dt><dd>{order?.product.packageLabel}</dd></div>
-              <div><dt>User ID</dt><dd>{order?.account.userId}</dd></div>
-              {order?.account.serverId && <div><dt>Server / Zone</dt><dd>{order.account.serverId}</dd></div>}
-              {order?.promoCode && <div><dt>Promo</dt><dd>{order.promoCode}</dd></div>}
-              {order?.referralCode && <div><dt>Referral</dt><dd>{order.referralCode}</dd></div>}
-              {order?.payment.paymentType && <div><dt>Channel Midtrans</dt><dd>{order.payment.paymentType}</dd></div>}
+              <div><dt>Produk</dt><dd>{product.gameName}</dd></div>
+              <div><dt>Nominal</dt><dd>{product.packageLabel}</dd></div>
+              <div><dt>User ID</dt><dd>{account.userId}</dd></div>
+              {account.serverId && <div><dt>Server / Zone</dt><dd>{account.serverId}</dd></div>}
+              {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
+              {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
+              {paymentType && <div><dt>Channel Midtrans</dt><dd>{paymentType}</dd></div>}
             </dl>
 
             <div className="order-price-breakdown">
-              <div><span>Harga Nambah</span><strong>{order?.pricing.sellingPrice ? formatIDR(order.pricing.sellingPrice) : "-"}</strong></div>
-              {order?.pricing.promotionDiscount && order.pricing.promotionDiscount > 0 && (
-                <div className="saving"><span>Promo</span><strong>-{formatIDR(order.pricing.promotionDiscount)}</strong></div>
+              <div><span>Harga Nambah</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
+              {pricing.promotionDiscount > 0 && (
+                <div className="saving"><span>Promo</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
               )}
-              {order?.pricing.referralDiscount && order.pricing.referralDiscount > 0 && (
-                <div className="referral-saving"><span>Benefit referral</span><strong>-{formatIDR(order.pricing.referralDiscount)}</strong></div>
+              {pricing.referralDiscount > 0 && (
+                <div className="referral-saving"><span>Benefit referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
               )}
-              <div><span>Biaya pembayaran</span><strong>{order?.pricing.customerPaymentFee ? formatIDR(order.pricing.customerPaymentFee) : "-"}</strong></div>
+              <div><span>Biaya pembayaran</span><strong>{formatIDR(pricing.customerPaymentFee)}</strong></div>
             </div>
 
             <div className="order-grand-total">
               <span>Total</span>
-              <strong>{order?.pricing.finalPrice ? formatIDR(order.pricing.finalPrice) : "-"}</strong>
+              <strong>{formatIDR(pricing.finalPrice)}</strong>
             </div>
 
-            {/* Action Buttons */}
-            {statusCTAs.length > 0 && (
+            {!isPreview && statusActions.length > 0 && (
               <div className="order-summary-actions">
-                {statusCTAs.map((cta, index) => {
-                  const isPrimary = cta.action === "pay" || cta.action === "new_order" || cta.action === "refresh";
-
-                  const handleClick = () => {
-                    switch (cta.action) {
-                      case "copy":
-                        copyOrderId();
-                        break;
-                      case "pay":
-                        // Already embedded, do nothing
-                        break;
-                      case "refresh":
-                        if (!busy && order?.id) refreshStatus(order.id);
-                        break;
-                      case "new_order":
-                        router.push("/#topup");
-                        break;
-                      case "support":
-                        window.open("mailto:support@nambah.com?subject=Order%20Inquiry");
-                        break;
-                    }
-                  };
-
-                  return (
-                    <button
-                      key={index}
-                      className={`cta-button ${isPrimary ? "primary-button" : "text-link"}`}
-                      onClick={handleClick}
-                      disabled={busy}
-                    >
-                      {cta.label}
-                    </button>
-                  );
-                })}
+                {statusActions.map((cta) => (
+                  <button
+                    key={`${cta.action}-${cta.label}`}
+                    className={`cta-button ${["pay", "new_order", "refresh"].includes(cta.action) ? "primary-button" : "text-link"}`}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (cta.action === "copy") void copyOrderId();
+                      if (cta.action === "pay") openFallbackPayment();
+                      if (cta.action === "refresh" && order) void refreshStatus(order.id);
+                      if (cta.action === "new_order") router.push("/#topup");
+                      if (cta.action === "support") window.open("mailto:support@nambah.com?subject=Order%20Inquiry");
+                    }}
+                  >
+                    {cta.label}
+                  </button>
+                ))}
               </div>
             )}
 
-            {!isPreview && liveStatus === "pending_payment" && (
+            {!isPreview && liveStatus === "pending_payment" && order && (
               <button className="primary-button full" type="button" disabled={busy} onClick={() => void refreshStatus(order.id)}>
                 Cek status Midtrans <span>↻</span>
               </button>
@@ -700,19 +603,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
             <div className="order-secondary-links">
               <Link className="order-secondary-link" href="/#topup">Buat pesanan lain</Link>
-              {accessToken && (
-                <button
-                  className="order-secondary-link"
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({ title: "Order", text: `Order ${order?.id}`, url: shareableUrl });
-                    } else {
-                      // Fallback for mobile/web browsers without native share
-                      navigator.clipboard.writeText(shareableUrl);
-                      setNotice("Link disalin ke clipboard");
-                    }
-                  }}
-                >
+              {order && accessToken && (
+                <button className="order-secondary-link" type="button" onClick={shareOrder}>
                   Bagikan status
                 </button>
               )}
