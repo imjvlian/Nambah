@@ -16,6 +16,7 @@ import "./admin-digiflazz.css";
 import "./admin-digiflazz-v2.css";
 import "./admin-publish-checkbox.css";
 import "./admin-supplier-link.css";
+import "./product-checkout-rail-v2.css";
 
 export const metadata: Metadata = {
   title: "Nambah — Top Up Cepat, Main Lagi",
