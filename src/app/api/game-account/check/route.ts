@@ -48,6 +48,26 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 20;
 const CHECK_TIMEOUT_MS = 12_000;
 
+function configuredVolseverRoute(gameId: string) {
+  const raw = process.env.VOLSEVER_GAME_ROUTES_JSON?.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const value = parsed[gameId];
+    if (
+      typeof value === "string" &&
+      /^[a-z0-9-]+$/i.test(value.trim())
+    ) {
+      return value.trim();
+    }
+  } catch {
+    // Invalid mapping must never break checkout; System health will surface it.
+  }
+
+  return null;
+}
+
 const accountCache = new Map<string, CachedAccount>();
 const pendingChecks = new Map<string, PendingAccount>();
 const rateLimits = new Map<string, number[]>();
@@ -253,25 +273,43 @@ export async function POST(request: Request) {
   };
   const schema = getGameAccountSchema(gameDescriptor);
 
-  if (schema.checker !== "mobile-legends") {
-    return Response.json(
-      { error: "Auto check Volsever tahap awal baru diaktifkan untuk Mobile Legends." },
-      { status: 422 },
-    );
-  }
-
-  const account = validateGameAccountTarget(gameDescriptor, rawUserId, rawServerId);
+  const account = validateGameAccountTarget(
+    gameDescriptor,
+    rawUserId,
+    rawServerId,
+  );
   if (!account.ok) {
     return Response.json({ error: account.error }, { status: 400 });
   }
 
-  const userId = account.userId;
-  const serverId = account.serverId;
-  if (!serverId) {
-    return Response.json({ error: "Zone ID wajib diisi." }, { status: 400 });
+  if (!schema.checker) {
+    return Response.json({
+      verified: false,
+      localOnly: true,
+      message:
+        "Format tujuan valid. Produk ini tidak memerlukan auto-check provider.",
+    });
   }
 
-  const cacheKey = `${game.id}:${userId}:${serverId}`;
+  const userId = account.userId;
+  const serverId = account.serverId;
+  const isMobileLegends = schema.checker === "mobile-legends";
+  const routeSlug = isMobileLegends
+    ? "mobile-legends-wr"
+    : configuredVolseverRoute(game.id);
+
+  if (!routeSlug) {
+    return Response.json({
+      verified: false,
+      localOnly: true,
+      server: serverId ?? null,
+      message:
+        "Format akun valid. Auto-check provider belum dikonfigurasi untuk produk ini.",
+      source: "local",
+    });
+  }
+
+  const cacheKey = `${game.id}:${userId}:${serverId ?? ""}`;
   const cached = accountCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return Response.json({
@@ -297,15 +335,15 @@ export async function POST(request: Request) {
   let volseverUnavailable = false;
   try {
     const result = await checkVolseverGame({
-      routeSlug: "mobile-legends-wr",
+      routeSlug,
       userId,
-      serverId,
+      ...(serverId ? { serverId } : {}),
     });
 
     if (result.configured && result.ok && result.nickname) {
       accountCache.set(cacheKey, {
         nickname: result.nickname,
-        server: result.server ?? serverId,
+        server: result.server ?? serverId ?? "",
         region: result.region,
         countryCode: result.countryCode,
         source: "volsever",
@@ -314,7 +352,7 @@ export async function POST(request: Request) {
 
       return Response.json({
         nickname: result.nickname,
-        server: result.server ?? serverId,
+        server: result.server ?? serverId ?? null,
         region: result.region,
         countryCode: result.countryCode,
         verified: true,
@@ -338,6 +376,28 @@ export async function POST(request: Request) {
   } catch (error) {
     volseverUnavailable = true;
     console.error("Volsever account checker failed", error);
+  }
+
+  if (!isMobileLegends) {
+    return Response.json(
+      {
+        verified: false,
+        retryable: volseverUnavailable,
+        localOnly: false,
+        server: serverId ?? null,
+        message:
+          "Provider auto-check belum dapat memverifikasi akun. Format input tetap valid dan checkout dapat dilanjutkan.",
+        source: "volsever",
+      },
+      { status: volseverUnavailable ? 503 : 200 },
+    );
+  }
+
+  if (!serverId) {
+    return Response.json(
+      { error: "Zone ID wajib diisi untuk Mobile Legends." },
+      { status: 400 },
+    );
   }
 
   const { username, secret } = getMimihCredentials();

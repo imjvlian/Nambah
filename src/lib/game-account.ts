@@ -19,7 +19,7 @@ export type GameAccountSchema = {
   kind: "mobile-legends" | "magic-chess" | "genshin" | "roblox" | "numeric-player" | "generic";
   user: AccountField;
   server?: AccountField;
-  checker: "mobile-legends" | null;
+  checker: "mobile-legends" | "universal" | null;
   helper: string;
 };
 
@@ -126,7 +126,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
             },
           }
         : {}),
-      checker: null,
+      checker: "universal",
       helper: requiresServer
         ? "Pastikan User ID dan Zone ID sesuai akun Magic Chess: Go Go."
         : "Pastikan User ID sesuai akun Magic Chess: Go Go.",
@@ -154,7 +154,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
             },
           }
         : {}),
-      checker: null,
+      checker: "universal",
       helper: requiresServer
         ? "Masukkan UID dan nama server/region akun Genshin."
         : "Masukkan UID akun Genshin.",
@@ -174,7 +174,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
         invalidMessage: "Username / User ID Roblox harus 3–32 karakter (huruf, angka, atau _).",
       },
       ...(requiresServer ? { server: GENERIC_SERVER } : {}),
-      checker: null,
+      checker: "universal",
       helper: "Pastikan username atau User ID Roblox tepat sebelum pembayaran.",
     };
   }
@@ -184,7 +184,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
       kind: "numeric-player",
       user: GENERIC_NUMERIC_USER,
       ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
-      checker: null,
+      checker: "universal",
       helper: requiresServer
         ? "Masukkan Player ID dan Server / Zone ID sesuai akun game."
         : "Masukkan Player ID sesuai akun game.",

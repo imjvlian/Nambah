@@ -205,7 +205,7 @@ export default function TopupExperience({
 
   const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
   const accountSchema = getGameAccountSchema(selectedGame);
-  const canCheckUsername = accountSchema.checker === "mobile-legends";
+  const canCheckUsername = Boolean(accountSchema.checker);
 
   const nominalSections = useMemo(
     () =>
@@ -406,9 +406,21 @@ export default function TopupExperience({
           error?: string;
           pending?: boolean;
           verified?: boolean;
+          localOnly?: boolean;
         };
 
         if (!mounted) return;
+
+        if (data.localOnly) {
+          setUsernameCheck({
+            status: "pending",
+            server: normalizedServerId,
+            message:
+              data.message ??
+              "Format akun valid; auto-check provider belum tersedia.",
+          });
+          return;
+        }
 
         if (response.status === 202 || data.pending) {
           setUsernameCheck({
