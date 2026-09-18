@@ -3,6 +3,7 @@ import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
+import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
@@ -296,6 +297,12 @@ export async function applyMidtransStatus(
     await syncOrderCommissionLifecycle(orderId, orderStatus);
   } catch (error) {
     console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
+  }
+
+  try {
+    await syncPromotionLifecycle(orderId, orderStatus);
+  } catch (error) {
+    console.error(`Promotion lifecycle sync failed for order ${orderId}`, error);
   }
 
   await supabaseInsert("midtrans_payment_events", {

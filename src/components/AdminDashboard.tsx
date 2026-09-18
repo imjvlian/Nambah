@@ -211,6 +211,26 @@ type AffiliatePayload = {
   }>;
 };
 
+type PromotionPayload = {
+  promotions: Array<{
+    code: string;
+    name: string;
+    type: "flat" | "percentage";
+    value: number;
+    minimumOrder: number;
+    maxDiscount: number | null;
+    stackableWithReferral: boolean;
+    startsAt: string | null;
+    endsAt: string | null;
+    quota: number | null;
+    quotaPerUser: number | null;
+    active: boolean;
+    productIds: string[];
+    reserved: number;
+    redeemed: number;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -333,6 +353,17 @@ export default function AdminDashboard() {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [pointsData, setPointsData] = useState<AdminPointsPayload | null>(null);
   const [affiliateData, setAffiliateData] = useState<AffiliatePayload | null>(null);
+  const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
+  const [promoDraft, setPromoDraft] = useState({
+    code: "",
+    name: "",
+    type: "flat" as "flat" | "percentage",
+    value: "1000",
+    minimumOrder: "20000",
+    maxDiscount: "",
+    quota: "",
+    quotaPerUser: "",
+  });
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
@@ -419,6 +450,72 @@ export default function AdminDashboard() {
     setAffiliateData(data);
   }
 
+  async function loadPromotions() {
+    const response = await fetch("/api/admin/promotions", { cache: "no-store" });
+    const data = (await response.json()) as PromotionPayload & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Promo gagal dimuat.");
+    setPromotionData(data);
+  }
+
+  async function createPromotion() {
+    setBusy("promotion-create");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/promotions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: promoDraft.code,
+          name: promoDraft.name,
+          type: promoDraft.type,
+          value: Number(promoDraft.value),
+          minimumOrder: Number(promoDraft.minimumOrder),
+          maxDiscount: promoDraft.maxDiscount || null,
+          quota: promoDraft.quota || null,
+          quotaPerUser: promoDraft.quotaPerUser || null,
+          active: true,
+        }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Promo gagal dibuat.");
+      setPromoDraft({
+        code: "",
+        name: "",
+        type: "flat",
+        value: "1000",
+        minimumOrder: "20000",
+        maxDiscount: "",
+        quota: "",
+        quotaPerUser: "",
+      });
+      await Promise.all([loadPromotions(), loadOverview()]);
+      setNotice("Promo berhasil dibuat.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Promo gagal dibuat.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function togglePromotion(code: string, active: boolean) {
+    setBusy("promotion:" + code);
+    try {
+      const response = await fetch("/api/admin/promotions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, active }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Promo gagal diperbarui.");
+      await Promise.all([loadPromotions(), loadOverview()]);
+      setNotice(code + (active ? " diaktifkan." : " dinonaktifkan."));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Promo gagal diperbarui.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function runReconciliation() {
     setBusy("reconciliation");
     setNotice("");
@@ -475,6 +572,7 @@ export default function AdminDashboard() {
       if (section === "receipts") await loadReceipts();
       if (section === "points") await loadPoints();
       if (section === "affiliates") await loadAffiliates();
+      if (section === "promotions") await loadPromotions();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -572,7 +670,14 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData]);
+    if (section === "promotions" && !promotionData) {
+      void loadPromotions().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Promo gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData]);
 
   async function logout() {
     setBusy("logout");
@@ -1550,33 +1655,110 @@ export default function AdminDashboard() {
             </>
           )}
 
-          {section === "promotions" && overview && (
+          {section === "promotions" && overview && promotionData && (
             <>
               <SectionHead
                 eyebrow="Growth"
                 title="Promotions"
-                copy="Engine promo sudah dipakai pricing. Management UI berikutnya akan mengelola campaign tanpa SQL."
+                copy="Campaign promo dikelola tanpa SQL, dengan quota reservation yang aman terhadap checkout paralel."
               />
+
               <div className="acc-module-summary">
                 <article>
                   <small>Active promotions</small>
-                  <strong>
-                    {numberOrDash(overview.stats.activePromotions)}
-                  </strong>
-                  <span>Database + pricing engine aktif</span>
+                  <strong>{promotionData.promotions.filter((item) => item.active).length}</strong>
+                  <span>{promotionData.promotions.length} total campaign</span>
                 </article>
-                <article className="planned">
-                  <small>Next controls</small>
-                  <strong>Create / schedule</strong>
-                  <span>Quota, per-user limit, product targeting, audit log</span>
+                <article>
+                  <small>Redeemed</small>
+                  <strong>{promotionData.promotions.reduce((sum, item) => sum + item.redeemed, 0)}</strong>
+                  <span>{promotionData.promotions.reduce((sum, item) => sum + item.reserved, 0)} reserved</span>
                 </article>
               </div>
-              <div className="acc-planned-list">
-                <span>Campaign create/edit</span>
-                <span>Product-specific promo</span>
-                <span>Start/end scheduling</span>
-                <span>Quota & quota per user</span>
-                <span>Promo usage analytics</span>
+
+              <div className="acc-action-panel">
+                <input
+                  placeholder="CODE"
+                  value={promoDraft.code}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      code: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+                <input
+                  placeholder="Nama campaign"
+                  value={promoDraft.name}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+                <select
+                  value={promoDraft.type}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      type: event.target.value as "flat" | "percentage",
+                    }))
+                  }
+                >
+                  <option value="flat">Flat</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+                <input
+                  type="number"
+                  placeholder="Value"
+                  value={promoDraft.value}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      value: event.target.value,
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => void createPromotion()}
+                >
+                  {busy === "promotion-create" ? "Creating..." : "Create promo"}
+                </button>
+              </div>
+
+              <div className="acc-table-card">
+                <div className="acc-receipts-head">
+                  <span>Campaign</span>
+                  <span>Benefit</span>
+                  <span>Quota</span>
+                  <span>Usage</span>
+                  <span>Status</span>
+                </div>
+                {promotionData.promotions.map((promo) => (
+                  <div className="acc-receipts-row" key={promo.code}>
+                    <div>
+                      <strong>{promo.code}</strong>
+                      <span>{promo.name}</span>
+                    </div>
+                    <strong>
+                      {promo.type === "flat"
+                        ? formatIDR(promo.value)
+                        : promo.value + "%"}
+                    </strong>
+                    <span>{promo.quota ?? "∞"}</span>
+                    <span>{promo.redeemed} used · {promo.reserved} reserved</span>
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => void togglePromotion(promo.code, !promo.active)}
+                    >
+                      {promo.active ? "Active" : "Inactive"}
+                    </button>
+                  </div>
+                ))}
               </div>
             </>
           )}

@@ -2,6 +2,7 @@ import type { DigiflazzTransactionData } from "@/lib/digiflazz/client";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
+import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
   supabaseSelect,
@@ -367,6 +368,15 @@ export async function applyDigiflazzTransactionStatus(
   } catch (error) {
     console.error(
       `Affiliate commission callback sync failed for order ${order.id}`,
+      error,
+    );
+  }
+
+  try {
+    await syncPromotionLifecycle(order.id, latestOrder.status);
+  } catch (error) {
+    console.error(
+      `Promotion callback sync failed for order ${order.id}`,
       error,
     );
   }

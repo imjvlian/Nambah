@@ -18,6 +18,7 @@ import {
   validateRequestedPoints,
 } from "@/lib/loyalty";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
+import { reservePromotionForOrder, syncPromotionLifecycle } from "@/lib/promotion-service";
 import { getPublicOrder } from "@/lib/order-service";
 import {
   createOrderAccessCookie,
@@ -320,6 +321,33 @@ export async function POST(request: Request) {
       }
     }
 
+    if (pricing.promoCode) {
+      try {
+        await reservePromotionForOrder(orderId);
+      } catch (error) {
+        await Promise.all([
+          pricing.pointsRedeemed > 0
+            ? restoreOrderPointsRedemption(orderId).catch(() => undefined)
+            : Promise.resolve(),
+          supabaseUpdate(
+            "orders",
+            {
+              status: "cancelled",
+              status_changed_at: new Date().toISOString(),
+              terminal_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { filters: { id: `eq.${orderId}` } },
+          ),
+        ]);
+        throw new Error(
+          error instanceof Error
+            ? `Promo gagal direservasi: ${error.message}`
+            : "Promo gagal direservasi.",
+        );
+      }
+    }
+
     await supabaseInsert("payments", {
       order_id: orderId,
       provider: "midtrans",
@@ -349,6 +377,14 @@ export async function POST(request: Request) {
               console.error(
                 `Failed to restore points after Snap error for ${orderId}`,
                 restoreError,
+              ),
+            )
+          : Promise.resolve(),
+        pricing.promoCode
+          ? syncPromotionLifecycle(orderId, "cancelled").catch((promoError) =>
+              console.error(
+                `Failed to release promo after Snap error for ${orderId}`,
+                promoError,
               ),
             )
           : Promise.resolve(),

@@ -223,3 +223,32 @@ export async function supabaseRpc<T>(
 
   return (responseBody ? JSON.parse(responseBody) : null) as T;
 }
+
+
+export async function supabaseDelete<T>(
+  table: string,
+  options: SupabaseMutationOptions,
+): Promise<T[]> {
+  const { url, secretKey } = requireSupabaseConfig();
+  const query = new URLSearchParams();
+  applyFilters(query, options.filters);
+
+  const response = await fetch(`${url}/rest/v1/${table}?${query.toString()}`, {
+    method: "DELETE",
+    headers: createHeaders(
+      secretKey,
+      options.prefer ?? "return=representation",
+    ),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new Error(
+      `Supabase ${table} delete failed (${response.status}): ${responseBody}`,
+    );
+  }
+
+  const responseBody = await response.text();
+  return responseBody ? (JSON.parse(responseBody) as T[]) : [];
+}

@@ -2,6 +2,7 @@ import { runDigiflazzTestTransaction, type DigiflazzTestOutcome } from "@/lib/di
 import { isFlowTestMode } from "@/lib/flow-test";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
+import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
@@ -256,6 +257,12 @@ async function finalizeOrder(
     await syncOrderCommissionLifecycle(orderId, status);
   } catch (error) {
     console.error(`Affiliate commission finalization failed for order ${orderId}`, error);
+  }
+
+  try {
+    await syncPromotionLifecycle(orderId, status);
+  } catch (error) {
+    console.error(`Promotion finalization failed for order ${orderId}`, error);
   }
 
   if (status === "success") {
