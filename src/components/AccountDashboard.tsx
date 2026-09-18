@@ -40,6 +40,13 @@ type PointsSummary = {
   };
 };
 
+type CustomerProfile = {
+  displayName: string;
+  whatsapp: string;
+  preferredReceiptChannel: "email" | "whatsapp" | "both";
+  updatedAt: string | null;
+};
+
 type PointLedger = {
   id: number;
   orderId: string | null;
@@ -94,6 +101,14 @@ export default function AccountDashboard() {
   const [orders, setOrders] = useState<AccountOrder[]>([]);
   const [points, setPoints] = useState<PointsSummary | null>(null);
   const [ledger, setLedger] = useState<PointLedger[]>([]);
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [profileDraft, setProfileDraft] = useState({
+    displayName: "",
+    whatsapp: "",
+    preferredReceiptChannel: "email" as "email" | "whatsapp" | "both",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState("");
   const [pointsError, setPointsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -125,16 +140,21 @@ export default function AccountDashboard() {
         if (!active) return;
         setUser(meData.user);
 
-        const [ordersResponse, pointsResponse] = await Promise.all([
-          fetch("/api/account/orders", {
-            cache: "no-store",
-            credentials: "same-origin",
-          }),
-          fetch("/api/account/points", {
-            cache: "no-store",
-            credentials: "same-origin",
-          }),
-        ]);
+        const [ordersResponse, pointsResponse, profileResponse] =
+          await Promise.all([
+            fetch("/api/account/orders", {
+              cache: "no-store",
+              credentials: "same-origin",
+            }),
+            fetch("/api/account/points", {
+              cache: "no-store",
+              credentials: "same-origin",
+            }),
+            fetch("/api/account/profile", {
+              cache: "no-store",
+              credentials: "same-origin",
+            }),
+          ]);
 
         const ordersData = (await ordersResponse.json()) as {
           orders?: AccountOrder[];
@@ -151,9 +171,23 @@ export default function AccountDashboard() {
           ledger?: PointLedger[];
           error?: string;
         };
+        const profileData = (await profileResponse.json()) as {
+          profile?: CustomerProfile;
+          error?: string;
+        };
 
         if (!active) return;
         setOrders(ordersData.orders ?? []);
+
+        if (profileResponse.ok && profileData.profile) {
+          setProfile(profileData.profile);
+          setProfileDraft({
+            displayName: profileData.profile.displayName,
+            whatsapp: profileData.profile.whatsapp,
+            preferredReceiptChannel:
+              profileData.profile.preferredReceiptChannel,
+          });
+        }
 
         if (pointsResponse.ok && pointsData.points) {
           setPoints(pointsData.points);
@@ -182,6 +216,39 @@ export default function AccountDashboard() {
       active = false;
     };
   }, []);
+
+  async function saveProfile() {
+    setProfileSaving(true);
+    setProfileMessage("");
+    try {
+      const response = await fetch("/api/account/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(profileDraft),
+      });
+      const data = (await response.json()) as {
+        profile?: CustomerProfile;
+        error?: string;
+      };
+      if (!response.ok || !data.profile) {
+        throw new Error(data.error ?? "Profil gagal disimpan.");
+      }
+      setProfile(data.profile);
+      setProfileDraft({
+        displayName: data.profile.displayName,
+        whatsapp: data.profile.whatsapp,
+        preferredReceiptChannel: data.profile.preferredReceiptChannel,
+      });
+      setProfileMessage("Profil tersimpan.");
+    } catch (error) {
+      setProfileMessage(
+        error instanceof Error ? error.message : "Profil gagal disimpan.",
+      );
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function logout() {
     setLoggingOut(true);
@@ -240,6 +307,76 @@ export default function AccountDashboard() {
         >
           {loggingOut ? "Keluar..." : "Keluar"}
         </button>
+      </section>
+
+      <section className="account-profile-settings">
+        <div className="account-section-head">
+          <div>
+            <span className="eyebrow">Profil</span>
+            <h2>Data checkout.</h2>
+          </div>
+          <span className="account-profile-saved">
+            {profile?.updatedAt ? "Tersimpan " + formatDate(profile.updatedAt) : "Belum disimpan"}
+          </span>
+        </div>
+        <div className="account-profile-form">
+          <label>
+            <span>Nama</span>
+            <input
+              value={profileDraft.displayName}
+              onChange={(event) =>
+                setProfileDraft((current) => ({
+                  ...current,
+                  displayName: event.target.value,
+                }))
+              }
+              placeholder="Nama kamu"
+            />
+          </label>
+          <label>
+            <span>WhatsApp</span>
+            <input
+              inputMode="tel"
+              value={profileDraft.whatsapp}
+              onChange={(event) =>
+                setProfileDraft((current) => ({
+                  ...current,
+                  whatsapp: event.target.value,
+                }))
+              }
+              placeholder="081234567890"
+            />
+          </label>
+          <label>
+            <span>Preferensi receipt</span>
+            <select
+              value={profileDraft.preferredReceiptChannel}
+              onChange={(event) =>
+                setProfileDraft((current) => ({
+                  ...current,
+                  preferredReceiptChannel: event.target.value as
+                    | "email"
+                    | "whatsapp"
+                    | "both",
+                }))
+              }
+            >
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="both">Email + WhatsApp</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={profileSaving}
+            onClick={() => void saveProfile()}
+          >
+            {profileSaving ? "Menyimpan..." : "Simpan profil"}
+          </button>
+        </div>
+        {profileMessage && (
+          <p className="account-profile-message">{profileMessage}</p>
+        )}
       </section>
 
       <section className="account-points-card">

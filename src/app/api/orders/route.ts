@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import {
   isValidReceiptEmail,
   normalizeReceiptEmail,
+  normalizeReceiptWhatsapp,
+  isValidIndonesianWhatsapp,
   validateGuestReceiptContact,
 } from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
@@ -101,6 +103,25 @@ export async function POST(request: Request) {
         { error: "Email akun Nambah tidak tersedia untuk receipt." },
         { status: 409 },
       );
+    }
+
+    try {
+      const [profile] = await supabaseSelect<{
+        whatsapp: string | null;
+      }>("customer_profiles", {
+        select: "whatsapp",
+        filters: { user_id: `eq.${auth.user.id}` },
+        limit: 1,
+      });
+      const normalizedWhatsapp = normalizeReceiptWhatsapp(profile?.whatsapp);
+      if (
+        normalizedWhatsapp &&
+        isValidIndonesianWhatsapp(normalizedWhatsapp)
+      ) {
+        receiptWhatsapp = normalizedWhatsapp;
+      }
+    } catch (error) {
+      console.warn("Customer profile receipt contact unavailable", error);
     }
   } else {
     const contact = validateGuestReceiptContact(

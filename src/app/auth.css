@@ -531,3 +531,82 @@
     padding: 15px 17px;
   }
 }
+
+
+.account-profile-settings {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(17,19,16,.96);
+}
+
+.account-profile-saved {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.account-profile-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 20px 26px 24px;
+}
+
+.account-profile-form label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.account-profile-form label > span {
+  color: #9ea59a;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.account-profile-form input,
+.account-profile-form select {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  outline: 0;
+  background: #0d0f0c;
+  color: var(--text);
+  font-size: 10px;
+}
+
+.account-profile-form button {
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(201,255,63,.22);
+  border-radius: 11px;
+  background: rgba(201,255,63,.08);
+  color: var(--lime);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.account-profile-message {
+  margin: -12px 26px 20px;
+  color: #b7c78c;
+  font-size: 8px;
+}
+
+@media (max-width: 900px) {
+  .account-profile-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .account-profile-form {
+    grid-template-columns: 1fr;
+    padding-inline: 20px;
+  }
+}
