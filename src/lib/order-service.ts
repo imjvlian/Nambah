@@ -305,3 +305,17 @@ export async function applyMidtransStatus(
   if (!publicOrder) throw new Error(`Order ${orderId} hilang setelah update.`);
   return publicOrder;
 }
+
+
+export async function isOrderOwnedByUser(orderId: string, userId: string) {
+  if (!orderId || !userId) return false;
+  const rows = await supabaseSelect<{ id: string }>("orders", {
+    select: "id",
+    filters: {
+      id: `eq.${orderId}`,
+      customer_user_id: `eq.${userId}`,
+    },
+    limit: 1,
+  });
+  return rows.length > 0;
+}

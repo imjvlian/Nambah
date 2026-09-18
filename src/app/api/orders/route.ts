@@ -1,3 +1,7 @@
+import {
+  appendResolvedNambahAuthCookies,
+  resolveNambahAuth,
+} from "@/lib/nambah-auth";
 import { randomUUID } from "node:crypto";
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
@@ -150,6 +154,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Total pembayaran tidak valid." }, { status: 409 });
   }
 
+  const auth = await resolveNambahAuth(request);
   const orderId = createOrderId();
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -158,6 +163,7 @@ export async function POST(request: Request) {
   try {
     await supabaseInsert("orders", {
       id: orderId,
+      customer_user_id: auth.user?.id ?? null,
       game_id: game.id,
       product_id: selectedPackage.id,
       payment_method_id: paymentMethod.id,
@@ -237,13 +243,17 @@ export async function POST(request: Request) {
     const order = await getPublicOrder(orderId);
     if (!order) throw new Error("Order tidak ditemukan setelah dibuat.");
 
+    const responseHeaders = new Headers({
+      "Cache-Control": "private, no-store",
+    });
+    responseHeaders.append("Set-Cookie", createOrderAccessCookie(orderId, access.token));
+    appendResolvedNambahAuthCookies(responseHeaders, auth);
+
     return Response.json(
       { order, accessToken: access.token },
       {
         status: 201,
-        headers: {
-          "Set-Cookie": createOrderAccessCookie(orderId, access.token),
-        },
+        headers: responseHeaders,
       },
     );
   } catch (error) {
