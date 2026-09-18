@@ -111,6 +111,17 @@ create table if not exists public.promotion_products (
   primary key (promotion_code, product_id)
 );
 
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'admin' check (role in ('admin', 'superadmin')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists admin_users_active_role_idx
+  on public.admin_users(active, role);
+
 create table if not exists public.affiliates (
   code text primary key,
   display_name text not null,
@@ -269,6 +280,7 @@ alter table public.supplier_products enable row level security;
 alter table public.pricing_rules enable row level security;
 alter table public.promotions enable row level security;
 alter table public.promotion_products enable row level security;
+alter table public.admin_users enable row level security;
 alter table public.affiliates enable row level security;
 alter table public.supplier_balances enable row level security;
 alter table public.supplier_balance_snapshots enable row level security;
@@ -289,6 +301,7 @@ revoke all on table public.supplier_products from anon, authenticated;
 revoke all on table public.pricing_rules from anon, authenticated;
 revoke all on table public.promotions from anon, authenticated;
 revoke all on table public.promotion_products from anon, authenticated;
+revoke all on table public.admin_users from anon, authenticated;
 revoke all on table public.affiliates from anon, authenticated;
 revoke all on table public.supplier_balances from anon, authenticated;
 revoke all on table public.supplier_balance_snapshots from anon, authenticated;

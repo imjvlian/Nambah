@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
 
 type CatalogProduct = {
@@ -90,9 +90,15 @@ function draftFromProduct(product: CatalogProduct): DraftProduct {
   };
 }
 
+type AdminSessionUser = {
+  email: string;
+  displayName: string;
+};
+
 export default function AdminDashboard() {
-  const [authState, setAuthState] = useState<"loading" | "guest" | "ready">("loading");
-  const [token, setToken] = useState("");
+  const [authState, setAuthState] = useState<"loading" | "guest" | "forbidden" | "ready">("loading");
+  const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
+  const [adminRole, setAdminRole] = useState("");
   const [catalog, setCatalog] = useState<CatalogPayload | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
@@ -132,14 +138,33 @@ export default function AdminDashboard() {
         const data = (await response.json()) as {
           configured?: boolean;
           authenticated?: boolean;
+          accountAuthenticated?: boolean;
+          forbidden?: boolean;
+          role?: string;
+          user?: AdminSessionUser | null;
+          error?: string;
         };
         if (!mounted) return;
 
-        if (!data.configured || !data.authenticated) {
+        if (!response.ok || !data.configured) {
+          setAuthState("guest");
+          setNotice(data.error ?? "Admin session belum dikonfigurasi.");
+          return;
+        }
+
+        if (data.forbidden) {
+          setAdminUser(data.user ?? null);
+          setAuthState("forbidden");
+          return;
+        }
+
+        if (!data.authenticated) {
           setAuthState("guest");
           return;
         }
 
+        setAdminUser(data.user ?? null);
+        setAdminRole(data.role ?? "admin");
         await loadCatalog();
       } catch {
         if (mounted) {
@@ -155,39 +180,21 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy("login");
-    setNotice("");
-
-    try {
-      const response = await fetch("/api/admin/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        setNotice(data.error ?? "Login admin gagal.");
-        return;
-      }
-
-      setToken("");
-      await loadCatalog();
-    } catch {
-      setNotice("Tidak dapat login ke dashboard admin.");
-    } finally {
-      setBusy("");
-    }
-  }
-
   async function logout() {
     setBusy("logout");
     try {
-      await fetch("/api/admin/session", { method: "DELETE" });
+      await Promise.all([
+        fetch("/api/admin/session", { method: "DELETE" }),
+        fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+        }),
+      ]);
     } finally {
       setCatalog(null);
       setDrafts({});
+      setAdminUser(null);
+      setAdminRole("");
       setAuthState("guest");
       setBusy("");
     }
@@ -372,22 +379,41 @@ export default function AdminDashboard() {
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
           <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
-          <span className="admin-kicker">Admin</span>
-          <h1>Kelola katalog Nambah.</h1>
-          <p>Masukkan <code>NAMBAH_ADMIN_API_TOKEN</code>. Token ditukar menjadi session HttpOnly dan tidak disimpan di localStorage.</p>
-          <form onSubmit={login}>
-            <input
-              autoComplete="current-password"
-              type="password"
-              placeholder="Admin API token"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-            <button className="primary-button full" disabled={!token || busy === "login"} type="submit">
-              {busy === "login" ? "Masuk..." : "Masuk dashboard"} <span>→</span>
-            </button>
-          </form>
+          <span className="admin-kicker">Admin account</span>
+          <h1>Masuk dengan akun admin.</h1>
+          <p>
+            Dashboard memakai akun Nambah yang sudah diberi role admin.
+            Password admin tidak disimpan terpisah dan token internal tidak perlu diketik di browser.
+          </p>
+          <Link className="primary-button full admin-account-login" href="/login?next=%2Fadmin">
+            Masuk ke akun admin <span>→</span>
+          </Link>
           {notice && <p className="admin-notice error">{notice}</p>}
+        </section>
+      </main>
+    );
+  }
+
+  if (authState === "forbidden") {
+    return (
+      <main className="admin-shell admin-login-shell">
+        <section className="admin-login-card">
+          <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
+          <span className="admin-kicker">Akses ditolak</span>
+          <h1>Akun ini bukan admin.</h1>
+          <p>
+            {adminUser?.email
+              ? `${adminUser.email} sudah login, tetapi belum memiliki role admin Nambah.`
+              : "Akun yang sedang login belum memiliki role admin Nambah."}
+          </p>
+          <div className="admin-login-actions">
+            <Link className="primary-button full" href="/account">
+              Buka akun <span>→</span>
+            </Link>
+            <button type="button" className="admin-secondary-button" onClick={() => void logout()} disabled={busy === "logout"}>
+              {busy === "logout" ? "Keluar..." : "Keluar & ganti akun"}
+            </button>
+          </div>
         </section>
       </main>
     );
@@ -400,6 +426,11 @@ export default function AdminDashboard() {
       <header className="admin-header">
         <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
         <div className="admin-header-actions">
+          {adminUser && (
+            <span className="admin-account-badge" title={adminUser.email}>
+              {adminUser.displayName} · {adminRole || "admin"}
+            </span>
+          )}
           <Link href="/" className="admin-text-link">Lihat website</Link>
           <button type="button" className="admin-text-button" onClick={() => void logout()} disabled={busy === "logout"}>Keluar</button>
         </div>
