@@ -1252,8 +1252,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Promo engine"
-                    status="foundation"
-                    copy="Pricing dan database promo aktif; management UI lengkap masih berikutnya."
+                    status="live"
+                    copy="Campaign CRUD, quota reservation, per-user limit, scheduling data, dan product targeting aktif."
                   />
                   <RoadmapCard
                     title="Nambah Points"
@@ -1262,8 +1262,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Affiliate lifecycle"
-                    status="foundation"
-                    copy="Referral pricing dan tabel commission tersedia; lifecycle pending/available/withdraw masih perlu otomasi."
+                    status="live"
+                    copy="Commission pending/available/cancelled mengikuti status order; ledger admin aktif."
                   />
                   <RoadmapCard
                     title="Digiflazz callback"
@@ -2092,8 +2092,8 @@ export default function AdminDashboard() {
                 />
                 <RoadmapCard
                   title="Live safety gate"
-                  status="planned"
-                  copy="Customer number formatter per game, explicit opt-in, dan production checklist sebelum spend saldo."
+                  status="live"
+                  copy="Template customer_no per game/product, frozen max_price, SKU mapping, dan double opt-in sebelum saldo Digiflazz dapat terpakai."
                 />
               </div>
             </>

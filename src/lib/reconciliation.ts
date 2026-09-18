@@ -1,9 +1,11 @@
 import {
+  runDigiflazzPrepaidTransaction,
   runDigiflazzTestTransaction,
   type DigiflazzTestOutcome,
 } from "@/lib/digiflazz/client";
 import { applyDigiflazzTransactionStatus } from "@/lib/digiflazz/status-service";
 import {
+  assertLiveFulfillmentSafety,
   fulfillPaidOrder,
   getFulfillmentMode,
 } from "@/lib/fulfillment";
@@ -17,6 +19,9 @@ type PendingSupplierRow = {
   order_id: string;
   request_ref: string;
   supplier_transaction_id: string | null;
+  supplier_sku: string | null;
+  target: string;
+  cost: number | string;
   status: "pending";
   updated_at: string;
 };
@@ -181,7 +186,7 @@ export async function runNambahReconciliation(input?: {
     "supplier_transactions",
     {
       select:
-        "id,order_id,request_ref,supplier_transaction_id,status,updated_at",
+        "id,order_id,request_ref,supplier_transaction_id,supplier_sku,target,cost,status,updated_at",
       filters: {
         supplier_id: "eq.digiflazz",
         status: "eq.pending",
@@ -195,18 +200,44 @@ export async function runNambahReconciliation(input?: {
   for (const transaction of pendingSupplier) {
     result.supplier.checked += 1;
 
-    if (fulfillmentMode !== "digiflazz-test") {
-      // Production/live re-query remains locked until Nambah has the final
-      // per-game customer_no formatter. Webhook remains primary in that mode.
+    if (
+      fulfillmentMode !== "digiflazz-test" &&
+      fulfillmentMode !== "digiflazz-live"
+    ) {
       result.supplier.skipped += 1;
       continue;
     }
 
     try {
-      const supplierResult = await runDigiflazzTestTransaction({
-        outcome: configuredTestOutcome(),
-        refId: transaction.request_ref,
-      });
+      const supplierResult =
+        fulfillmentMode === "digiflazz-test"
+          ? await runDigiflazzTestTransaction({
+              outcome: configuredTestOutcome(),
+              refId: transaction.request_ref,
+            })
+          : await (async () => {
+              assertLiveFulfillmentSafety();
+              if (!transaction.supplier_sku || !transaction.target) {
+                throw new Error(
+                  "Pending live transaction tidak memiliki SKU/target untuk status check.",
+                );
+              }
+              const maxPrice = Number(transaction.cost);
+              if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+                throw new Error(
+                  "Pending live transaction tidak memiliki max_price yang valid.",
+                );
+              }
+              return runDigiflazzPrepaidTransaction({
+                buyerSkuCode: transaction.supplier_sku,
+                customerNo: transaction.target,
+                refId: transaction.request_ref,
+                maxPrice,
+                testing: false,
+                useCallback: true,
+                allowDot: transaction.target.includes("."),
+              });
+            })();
       const applied = await applyDigiflazzTransactionStatus(supplierResult);
 
       if (applied.supplierTransactionStatus === "pending") {

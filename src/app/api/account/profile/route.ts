@@ -50,7 +50,8 @@ export async function GET(request: Request) {
           displayName:
             profile?.display_name?.trim() ||
             auth.user.user_metadata?.display_name ||
-            auth.user.email.split("@")[0],
+            auth.user.email?.split("@")[0] ||
+            "User Nambah",
           whatsapp: profile?.whatsapp ?? "",
           preferredReceiptChannel:
             profile?.preferred_receipt_channel ?? "email",

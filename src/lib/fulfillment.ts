@@ -1,4 +1,9 @@
-import { runDigiflazzTestTransaction, type DigiflazzTestOutcome } from "@/lib/digiflazz/client";
+import {
+  runDigiflazzPrepaidTransaction,
+  runDigiflazzTestTransaction,
+  type DigiflazzTestOutcome,
+} from "@/lib/digiflazz/client";
+import { renderFulfillmentTarget } from "@/lib/fulfillment-target";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
@@ -21,6 +26,7 @@ type SimulationOutcome = "success" | "failed" | "pending";
 
 type OrderRow = {
   id: string;
+  game_id: string;
   product_id: string;
   supplier_id: string | null;
   target_user_id: string;
@@ -82,6 +88,22 @@ function explicitlyEnabled(name: string) {
   return ["true", "1", "yes", "on"].includes(configuredValue(name));
 }
 
+export function assertLiveFulfillmentSafety() {
+  if (!explicitlyEnabled("NAMBAH_ALLOW_LIVE_FULFILLMENT")) {
+    throw new Error(
+      "Digiflazz live fulfillment dikunci. NAMBAH_ALLOW_LIVE_FULFILLMENT belum aktif.",
+    );
+  }
+
+  const acknowledgment =
+    process.env.NAMBAH_LIVE_FULFILLMENT_ACK?.trim() ?? "";
+  if (acknowledgment !== "SPEND_REAL_DIGIFLAZZ_BALANCE") {
+    throw new Error(
+      "Digiflazz live fulfillment membutuhkan NAMBAH_LIVE_FULFILLMENT_ACK=SPEND_REAL_DIGIFLAZZ_BALANCE.",
+    );
+  }
+}
+
 export function getFulfillmentMode(): FulfillmentMode {
   const configured = configuredValue("NAMBAH_FULFILLMENT_MODE");
   if (!configured) {
@@ -130,11 +152,95 @@ function targetForLog(order: OrderRow) {
 async function getOrder(orderId: string) {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,product_id,supplier_id,target_user_id,target_server_id,supplier_cost,status",
+      "id,game_id,product_id,supplier_id,target_user_id,target_server_id,supplier_cost,status",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
   return order ?? null;
+}
+
+
+type LiveDispatchConfig = {
+  supplierSku: string;
+  customerNo: string;
+  allowDot: boolean;
+  maxPrice: number;
+};
+
+async function getLiveDispatchConfig(
+  order: OrderRow,
+): Promise<LiveDispatchConfig> {
+  assertLiveFulfillmentSafety();
+
+  const [[mapping], [product], [game]] = await Promise.all([
+    supabaseSelect<{
+      supplier_sku: string | null;
+      supplier_cost: number | string;
+      active: boolean;
+    }>("supplier_products", {
+      select: "supplier_sku,supplier_cost,active",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        product_id: `eq.${order.product_id}`,
+        active: "eq.true",
+      },
+      limit: 1,
+    }),
+    supabaseSelect<{
+      game_id: string;
+      fulfillment_target_template: string | null;
+    }>("products", {
+      select: "game_id,fulfillment_target_template",
+      filters: { id: `eq.${order.product_id}`, active: "eq.true" },
+      limit: 1,
+    }),
+    supabaseSelect<{
+      requires_server: boolean;
+      fulfillment_target_template: string | null;
+    }>("games", {
+      select: "requires_server,fulfillment_target_template",
+      filters: { id: `eq.${order.game_id}`, active: "eq.true" },
+      limit: 1,
+    }),
+  ]);
+
+  if (!mapping?.supplier_sku || !mapping.active) {
+    throw new Error(
+      "SKU Digiflazz live belum mapped atau sedang tidak aktif.",
+    );
+  }
+
+  const frozenCost = Number(order.supplier_cost);
+  const currentCost = Number(mapping.supplier_cost);
+  if (!Number.isFinite(frozenCost) || frozenCost <= 0) {
+    throw new Error("Supplier cost snapshot order tidak valid.");
+  }
+  if (!Number.isFinite(currentCost) || currentCost < 0) {
+    throw new Error("Supplier cost mapping tidak valid.");
+  }
+  if (currentCost > frozenCost) {
+    throw new Error(
+      "Harga supplier naik setelah checkout. Live dispatch diblokir agar margin tidak menjadi negatif.",
+    );
+  }
+
+  const template =
+    product?.fulfillment_target_template?.trim() ||
+    game?.fulfillment_target_template?.trim() ||
+    "";
+
+  const rendered = renderFulfillmentTarget(template, {
+    userId: order.target_user_id,
+    serverId: order.target_server_id,
+    requiresServer: Boolean(game?.requires_server),
+  });
+
+  return {
+    supplierSku: mapping.supplier_sku,
+    customerNo: rendered.customerNo,
+    allowDot: rendered.allowDot,
+    maxPrice: frozenCost,
+  };
 }
 
 async function getSupplierTransaction(requestRef: string) {
@@ -157,6 +263,7 @@ async function ensureSupplierTransaction(
   order: OrderRow,
   requestRef: string,
   mode: FulfillmentMode,
+  liveConfig?: LiveDispatchConfig,
 ) {
   const existing = await getSupplierTransaction(requestRef);
   if (existing) return existing;
@@ -175,10 +282,15 @@ async function ensureSupplierTransaction(
           ? "xld10"
           : mode === "simulate"
             ? "__simulate__"
-            : null,
-      target: targetForLog(order),
-      // Simulation/testing:true must not look like real supplier spend.
-      cost: 0,
+            : liveConfig?.supplierSku ?? null,
+      target:
+        mode === "digiflazz-live"
+          ? liveConfig?.customerNo ?? targetForLog(order)
+          : targetForLog(order),
+      cost:
+        mode === "digiflazz-live"
+          ? liveConfig?.maxPrice ?? Number(order.supplier_cost)
+          : 0,
       status: "pending",
       message: `queued:${mode}`,
       serial_number: null,
@@ -408,6 +520,67 @@ async function runDigiflazzTest(
   }
 }
 
+
+async function runDigiflazzLive(
+  order: OrderRow,
+  transaction: SupplierTransactionRow,
+  requestRef: string,
+  config: LiveDispatchConfig,
+): Promise<FulfillmentResult> {
+  try {
+    const result = await runDigiflazzPrepaidTransaction({
+      buyerSkuCode: config.supplierSku,
+      customerNo: config.customerNo,
+      refId: requestRef,
+      maxPrice: config.maxPrice,
+      testing: false,
+      useCallback: true,
+      allowDot: config.allowDot,
+    });
+    const status = normalizeDigiflazzStatus(result.status);
+    const now = new Date().toISOString();
+
+    await supabaseUpdate(
+      "supplier_transactions",
+      {
+        supplier_transaction_id: result.ref_id || requestRef,
+        supplier_sku: result.buyer_sku_code || config.supplierSku,
+        target: config.customerNo,
+        cost: Number(result.price ?? config.maxPrice),
+        status,
+        message: `Digiflazz live: ${result.message || result.status}`,
+        serial_number: result.sn ?? null,
+        updated_at: now,
+      },
+      { filters: { id: `eq.${transaction.id}` } },
+    );
+
+    if (status === "success" || status === "failed") {
+      await finalizeOrder(order.id, status);
+    }
+
+    return {
+      mode: "digiflazz-live",
+      orderId: order.id,
+      requestRef,
+      status,
+      source: "digiflazz",
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown Digiflazz live error.";
+    await supabaseUpdate(
+      "supplier_transactions",
+      {
+        message: `dispatch_error:${message}`,
+        updated_at: new Date().toISOString(),
+      },
+      { filters: { id: `eq.${transaction.id}` } },
+    );
+    throw error;
+  }
+}
+
 export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResult> {
   const order = await getOrder(orderId);
   if (!order) throw new Error(`Order ${orderId} tidak ditemukan untuk fulfillment.`);
@@ -469,22 +642,14 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResu
     };
   }
 
-  // Live dispatch is intentionally double-locked. 0.4.3 establishes the
-  // orchestration and test path first; customer_no formatting must be explicit
-  // per game/product before real balance can ever be spent.
-  if (mode === "digiflazz-live") {
-    if (!explicitlyEnabled("NAMBAH_ALLOW_LIVE_FULFILLMENT")) {
-      throw new Error(
-        "Digiflazz live fulfillment dikunci. NAMBAH_ALLOW_LIVE_FULFILLMENT belum aktif.",
-      );
-    }
-    throw new Error(
-      "Digiflazz live fulfillment belum dibuka: format customer_no per game/product harus dikonfigurasi eksplisit terlebih dahulu.",
-    );
-  }
+  const liveConfig =
+    mode === "digiflazz-live"
+      ? await getLiveDispatchConfig(order)
+      : undefined;
 
   const transaction =
-    existing ?? (await ensureSupplierTransaction(order, requestRef, mode));
+    existing ??
+    (await ensureSupplierTransaction(order, requestRef, mode, liveConfig));
 
   if (transaction.supplier_transaction_id) {
     await markOrderProcessing(order);
@@ -503,6 +668,15 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResu
 
   if (mode === "simulate") {
     return runSimulation(order, transaction, requestRef);
+  }
+
+  if (mode === "digiflazz-live") {
+    return runDigiflazzLive(
+      order,
+      transaction,
+      requestRef,
+      liveConfig!,
+    );
   }
 
   return runDigiflazzTest(order, transaction, requestRef);
