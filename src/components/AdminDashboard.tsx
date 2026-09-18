@@ -3,6 +3,23 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import AdminCatalogTools from "@/components/AdminCatalogTools";
+
+type AdminSection =
+  | "overview"
+  | "orders"
+  | "catalog"
+  | "supplier"
+  | "receipts"
+  | "promotions"
+  | "affiliates"
+  | "users"
+  | "system";
+
+type AdminSessionUser = {
+  email: string;
+  displayName: string;
+};
 
 type CatalogProduct = {
   id: string;
@@ -57,26 +74,118 @@ type DraftProduct = {
   supplierSku: string;
 };
 
+type OverviewPayload = {
+  generatedAt: string;
+  stats: {
+    ordersToday: number | null;
+    successToday: number | null;
+    pendingPayment: number | null;
+    processing: number | null;
+    failed: number | null;
+    receiptsSent: number | null;
+    receiptsFailed: number | null;
+    activePromotions: number | null;
+    activeAffiliates: number | null;
+  };
+  finance: {
+    gmvToday: number;
+    supplierBalance: number;
+    reservedBalance: number;
+    availableBalance: number;
+    balanceCheckedAt: string | null;
+  };
+  recentOrders: AdminOrder[];
+  system: {
+    flowTest: boolean;
+    fulfillmentMode: string;
+    services: Array<{
+      id: string;
+      name: string;
+      ready: boolean;
+      detail: string;
+      state: "live" | "test" | "planned" | "attention";
+    }>;
+  };
+};
+
+type AdminOrder = {
+  id: string;
+  status: string;
+  finalPrice: number;
+  targetUserId: string;
+  targetServerId: string | null;
+  receiptEmail?: string | null;
+  customerUserId?: string | null;
+  gameName: string;
+  packageLabel: string;
+  paymentName?: string;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string | null;
+  fulfilledAt?: string | null;
+};
+
+type ReceiptRow = {
+  id: number;
+  orderId: string;
+  channel: string;
+  recipient: string;
+  provider: string;
+  status: string;
+  providerMessageId: string | null;
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type BootstrapResult = {
-  mode: string;
   summary?: {
-    supplierCatalogItems?: number;
-    nambahProducts?: number;
-    alreadyMapped?: number;
-    suggested?: number;
     autoMapped?: number;
+    suggested?: number;
     unmapped?: number;
   };
 };
 
-function formatTime(value: string | null) {
-  if (!value) return "Belum pernah";
+const NAV: Array<{
+  id: AdminSection;
+  label: string;
+  short: string;
+}> = [
+  { id: "overview", label: "Overview", short: "OV" },
+  { id: "orders", label: "Orders", short: "OR" },
+  { id: "catalog", label: "Catalog", short: "CA" },
+  { id: "supplier", label: "Supplier", short: "SU" },
+  { id: "receipts", label: "Receipts", short: "RE" },
+  { id: "promotions", label: "Promotions", short: "PR" },
+  { id: "affiliates", label: "Affiliates", short: "AF" },
+  { id: "users", label: "Users", short: "US" },
+  { id: "system", label: "System", short: "SY" },
+];
+
+const STATUS_LABEL: Record<string, string> = {
+  pending_payment: "Pending payment",
+  paid: "Paid",
+  processing: "Processing",
+  success: "Success",
+  failed: "Failed",
+  refunded: "Refunded",
+  cancelled: "Cancelled",
+};
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function numberOrDash(value: number | null | undefined) {
+  return value === null || value === undefined ? "—" : String(value);
 }
 
 function draftFromProduct(product: CatalogProduct): DraftProduct {
@@ -90,43 +199,148 @@ function draftFromProduct(product: CatalogProduct): DraftProduct {
   };
 }
 
-type AdminSessionUser = {
-  email: string;
-  displayName: string;
-};
+function SectionHead({
+  eyebrow,
+  title,
+  copy,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  copy: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="acc-section-head">
+      <div>
+        <span className="acc-eyebrow">{eyebrow}</span>
+        <h2>{title}</h2>
+        <p>{copy}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function RoadmapCard({
+  title,
+  status,
+  copy,
+}: {
+  title: string;
+  status: "live" | "foundation" | "planned";
+  copy: string;
+}) {
+  return (
+    <article className="acc-roadmap-card">
+      <div>
+        <strong>{title}</strong>
+        <span className={`acc-roadmap-status ${status}`}>
+          {status === "live"
+            ? "Live"
+            : status === "foundation"
+              ? "Foundation"
+              : "Planned"}
+        </span>
+      </div>
+      <p>{copy}</p>
+    </article>
+  );
+}
 
 export default function AdminDashboard() {
-  const [authState, setAuthState] = useState<"loading" | "guest" | "forbidden" | "ready">("loading");
+  const [authState, setAuthState] = useState<
+    "loading" | "guest" | "forbidden" | "ready"
+  >("loading");
+  const [section, setSection] = useState<AdminSection>("overview");
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
   const [adminRole, setAdminRole] = useState("");
+  const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [catalog, setCatalog] = useState<CatalogPayload | null>(null);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [mappingFilter, setMappingFilter] = useState("all");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
   function hydrateDrafts(payload: CatalogPayload) {
     setDrafts(
-      Object.fromEntries(payload.products.map((product) => [product.id, draftFromProduct(product)])),
+      Object.fromEntries(
+        payload.products.map((product) => [
+          product.id,
+          draftFromProduct(product),
+        ]),
+      ),
     );
+  }
+
+  async function loadOverview() {
+    const response = await fetch("/api/admin/overview", { cache: "no-store" });
+    if (response.status === 401) {
+      setAuthState("guest");
+      return;
+    }
+    const data = (await response.json()) as OverviewPayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Overview admin gagal dimuat.");
+    }
+    setOverview(data);
   }
 
   async function loadCatalog() {
     const response = await fetch("/api/admin/catalog", { cache: "no-store" });
     if (response.status === 401) {
       setAuthState("guest");
-      setCatalog(null);
       return;
     }
-
     const data = (await response.json()) as CatalogPayload & { error?: string };
-    if (!response.ok) throw new Error(data.error ?? "Katalog admin gagal dimuat.");
-
+    if (!response.ok) {
+      throw new Error(data.error ?? "Katalog admin gagal dimuat.");
+    }
     setCatalog(data);
     hydrateDrafts(data);
-    setAuthState("ready");
+  }
+
+  async function loadOrders() {
+    const response = await fetch("/api/admin/orders", { cache: "no-store" });
+    const data = (await response.json()) as {
+      orders?: AdminOrder[];
+      error?: string;
+    };
+    if (!response.ok) throw new Error(data.error ?? "Order gagal dimuat.");
+    setOrders(data.orders ?? []);
+  }
+
+  async function loadReceipts() {
+    const response = await fetch("/api/admin/receipts", { cache: "no-store" });
+    const data = (await response.json()) as {
+      receipts?: ReceiptRow[];
+      error?: string;
+    };
+    if (!response.ok) throw new Error(data.error ?? "Receipt gagal dimuat.");
+    setReceipts(data.receipts ?? []);
+  }
+
+  async function refreshCurrent() {
+    setBusy("refresh");
+    setNotice("");
+    try {
+      await loadOverview();
+      if (section === "orders") await loadOrders();
+      if (section === "catalog" || section === "supplier") await loadCatalog();
+      if (section === "receipts") await loadReceipts();
+      setNotice("Data admin diperbarui.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Refresh admin gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
   useEffect(() => {
@@ -134,11 +348,12 @@ export default function AdminDashboard() {
 
     async function init() {
       try {
-        const response = await fetch("/api/admin/session", { cache: "no-store" });
+        const response = await fetch("/api/admin/session", {
+          cache: "no-store",
+        });
         const data = (await response.json()) as {
           configured?: boolean;
           authenticated?: boolean;
-          accountAuthenticated?: boolean;
           forbidden?: boolean;
           role?: string;
           user?: AdminSessionUser | null;
@@ -165,11 +380,17 @@ export default function AdminDashboard() {
 
         setAdminUser(data.user ?? null);
         setAdminRole(data.role ?? "admin");
-        await loadCatalog();
-      } catch {
+
+        await Promise.all([loadOverview(), loadCatalog()]);
+        if (mounted) setAuthState("ready");
+      } catch (error) {
         if (mounted) {
           setAuthState("guest");
-          setNotice("Dashboard admin belum dapat dihubungi.");
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Dashboard admin belum dapat dihubungi.",
+          );
         }
       }
     }
@@ -179,6 +400,23 @@ export default function AdminDashboard() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (authState !== "ready") return;
+
+    if (section === "orders" && orders.length === 0) {
+      void loadOrders().catch((error) =>
+        setNotice(error instanceof Error ? error.message : "Order gagal dimuat."),
+      );
+    }
+    if (section === "receipts" && receipts.length === 0) {
+      void loadReceipts().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Receipt gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length]);
 
   async function logout() {
     setBusy("logout");
@@ -191,12 +429,7 @@ export default function AdminDashboard() {
         }),
       ]);
     } finally {
-      setCatalog(null);
-      setDrafts({});
-      setAdminUser(null);
-      setAdminRole("");
-      setAuthState("guest");
-      setBusy("");
+      window.location.replace("/login?next=%2Fadmin");
     }
   }
 
@@ -223,22 +456,21 @@ export default function AdminDashboard() {
       setNotice(`${product.id}: harga jual tidak valid.`);
       return;
     }
-
     if (!Number.isInteger(referencePrice) || referencePrice < sellingPrice) {
       setNotice(`${product.id}: reference price harus >= harga jual.`);
       return;
     }
-
     if (!nextSku && currentSku) {
-      setNotice(`${product.id}: mapping SKU tidak dikosongkan dari form ini. Isi SKU baru atau biarkan SKU lama.`);
+      setNotice(
+        `${product.id}: SKU lama tidak boleh dikosongkan dari editor ini.`,
+      );
       return;
     }
 
     setBusy(`save:${product.id}`);
     setNotice("");
-
     try {
-      const updateResponse = await fetch(
+      const response = await fetch(
         `/api/admin/catalog/${encodeURIComponent(product.id)}`,
         {
           method: "PATCH",
@@ -252,25 +484,32 @@ export default function AdminDashboard() {
           }),
         },
       );
-      const updateData = (await updateResponse.json()) as { error?: string };
-      if (!updateResponse.ok) throw new Error(updateData.error ?? "Produk gagal disimpan.");
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Produk gagal disimpan.");
+      }
 
       if (nextSku && nextSku.toUpperCase() !== currentSku.toUpperCase()) {
         const mappingResponse = await fetch("/api/admin/digiflazz/map-sku", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: product.id, supplierSku: nextSku }),
+          body: JSON.stringify({
+            productId: product.id,
+            supplierSku: nextSku,
+          }),
         });
-        const mappingData = (await mappingResponse.json()) as { error?: string };
+        const mapping = (await mappingResponse.json()) as { error?: string };
         if (!mappingResponse.ok) {
-          throw new Error(mappingData.error ?? "Mapping SKU Digiflazz gagal.");
+          throw new Error(mapping.error ?? "Mapping SKU gagal.");
         }
       }
 
-      await loadCatalog();
+      await Promise.all([loadCatalog(), loadOverview()]);
       setNotice(`${product.id} berhasil diperbarui.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Produk gagal diperbarui.");
+      setNotice(
+        error instanceof Error ? error.message : "Produk gagal diperbarui.",
+      );
     } finally {
       setBusy("");
     }
@@ -279,26 +518,29 @@ export default function AdminDashboard() {
   async function runBootstrap(apply: boolean) {
     setBusy(apply ? "bootstrap-apply" : "bootstrap-scan");
     setNotice("");
-
     try {
       const response = await fetch("/api/admin/digiflazz/bootstrap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apply, remap: false }),
       });
-      const result = (await response.json()) as BootstrapResult & { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Bootstrap Digiflazz gagal.");
+      const result = (await response.json()) as BootstrapResult & {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Bootstrap Digiflazz gagal.");
+      }
 
-      const summary = result.summary;
+      if (apply) await Promise.all([loadCatalog(), loadOverview()]);
       setNotice(
         apply
-          ? `Auto-map selesai. ${summary?.autoMapped ?? 0} produk baru dipetakan, ${summary?.unmapped ?? 0} masih perlu dicek.`
-          : `Scan selesai. ${summary?.suggested ?? 0} produk punya kandidat auto-map, ${summary?.unmapped ?? 0} belum cocok.`,
+          ? `Auto-map selesai. ${result.summary?.autoMapped ?? 0} produk dipetakan, ${result.summary?.unmapped ?? 0} belum mapped.`
+          : `Scan selesai. ${result.summary?.suggested ?? 0} kandidat aman, ${result.summary?.unmapped ?? 0} belum cocok.`,
       );
-
-      if (apply) await loadCatalog();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Bootstrap Digiflazz gagal.");
+      setNotice(
+        error instanceof Error ? error.message : "Bootstrap Digiflazz gagal.",
+      );
     } finally {
       setBusy("");
     }
@@ -307,7 +549,6 @@ export default function AdminDashboard() {
   async function syncPrices() {
     setBusy("sync");
     setNotice("");
-
     try {
       const response = await fetch("/api/admin/digiflazz/sync-prices", {
         method: "POST",
@@ -316,16 +557,24 @@ export default function AdminDashboard() {
       });
       const result = (await response.json()) as {
         error?: string;
-        summary?: { found?: number; costChanged?: number; missing?: number };
+        summary?: {
+          found?: number;
+          costChanged?: number;
+          missing?: number;
+        };
       };
-      if (!response.ok) throw new Error(result.error ?? "Sinkronisasi harga gagal.");
+      if (!response.ok) {
+        throw new Error(result.error ?? "Sinkronisasi harga gagal.");
+      }
 
-      await loadCatalog();
+      await Promise.all([loadCatalog(), loadOverview()]);
       setNotice(
-        `Harga supplier tersinkron. ${result.summary?.found ?? 0} SKU ditemukan, ${result.summary?.costChanged ?? 0} harga berubah, ${result.summary?.missing ?? 0} hilang dari price list.`,
+        `Sync selesai. ${result.summary?.found ?? 0} SKU ditemukan, ${result.summary?.costChanged ?? 0} harga berubah, ${result.summary?.missing ?? 0} missing.`,
       );
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Sinkronisasi harga gagal.");
+      setNotice(
+        error instanceof Error ? error.message : "Sinkronisasi harga gagal.",
+      );
     } finally {
       setBusy("");
     }
@@ -334,18 +583,22 @@ export default function AdminDashboard() {
   async function checkBalance() {
     setBusy("balance");
     setNotice("");
-
     try {
       const response = await fetch("/api/admin/digiflazz/balance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notify: false }),
       });
-      const result = (await response.json()) as { error?: string; availableBalance?: number };
+      const result = (await response.json()) as {
+        error?: string;
+        availableBalance?: number;
+      };
       if (!response.ok) throw new Error(result.error ?? "Cek saldo gagal.");
 
-      await loadCatalog();
-      setNotice(`Saldo Digiflazz diperbarui: ${formatIDR(result.availableBalance ?? 0)} tersedia.`);
+      await Promise.all([loadCatalog(), loadOverview()]);
+      setNotice(
+        `Saldo diperbarui: ${formatIDR(result.availableBalance ?? 0)} tersedia.`,
+      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Cek saldo gagal.");
     } finally {
@@ -370,22 +623,48 @@ export default function AdminDashboard() {
     });
   }, [catalog, query, gameFilter, mappingFilter]);
 
+  const filteredOrders = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return orders.filter((order) => {
+      if (
+        orderStatusFilter !== "all" &&
+        order.status !== orderStatusFilter
+      ) {
+        return false;
+      }
+      if (!keyword) return true;
+      return `${order.id} ${order.gameName} ${order.packageLabel} ${order.targetUserId}`
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [orders, orderStatusFilter, query]);
+
   if (authState === "loading") {
-    return <main className="admin-shell"><div className="admin-loading">Memuat dashboard admin...</div></main>;
+    return (
+      <main className="admin-shell">
+        <div className="admin-loading">Memuat Nambah Control Center...</div>
+      </main>
+    );
   }
 
   if (authState === "guest") {
     return (
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
-          <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
+          <Link className="brand" href="/">
+            <span className="brand-mark">N+</span>
+            <span>Nambah</span>
+          </Link>
           <span className="admin-kicker">Admin account</span>
           <h1>Masuk dengan akun admin.</h1>
           <p>
-            Dashboard memakai akun Nambah yang sudah diberi role admin.
-            Password admin tidak disimpan terpisah dan token internal tidak perlu diketik di browser.
+            Control Center memakai akun Nambah dengan role admin atau
+            superadmin.
           </p>
-          <Link className="primary-button full admin-account-login" href="/login?next=%2Fadmin">
+          <Link
+            className="primary-button full admin-account-login"
+            href="/login?next=%2Fadmin"
+          >
             Masuk ke akun admin <span>→</span>
           </Link>
           {notice && <p className="admin-notice error">{notice}</p>}
@@ -398,166 +677,783 @@ export default function AdminDashboard() {
     return (
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
-          <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
+          <Link className="brand" href="/">
+            <span className="brand-mark">N+</span>
+            <span>Nambah</span>
+          </Link>
           <span className="admin-kicker">Akses ditolak</span>
           <h1>Akun ini bukan admin.</h1>
           <p>
             {adminUser?.email
-              ? `${adminUser.email} sudah login, tetapi belum memiliki role admin Nambah.`
-              : "Akun yang sedang login belum memiliki role admin Nambah."}
+              ? `${adminUser.email} sudah login tetapi belum memiliki role admin.`
+              : "Akun ini belum memiliki role admin."}
           </p>
-          <div className="admin-login-actions">
-            <Link className="primary-button full" href="/account">
-              Buka akun <span>→</span>
-            </Link>
-            <button type="button" className="admin-secondary-button" onClick={() => void logout()} disabled={busy === "logout"}>
-              {busy === "logout" ? "Keluar..." : "Keluar & ganti akun"}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            onClick={() => void logout()}
+          >
+            Keluar & ganti akun
+          </button>
         </section>
       </main>
     );
   }
 
-  if (!catalog) return null;
+  const activeNav = NAV.find((item) => item.id === section) ?? NAV[0]!;
 
   return (
-    <main className="admin-shell">
-      <header className="admin-header">
-        <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
-        <div className="admin-header-actions">
+    <main className="acc-page">
+      <aside className="acc-sidebar">
+        <Link className="acc-brand" href="/">
+          <span className="brand-mark">N+</span>
+          <span>
+            <b>Nambah</b>
+            <small>Control Center</small>
+          </span>
+        </Link>
+
+        <nav className="acc-nav" aria-label="Admin navigation">
+          {NAV.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className={section === item.id ? "active" : ""}
+              onClick={() => {
+                setSection(item.id);
+                setQuery("");
+                setNotice("");
+              }}
+            >
+              <span>{item.short}</span>
+              <b>{item.label}</b>
+            </button>
+          ))}
+        </nav>
+
+        <div className="acc-sidebar-foot">
           {adminUser && (
-            <span className="admin-account-badge" title={adminUser.email}>
-              {adminUser.displayName} · {adminRole || "admin"}
-            </span>
+            <div className="acc-admin-user">
+              <span>
+                {adminUser.displayName.slice(0, 1).toUpperCase()}
+              </span>
+              <div>
+                <strong>{adminUser.displayName}</strong>
+                <small>{adminRole || "admin"}</small>
+              </div>
+            </div>
           )}
-          <Link href="/" className="admin-text-link">Lihat website</Link>
-          <button type="button" className="admin-text-button" onClick={() => void logout()} disabled={busy === "logout"}>Keluar</button>
-        </div>
-      </header>
-
-      <section className="admin-hero">
-        <div>
-          <span className="admin-kicker">Catalog Control</span>
-          <h1>Dashboard katalog.</h1>
-          <p>Mapping Digiflazz, harga jual, status produk, sinkronisasi supplier, dan saldo ada di satu tempat.</p>
-        </div>
-        <div className="admin-balance-card">
-          <small>Saldo tersedia Digiflazz</small>
-          <strong>{formatIDR(catalog.balance.availableBalance)}</strong>
-          <span>Dicek {formatTime(catalog.balance.checkedAt)}</span>
-        </div>
-      </section>
-
-      <section className="admin-stats">
-        <div><small>Total produk</small><strong>{catalog.stats.total}</strong></div>
-        <div><small>Produk aktif</small><strong>{catalog.stats.active}</strong></div>
-        <div><small>SKU mapped</small><strong>{catalog.stats.mapped}</strong></div>
-        <div><small>Ready supplier</small><strong>{catalog.stats.ready}</strong></div>
-        <div><small>Belum mapped</small><strong>{catalog.stats.unmapped}</strong></div>
-      </section>
-
-      <section className="admin-toolbar">
-        <div className="admin-action-group">
-          <button type="button" onClick={() => void runBootstrap(false)} disabled={Boolean(busy)}>
-            {busy === "bootstrap-scan" ? "Scanning..." : "Scan katalog Digiflazz"}
-          </button>
-          <button type="button" onClick={() => void runBootstrap(true)} disabled={Boolean(busy)}>
-            {busy === "bootstrap-apply" ? "Mapping..." : "Auto-map aman"}
-          </button>
-          <button type="button" onClick={() => void syncPrices()} disabled={Boolean(busy)}>
-            {busy === "sync" ? "Sync..." : "Sync harga supplier"}
-          </button>
-          <button type="button" onClick={() => void checkBalance()} disabled={Boolean(busy)}>
-            {busy === "balance" ? "Checking..." : "Cek saldo"}
+          <button type="button" onClick={() => void logout()}>
+            Keluar
           </button>
         </div>
-        {notice && <p className="admin-notice">{notice}</p>}
-      </section>
+      </aside>
 
-      <section className="admin-filters">
-        <input
-          type="search"
-          placeholder="Cari produk, ID, atau SKU..."
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <select value={gameFilter} onChange={(event) => setGameFilter(event.target.value)}>
-          <option value="all">Semua game</option>
-          {catalog.games.map((game) => <option key={game.id} value={game.id}>{game.name}</option>)}
-        </select>
-        <select value={mappingFilter} onChange={(event) => setMappingFilter(event.target.value)}>
-          <option value="all">Semua mapping</option>
-          <option value="ready">Ready</option>
-          <option value="mapped">Sudah mapped</option>
-          <option value="unmapped">Belum mapped</option>
-        </select>
-      </section>
+      <section className="acc-workspace">
+        <header className="acc-topbar">
+          <div>
+            <small>Admin / {activeNav.label}</small>
+            <strong>{activeNav.label}</strong>
+          </div>
+          <div className="acc-topbar-actions">
+            {overview?.system.flowTest && (
+              <span className="acc-env-badge">FLOW TEST</span>
+            )}
+            <button
+              type="button"
+              onClick={() => void refreshCurrent()}
+              disabled={busy === "refresh"}
+            >
+              {busy === "refresh" ? "Refreshing..." : "Refresh"}
+            </button>
+            <Link href="/" target="_blank">
+              Website ↗
+            </Link>
+          </div>
+        </header>
 
-      <section className="admin-catalog-card">
-        <div className="admin-table-head">
-          <span>Produk</span>
-          <span>Harga Nambah</span>
-          <span>Digiflazz</span>
-          <span>Status</span>
-          <span />
-        </div>
+        {notice && (
+          <div className="acc-global-notice" role="status">
+            {notice}
+          </div>
+        )}
 
-        <div className="admin-product-list">
-          {filteredProducts.map((product) => {
-            const draft = drafts[product.id] ?? draftFromProduct(product);
-            const saving = busy === `save:${product.id}`;
-
-            return (
-              <article className="admin-product-row" key={product.id}>
-                <div className="admin-product-main">
-                  <small>{product.gameShortName} · {product.id}</small>
-                  <input
-                    className="admin-inline-name"
-                    value={draft.label}
-                    onChange={(event) => updateDraft(product.id, { label: event.target.value })}
-                  />
-                  <input
-                    className="admin-inline-note"
-                    placeholder="Catatan produk"
-                    value={draft.note}
-                    onChange={(event) => updateDraft(product.id, { note: event.target.value })}
-                  />
+        <div className="acc-content">
+          {section === "overview" && overview && (
+            <>
+              <section className="acc-hero">
+                <div>
+                  <span className="acc-eyebrow">Operations overview</span>
+                  <h1>Semua yang penting, satu layar.</h1>
+                  <p>
+                    Pantau order, supplier, receipt, pricing, dan kesiapan
+                    sistem tanpa membuka database satu per satu.
+                  </p>
                 </div>
-
-                <div className="admin-price-fields">
-                  <label><span>Jual</span><input type="number" min="1" value={draft.sellingPrice} onChange={(event) => updateDraft(product.id, { sellingPrice: event.target.value })} /></label>
-                  <label><span>Coret</span><input type="number" min="1" value={draft.referencePrice} onChange={(event) => updateDraft(product.id, { referencePrice: event.target.value })} /></label>
-                </div>
-
-                <div className="admin-supplier-fields">
-                  <label><span>SKU</span><input placeholder="SKU Digiflazz" value={draft.supplierSku} onChange={(event) => updateDraft(product.id, { supplierSku: event.target.value })} /></label>
-                  <div className="admin-cost-line">
-                    <span>Modal</span>
-                    <strong>{product.supplier.cost === null ? "-" : formatIDR(product.supplier.cost)}</strong>
-                  </div>
-                  <small>{product.supplier.lastSyncedAt ? `Sync ${formatTime(product.supplier.lastSyncedAt)}` : "Belum sync live"}</small>
-                </div>
-
-                <div className="admin-status-stack">
-                  <span className={`admin-status ${product.supplier.ready ? "ready" : product.supplier.mapped ? "warning" : "muted"}`}>
-                    {product.supplier.ready ? "Supplier ready" : product.supplier.mapped ? "Supplier inactive" : "Belum mapped"}
+                <div className="acc-balance">
+                  <small>Saldo Digiflazz tersedia</small>
+                  <strong>{formatIDR(overview.finance.availableBalance)}</strong>
+                  <span>
+                    Update {formatTime(overview.finance.balanceCheckedAt)}
                   </span>
-                  <label className="admin-toggle">
-                    <input type="checkbox" checked={draft.active} onChange={(event) => updateDraft(product.id, { active: event.target.checked })} />
-                    <span>{draft.active ? "Tampil" : "Disembunyikan"}</span>
-                  </label>
+                </div>
+              </section>
+
+              <section className="acc-metrics">
+                <article>
+                  <small>Order hari ini</small>
+                  <strong>{numberOrDash(overview.stats.ordersToday)}</strong>
+                  <span>{numberOrDash(overview.stats.successToday)} sukses</span>
+                </article>
+                <article>
+                  <small>GMV hari ini</small>
+                  <strong>{formatIDR(overview.finance.gmvToday)}</strong>
+                  <span>Order berstatus success</span>
+                </article>
+                <article>
+                  <small>Processing</small>
+                  <strong>{numberOrDash(overview.stats.processing)}</strong>
+                  <span>{numberOrDash(overview.stats.pendingPayment)} menunggu bayar</span>
+                </article>
+                <article>
+                  <small>Receipt gagal</small>
+                  <strong>{numberOrDash(overview.stats.receiptsFailed)}</strong>
+                  <span>{numberOrDash(overview.stats.receiptsSent)} terkirim</span>
+                </article>
+              </section>
+
+              <section className="acc-grid-two">
+                <div className="acc-panel">
+                  <SectionHead
+                    eyebrow="Recent activity"
+                    title="Order terbaru"
+                    copy="10 transaksi terakhir yang masuk ke sistem."
+                    action={
+                      <button
+                        className="acc-inline-button"
+                        type="button"
+                        onClick={() => setSection("orders")}
+                      >
+                        Lihat semua →
+                      </button>
+                    }
+                  />
+                  <div className="acc-order-list">
+                    {overview.recentOrders.map((order) => (
+                      <div className="acc-order-row" key={order.id}>
+                        <div>
+                          <small>{order.id}</small>
+                          <strong>{order.gameName}</strong>
+                          <span>{order.packageLabel}</span>
+                        </div>
+                        <b>{formatIDR(order.finalPrice)}</b>
+                        <span className={`acc-status ${order.status}`}>
+                          {STATUS_LABEL[order.status] ?? order.status}
+                        </span>
+                      </div>
+                    ))}
+                    {overview.recentOrders.length === 0 && (
+                      <div className="acc-empty">Belum ada order.</div>
+                    )}
+                  </div>
                 </div>
 
-                <button className="admin-save-button" type="button" disabled={Boolean(busy)} onClick={() => void saveProduct(product)}>
-                  {saving ? "Simpan..." : "Simpan"}
-                </button>
-              </article>
-            );
-          })}
-        </div>
+                <div className="acc-panel">
+                  <SectionHead
+                    eyebrow="System health"
+                    title="Integrasi"
+                    copy="Status konfigurasi service utama Nambah."
+                  />
+                  <div className="acc-service-list">
+                    {overview.system.services.map((service) => (
+                      <div className="acc-service-row" key={service.id}>
+                        <span className={`acc-health ${service.state}`} />
+                        <div>
+                          <strong>{service.name}</strong>
+                          <small>{service.detail}</small>
+                        </div>
+                        <b>{service.state}</b>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
 
-        {filteredProducts.length === 0 && <div className="admin-empty">Tidak ada produk yang cocok dengan filter.</div>}
+              <section className="acc-panel">
+                <SectionHead
+                  eyebrow="Roadmap"
+                  title="Modul Nambah"
+                  copy="Fitur aktif dan pekerjaan yang sudah ada dalam roadmap production-ready."
+                />
+                <div className="acc-roadmap-grid">
+                  <RoadmapCard
+                    title="Payment verification"
+                    status="live"
+                    copy="Midtrans webhook/status API, gross amount validation, dan anti-downgrade status."
+                  />
+                  <RoadmapCard
+                    title="Fulfillment orchestration"
+                    status="live"
+                    copy="Simulate + Digiflazz testing dengan request_ref idempotent. Live tetap safety-locked."
+                  />
+                  <RoadmapCard
+                    title="Email receipt"
+                    status="live"
+                    copy="Brevo transactional receipt dengan delivery log dan retry."
+                  />
+                  <RoadmapCard
+                    title="Promo engine"
+                    status="foundation"
+                    copy="Pricing dan database promo aktif; management UI lengkap masih berikutnya."
+                  />
+                  <RoadmapCard
+                    title="Affiliate lifecycle"
+                    status="foundation"
+                    copy="Referral pricing dan tabel commission tersedia; lifecycle pending/available/withdraw masih perlu otomasi."
+                  />
+                  <RoadmapCard
+                    title="Digiflazz callback"
+                    status="planned"
+                    copy="Apply callback supplier ke supplier_transactions dan order secara idempotent."
+                  />
+                  <RoadmapCard
+                    title="Reconciliation & retry"
+                    status="planned"
+                    copy="Cron untuk order processing, supplier pending, dan receipt yang perlu ditinjau."
+                  />
+                  <RoadmapCard
+                    title="Universal account checker"
+                    status="planned"
+                    copy="Router checker per-game berbasis Volsever dengan fallback yang aman."
+                  />
+                  <RoadmapCard
+                    title="Production hardening"
+                    status="planned"
+                    copy="Health endpoint, rate limit, alert, audit log, dan explicit live guards."
+                  />
+                </div>
+              </section>
+            </>
+          )}
+
+          {section === "orders" && (
+            <>
+              <SectionHead
+                eyebrow="Transactions"
+                title="Orders"
+                copy="100 order terbaru. Gunakan filter untuk audit status atau mencari transaksi."
+              />
+              <div className="acc-filterbar">
+                <input
+                  type="search"
+                  placeholder="Cari order, game, user ID..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+                <select
+                  value={orderStatusFilter}
+                  onChange={(event) => setOrderStatusFilter(event.target.value)}
+                >
+                  <option value="all">Semua status</option>
+                  {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="acc-table-card">
+                <div className="acc-orders-head">
+                  <span>Order</span>
+                  <span>Akun</span>
+                  <span>Pembayaran</span>
+                  <span>Total</span>
+                  <span>Status</span>
+                </div>
+                {filteredOrders.map((order) => (
+                  <div className="acc-orders-row" key={order.id}>
+                    <div>
+                      <small>{order.id}</small>
+                      <strong>{order.gameName}</strong>
+                      <span>{order.packageLabel}</span>
+                    </div>
+                    <div>
+                      <strong>{order.targetUserId}</strong>
+                      <span>
+                        {order.targetServerId
+                          ? `Zone ${order.targetServerId}`
+                          : "Tanpa server"}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>{order.paymentName ?? "-"}</strong>
+                      <span>{formatTime(order.createdAt)}</span>
+                    </div>
+                    <strong>{formatIDR(order.finalPrice)}</strong>
+                    <span className={`acc-status ${order.status}`}>
+                      {STATUS_LABEL[order.status] ?? order.status}
+                    </span>
+                  </div>
+                ))}
+                {filteredOrders.length === 0 && (
+                  <div className="acc-empty">Tidak ada order yang cocok.</div>
+                )}
+              </div>
+            </>
+          )}
+
+          {section === "catalog" && catalog && (
+            <>
+              <SectionHead
+                eyebrow="Catalog"
+                title="Produk & pricing"
+                copy="Edit label, harga, status, dan mapping SKU tanpa mengubah source supplier."
+              />
+              <div className="acc-filterbar acc-filterbar-three">
+                <input
+                  type="search"
+                  placeholder="Cari produk, ID, SKU..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+                <select
+                  value={gameFilter}
+                  onChange={(event) => setGameFilter(event.target.value)}
+                >
+                  <option value="all">Semua game</option>
+                  {catalog.games.map((game) => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={mappingFilter}
+                  onChange={(event) => setMappingFilter(event.target.value)}
+                >
+                  <option value="all">Semua mapping</option>
+                  <option value="ready">Ready</option>
+                  <option value="mapped">Mapped</option>
+                  <option value="unmapped">Unmapped</option>
+                </select>
+              </div>
+
+              <div className="admin-catalog-card acc-catalog-card">
+                <div className="admin-table-head">
+                  <span>Produk</span>
+                  <span>Harga Nambah</span>
+                  <span>Digiflazz</span>
+                  <span>Status</span>
+                  <span />
+                </div>
+                <div className="admin-product-list">
+                  {filteredProducts.map((product) => {
+                    const draft =
+                      drafts[product.id] ?? draftFromProduct(product);
+                    const saving = busy === `save:${product.id}`;
+
+                    return (
+                      <article className="admin-product-row" key={product.id}>
+                        <div className="admin-product-main">
+                          <small>
+                            {product.gameShortName} · {product.id}
+                          </small>
+                          <input
+                            className="admin-inline-name"
+                            value={draft.label}
+                            onChange={(event) =>
+                              updateDraft(product.id, {
+                                label: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="admin-inline-note"
+                            value={draft.note}
+                            placeholder="Catatan produk"
+                            onChange={(event) =>
+                              updateDraft(product.id, {
+                                note: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="admin-price-fields">
+                          <label>
+                            <span>Harga jual</span>
+                            <input
+                              type="number"
+                              value={draft.sellingPrice}
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  sellingPrice: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Harga coret</span>
+                            <input
+                              type="number"
+                              value={draft.referencePrice}
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  referencePrice: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        <div className="admin-supplier-fields">
+                          <label>
+                            <span>SKU supplier</span>
+                            <input
+                              value={draft.supplierSku}
+                              placeholder="Belum mapped"
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  supplierSku: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <div className="admin-cost-line">
+                            <span>Modal</span>
+                            <strong>
+                              {product.supplier.cost === null
+                                ? "-"
+                                : formatIDR(product.supplier.cost)}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className="admin-status-stack">
+                          <span
+                            className={`admin-status ${
+                              product.supplier.ready
+                                ? "ready"
+                                : product.supplier.mapped
+                                  ? "warning"
+                                  : "muted"
+                            }`}
+                          >
+                            {product.supplier.ready
+                              ? "Supplier ready"
+                              : product.supplier.mapped
+                                ? "Mapped / unavailable"
+                                : "Unmapped"}
+                          </span>
+                          <label className="admin-toggle">
+                            <input
+                              type="checkbox"
+                              checked={draft.active}
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  active: event.target.checked,
+                                })
+                              }
+                            />
+                            Aktif
+                          </label>
+                        </div>
+
+                        <button
+                          className="admin-save-button"
+                          type="button"
+                          disabled={Boolean(busy)}
+                          onClick={() => void saveProduct(product)}
+                        >
+                          {saving ? "Saving..." : "Simpan"}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {section === "supplier" && catalog && (
+            <>
+              <SectionHead
+                eyebrow="Supplier"
+                title="Digiflazz operations"
+                copy="Saldo, sync price list, mapping, dan automation supplier."
+                action={
+                  <Link className="acc-primary-link" href="/admin/digiflazz">
+                    Buka supplier catalog →
+                  </Link>
+                }
+              />
+
+              <div className="acc-metrics acc-metrics-three">
+                <article>
+                  <small>Saldo tersedia</small>
+                  <strong>{formatIDR(catalog.balance.availableBalance)}</strong>
+                  <span>{formatTime(catalog.balance.checkedAt)}</span>
+                </article>
+                <article>
+                  <small>Ready supplier</small>
+                  <strong>{catalog.stats.ready}</strong>
+                  <span>{catalog.stats.mapped} mapped</span>
+                </article>
+                <article>
+                  <small>Perlu mapping</small>
+                  <strong>{catalog.stats.unmapped}</strong>
+                  <span>Dari {catalog.stats.total} produk</span>
+                </article>
+              </div>
+
+              <div className="acc-action-panel">
+                <button
+                  type="button"
+                  onClick={() => void checkBalance()}
+                  disabled={Boolean(busy)}
+                >
+                  Cek saldo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void syncPrices()}
+                  disabled={Boolean(busy)}
+                >
+                  Sync harga supplier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runBootstrap(false)}
+                  disabled={Boolean(busy)}
+                >
+                  Scan mapping
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runBootstrap(true)}
+                  disabled={Boolean(busy)}
+                >
+                  Auto-map aman
+                </button>
+              </div>
+
+              <AdminCatalogTools />
+            </>
+          )}
+
+          {section === "receipts" && (
+            <>
+              <SectionHead
+                eyebrow="Delivery"
+                title="Receipt email"
+                copy="Log Brevo untuk melihat receipt terkirim, retry, dan error provider."
+              />
+              <div className="acc-table-card">
+                <div className="acc-receipts-head">
+                  <span>Order</span>
+                  <span>Recipient</span>
+                  <span>Provider</span>
+                  <span>Attempt</span>
+                  <span>Status</span>
+                </div>
+                {receipts.map((receipt) => (
+                  <div className="acc-receipts-row" key={receipt.id}>
+                    <div>
+                      <strong>{receipt.orderId}</strong>
+                      <span>{formatTime(receipt.createdAt)}</span>
+                    </div>
+                    <span>{receipt.recipient}</span>
+                    <div>
+                      <strong>{receipt.provider}</strong>
+                      <span>
+                        {receipt.providerMessageId
+                          ? receipt.providerMessageId
+                          : "Belum ada message ID"}
+                      </span>
+                    </div>
+                    <strong>{receipt.attempts}</strong>
+                    <div>
+                      <span className={`acc-status receipt-${receipt.status}`}>
+                        {receipt.status}
+                      </span>
+                      {receipt.lastError && (
+                        <small className="acc-error-text">
+                          {receipt.lastError}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {receipts.length === 0 && (
+                  <div className="acc-empty">Belum ada log receipt.</div>
+                )}
+              </div>
+            </>
+          )}
+
+          {section === "promotions" && overview && (
+            <>
+              <SectionHead
+                eyebrow="Growth"
+                title="Promotions"
+                copy="Engine promo sudah dipakai pricing. Management UI berikutnya akan mengelola campaign tanpa SQL."
+              />
+              <div className="acc-module-summary">
+                <article>
+                  <small>Active promotions</small>
+                  <strong>
+                    {numberOrDash(overview.stats.activePromotions)}
+                  </strong>
+                  <span>Database + pricing engine aktif</span>
+                </article>
+                <article className="planned">
+                  <small>Next controls</small>
+                  <strong>Create / schedule</strong>
+                  <span>Quota, per-user limit, product targeting, audit log</span>
+                </article>
+              </div>
+              <div className="acc-planned-list">
+                <span>Campaign create/edit</span>
+                <span>Product-specific promo</span>
+                <span>Start/end scheduling</span>
+                <span>Quota & quota per user</span>
+                <span>Promo usage analytics</span>
+              </div>
+            </>
+          )}
+
+          {section === "affiliates" && overview && (
+            <>
+              <SectionHead
+                eyebrow="Partners"
+                title="Affiliate"
+                copy="Referral benefit sudah masuk pricing. Modul berikutnya menyelesaikan commission lifecycle dan withdrawal."
+              />
+              <div className="acc-module-summary">
+                <article>
+                  <small>Active affiliates</small>
+                  <strong>
+                    {numberOrDash(overview.stats.activeAffiliates)}
+                  </strong>
+                  <span>Referral pricing aktif</span>
+                </article>
+                <article className="planned">
+                  <small>Commission rule</small>
+                  <strong>20% net profit</strong>
+                  <span>pending → available → withdrawn / cancelled</span>
+                </article>
+              </div>
+              <div className="acc-planned-list">
+                <span>Affiliate CRUD</span>
+                <span>Commission ledger</span>
+                <span>Withdrawal approval</span>
+                <span>Refund/failure cancellation</span>
+                <span>Partner performance analytics</span>
+              </div>
+            </>
+          )}
+
+          {section === "users" && (
+            <>
+              <SectionHead
+                eyebrow="Accounts"
+                title="Users & access"
+                copy="Customer account dan RBAC admin sudah live. Management user tetap dipisahkan dari password/auth provider."
+              />
+              <div className="acc-roadmap-grid">
+                <RoadmapCard
+                  title="Customer account"
+                  status="live"
+                  copy="Register, login, logout, session refresh, order history, dan order ownership."
+                />
+                <RoadmapCard
+                  title="Admin RBAC"
+                  status="live"
+                  copy="admin_users dengan role admin/superadmin dan server-side authorization."
+                />
+                <RoadmapCard
+                  title="Customer profile"
+                  status="planned"
+                  copy="Nama, WhatsApp terverifikasi, preferensi receipt, dan data profil non-auth."
+                />
+                <RoadmapCard
+                  title="User management"
+                  status="planned"
+                  copy="Search user, disable access, inspect order history, dan audit action admin."
+                />
+              </div>
+            </>
+          )}
+
+          {section === "system" && overview && (
+            <>
+              <SectionHead
+                eyebrow="Operations"
+                title="System & production readiness"
+                copy="Konfigurasi service sekarang dan backlog yang harus selesai sebelum live money."
+              />
+
+              <div className="acc-service-grid">
+                {overview.system.services.map((service) => (
+                  <article key={service.id}>
+                    <span className={`acc-health ${service.state}`} />
+                    <div>
+                      <strong>{service.name}</strong>
+                      <p>{service.detail}</p>
+                    </div>
+                    <b>{service.state}</b>
+                  </article>
+                ))}
+              </div>
+
+              <div className="acc-system-note">
+                <div>
+                  <small>Fulfillment mode</small>
+                  <strong>{overview.system.fulfillmentMode}</strong>
+                </div>
+                <div>
+                  <small>Flow test</small>
+                  <strong>
+                    {overview.system.flowTest ? "Enabled" : "Disabled"}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="acc-roadmap-grid">
+                <RoadmapCard
+                  title="Digiflazz webhook apply"
+                  status="planned"
+                  copy="Update supplier transaction dan order dari callback supplier tanpa downgrade terminal status."
+                />
+                <RoadmapCard
+                  title="Reconciliation cron"
+                  status="planned"
+                  copy="Pulihkan order processing/pending dan review receipt sending yang stale."
+                />
+                <RoadmapCard
+                  title="Commission lifecycle"
+                  status="planned"
+                  copy="Create pending saat paid, available saat success, cancel saat refund/failure."
+                />
+                <RoadmapCard
+                  title="Rate limit & abuse guard"
+                  status="planned"
+                  copy="Checkout, checker, auth, dan admin endpoint diberi limit serta observability."
+                />
+                <RoadmapCard
+                  title="Health & alerts"
+                  status="planned"
+                  copy="Service health, low balance, provider failures, dan operational alerts."
+                />
+                <RoadmapCard
+                  title="Live safety gate"
+                  status="planned"
+                  copy="Customer number formatter per game, explicit opt-in, dan production checklist sebelum spend saldo."
+                />
+              </div>
+            </>
+          )}
+        </div>
       </section>
     </main>
   );
