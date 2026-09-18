@@ -237,6 +237,20 @@ create table if not exists public.supplier_transactions (
 create index if not exists supplier_transactions_order_idx
   on public.supplier_transactions(order_id, created_at desc);
 
+create table if not exists public.supplier_webhook_events (
+  id bigint generated always as identity primary key,
+  supplier_id text not null references public.suppliers(id) on delete cascade,
+  event_type text not null,
+  request_ref text,
+  status text,
+  user_agent text,
+  payload jsonb not null,
+  received_at timestamptz not null default now()
+);
+
+create index if not exists supplier_webhook_events_lookup_idx
+  on public.supplier_webhook_events(supplier_id, request_ref, received_at desc);
+
 create table if not exists public.receipt_deliveries (
   id bigint generated always as identity primary key,
   order_id text not null references public.orders(id) on delete cascade,
@@ -309,6 +323,7 @@ alter table public.supplier_balance_snapshots enable row level security;
 alter table public.orders enable row level security;
 alter table public.payments enable row level security;
 alter table public.supplier_transactions enable row level security;
+alter table public.supplier_webhook_events enable row level security;
 alter table public.receipt_deliveries enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
@@ -331,6 +346,7 @@ revoke all on table public.supplier_balance_snapshots from anon, authenticated;
 revoke all on table public.orders from anon, authenticated;
 revoke all on table public.payments from anon, authenticated;
 revoke all on table public.supplier_transactions from anon, authenticated;
+revoke all on table public.supplier_webhook_events from anon, authenticated;
 revoke all on table public.receipt_deliveries from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;

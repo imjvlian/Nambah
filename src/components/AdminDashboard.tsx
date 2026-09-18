@@ -913,8 +913,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Digiflazz callback"
-                    status="planned"
-                    copy="Apply callback supplier ke supplier_transactions dan order secara idempotent."
+                    status="live"
+                    copy="Callback Pending/Sukses/Gagal diterapkan ke supplier transaction dan order secara idempotent."
                   />
                   <RoadmapCard
                     title="Reconciliation & retry"
@@ -1422,8 +1422,8 @@ export default function AdminDashboard() {
               <div className="acc-roadmap-grid">
                 <RoadmapCard
                   title="Digiflazz webhook apply"
-                  status="planned"
-                  copy="Update supplier transaction dan order dari callback supplier tanpa downgrade terminal status."
+                  status="live"
+                  copy="Update supplier transaction dan order dari callback supplier dengan terminal-status guard dan receipt trigger."
                 />
                 <RoadmapCard
                   title="Reconciliation cron"
