@@ -246,6 +246,7 @@ export async function runDigiflazzPrepaidTransaction(input: {
   maxPrice?: number;
   testing?: boolean;
   useCallback?: boolean;
+  allowDot?: boolean;
 }) {
   const { username, apiKey, callbackUrl } = requireApiConfig();
   const maxPrice = Number(input.maxPrice);
@@ -259,6 +260,7 @@ export async function runDigiflazzPrepaidTransaction(input: {
     ...(Number.isFinite(maxPrice) && maxPrice > 0 ? { max_price: Math.round(maxPrice) } : {}),
     ...(typeof input.testing === "boolean" ? { testing: input.testing } : {}),
     ...(input.useCallback && callbackUrl ? { cb_url: callbackUrl } : {}),
+    ...(input.allowDot ? { allow_dot: true } : {}),
   });
 
   if (!response.data) {

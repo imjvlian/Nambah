@@ -12,6 +12,7 @@ type AdminSection =
   | "supplier"
   | "receipts"
   | "points"
+  | "finance"
   | "promotions"
   | "affiliates"
   | "users"
@@ -255,6 +256,29 @@ type AdminUsersPayload = {
   }>;
 };
 
+type FinancePayload = {
+  stats: {
+    checked: number;
+    ok: number;
+    warning: number;
+    error: number;
+  };
+  rows: Array<{
+    orderId: string;
+    result: "ok" | "warning" | "error";
+    issues: Array<{
+      code: string;
+      severity: "warning" | "error";
+      message: string;
+      expected?: number | string;
+      actual?: number | string;
+    }>;
+    expected: Record<string, unknown>;
+    actual: Record<string, unknown>;
+    checkedAt: string;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -274,6 +298,7 @@ const NAV: Array<{
   { id: "supplier", label: "Supplier", short: "SU" },
   { id: "receipts", label: "Receipts", short: "RE" },
   { id: "points", label: "Nambah Points", short: "NP" },
+  { id: "finance", label: "Finance", short: "FI" },
   { id: "promotions", label: "Promotions", short: "PR" },
   { id: "affiliates", label: "Affiliates", short: "AF" },
   { id: "users", label: "Users", short: "US" },
@@ -380,6 +405,7 @@ export default function AdminDashboard() {
   const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
+  const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
   const [promoDraft, setPromoDraft] = useState({
     code: "",
     name: "",
@@ -596,6 +622,53 @@ export default function AdminDashboard() {
     setUsersData(data);
   }
 
+  async function loadFinance() {
+    const response = await fetch("/api/admin/finance", { cache: "no-store" });
+    const data = (await response.json()) as FinancePayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Financial reconciliation gagal dimuat.");
+    }
+    setFinanceData(data);
+  }
+
+  async function runFinanceReconciliation() {
+    setBusy("finance-reconcile");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/finance", { method: "POST" });
+      const data = (await response.json()) as {
+        checked?: number;
+        ok?: number;
+        warning?: number;
+        error?: number;
+        rows?: FinancePayload["rows"];
+        errorMessage?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Financial reconciliation gagal.");
+      }
+      await loadFinance();
+      setNotice(
+        "Finance check selesai: " +
+          (data.checked ?? 0) +
+          " order · " +
+          (data.error ?? 0) +
+          " error · " +
+          (data.warning ?? 0) +
+          " warning.",
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Financial reconciliation gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function runReconciliation() {
     setBusy("reconciliation");
     setNotice("");
@@ -654,6 +727,7 @@ export default function AdminDashboard() {
       if (section === "affiliates") await loadAffiliates();
       if (section === "promotions") await loadPromotions();
       if (section === "users") await loadUsers();
+      if (section === "finance") await loadFinance();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -765,7 +839,16 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData]);
+    if (section === "finance" && !financeData) {
+      void loadFinance().catch((error) =>
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Financial reconciliation gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData]);
 
   async function logout() {
     setBusy("logout");
@@ -1808,6 +1891,85 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {section === "finance" && (
+            <>
+              <SectionHead
+                eyebrow="Finance"
+                title="Financial reconciliation"
+                copy="Bandingkan frozen pricing, Midtrans, supplier cost, Points liability, dan affiliate ledger tanpa mengubah uang secara otomatis."
+                action={
+                  <button
+                    className="acc-primary-link"
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void runFinanceReconciliation()}
+                  >
+                    {busy === "finance-reconcile"
+                      ? "Checking..."
+                      : "Run reconciliation"}
+                  </button>
+                }
+              />
+
+              <div className="acc-metrics">
+                <article>
+                  <small>Checked</small>
+                  <strong>{financeData?.stats.checked ?? 0}</strong>
+                  <span>Snapshot terbaru</span>
+                </article>
+                <article>
+                  <small>OK</small>
+                  <strong>{financeData?.stats.ok ?? 0}</strong>
+                  <span>Financial invariant cocok</span>
+                </article>
+                <article>
+                  <small>Warning</small>
+                  <strong>{financeData?.stats.warning ?? 0}</strong>
+                  <span>Perlu ditinjau</span>
+                </article>
+                <article>
+                  <small>Error</small>
+                  <strong>{financeData?.stats.error ?? 0}</strong>
+                  <span>Mismatch penting</span>
+                </article>
+              </div>
+
+              <div className="acc-table-card">
+                <div className="acc-finance-head">
+                  <span>Order</span>
+                  <span>Checked</span>
+                  <span>Issues</span>
+                  <span>Result</span>
+                </div>
+                {(financeData?.rows ?? []).map((row) => (
+                  <div className="acc-finance-row" key={row.orderId}>
+                    <strong>{row.orderId}</strong>
+                    <span>{formatTime(row.checkedAt)}</span>
+                    <div>
+                      {row.issues.length === 0 ? (
+                        <span>No mismatch</span>
+                      ) : (
+                        row.issues.slice(0, 3).map((issue) => (
+                          <small key={issue.code}>
+                            {issue.code}: {issue.message}
+                          </small>
+                        ))
+                      )}
+                    </div>
+                    <span className={"acc-status finance-" + row.result}>
+                      {row.result}
+                    </span>
+                  </div>
+                ))}
+                {financeData && financeData.rows.length === 0 && (
+                  <div className="acc-empty">
+                    Belum ada financial reconciliation snapshot.
+                  </div>
+                )}
               </div>
             </>
           )}

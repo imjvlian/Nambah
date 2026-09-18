@@ -309,6 +309,19 @@ create index if not exists point_ledger_order_idx
   on public.point_ledger(order_id, created_at desc)
   where order_id is not null;
 
+create table if not exists public.financial_reconciliations (
+  order_id text primary key references public.orders(id) on delete cascade,
+  result text not null check (result in ('ok','warning','error')),
+  issues jsonb not null default '[]'::jsonb,
+  expected jsonb not null default '{}'::jsonb,
+  actual jsonb not null default '{}'::jsonb,
+  checked_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists financial_reconciliations_result_idx
+  on public.financial_reconciliations(result, checked_at desc);
+
 create table if not exists public.commissions (
   id bigint generated always as identity primary key,
   affiliate_code text not null references public.affiliates(code),
@@ -365,6 +378,7 @@ alter table public.supplier_webhook_events enable row level security;
 alter table public.receipt_deliveries enable row level security;
 alter table public.loyalty_accounts enable row level security;
 alter table public.point_ledger enable row level security;
+alter table public.financial_reconciliations enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
 
@@ -390,6 +404,7 @@ revoke all on table public.supplier_webhook_events from anon, authenticated;
 revoke all on table public.receipt_deliveries from anon, authenticated;
 revoke all on table public.loyalty_accounts from anon, authenticated;
 revoke all on table public.point_ledger from anon, authenticated;
+revoke all on table public.financial_reconciliations from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;
 
