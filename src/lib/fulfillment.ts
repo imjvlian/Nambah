@@ -485,7 +485,9 @@ async function runDigiflazzTest(
       outcome,
       refId: requestRef,
     });
-    const status = normalizeDigiflazzStatus(result.status);
+    const normalizedStatus = normalizeDigiflazzStatus(result.status);
+    const status =
+      normalizedStatus === "unknown" ? "pending" : normalizedStatus;
     const now = new Date().toISOString();
 
     await supabaseUpdate(
@@ -545,7 +547,9 @@ async function runDigiflazzLive(
       useCallback: true,
       allowDot: config.allowDot,
     });
-    const status = normalizeDigiflazzStatus(result.status);
+    const normalizedStatus = normalizeDigiflazzStatus(result.status);
+    const status =
+      normalizedStatus === "unknown" ? "pending" : normalizedStatus;
     const now = new Date().toISOString();
 
     await supabaseUpdate(

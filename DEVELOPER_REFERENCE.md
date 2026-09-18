@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.3 — Fulfillment Reliability  
+Baseline: Nambah 0.5.4 — Financial & Loyalty Hardening  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1538,3 +1538,31 @@ initial dispatch
 This prevents a pending staging transaction from changing meaning after an ENV change or another admin Test Lab scenario.
 
 Fallback to `NAMBAH_DIGIFLAZZ_TEST_OUTCOME` is used only when the order has no valid frozen test scenario.
+
+
+---
+
+## 45. Points FIFO Lots & Expiry (0.5.4)
+
+Points earnings are now represented as FIFO lots in `point_lots`. Redemptions reserve specific lots through `point_redemption_allocations`.
+
+This fixes the ambiguity of expiring aggregate balances:
+
+~~~text
+earn → point lot with 12-month expiry
+reserve → FIFO allocation without reducing lot balance
+payment verified → allocation committed + lot reduced
+failed/refunded → reservation/committed allocation restored
+expiry → only unreserved remaining points expire
+~~~
+
+Legacy pre-0.5.4 balances are lazily converted to a non-expiring legacy lot on first redemption so an upgrade cannot accidentally delete historical Points.
+
+Expiry can be run from:
+
+~~~text
+POST /api/admin/points/expire
+GET  /api/cron/points-expiry
+~~~
+
+Both use the atomic `nambah_points_expire` RPC. Cron authorization continues to use `CRON_SECRET`; no new ENV is required.

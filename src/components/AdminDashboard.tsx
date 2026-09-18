@@ -518,6 +518,34 @@ export default function AdminDashboard() {
     setPointsData(data);
   }
 
+  async function runPointsExpiry() {
+    setBusy("points-expiry");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/points/expire", {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        lotsProcessed?: number;
+        pointsExpired?: number;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Expiry Nambah Points gagal.");
+      }
+      await loadPoints();
+      setNotice(
+        `Points expiry selesai: ${data.pointsExpired ?? 0} pts expired dari ${data.lotsProcessed ?? 0} lot.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Expiry Nambah Points gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function loadAffiliates() {
     const response = await fetch("/api/admin/affiliates", { cache: "no-store" });
     const data = (await response.json()) as AffiliatePayload & { error?: string };
@@ -1843,7 +1871,17 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Loyalty"
                 title="Nambah Points"
-                copy="Outstanding liability, reservation, account balance, dan immutable ledger points."
+                copy="Outstanding liability, reservation, FIFO lots, expiry, dan immutable ledger points."
+                action={
+                  <button
+                    className="acc-primary-link"
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void runPointsExpiry()}
+                  >
+                    {busy === "points-expiry" ? "Expiring..." : "Run expiry"}
+                  </button>
+                }
               />
 
               <div className="acc-metrics">
