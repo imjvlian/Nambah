@@ -102,6 +102,8 @@ export async function GET(request: Request) {
       receiptsFailed,
       activePromotions,
       activeAffiliates,
+      supplierPending,
+      receiptSending,
     ] = await Promise.all([
       supabaseSelect<OrderRow>("orders", {
         select:
@@ -140,6 +142,14 @@ export async function GET(request: Request) {
       }),
       safeCount("promotions", "code", { active: "eq.true" }),
       safeCount("affiliates", "code", { status: "eq.active" }),
+      safeCount("supplier_transactions", "id", {
+        supplier_id: "eq.digiflazz",
+        status: "eq.pending",
+      }),
+      safeCount("receipt_deliveries", "id", {
+        channel: "eq.email",
+        status: "eq.sending",
+      }),
     ]);
 
     const balance = balanceRows[0];
@@ -164,6 +174,8 @@ export async function GET(request: Request) {
         receiptsFailed,
         activePromotions,
         activeAffiliates,
+        supplierPending,
+        receiptSending,
       },
       finance: {
         gmvToday: successfulToday.reduce(
@@ -234,6 +246,15 @@ export async function GET(request: Request) {
             configured("VOLSEVER_API_KEY")
               ? "Account checker tersedia."
               : "VOLSEVER_API_KEY belum terpasang.",
+          ),
+          service(
+            "reconciliation",
+            "Reconciliation",
+            configured("CRON_SECRET"),
+            configured("CRON_SECRET")
+              ? "Recovery endpoint siap untuk scheduler dan manual admin."
+              : "Manual admin tersedia; CRON_SECRET belum dikonfigurasi untuk scheduler.",
+            configured("CRON_SECRET") ? "live" : "attention",
           ),
           service(
             "telegram",

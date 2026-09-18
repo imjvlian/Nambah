@@ -86,6 +86,8 @@ type OverviewPayload = {
     receiptsFailed: number | null;
     activePromotions: number | null;
     activeAffiliates: number | null;
+    supplierPending: number | null;
+    receiptSending: number | null;
   };
   finance: {
     gmvToday: number;
@@ -323,6 +325,52 @@ export default function AdminDashboard() {
     };
     if (!response.ok) throw new Error(data.error ?? "Receipt gagal dimuat.");
     setReceipts(data.receipts ?? []);
+  }
+
+  async function runReconciliation() {
+    setBusy("reconciliation");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/reconciliation", {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        orders?: {
+          checked: number;
+          recovered: number;
+          pending: number;
+          failed: number;
+        };
+        supplier?: {
+          checked: number;
+          applied: number;
+          stillPending: number;
+          skipped: number;
+          failed: number;
+        };
+        receipts?: {
+          retried: number;
+          sent: number;
+          stillFailed: number;
+          staleSending: number;
+        };
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Reconciliation gagal.");
+      }
+
+      await Promise.all([loadOverview(), loadOrders(), loadReceipts()]);
+      setNotice(
+        `Reconciliation selesai: ${data.orders?.recovered ?? 0} order pulih, ${data.supplier?.applied ?? 0} status supplier diterapkan, ${data.receipts?.sent ?? 0} receipt terkirim ulang, ${data.receipts?.staleSending ?? 0} receipt sending perlu review.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Reconciliation gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
   async function refreshCurrent() {
@@ -918,8 +966,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Reconciliation & retry"
-                    status="planned"
-                    copy="Cron untuk order processing, supplier pending, dan receipt yang perlu ditinjau."
+                    status="live"
+                    copy="Recovery paid/processing, polling Digiflazz test pending, retry receipt failed, dan stale sending detection."
                   />
                   <RoadmapCard
                     title="Universal account checker"
@@ -1419,6 +1467,24 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              <div className="acc-action-panel">
+                <button
+                  type="button"
+                  onClick={() => void runReconciliation()}
+                  disabled={Boolean(busy)}
+                >
+                  {busy === "reconciliation"
+                    ? "Reconciling..."
+                    : "Run reconciliation"}
+                </button>
+                <span className="acc-status processing">
+                  {numberOrDash(overview.stats.supplierPending)} supplier pending
+                </span>
+                <span className="acc-status receipt-sending">
+                  {numberOrDash(overview.stats.receiptSending)} receipt sending
+                </span>
+              </div>
+
               <div className="acc-roadmap-grid">
                 <RoadmapCard
                   title="Digiflazz webhook apply"
@@ -1427,8 +1493,8 @@ export default function AdminDashboard() {
                 />
                 <RoadmapCard
                   title="Reconciliation cron"
-                  status="planned"
-                  copy="Pulihkan order processing/pending dan review receipt sending yang stale."
+                  status="live"
+                  copy="Endpoint cron + manual admin memulihkan order tertunda, supplier pending test, dan receipt failed secara idempotent."
                 />
                 <RoadmapCard
                   title="Commission lifecycle"
