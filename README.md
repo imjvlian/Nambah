@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.0 — Production Candidate**
+**0.5.1 — Staging Test Lab**
 
 Core flow tersedia:
 
@@ -14,7 +14,7 @@ catalog → account validation → pricing → promo/referral/points
 → webhook/reconciliation → receipt → affiliate/finance/admin
 ```
 
-Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
+Staging Test Lab tersedia di `/admin/test-lab` untuk memilih scenario Digiflazz `testing:true` tanpa mengubah ENV/redeploy. Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
 
 Deployment staging saat ini:
 
@@ -27,6 +27,8 @@ https://nambah.vercel.app
 ```bash
 npm ci
 npm run dev
+npm run test
+npm run build
 ```
 
 ## Database
@@ -43,6 +45,7 @@ Migration fitur terbaru:
 016 Live fulfillment targets
 017 Financial reconciliation
 018 Production hardening
+019 Staging Test Lab + operational indexes
 ```
 
 Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).

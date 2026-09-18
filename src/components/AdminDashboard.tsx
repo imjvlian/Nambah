@@ -2250,6 +2250,9 @@ export default function AdminDashboard() {
               </div>
 
               <div className="acc-action-panel">
+                <Link className="acc-inline-button" href="/admin/test-lab">
+                  Open Staging Test Lab →
+                </Link>
                 <button
                   type="button"
                   onClick={() => void runReconciliation()}

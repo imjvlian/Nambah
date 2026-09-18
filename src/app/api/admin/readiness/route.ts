@@ -58,6 +58,7 @@ export async function GET(request: Request) {
     financeMigration,
     rateLimitMigration,
     auditMigration,
+    testLabMigration,
   ] = await Promise.all([
     tableExists("loyalty_accounts"),
     tableExists("commissions"),
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
     tableExists("financial_reconciliations"),
     tableExists("rate_limit_buckets"),
     tableExists("admin_audit_logs"),
+    tableExists("staging_test_lab"),
   ]);
 
   const liveEnabled =
@@ -142,6 +144,7 @@ export async function GET(request: Request) {
       ["migration-finance", "Migration 017 Finance", financeMigration],
       ["migration-rate-limit", "Migration 018 Rate limit", rateLimitMigration],
       ["migration-audit", "Migration 018 Audit", auditMigration],
+      ["migration-test-lab", "Migration 019 Staging Test Lab", testLabMigration],
     ].map(([id, label, ok]) => ({
       id: String(id),
       label: String(label),
@@ -274,7 +277,7 @@ export async function GET(request: Request) {
   ).length;
 
   return Response.json({
-    version: "0.5.0",
+    version: "0.5.1",
     stage: "production-candidate",
     readyForStagingE2E: stagingBlockers === 0,
     automatedProductionReady: productionBlockers === 0,

@@ -1,12 +1,14 @@
 {
   "name": "nambah",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "assets:sync": "node scripts/sync-codashop-product-assets.mjs"
+    "assets:sync": "node scripts/sync-codashop-product-assets.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
     "next": "16.3.3",

@@ -1,9 +1,9 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.0 — Production Candidate  
+Baseline: Nambah 0.5.1 — Staging Test Lab  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
-Baseline commit reviewed: 80b08d9c3248a485636b980c44d55d4b24020b9d  
+Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
 Last reviewed: 2026-09-18
 
 Dokumen ini adalah referensi developer utama untuk memahami, mengubah, dan menambah fitur Nambah tanpa merusak alur pembayaran, fulfillment, loyalty, atau keamanan.
@@ -1443,3 +1443,56 @@ Update DEVELOPER_REFERENCE.md in the same change whenever any of these occur:
 - new release/deployment rule.
 
 The goal is not to document every line of code. The goal is to keep the system boundaries, ownership, invariants, and safe extension paths accurate enough that future feature work starts from the correct architecture.
+
+
+---
+
+## 42. Staging Test Lab (0.5.1)
+
+Admin route: `/admin/test-lab`  
+API: `GET/PATCH /api/admin/test-lab`  
+Service: `src/lib/test-lab.ts`  
+Policy helpers: `src/lib/test-lab-policy.ts`
+
+The Test Lab stores Digiflazz testing scenarios in `staging_test_lab` and consumes them atomically through `nambah_test_lab_consume`.
+
+Supported scenarios:
+
+~~~text
+success
+failed
+pending-success
+pending-failed
+~~~
+
+Supported scopes:
+
+~~~text
+next-order
+next-n
+until-changed
+~~~
+
+Safety invariant:
+
+- Test Lab can only be enabled when `NAMBAH_FLOW_TEST_MODE=true`.
+- Fulfillment must be `NAMBAH_FULFILLMENT_MODE=digiflazz-test`.
+- Test Lab has no code path that enables `digiflazz-live`.
+- Orders snapshot `environment`, `provider_mode`, `test_scenario`, and `test_scenario_source` for diagnostics.
+- If Test Lab consumption fails, fulfillment falls back to the configured `NAMBAH_DIGIFLAZZ_TEST_OUTCOME`; it never escalates to live mode.
+
+Migration 019 also adds covering indexes for previously unindexed operational foreign keys.
+
+Automated regression tests are now run with:
+
+~~~text
+npm run test
+~~~
+
+CI order is:
+
+~~~text
+npm ci
+npm run test
+npm run build
+~~~
