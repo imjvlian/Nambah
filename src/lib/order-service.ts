@@ -1,3 +1,4 @@
+import { fulfillPaidOrder } from "@/lib/fulfillment";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
@@ -287,6 +288,18 @@ export async function applyMidtransStatus(
     payload,
     received_at: now,
   });
+
+  // Payment success and fulfillment are deliberately decoupled. A supplier
+  // outage must never erase a verified Midtrans payment. Repeated webhook or
+  // manual refresh calls are safe because fulfillment uses a deterministic
+  // supplier request_ref per order.
+  if (orderStatus === "paid" || orderStatus === "processing") {
+    try {
+      await fulfillPaidOrder(orderId);
+    } catch (error) {
+      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
+    }
+  }
 
   const publicOrder = await getPublicOrder(orderId);
   if (!publicOrder) throw new Error(`Order ${orderId} hilang setelah update.`);
