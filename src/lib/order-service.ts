@@ -1,5 +1,8 @@
 import { fulfillPaidOrder } from "@/lib/fulfillment";
-import type { MidtransStatusPayload } from "@/lib/midtrans/client";
+import {
+  getMidtransEnvironment,
+  type MidtransStatusPayload,
+} from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
@@ -33,6 +36,9 @@ type OrderRow = {
   final_price: number | string;
   created_at: string;
   updated_at: string;
+  expires_at: string | null;
+  status_changed_at: string | null;
+  terminal_at: string | null;
 };
 
 type GameRow = {
@@ -115,8 +121,14 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     id: order.id,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
-    mode: "midtrans-sandbox",
+    mode:
+      getMidtransEnvironment() === "production"
+        ? "midtrans-production"
+        : "midtrans-sandbox",
     status: order.status,
+    expiresAt: order.expires_at,
+    statusChangedAt: order.status_changed_at,
+    terminalAt: order.terminal_at,
     product: {
       gameId: game.id,
       gameName: game.name,

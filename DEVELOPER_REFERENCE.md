@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.5 — Operations & Monitoring  
+Baseline: Nambah 0.5.6 — Customer Experience Finalization  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1587,3 +1587,19 @@ The detector tracks:
 Incidents are deduplicated by fingerprint in `operational_incidents`. Resolved conditions are closed automatically. Critical cron incidents can notify Telegram with a one-hour notification cooldown.
 
 The Operations Center can trigger existing order/supplier/receipt reconciliation and financial reconciliation without direct SQL.
+
+
+---
+
+## 47. Payment Environment UX (0.5.6)
+
+Public orders now expose the server-resolved payment mode:
+
+~~~text
+midtrans-sandbox
+midtrans-production
+~~~
+
+The order page prefers this server value over the browser build-time environment when rendering payment labels and loading Snap. This avoids misleading environment badges when deployment configuration changes.
+
+Order API responses also expose persisted expiry/status-change/terminal timestamps consistently for customer tracking.

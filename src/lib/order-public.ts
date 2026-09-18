@@ -14,7 +14,7 @@ export type PublicOrder = {
   expiresAt?: string | null;
   statusChangedAt?: string | null;
   terminalAt?: string | null;
-  mode: "midtrans-sandbox";
+  mode: "midtrans-sandbox" | "midtrans-production";
   status: PublicOrderStatus;
   product: {
     gameId: string;

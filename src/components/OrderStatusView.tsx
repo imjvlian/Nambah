@@ -75,11 +75,17 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const embeddedOrderRef = useRef<string | null>(null);
   const midtransClientKey =
     process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
-  const midtransEnvironment =
+  const configuredMidtransEnvironment =
     process.env.NEXT_PUBLIC_MIDTRANS_ENVIRONMENT?.trim().toLowerCase() ===
     "production"
       ? "production"
       : "sandbox";
+  const midtransEnvironment =
+    order?.mode === "midtrans-production"
+      ? "production"
+      : order?.mode === "midtrans-sandbox"
+        ? "sandbox"
+        : configuredMidtransEnvironment;
   const midtransLabel =
     midtransEnvironment === "production" ? "Midtrans" : "Midtrans Sandbox";
   const midtransSnapUrl =

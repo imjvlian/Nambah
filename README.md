@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.5 — Operations & Monitoring**
+**0.5.6 — Customer Experience Finalization**
 
 Core flow tersedia:
 
