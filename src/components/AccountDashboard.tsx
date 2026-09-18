@@ -380,7 +380,7 @@ export default function AccountDashboard() {
         )}
       </section>
 
-      <section className="account-points-card">
+      <section className="account-points-card" id="nambah-points">
         <div className="account-points-hero">
           <div>
             <span className="eyebrow">Nambah Points</span>

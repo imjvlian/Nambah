@@ -13,8 +13,10 @@ type PointsSummary = {
   available: number;
 };
 
+type AdminRole = "admin" | "superadmin";
+
 export default function AccountNav({
-  showPoints = false,
+  showPoints = true,
 }: {
   showPoints?: boolean;
 }) {
@@ -23,6 +25,7 @@ export default function AccountNav({
   const [points, setPoints] = useState<number | null | undefined>(
     showPoints ? undefined : null,
   );
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -39,6 +42,7 @@ export default function AccountNav({
         if (!response.ok) {
           setUser(null);
           setPoints(null);
+          setAdminRole(null);
           return;
         }
 
@@ -48,34 +52,79 @@ export default function AccountNav({
         const nextUser = data.user ?? null;
         setUser(nextUser);
 
-        if (!nextUser || !showPoints) {
+        if (!nextUser) {
+          setPoints(null);
+          setAdminRole(null);
+          return;
+        }
+
+        const requests: Promise<Response>[] = [
+          fetch("/api/admin/session", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
+        ];
+
+        if (showPoints) {
+          requests.push(
+            fetch("/api/account/points", {
+              cache: "no-store",
+              credentials: "same-origin",
+            }),
+          );
+        }
+
+        const results = await Promise.allSettled(requests);
+        if (!active) return;
+
+        const adminResult = results[0];
+        if (adminResult?.status === "fulfilled") {
+          try {
+            const adminData = (await adminResult.value.json()) as {
+              authenticated?: boolean;
+              role?: string;
+            };
+            const role =
+              adminData.authenticated &&
+              (adminData.role === "admin" || adminData.role === "superadmin")
+                ? adminData.role
+                : null;
+            setAdminRole(role);
+          } catch {
+            setAdminRole(null);
+          }
+        } else {
+          setAdminRole(null);
+        }
+
+        if (!showPoints) {
+          setPoints(null);
+          return;
+        }
+
+        const pointsResult = results[1];
+        if (pointsResult?.status !== "fulfilled") {
           setPoints(null);
           return;
         }
 
         try {
-          const pointsResponse = await fetch("/api/account/points", {
-            cache: "no-store",
-            credentials: "same-origin",
-          });
-          const pointsData = (await pointsResponse.json()) as {
+          const pointsData = (await pointsResult.value.json()) as {
             points?: PointsSummary;
           };
-
-          if (!active) return;
-
           setPoints(
-            pointsResponse.ok && pointsData.points
+            pointsResult.value.ok && pointsData.points
               ? pointsData.points.available
               : null,
           );
         } catch {
-          if (active) setPoints(null);
+          setPoints(null);
         }
       } catch {
         if (active) {
           setUser(null);
           setPoints(null);
+          setAdminRole(null);
         }
       }
     }
@@ -106,27 +155,43 @@ export default function AccountNav({
   }
 
   return (
-    <a
-      className={
-        "account-nav account-nav-user" +
-        (showPoints ? " account-nav-user-with-points" : "")
-      }
-      href="/account"
-      title={user.email}
-    >
-      <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
-      <b>{user.displayName}</b>
+    <div className="account-nav-cluster">
+      {adminRole && (
+        <a
+          className="account-admin-route"
+          href="/admin"
+          title={`Buka admin dashboard · ${adminRole}`}
+        >
+          <span aria-hidden="true">AD</span>
+          <b>Dashboard</b>
+        </a>
+      )}
 
       {showPoints && (
-        <em className="account-nav-points" aria-label="Nambah Points">
-          <i>N+</i>
+        <a
+          className="account-header-points"
+          href="/account#nambah-points"
+          aria-label={`Nambah Points: ${points ?? 0} points`}
+          title="Nambah Points"
+        >
+          <i aria-hidden="true">N+</i>
           <strong>
             {points === undefined
               ? "..."
-              : (points ?? 0).toLocaleString("id-ID") + " pts"}
+              : (points ?? 0).toLocaleString("id-ID")}
           </strong>
-        </em>
+          <small>pts</small>
+        </a>
       )}
-    </a>
+
+      <a
+        className="account-nav account-nav-user"
+        href="/account"
+        title={user.email}
+      >
+        <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
+        <b>{user.displayName}</b>
+      </a>
+    </div>
   );
 }

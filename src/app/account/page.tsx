@@ -1,3 +1,4 @@
+import AccountNav from "@/components/AccountNav";
 import type { Metadata } from "next";
 import AccountDashboard from "@/components/AccountDashboard";
 
@@ -20,7 +21,10 @@ export default function AccountPage() {
           <a href="/">Katalog</a>
           <a href="/account">Akun</a>
         </nav>
-        <a className="header-cta" href="/#catalog-start">Top up lagi</a>
+        <div className="header-actions">
+          <AccountNav />
+          <a className="header-cta" href="/#catalog-start">Top up lagi</a>
+        </div>
       </header>
 
       <section className="account-shell shell">
