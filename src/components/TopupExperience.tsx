@@ -165,6 +165,7 @@ export default function TopupExperience({
   const [appliedReferralCode, setAppliedReferralCode] = useState("");
   const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [accountError, setAccountError] = useState("");
   const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
   const [pricingError, setPricingError] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
@@ -363,6 +364,7 @@ export default function TopupExperience({
     setSelectedPackageId(nextGame.packages[0]!.id);
     setUserId("");
     setServerId("");
+    setAccountError("");
     setUsernameCheck({ status: "idle" });
     resetPricingMessages();
     requestAnimationFrame(() => {
@@ -401,10 +403,17 @@ export default function TopupExperience({
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice("");
+    setAccountError("");
 
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
     if (!account.ok) {
-      setNotice(account.error);
+      setAccountError(account.error);
+      requestAnimationFrame(() => {
+        document.getElementById("account-data")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
       return;
     }
     if (!serverPricing) {
@@ -541,7 +550,16 @@ export default function TopupExperience({
             <span className="preview-badge">{catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}</span>
           </div>
 
-          <div className="form-block account-form-block">
+          <div className="form-block account-form-block" id="account-data">
+            {accountError && (
+              <div className="account-validation-error" role="alert" aria-live="assertive">
+                <span className="account-validation-error-icon" aria-hidden="true">!</span>
+                <span className="account-validation-error-copy">
+                  <strong>Data akun belum lengkap</strong>
+                  <small>{accountError}</small>
+                </span>
+              </div>
+            )}
             <div className="form-label">
               <span className="step-number">1</span>
               <div>
@@ -559,6 +577,7 @@ export default function TopupExperience({
                   value={userId}
                   onChange={(event) => {
                     setUserId(sanitizeAccountField(event.target.value, accountSchema.user));
+                    setAccountError("");
                     setUsernameCheck({ status: "idle" });
                   }}
                 />
@@ -573,6 +592,7 @@ export default function TopupExperience({
                     value={serverId}
                     onChange={(event) => {
                       setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
+                      setAccountError("");
                       setUsernameCheck({ status: "idle" });
                     }}
                   />
