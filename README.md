@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.6.0 — Affiliate Withdrawal Workflow**
+**0.9.0 — Release Candidate**
 
 Core flow tersedia:
 
@@ -53,7 +53,18 @@ Migration fitur terbaru:
 024 Affiliate withdrawal workflow
 ```
 
-Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).
+## Dokumentasi
+
+- [Developer Reference](./DEVELOPER_REFERENCE.md) — architecture, API, service, database, invariants.
+- [Environment Guide](./ENVIRONMENT_GUIDE.md) — local, staging, production, secret dan live-money gate.
+- [Test Guide](./TEST_GUIDE.md) — automated + manual E2E regression.
+- [Release Checklist](./RELEASE_CHECKLIST.md) — sign-off, launch dan rollback.
+- [Production Guide](./PRODUCTION.md) — deployment dan controlled production launch.
+- [Changelog](./CHANGELOG.md) — milestone release.
+
+Default scheduled operations untuk Vercel didefinisikan di `vercel.json`. Semua endpoint cron tetap memerlukan `CRON_SECRET`.
+
+Versi 1.0.0 tidak identik dengan live-money ON; activation provider production tetap mempunyai gate operasional terpisah.
 
 ## Environment penting
 

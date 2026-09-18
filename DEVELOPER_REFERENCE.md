@@ -1,9 +1,9 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.6.0 — Affiliate Withdrawal Workflow
+Baseline: Nambah 0.9.0 — Release Candidate
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
-Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
+Baseline commit reviewed: 8831f43d1221fab3efb0f7b9a23916bd553b7f1b  
 Last reviewed: 2026-09-18
 
 Dokumen ini adalah referensi developer utama untuk memahami, mengubah, dan menambah fitur Nambah tanpa merusak alur pembayaran, fulfillment, loyalty, atau keamanan.
@@ -72,16 +72,19 @@ npm run dev
 npm run build
 npm run start
 npm run assets:sync
+npm run test
+npm run check
 ~~~
 
-Current CI hanya menjalankan:
+Current CI menjalankan:
 
 ~~~text
 npm ci
+npm run test
 npm run build
 ~~~
 
-Belum ada dedicated unit, integration, atau e2e test runner pada baseline 0.5.0.
+Regression test policy tersedia untuk e2e test runner pada baseline 0.5.0.
 
 ---
 
@@ -1666,3 +1669,35 @@ Rejected/cancelled withdrawals automatically stop reserving commission because t
 Database RPCs use `SECURITY INVOKER`, are revoked from `PUBLIC`, `anon`, and `authenticated`, and are granted only to `service_role`.
 
 Withdrawal payout does **not** move money automatically. Nambah records the request, locks eligible commission value, and keeps payout status/audit data consistent; the actual transfer remains an operator action.
+
+
+---
+
+## 50. Release Candidate Packaging (0.9.0)
+
+Dokumen operasional utama:
+
+~~~text
+ENVIRONMENT_GUIDE.md
+TEST_GUIDE.md
+RELEASE_CHECKLIST.md
+PRODUCTION.md
+CHANGELOG.md
+DEVELOPER_REFERENCE.md
+~~~
+
+Default Vercel schedule tersimpan di `vercel.json`:
+
+~~~text
+/api/cron/reconcile              */5 * * * *
+/api/cron/operations-health      */10 * * * *
+/api/cron/digiflazz-balance      */15 * * * *
+/api/cron/financial-reconcile    5 * * * *
+/api/cron/points-expiry          15 0 * * *
+~~~
+
+Vercel cron memakai UTC dan mengirim request ke production deployment. Endpoint Nambah tetap memverifikasi `Authorization: Bearer <CRON_SECRET>`.
+
+Deploy platform selain Vercel harus menjadwalkan endpoint yang sama dengan scheduler masing-masing.
+
+Release version tidak pernah menyalakan real-money. Production Midtrans dan Digiflazz live tetap dikendalikan oleh ENV + readiness gate + explicit owner approval.
