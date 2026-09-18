@@ -593,13 +593,13 @@ export default function TopupExperience({
       });
       const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
+        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans.");
         return;
       }
       const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
       router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
-      setNotice("Tidak bisa menyiapkan pembayaran Sandbox. Coba lagi.");
+      setNotice("Tidak bisa menyiapkan pembayaran. Coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -666,7 +666,7 @@ export default function TopupExperience({
           <h2>Top up tanpa muter-muter.</h2>
           <p>
             {catalogSource === "supabase"
-              ? "Katalog dan pricing dibaca dari database Nambah. Harga final divalidasi ulang saat order Midtrans Sandbox dibuat."
+              ? "Katalog dan pricing dibaca dari database Nambah. Harga final divalidasi ulang saat order Midtrans dibuat."
               : "Harga Nambah, promo, dan benefit referral dihitung terpisah. Static fallback tetap aktif sampai database Nambah dihubungkan."}
           </p>
           <div className="trust-list">
@@ -698,7 +698,7 @@ export default function TopupExperience({
                 <strong>{selectedGame.name}</strong>
               </div>
             </div>
-            <span className="preview-badge">{catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}</span>
+            <span className="preview-badge">{catalogSource === "supabase" ? "Secure Checkout" : "MVP Pricing"}</span>
           </div>
 
           <div className="form-block account-form-block" id="account-data">
@@ -1085,7 +1085,7 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">4</span>
-              <div><strong>Metode pembayaran</strong><small>Selama flow test, pembayaran menggunakan Midtrans Sandbox dan tidak menagih uang asli.</small></div>
+              <div><strong>Metode pembayaran</strong><small>Metode pembayaran diproses melalui Midtrans. Environment sandbox/production dikontrol oleh server Nambah.</small></div>
             </div>
             <div className="payment-list">
               {paymentMethods.map((method) => (
@@ -1127,7 +1127,7 @@ export default function TopupExperience({
           </div>
 
           <button className="primary-button full" disabled={isSubmitting || pricingLoading || Boolean(pricingError)} type="submit">
-            {isSubmitting ? "Membuat pembayaran Sandbox..." : pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
+            {isSubmitting ? "Membuat pembayaran..." : pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
           </button>
           {notice && <p className="form-notice" role="status">{notice}</p>}
         </form>

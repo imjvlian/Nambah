@@ -1,6 +1,10 @@
 import { getFulfillmentMode } from "@/lib/fulfillment";
 import { isFlowTestMode } from "@/lib/flow-test";
 import {
+  getMidtransEnvironment,
+  isMidtransConfigured,
+} from "@/lib/midtrans/client";
+import {
   isSupabaseConfigured,
   supabaseSelect,
 } from "@/lib/supabase/server";
@@ -27,7 +31,7 @@ export async function GET() {
 
   const services = {
     database,
-    midtrans: configured("MIDTRANS_SERVER_KEY"),
+    midtrans: isMidtransConfigured(),
     digiflazz:
       configured("DIGIFLAZZ_USERNAME") &&
       configured("DIGIFLAZZ_API_KEY"),
@@ -40,10 +44,13 @@ export async function GET() {
 
   return Response.json(
     {
+      version: "0.5.0",
+      stage: "production-candidate",
       status: database ? "ok" : "degraded",
       timestamp: new Date().toISOString(),
       flowTest: isFlowTestMode(),
       fulfillmentMode: getFulfillmentMode(),
+      midtransEnvironment: getMidtransEnvironment(),
       services,
     },
     {

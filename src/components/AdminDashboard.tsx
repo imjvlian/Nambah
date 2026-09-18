@@ -280,15 +280,24 @@ type FinancePayload = {
 };
 
 type ReadinessPayload = {
+  version: string;
   stage: string;
   readyForStagingE2E: boolean;
+  automatedProductionReady: boolean;
   blockers: number;
+  stagingBlockers: number;
   warnings: number;
   fulfillmentMode: string;
   flowTest: boolean;
+  midtransEnvironment: {
+    server: string;
+    client: string;
+  };
+  manualChecklist: string[];
   checks: Array<{
     id: string;
     label: string;
+    scope: "staging" | "production";
     status: "pass" | "warning" | "blocker";
     detail: string;
   }>;
@@ -2262,11 +2271,11 @@ export default function AdminDashboard() {
                 <div className="acc-readiness-panel">
                   <div className="acc-readiness-head">
                     <div>
-                      <small>STAGING E2E READINESS</small>
+                      <small>{readiness.version} · PRODUCTION CANDIDATE</small>
                       <strong>
-                        {readiness.readyForStagingE2E
-                          ? "Ready for E2E"
-                          : readiness.blockers + " blocker"}
+                        {readiness.automatedProductionReady
+                          ? "Automated production checks pass"
+                          : readiness.blockers + " production blocker"}
                       </strong>
                     </div>
                     <span>
@@ -2279,7 +2288,9 @@ export default function AdminDashboard() {
                         <span className={"acc-health " + check.status} />
                         <div>
                           <strong>{check.label}</strong>
-                          <small>{check.detail}</small>
+                          <small>
+                            {check.scope} · {check.detail}
+                          </small>
                         </div>
                         <b>{check.status}</b>
                       </div>
@@ -2310,9 +2321,9 @@ export default function AdminDashboard() {
                   copy="Durable database limiter melindungi login, signup, account checker, dan order creation."
                 />
                 <RoadmapCard
-                  title="Health & readiness"
+                  title="0.5.0 production candidate"
                   status="live"
-                  copy="Public health probe, admin staging checklist, migration detection, audit log, dan integration readiness aktif."
+                  copy="Health/readiness, sandbox-production payment switch, live-money double gate, financial reconciliation, rate limit, dan audit tersedia untuk final launch verification."
                 />
                 <RoadmapCard
                   title="Live safety gate"

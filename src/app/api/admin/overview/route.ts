@@ -1,6 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { getFulfillmentMode } from "@/lib/fulfillment";
+import { getMidtransEnvironment } from "@/lib/midtrans/client";
 import {
   isSupabaseConfigured,
   supabaseSelect,
@@ -157,6 +158,7 @@ export async function GET(request: Request) {
     const reservedBalance = Number(balance?.reserved_balance ?? 0);
     const fulfillmentMode = getFulfillmentMode();
     const flowTest = isFlowTestMode();
+    const midtransEnvironment = getMidtransEnvironment();
     const brevoReady =
       enabled("BREVO_RECEIPT_ENABLED") &&
       configured("BREVO_API_KEY") &&
@@ -214,9 +216,13 @@ export async function GET(request: Request) {
             "Midtrans",
             configured("MIDTRANS_SERVER_KEY"),
             configured("MIDTRANS_SERVER_KEY")
-              ? "Sandbox payment verification siap."
+              ? `Midtrans ${midtransEnvironment} siap.`
               : "MIDTRANS_SERVER_KEY belum terpasang.",
-            flowTest ? "test" : configured("MIDTRANS_SERVER_KEY") ? "live" : "attention",
+            midtransEnvironment === "sandbox"
+              ? "test"
+              : configured("MIDTRANS_SERVER_KEY")
+                ? "live"
+                : "attention",
           ),
           service(
             "digiflazz",

@@ -1,6 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { getFulfillmentMode } from "@/lib/fulfillment";
 import { isFlowTestMode } from "@/lib/flow-test";
+import { getMidtransEnvironment } from "@/lib/midtrans/client";
 import { supabaseSelect } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -8,12 +9,19 @@ export const runtime = "nodejs";
 type Check = {
   id: string;
   label: string;
+  scope: "staging" | "production";
   status: "pass" | "warning" | "blocker";
   detail: string;
 };
 
 function configured(name: string) {
   return Boolean(process.env[name]?.trim());
+}
+
+function enabled(name: string) {
+  return ["true", "1", "yes", "on"].includes(
+    process.env[name]?.trim().toLowerCase() ?? "",
+  );
 }
 
 async function tableExists(table: string) {
@@ -34,6 +42,12 @@ export async function GET(request: Request) {
 
   const fulfillmentMode = getFulfillmentMode();
   const flowTest = isFlowTestMode();
+  const serverMidtransEnvironment = getMidtransEnvironment();
+  const publicMidtransEnvironment =
+    process.env.NEXT_PUBLIC_MIDTRANS_ENVIRONMENT?.trim().toLowerCase() ===
+    "production"
+      ? "production"
+      : "sandbox";
 
   const [
     pointsMigration,
@@ -61,15 +75,21 @@ export async function GET(request: Request) {
   ]);
 
   const liveEnabled =
-    process.env.NAMBAH_ALLOW_LIVE_FULFILLMENT?.trim().toLowerCase() ===
-      "true" &&
+    enabled("NAMBAH_ALLOW_LIVE_FULFILLMENT") &&
     process.env.NAMBAH_LIVE_FULFILLMENT_ACK?.trim() ===
       "SPEND_REAL_DIGIFLAZZ_BALANCE";
+  const midtransServerKey = process.env.MIDTRANS_SERVER_KEY?.trim() ?? "";
+  const midtransClientKey =
+    process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
+  const digiflazzCallback =
+    process.env.DIGIFLAZZ_CALLBACK_URL?.trim() ?? "";
+  const brevoEnabled = enabled("BREVO_RECEIPT_ENABLED");
 
   const checks: Check[] = [
     {
       id: "database",
       label: "Supabase server database",
+      scope: "staging",
       status:
         configured("SUPABASE_URL") && configured("SUPABASE_SECRET_KEY")
           ? "pass"
@@ -77,63 +97,41 @@ export async function GET(request: Request) {
       detail: "Server database credentials wajib tersedia.",
     },
     {
-      id: "midtrans",
-      label: "Midtrans",
+      id: "midtrans-keys",
+      label: "Midtrans keys",
+      scope: "staging",
       status:
-        configured("MIDTRANS_SERVER_KEY") &&
-        configured("NEXT_PUBLIC_MIDTRANS_CLIENT_KEY")
-          ? "pass"
-          : "blocker",
-      detail: "Server key dan client key harus terpasang.",
+        midtransServerKey && midtransClientKey ? "pass" : "blocker",
+      detail: "Server Key dan Client Key wajib tersedia.",
     },
     {
       id: "digiflazz",
-      label: "Digiflazz",
+      label: "Digiflazz signed callback",
+      scope: "staging",
       status:
         configured("DIGIFLAZZ_USERNAME") &&
         configured("DIGIFLAZZ_API_KEY") &&
         configured("DIGIFLAZZ_WEBHOOK_SECRET") &&
-        configured("DIGIFLAZZ_CALLBACK_URL")
+        digiflazzCallback.startsWith("https://")
           ? "pass"
           : "blocker",
-      detail: "Credentials + signed public callback wajib lengkap.",
+      detail: "Credentials dan callback HTTPS wajib lengkap.",
+    },
+    {
+      id: "admin-session",
+      label: "Admin session secret",
+      scope: "staging",
+      status: configured("NAMBAH_ADMIN_SESSION_SECRET")
+        ? "pass"
+        : "blocker",
+      detail: "Browser admin harus memakai signing secret server-only.",
     },
     {
       id: "cron",
       label: "Cron authentication",
-      status: configured("CRON_SECRET") ? "pass" : "warning",
-      detail: "CRON_SECRET melindungi reconciliation/monitor endpoints.",
-    },
-    {
-      id: "rate-limit-secret",
-      label: "Rate-limit privacy secret",
-      status: configured("NAMBAH_RATE_LIMIT_SECRET")
-        ? "pass"
-        : "warning",
-      detail:
-        "Limiter tetap bekerja tanpa secret, tetapi secret direkomendasikan untuk pseudonymous client keys.",
-    },
-    {
-      id: "flow-test",
-      label: "Flow test",
-      status: flowTest ? "warning" : "pass",
-      detail: flowTest
-        ? "Staging mode aktif; jangan dianggap production live."
-        : "Flow test dimatikan.",
-    },
-    {
-      id: "live-money",
-      label: "Live fulfillment gate",
-      status:
-        fulfillmentMode !== "digiflazz-live"
-          ? "warning"
-          : liveEnabled
-            ? "pass"
-            : "blocker",
-      detail:
-        fulfillmentMode === "digiflazz-live"
-          ? "Live mode membutuhkan dua explicit opt-in."
-          : "Live money masih OFF; aman untuk staging.",
+      scope: "staging",
+      status: configured("CRON_SECRET") ? "pass" : "blocker",
+      detail: "Cron endpoints harus dilindungi CRON_SECRET.",
     },
     ...[
       ["migration-points", "Migration 012 Points", pointsMigration],
@@ -147,21 +145,156 @@ export async function GET(request: Request) {
     ].map(([id, label, ok]) => ({
       id: String(id),
       label: String(label),
+      scope: "staging" as const,
       status: ok ? ("pass" as const) : ("blocker" as const),
       detail: ok ? "Terdeteksi." : "Belum terdeteksi di database.",
     })),
+    {
+      id: "midtrans-server-production",
+      label: "Midtrans backend production mode",
+      scope: "production",
+      status:
+        serverMidtransEnvironment === "production" &&
+        midtransServerKey &&
+        !midtransServerKey.startsWith("SB-")
+          ? "pass"
+          : "blocker",
+      detail:
+        serverMidtransEnvironment === "production"
+          ? "Backend diarahkan ke endpoint production."
+          : "MIDTRANS_ENVIRONMENT masih sandbox.",
+    },
+    {
+      id: "midtrans-client-production",
+      label: "Midtrans Snap production mode",
+      scope: "production",
+      status:
+        publicMidtransEnvironment === "production" &&
+        midtransClientKey &&
+        !midtransClientKey.startsWith("SB-")
+          ? "pass"
+          : "blocker",
+      detail:
+        publicMidtransEnvironment === "production"
+          ? "Browser memakai Snap production."
+          : "NEXT_PUBLIC_MIDTRANS_ENVIRONMENT masih sandbox.",
+    },
+    {
+      id: "midtrans-env-match",
+      label: "Midtrans environment parity",
+      scope: "production",
+      status:
+        serverMidtransEnvironment === publicMidtransEnvironment
+          ? "pass"
+          : "blocker",
+      detail:
+        serverMidtransEnvironment === publicMidtransEnvironment
+          ? "Backend dan Snap memakai environment yang sama."
+          : "Backend dan browser Midtrans berbeda environment.",
+    },
+    {
+      id: "flow-test-off",
+      label: "Flow test disabled",
+      scope: "production",
+      status: flowTest ? "blocker" : "pass",
+      detail: flowTest
+        ? "NAMBAH_FLOW_TEST_MODE masih aktif."
+        : "Flow test dimatikan.",
+    },
+    {
+      id: "live-fulfillment",
+      label: "Digiflazz live fulfillment",
+      scope: "production",
+      status:
+        fulfillmentMode === "digiflazz-live" && liveEnabled
+          ? "pass"
+          : "blocker",
+      detail:
+        fulfillmentMode === "digiflazz-live" && liveEnabled
+          ? "Live mode + double explicit opt-in aktif."
+          : "Live money tetap terkunci.",
+    },
+    {
+      id: "rate-limit-secret",
+      label: "Rate-limit privacy secret",
+      scope: "production",
+      status: configured("NAMBAH_RATE_LIMIT_SECRET")
+        ? "pass"
+        : "blocker",
+      detail: "Production wajib memakai pseudonymous rate-limit salt.",
+    },
+    {
+      id: "brevo",
+      label: "Transactional receipt",
+      scope: "production",
+      status:
+        brevoEnabled &&
+        configured("BREVO_API_KEY") &&
+        configured("BREVO_SENDER_EMAIL")
+          ? "pass"
+          : "blocker",
+      detail: brevoEnabled
+        ? "Brevo receipt diaktifkan."
+        : "BREVO_RECEIPT_ENABLED belum aktif.",
+    },
+    {
+      id: "telegram",
+      label: "Operational alerts",
+      scope: "production",
+      status:
+        configured("TELEGRAM_BOT_TOKEN") &&
+        configured("TELEGRAM_ADMIN_CHAT_ID")
+          ? "pass"
+          : "warning",
+      detail: "Telegram alerts direkomendasikan sebelum live traffic.",
+    },
+    {
+      id: "universal-checker",
+      label: "Universal account checker routing",
+      scope: "production",
+      status: configured("VOLSEVER_API_KEY") ? "pass" : "warning",
+      detail:
+        "Produk tanpa provider mapping tetap memakai validasi format lokal.",
+    },
   ];
 
-  const blockers = checks.filter((check) => check.status === "blocker").length;
-  const warnings = checks.filter((check) => check.status === "warning").length;
+  const stagingChecks = checks.filter((check) => check.scope === "staging");
+  const productionChecks = checks.filter(
+    (check) => check.scope === "production",
+  );
+  const stagingBlockers = stagingChecks.filter(
+    (check) => check.status === "blocker",
+  ).length;
+  const productionBlockers = [
+    ...stagingChecks,
+    ...productionChecks,
+  ].filter((check) => check.status === "blocker").length;
+  const warnings = checks.filter(
+    (check) => check.status === "warning",
+  ).length;
 
   return Response.json({
-    stage: "staging-readiness",
-    readyForStagingE2E: blockers === 0,
-    blockers,
+    version: "0.5.0",
+    stage: "production-candidate",
+    readyForStagingE2E: stagingBlockers === 0,
+    automatedProductionReady: productionBlockers === 0,
+    blockers: productionBlockers,
+    stagingBlockers,
     warnings,
     fulfillmentMode,
     flowTest,
+    midtransEnvironment: {
+      server: serverMidtransEnvironment,
+      client: publicMidtransEnvironment,
+    },
+    manualChecklist: [
+      "Midtrans Payment Notification URL mengarah ke /api/webhooks/midtrans.",
+      "Digiflazz callback URL mengarah ke /api/webhooks/digiflazz dan secret cocok.",
+      "Supabase Auth Site URL/Redirect URL memakai domain production.",
+      "Brevo sender/domain sudah authenticated.",
+      "Semua SKU live dan fulfillment_target_template diverifikasi per produk/game.",
+      "Lakukan satu transaksi real bernilai kecil setelah approval owner sebelum membuka traffic.",
+    ],
     checks,
   });
 }

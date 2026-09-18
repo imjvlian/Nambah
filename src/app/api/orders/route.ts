@@ -19,7 +19,7 @@ import {
   restoreOrderPointsRedemption,
   validateRequestedPoints,
 } from "@/lib/loyalty";
-import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
+import { createMidtransSnapTransaction, isMidtransConfigured } from "@/lib/midtrans/client";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { reservePromotionForOrder, syncPromotionLifecycle } from "@/lib/promotion-service";
 import { getPublicOrder } from "@/lib/order-service";
@@ -84,9 +84,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isMidtransSandboxConfigured()) {
+  if (!isMidtransConfigured()) {
     return Response.json(
-      { error: "Midtrans Sandbox belum dikonfigurasi." },
+      { error: "Midtrans belum dikonfigurasi." },
       { status: 503 },
     );
   }
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
   const enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id];
   if (!enabledPayments) {
     return Response.json(
-      { error: "Metode pembayaran belum didukung Midtrans Sandbox." },
+      { error: "Metode pembayaran belum didukung Midtrans." },
       { status: 400 },
     );
   }
@@ -459,9 +459,9 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error("Midtrans Sandbox order creation failed", error);
+    console.error("Midtrans order creation failed", error);
     return Response.json(
-      { error: "Gagal membuat pembayaran Midtrans Sandbox." },
+      { error: "Gagal membuat pembayaran Midtrans." },
       { status: 502 },
     );
   }

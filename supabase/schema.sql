@@ -203,6 +203,33 @@ create index if not exists orders_status_created_idx on public.orders(status, cr
 create index if not exists orders_affiliate_idx
   on public.orders(affiliate_code) where affiliate_code is not null;
 
+create table if not exists public.customer_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  whatsapp text,
+  preferred_receipt_channel text not null default 'email'
+    check (preferred_receipt_channel in ('email','whatsapp','both')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.promotion_redemptions (
+  id bigint generated always as identity primary key,
+  promotion_code text not null references public.promotions(code) on delete cascade,
+  order_id text not null unique references public.orders(id) on delete cascade,
+  user_id uuid,
+  status text not null default 'reserved'
+    check (status in ('reserved','redeemed','released')),
+  reserved_at timestamptz not null default now(),
+  redeemed_at timestamptz,
+  released_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists promotion_redemptions_lookup_idx
+  on public.promotion_redemptions(promotion_code,status,created_at desc);
+
 create table if not exists public.payments (
   id bigint generated always as identity primary key,
   order_id text not null references public.orders(id) on delete cascade,
@@ -396,6 +423,8 @@ alter table public.payments enable row level security;
 alter table public.supplier_transactions enable row level security;
 alter table public.supplier_webhook_events enable row level security;
 alter table public.receipt_deliveries enable row level security;
+alter table public.customer_profiles enable row level security;
+alter table public.promotion_redemptions enable row level security;
 alter table public.loyalty_accounts enable row level security;
 alter table public.point_ledger enable row level security;
 alter table public.rate_limit_buckets enable row level security;
@@ -424,6 +453,8 @@ revoke all on table public.payments from anon, authenticated;
 revoke all on table public.supplier_transactions from anon, authenticated;
 revoke all on table public.supplier_webhook_events from anon, authenticated;
 revoke all on table public.receipt_deliveries from anon, authenticated;
+revoke all on table public.customer_profiles from anon, authenticated;
+revoke all on table public.promotion_redemptions from anon, authenticated;
 revoke all on table public.loyalty_accounts from anon, authenticated;
 revoke all on table public.point_ledger from anon, authenticated;
 revoke all on table public.rate_limit_buckets from anon, authenticated;

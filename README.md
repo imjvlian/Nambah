@@ -1,178 +1,91 @@
 # Nambah
 
-Nambah adalah web top up digital berbasis Next.js. MVP memakai Midtrans untuk pembayaran, Digiflazz sebagai supplier awal, dan Supabase PostgreSQL sebagai database.
+Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL, Midtrans, Digiflazz, Brevo, loyalty Points, promo, dan affiliate.
 
 ## Status
 
-`0.3.0` — Midtrans Sandbox end-to-end.
+**0.5.0 — Production Candidate**
 
-Pada milestone ini order pembayaran sudah disimpan server-side, Snap token dibuat oleh backend, status pembayaran dapat diperbarui dari webhook Midtrans atau Get Status API, dan halaman order membaca status dari database. Transaksi Digiflazz production tetap belum diaktifkan.
+Core flow tersedia:
+
+```text
+catalog → account validation → pricing → promo/referral/points
+→ Midtrans → verified payment → Digiflazz fulfillment
+→ webhook/reconciliation → receipt → affiliate/finance/admin
+```
+
+Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
+
+Deployment staging saat ini:
+
+```text
+https://nambah.vercel.app
+```
 
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Buka `http://localhost:3000`.
+## Database
 
-## Supabase
+Jangan gunakan `supabase/seed.sql` untuk meng-upgrade database existing karena seed dapat menimpa data katalog/price/active state.
 
-Gunakan project Supabase khusus Nambah.
+Migration fitur terbaru:
 
-Urutan instalasi database:
+```text
+012 Nambah Points
+013 Affiliate commissions
+014 Promotion management
+015 Customer profiles
+016 Live fulfillment targets
+017 Financial reconciliation
+018 Production hardening
+```
 
-1. `supabase/schema.sql`
-2. `supabase/seed.sql`
-3. `supabase/migrations/20260831_001_digiflazz_test.sql`
-4. `supabase/migrations/20260831_002_supplier_price_sync.sql`
-5. `supabase/migrations/20260831_003_supplier_balance_monitor.sql`
-6. `supabase/migrations/20260831_004_midtrans_sandbox.sql`
+Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).
 
-Server credential:
+## Environment penting
 
 ```env
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_...
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+
+MIDTRANS_ENVIRONMENT=sandbox
+NEXT_PUBLIC_MIDTRANS_ENVIRONMENT=sandbox
+MIDTRANS_SERVER_KEY=
+NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=
+
+DIGIFLAZZ_USERNAME=
+DIGIFLAZZ_API_KEY=
+DIGIFLAZZ_WEBHOOK_SECRET=
+DIGIFLAZZ_CALLBACK_URL=
+
+BREVO_RECEIPT_ENABLED=false
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+BREVO_SENDER_NAME=Nambah
+
+NAMBAH_ADMIN_SESSION_SECRET=
+NAMBAH_RATE_LIMIT_SECRET=
+CRON_SECRET=
 ```
 
-## Digiflazz
+Lihat `.env.example` untuk seluruh opsi.
 
-```env
-NAMBAH_ADMIN_API_TOKEN=buat-token-random-panjang
-CRON_SECRET=buat-secret-cron-random
-DIGIFLAZZ_USERNAME=username-buyer
-DIGIFLAZZ_API_KEY=api-key-buyer
-DIGIFLAZZ_WEBHOOK_SECRET=secret-webhook
-DIGIFLAZZ_CALLBACK_URL=https://domain-kamu.com/api/webhooks/digiflazz
-TELEGRAM_BOT_TOKEN=token-bot
-TELEGRAM_ADMIN_CHAT_ID=chat-id
-```
+## Safety boundaries
 
-Semua credential di atas server-only.
-
-### Supplier price sync
-
-Preview:
-
-```text
-POST /api/admin/digiflazz/sync-prices
-{"dryRun":true}
-```
-
-Apply:
-
-```text
-POST /api/admin/digiflazz/sync-prices
-{"dryRun":false}
-```
-
-### Supplier balance
-
-Manual check:
-
-```text
-POST /api/admin/digiflazz/balance
-{"notify":false}
-```
-
-Periodic check:
-
-```text
-GET /api/cron/digiflazz-balance
-Authorization: Bearer <CRON_SECRET>
-```
-
-## Midtrans Sandbox
-
-Ambil Sandbox Server Key dan Client Key dari Midtrans MAP, lalu tambahkan ke `.env.local`:
-
-```env
-MIDTRANS_SERVER_KEY=SB-Mid-server-...
-NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=SB-Mid-client-...
-```
-
-`MIDTRANS_SERVER_KEY` tidak boleh diberi prefix `NEXT_PUBLIC_`.
-
-0.3.0 sengaja menggunakan endpoint Sandbox secara hard-coded:
-
-```text
-https://app.sandbox.midtrans.com/snap/v1/transactions
-https://api.sandbox.midtrans.com/v2/{order_id}/status
-```
-
-Tidak ada endpoint Midtrans production pada milestone ini.
-
-### Flow checkout
-
-```text
-Customer memilih produk
-→ server validasi pricing ulang
-→ order + payment pending disimpan ke Supabase
-→ backend membuat Snap token Sandbox
-→ customer membuka Snap
-→ Midtrans memproses pembayaran Sandbox
-→ webhook / Get Status diverifikasi backend
-→ orders.status diperbarui
-```
-
-Endpoint customer:
-
-```text
-POST /api/orders
-GET  /api/orders/{id}
-POST /api/orders/{id}/refresh
-```
-
-Webhook Midtrans:
-
-```text
-POST /api/webhooks/midtrans
-```
-
-Webhook diverifikasi memakai:
-
-```text
-SHA512(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY)
-```
-
-Callback `snap.pay()` di browser tidak pernah dipakai untuk menetapkan order sebagai paid. Callback hanya memicu `/api/orders/{id}/refresh`, yang mengecek status langsung ke Midtrans menggunakan Server Key.
-
-Untuk webhook ketika development masih di localhost, gunakan URL HTTPS publik/tunnel lalu set Notification URL Midtrans ke:
-
-```text
-https://PUBLIC_DOMAIN/api/webhooks/midtrans
-```
-
-Tanpa tunnel, flow Sandbox tetap dapat divalidasi dari tombol/Callback Get Status karena backend akan meminta status langsung ke Midtrans.
-
-### Mapping status pembayaran
-
-- `settlement` → order `paid`
-- `capture` + fraud accepted → order `paid`
-- `pending` → tetap `pending_payment`
-- `deny` → tetap `pending_payment` agar Snap masih dapat dicoba ulang
-- `expire` / `cancel` → `cancelled`
-- `failure` → `failed`
-- `refund` / `partial_refund` → `refunded`
-
-Setiap webhook/Get Status yang berhasil diproses disimpan ke `midtrans_payment_events` untuk audit.
-
-## Security boundary
-
-- Supplier cost, merchant payment cost, margin, Server Key, Digiflazz credential, dan Telegram token hanya berada di server.
-- Browser hanya menerima harga customer-safe, Snap token transaksi, redirect URL, dan status order.
-- Midtrans webhook wajib lolos signature SHA-512.
-- Gross amount Midtrans harus sama dengan snapshot `orders.final_price` sebelum status diterapkan.
-- Status pembayaran tidak dipercaya dari callback browser.
-- Semua tabel database tetap RLS-enabled dan browser tidak mendapat direct table access.
-- Digiflazz production transaction belum tersedia pada 0.3.0.
-
-## Roadmap berikutnya
-
-- `0.3.x` order orchestration: reserve supplier balance, payment-success → Digiflazz, pending/retry/refund
-- `0.4.0` admin dashboard
-- `0.5.0` affiliate dashboard
-- `0.9.0` production hardening
-- `1.0.0` production release
+- Browser tidak menerima supplier cost atau server credentials.
+- Midtrans payment status diverifikasi server-side; callback browser bukan sumber kebenaran.
+- Digiflazz menggunakan deterministic request ref, signed callback, terminal guards, reconciliation, dan frozen max price.
+- Points memakai atomic ledger/reservation untuk mencegah double-spend.
+- Promo quota memakai reservation lifecycle.
+- Affiliate commission mengikuti status order dan net profit.
+- Financial reconciliation hanya mendeteksi mismatch; tidak memindahkan uang otomatis.
+- Admin mutations penting dicatat ke audit log.
+- Login/signup/checker/order creation memakai durable rate limiting.
+- Live Digiflazz tetap terkunci sampai explicit production opt-in.

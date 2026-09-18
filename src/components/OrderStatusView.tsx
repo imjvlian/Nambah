@@ -73,7 +73,19 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const [countdown, setCountdown] = useState(() => calculateCountdown(null));
   const embeddedOrderRef = useRef<string | null>(null);
-  const midtransClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
+  const midtransClientKey =
+    process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
+  const midtransEnvironment =
+    process.env.NEXT_PUBLIC_MIDTRANS_ENVIRONMENT?.trim().toLowerCase() ===
+    "production"
+      ? "production"
+      : "sandbox";
+  const midtransLabel =
+    midtransEnvironment === "production" ? "Midtrans" : "Midtrans Sandbox";
+  const midtransSnapUrl =
+    midtransEnvironment === "production"
+      ? "https://app.midtrans.com/snap/snap.js"
+      : "https://app.sandbox.midtrans.com/snap/snap.js";
 
   async function loadLiveOrder(id: string, token = accessToken) {
     const url = new URL(`/api/orders/${encodeURIComponent(id)}`, window.location.origin);
@@ -287,7 +299,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     openFallbackPayment();
   }
 
-  async function createSandboxOrder() {
+  async function createPaymentOrder() {
     if (!preview) return;
     setBusy(true);
     setNotice("");
@@ -310,7 +322,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
       const data = (await response.json()) as OrderApiResponse;
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
+        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans.");
         return;
       }
 
@@ -323,7 +335,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         ? `?access_token=${encodeURIComponent(data.accessToken)}`
         : "";
       router.replace(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
-      setNotice("Order Sandbox dibuat. Pembayaran sedang dimuat.");
+      setNotice("Order dibuat. Pembayaran sedang dimuat.");
     } catch {
       setNotice("Tidak dapat menghubungi server pembayaran.");
     } finally {
@@ -378,7 +390,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <p>
               {accessDenied
                 ? "Gunakan link order yang dibuat saat checkout. Order baru juga menyimpan akses aman di browser ini."
-                : "Buat pesanan baru dari halaman utama untuk melanjutkan ke Midtrans Sandbox."}
+                : "Buat pesanan baru dari halaman utama untuk melanjutkan ke pembayaran."}
             </p>
             <Link className="primary-button" href="/#topup">Buat pesanan baru <span>→</span></Link>
           </div>
@@ -411,8 +423,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     <main>
       {midtransClientKey && order && (
         <Script
-          id="midtrans-snap-sandbox"
-          src="https://app.sandbox.midtrans.com/snap/snap.js"
+          id={"midtrans-snap-" + midtransEnvironment}
+          src={midtransSnapUrl}
           data-client-key={midtransClientKey}
           strategy="afterInteractive"
           onLoad={() => setSnapReady(true)}
@@ -448,7 +460,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               </div>
             )}
           </div>
-          <span className="order-mode-badge">{isPreview ? "PREVIEW" : "SANDBOX"}</span>
+          <span className="order-mode-badge">
+            {isPreview
+              ? "PREVIEW"
+              : midtransEnvironment === "production"
+                ? "LIVE PAYMENT"
+                : "SANDBOX"}
+          </span>
         </div>
 
         <div className="order-status-grid">
@@ -509,8 +527,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <strong>{payment.name}</strong>
                   <p>{payment.detail}</p>
                 </div>
-                <button type="button" disabled={busy} onClick={() => void createSandboxOrder()}>
-                  {busy ? "Memproses..." : "Buat pembayaran Sandbox"}
+                <button type="button" disabled={busy} onClick={() => void createPaymentOrder()}>
+                  {busy ? "Memproses..." : midtransEnvironment === "production" ? "Buat pembayaran" : "Buat pembayaran Sandbox"}
                 </button>
               </div>
             ) : liveStatus === "pending_payment" ? (
@@ -521,7 +539,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>Midtrans Sandbox</span>
+                  <span>{midtransLabel}</span>
                 </div>
 
                 {!midtransClientKey && (
@@ -562,7 +580,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <span>Ringkasan pesanan</span>
                 <small>{displayId}</small>
               </div>
-              <small>{isPreview ? "Preview" : "Sandbox"}</small>
+              <small>{isPreview ? "Preview" : midtransEnvironment === "production" ? "Production" : "Sandbox"}</small>
             </div>
 
             <dl className="order-detail-list">

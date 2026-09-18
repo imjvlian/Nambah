@@ -1,7 +1,16 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
-const SNAP_SANDBOX_URL = "https://app.sandbox.midtrans.com/snap/v1/transactions";
-const API_SANDBOX_URL = "https://api.sandbox.midtrans.com/v2";
+const SNAP_URLS = {
+  sandbox: "https://app.sandbox.midtrans.com/snap/v1/transactions",
+  production: "https://app.midtrans.com/snap/v1/transactions",
+} as const;
+
+const API_URLS = {
+  sandbox: "https://api.sandbox.midtrans.com/v2",
+  production: "https://api.midtrans.com/v2",
+} as const;
+
+export type MidtransEnvironment = "sandbox" | "production";
 
 export type MidtransStatusPayload = {
   order_id?: string;
@@ -18,6 +27,13 @@ export type MidtransStatusPayload = {
   [key: string]: unknown;
 };
 
+export function getMidtransEnvironment(): MidtransEnvironment {
+  return process.env.MIDTRANS_ENVIRONMENT?.trim().toLowerCase() ===
+    "production"
+    ? "production"
+    : "sandbox";
+}
+
 function getServerKey() {
   return process.env.MIDTRANS_SERVER_KEY?.trim() ?? "";
 }
@@ -25,7 +41,7 @@ function getServerKey() {
 function requireServerKey() {
   const serverKey = getServerKey();
   if (!serverKey) {
-    throw new Error("Midtrans Sandbox server key belum dikonfigurasi.");
+    throw new Error("Midtrans server key belum dikonfigurasi.");
   }
   return serverKey;
 }
@@ -41,22 +57,33 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   try {
     parsed = raw ? JSON.parse(raw) : null;
   } catch {
-    throw new Error(`Midtrans returned non-JSON response (${response.status}).`);
+    throw new Error(
+      `Midtrans returned non-JSON response (${response.status}).`,
+    );
   }
 
   if (!response.ok) {
     const message =
       parsed && typeof parsed === "object" && "error_messages" in parsed
-        ? JSON.stringify((parsed as { error_messages?: unknown }).error_messages)
+        ? JSON.stringify(
+            (parsed as { error_messages?: unknown }).error_messages,
+          )
         : raw;
-    throw new Error(`Midtrans request failed (${response.status}): ${message}`);
+    throw new Error(
+      `Midtrans request failed (${response.status}): ${message}`,
+    );
   }
 
   return parsed as T;
 }
 
-export function isMidtransSandboxConfigured() {
+export function isMidtransConfigured() {
   return Boolean(getServerKey());
+}
+
+// Backward-compatible export for older internal imports.
+export function isMidtransSandboxConfigured() {
+  return getMidtransEnvironment() === "sandbox" && isMidtransConfigured();
 }
 
 export async function createMidtransSnapTransaction(input: {
@@ -69,11 +96,12 @@ export async function createMidtransSnapTransaction(input: {
   customerPhone?: string;
 }) {
   const serverKey = requireServerKey();
+  const environment = getMidtransEnvironment();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch(SNAP_SANDBOX_URL, {
+    const response = await fetch(SNAP_URLS[environment], {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -99,8 +127,12 @@ export async function createMidtransSnapTransaction(input: {
         ...((input.customerEmail || input.customerPhone)
           ? {
               customer_details: {
-                ...(input.customerEmail ? { email: input.customerEmail } : {}),
-                ...(input.customerPhone ? { phone: input.customerPhone } : {}),
+                ...(input.customerEmail
+                  ? { email: input.customerEmail }
+                  : {}),
+                ...(input.customerPhone
+                  ? { phone: input.customerPhone }
+                  : {}),
               },
             }
           : {}),
@@ -113,14 +145,21 @@ export async function createMidtransSnapTransaction(input: {
       signal: controller.signal,
     });
 
-    const result = await readJsonResponse<{ token?: string; redirect_url?: string }>(response);
+    const result = await readJsonResponse<{
+      token?: string;
+      redirect_url?: string;
+    }>(response);
+
     if (!result.token || !result.redirect_url) {
-      throw new Error("Midtrans Snap response tidak memiliki token atau redirect_url.");
+      throw new Error(
+        "Midtrans Snap response tidak memiliki token atau redirect_url.",
+      );
     }
 
     return {
       token: result.token,
       redirectUrl: result.redirect_url,
+      environment,
     };
   } finally {
     clearTimeout(timeout);
@@ -129,20 +168,24 @@ export async function createMidtransSnapTransaction(input: {
 
 export async function getMidtransTransactionStatus(orderId: string) {
   const serverKey = requireServerKey();
+  const environment = getMidtransEnvironment();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    const response = await fetch(`${API_SANDBOX_URL}/${encodeURIComponent(orderId)}/status`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: authorizationHeader(serverKey),
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${API_URLS[environment]}/${encodeURIComponent(orderId)}/status`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: authorizationHeader(serverKey),
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        signal: controller.signal,
       },
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    );
 
     return await readJsonResponse<MidtransStatusPayload>(response);
   } finally {
@@ -150,14 +193,18 @@ export async function getMidtransTransactionStatus(orderId: string) {
   }
 }
 
-export function verifyMidtransNotificationSignature(payload: MidtransStatusPayload) {
+export function verifyMidtransNotificationSignature(
+  payload: MidtransStatusPayload,
+) {
   const serverKey = getServerKey();
   const orderId = payload.order_id ?? "";
   const statusCode = payload.status_code ?? "";
   const grossAmount = payload.gross_amount ?? "";
   const signature = payload.signature_key ?? "";
 
-  if (!serverKey || !orderId || !statusCode || !grossAmount || !signature) return false;
+  if (!serverKey || !orderId || !statusCode || !grossAmount || !signature) {
+    return false;
+  }
 
   const expected = createHash("sha512")
     .update(`${orderId}${statusCode}${grossAmount}${serverKey}`)
