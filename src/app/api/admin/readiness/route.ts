@@ -76,6 +76,7 @@ export async function GET(request: Request) {
     testLabMigration,
     pointsLotsMigration,
     operationsMigration,
+    affiliateWithdrawalMigration,
   ] = await Promise.all([
     tableExists("loyalty_accounts"),
     tableExists("commissions"),
@@ -93,6 +94,7 @@ export async function GET(request: Request) {
     tableExists("staging_test_lab"),
     tableExists("point_lots"),
     tableExists("operational_incidents"),
+    tableExists("affiliate_withdrawal_allocations"),
   ]);
 
   const [activeProducts, activeGames, activeMappings] = await Promise.all([
@@ -196,6 +198,7 @@ export async function GET(request: Request) {
       ["migration-test-lab", "Migration 019 Staging Test Lab", testLabMigration],
       ["migration-points-lots", "Migration 020 Points lots", pointsLotsMigration],
       ["migration-operations", "Migration 022 Operational incidents", operationsMigration],
+      ["migration-affiliate-withdrawal", "Migration 024 Affiliate withdrawal", affiliateWithdrawalMigration],
     ].map(([id, label, ok]) => ({
       id: String(id),
       label: String(label),
@@ -348,7 +351,7 @@ export async function GET(request: Request) {
   ).length;
 
   return Response.json({
-    version: "0.5.8",
+    version: "0.6.0",
     stage: "production-candidate",
     readyForStagingE2E: stagingBlockers === 0,
     automatedProductionReady: productionBlockers === 0,

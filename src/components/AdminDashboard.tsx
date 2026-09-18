@@ -189,12 +189,14 @@ type AffiliatePayload = {
     active: number;
     pending: number;
     available: number;
+    reserved: number;
     withdrawn: number;
     cancelled: number;
   };
   affiliates: Array<{
     code: string;
     displayName: string;
+    userId: string | null;
     commissionRate: number;
     status: string;
     createdAt: string;
@@ -2166,7 +2168,12 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Partners"
                 title="Affiliate"
-                copy="Commission lifecycle mengikuti status order dan dihitung dari net profit yang sudah memperhitungkan biaya Points."
+                copy="Commission lifecycle mengikuti status order, withdrawal memakai allocation ledger, dan payout tetap dikonfirmasi operator."
+                action={
+                  <Link className="acc-primary-link" href="/admin/affiliates">
+                    Open withdrawal center →
+                  </Link>
+                }
               />
               <div className="acc-metrics">
                 <article>
@@ -2182,7 +2189,7 @@ export default function AdminDashboard() {
                 <article>
                   <small>Available</small>
                   <strong>{formatIDR(affiliateData.stats.available)}</strong>
-                  <span>Siap withdrawal</span>
+                  <span>{formatIDR(affiliateData.stats.reserved)} reserved</span>
                 </article>
                 <article>
                   <small>Withdrawn</small>

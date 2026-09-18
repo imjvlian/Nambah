@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.8 — Production Configuration Gate**
+**0.6.0 — Affiliate Withdrawal Workflow**
 
 Core flow tersedia:
 
@@ -50,6 +50,7 @@ Migration fitur terbaru:
 021 Points reverse/reservation consistency
 022 Operational incidents
 023 Admin principal audit
+024 Affiliate withdrawal workflow
 ```
 
 Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).

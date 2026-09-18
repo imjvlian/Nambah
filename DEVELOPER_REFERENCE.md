@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.7 — Security & Abuse Review  
+Baseline: Nambah 0.6.0 — Affiliate Withdrawal Workflow
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1625,3 +1625,44 @@ Account sessions are limited to 2 hours. Legacy bearer recovery remains supporte
 Admin audit records now include `actor_user_id` and `actor_role` when an account-bound session is used.
 
 Remaining Supabase dashboard action before production: enable Auth leaked-password protection. This is a provider account setting, not an application ENV.
+
+
+---
+
+## 49. Affiliate Withdrawal Workflow (0.6.0)
+
+Affiliate ownership is linked through `affiliates.user_id`. A normal customer only sees the affiliate panel when their Nambah account is explicitly linked by a superadmin.
+
+Customer APIs:
+
+~~~text
+GET   /api/account/affiliate
+POST  /api/account/affiliate/withdrawals
+PATCH /api/account/affiliate/withdrawals
+~~~
+
+Admin APIs:
+
+~~~text
+POST      /api/admin/affiliates/link
+GET/PATCH /api/admin/affiliates/withdrawals
+~~~
+
+The withdrawal lifecycle is:
+
+~~~text
+available commission
+→ customer withdrawal request
+→ atomic allocation reservation
+→ pending
+→ approved
+→ operator transfers outside Nambah
+→ superadmin marks paid with payment reference
+→ fully consumed commissions become withdrawn
+~~~
+
+Rejected/cancelled withdrawals automatically stop reserving commission because their allocations are excluded from available-balance calculations.
+
+Database RPCs use `SECURITY INVOKER`, are revoked from `PUBLIC`, `anon`, and `authenticated`, and are granted only to `service_role`.
+
+Withdrawal payout does **not** move money automatically. Nambah records the request, locks eligible commission value, and keeps payout status/audit data consistent; the actual transfer remains an operator action.
