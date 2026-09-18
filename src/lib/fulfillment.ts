@@ -1,6 +1,7 @@
 import { runDigiflazzTestTransaction, type DigiflazzTestOutcome } from "@/lib/digiflazz/client";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
+import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
@@ -249,6 +250,12 @@ async function finalizeOrder(
     await syncOrderPointsLifecycle(orderId, status);
   } catch (error) {
     console.error(`Nambah Points finalization failed for order ${orderId}`, error);
+  }
+
+  try {
+    await syncOrderCommissionLifecycle(orderId, status);
+  } catch (error) {
+    console.error(`Affiliate commission finalization failed for order ${orderId}`, error);
   }
 
   if (status === "success") {

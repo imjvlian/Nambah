@@ -2,6 +2,7 @@ import { fulfillPaidOrder } from "@/lib/fulfillment";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
+import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
@@ -289,6 +290,12 @@ export async function applyMidtransStatus(
     // Payment truth must not be rolled back by a loyalty subsystem issue.
     // Repeated status checks and fulfillment finalization will retry idempotently.
     console.error(`Nambah Points lifecycle sync failed for order ${orderId}`, error);
+  }
+
+  try {
+    await syncOrderCommissionLifecycle(orderId, orderStatus);
+  } catch (error) {
+    console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
   }
 
   await supabaseInsert("midtrans_payment_events", {

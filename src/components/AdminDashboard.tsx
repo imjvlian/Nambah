@@ -182,6 +182,35 @@ type AdminPointsPayload = {
   }>;
 };
 
+type AffiliatePayload = {
+  stats: {
+    affiliates: number;
+    active: number;
+    pending: number;
+    available: number;
+    withdrawn: number;
+    cancelled: number;
+  };
+  affiliates: Array<{
+    code: string;
+    displayName: string;
+    commissionRate: number;
+    status: string;
+    createdAt: string;
+  }>;
+  commissions: Array<{
+    id: number;
+    affiliateCode: string;
+    orderId: string;
+    baseProfit: number;
+    rate: number;
+    amount: number;
+    status: string;
+    availableAt: string | null;
+    createdAt: string;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -303,6 +332,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [pointsData, setPointsData] = useState<AdminPointsPayload | null>(null);
+  const [affiliateData, setAffiliateData] = useState<AffiliatePayload | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
@@ -380,6 +410,15 @@ export default function AdminDashboard() {
     setPointsData(data);
   }
 
+  async function loadAffiliates() {
+    const response = await fetch("/api/admin/affiliates", { cache: "no-store" });
+    const data = (await response.json()) as AffiliatePayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Affiliate ledger gagal dimuat.");
+    }
+    setAffiliateData(data);
+  }
+
   async function runReconciliation() {
     setBusy("reconciliation");
     setNotice("");
@@ -435,6 +474,7 @@ export default function AdminDashboard() {
       if (section === "catalog" || section === "supplier") await loadCatalog();
       if (section === "receipts") await loadReceipts();
       if (section === "points") await loadPoints();
+      if (section === "affiliates") await loadAffiliates();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -525,7 +565,14 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData]);
+    if (section === "affiliates" && !affiliateData) {
+      void loadAffiliates().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Affiliate ledger gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData]);
 
   async function logout() {
     setBusy("logout");
@@ -1534,33 +1581,59 @@ export default function AdminDashboard() {
             </>
           )}
 
-          {section === "affiliates" && overview && (
+          {section === "affiliates" && overview && affiliateData && (
             <>
               <SectionHead
                 eyebrow="Partners"
                 title="Affiliate"
-                copy="Referral benefit sudah masuk pricing. Modul berikutnya menyelesaikan commission lifecycle dan withdrawal."
+                copy="Commission lifecycle mengikuti status order dan dihitung dari net profit yang sudah memperhitungkan biaya Points."
               />
-              <div className="acc-module-summary">
+              <div className="acc-metrics">
                 <article>
                   <small>Active affiliates</small>
-                  <strong>
-                    {numberOrDash(overview.stats.activeAffiliates)}
-                  </strong>
-                  <span>Referral pricing aktif</span>
+                  <strong>{affiliateData.stats.active}</strong>
+                  <span>Dari {affiliateData.stats.affiliates} partner</span>
                 </article>
-                <article className="planned">
-                  <small>Commission rule</small>
-                  <strong>20% net profit</strong>
-                  <span>pending → available → withdrawn / cancelled</span>
+                <article>
+                  <small>Pending</small>
+                  <strong>{formatIDR(affiliateData.stats.pending)}</strong>
+                  <span>Order paid / processing</span>
+                </article>
+                <article>
+                  <small>Available</small>
+                  <strong>{formatIDR(affiliateData.stats.available)}</strong>
+                  <span>Siap withdrawal</span>
+                </article>
+                <article>
+                  <small>Withdrawn</small>
+                  <strong>{formatIDR(affiliateData.stats.withdrawn)}</strong>
+                  <span>Sudah dibayarkan</span>
                 </article>
               </div>
-              <div className="acc-planned-list">
-                <span>Affiliate CRUD</span>
-                <span>Commission ledger</span>
-                <span>Withdrawal approval</span>
-                <span>Refund/failure cancellation</span>
-                <span>Partner performance analytics</span>
+
+              <div className="acc-table-card">
+                <div className="acc-receipts-head">
+                  <span>Order</span>
+                  <span>Affiliate</span>
+                  <span>Base profit</span>
+                  <span>Commission</span>
+                  <span>Status</span>
+                </div>
+                {affiliateData.commissions.slice(0, 50).map((row) => (
+                  <div className="acc-receipts-row" key={row.id}>
+                    <div>
+                      <strong>{row.orderId}</strong>
+                      <span>{formatTime(row.createdAt)}</span>
+                    </div>
+                    <span>{row.affiliateCode}</span>
+                    <strong>{formatIDR(row.baseProfit)}</strong>
+                    <strong>{formatIDR(row.amount)}</strong>
+                    <span className={"acc-status " + row.status}>{row.status}</span>
+                  </div>
+                ))}
+                {affiliateData.commissions.length === 0 && (
+                  <div className="acc-empty">Belum ada commission ledger.</div>
+                )}
               </div>
             </>
           )}
@@ -1662,8 +1735,8 @@ export default function AdminDashboard() {
                 />
                 <RoadmapCard
                   title="Commission lifecycle"
-                  status="planned"
-                  copy="Create pending saat paid, available saat success, cancel saat refund/failure."
+                  status="live"
+                  copy="Commission pending saat paid/processing, available saat success, dan cancelled saat failure/refund."
                 />
                 <RoadmapCard
                   title="Rate limit & abuse guard"
