@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.6 — Customer Experience Finalization**
+**0.5.7 — Security & Abuse Review**
 
 Core flow tersedia:
 
@@ -49,6 +49,7 @@ Migration fitur terbaru:
 020 Points lots + expiry
 021 Points reverse/reservation consistency
 022 Operational incidents
+023 Admin principal audit
 ```
 
 Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).

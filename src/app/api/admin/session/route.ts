@@ -40,7 +40,13 @@ export async function GET(request: Request) {
         if (!legacyAuthorized) {
           headers.append(
             "Set-Cookie",
-            createAdminSessionCookie(createAdminSessionValue()),
+            createAdminSessionCookie(
+              createAdminSessionValue({
+                mode: "account",
+                userId: admin.userId,
+                role: admin.role,
+              }),
+            ),
           );
         }
 
@@ -134,7 +140,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const session = createAdminSessionValue();
+  const session = createAdminSessionValue({ mode: "legacy" });
   return Response.json(
     { authenticated: true, mode: "legacy" },
     { headers: { "Set-Cookie": createAdminSessionCookie(session) } },

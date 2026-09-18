@@ -1,7 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const ADMIN_SESSION_COOKIE = "nambah_admin_session";
-const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const ADMIN_SESSION_TTL_SECONDS = 2 * 60 * 60;
+
+export type AdminPrincipal = {
+  mode: "account" | "legacy";
+  userId: string | null;
+  role: "admin" | "superadmin" | "legacy";
+  exp: number;
+};
 
 function safeEqual(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
@@ -15,10 +22,7 @@ function configuredAdminToken() {
 }
 
 function configuredAdminSessionSecret() {
-  return (
-    process.env.NAMBAH_ADMIN_SESSION_SECRET?.trim() ||
-    configuredAdminToken()
-  );
+  return process.env.NAMBAH_ADMIN_SESSION_SECRET?.trim() || configuredAdminToken();
 }
 
 function signAdminSession(payload: string, secret: string) {
@@ -45,36 +49,67 @@ export function verifyAdminToken(suppliedToken: string) {
   );
 }
 
-export function createAdminSessionValue(now = Date.now()) {
+export function createAdminSessionValue(
+  input?: {
+    userId?: string | null;
+    role?: "admin" | "superadmin";
+    mode?: "account" | "legacy";
+  },
+  now = Date.now(),
+) {
   const secret = configuredAdminSessionSecret();
   if (!secret) throw new Error("Admin session secret belum dikonfigurasi.");
 
+  const mode = input?.mode ?? "legacy";
+  const role = mode === "legacy" ? "legacy" : input?.role ?? "admin";
   const payload = Buffer.from(
     JSON.stringify({
       exp: Math.floor(now / 1000) + ADMIN_SESSION_TTL_SECONDS,
+      mode,
+      userId: mode === "account" ? input?.userId ?? null : null,
+      role,
     }),
   ).toString("base64url");
 
   return `${payload}.${signAdminSession(payload, secret)}`;
 }
 
-export function verifyAdminSessionValue(value: string) {
+export function verifyAdminSessionValue(value: string): AdminPrincipal | null {
   const secret = configuredAdminSessionSecret();
-  if (!secret || !value) return false;
+  if (!secret || !value) return null;
 
   const [payload, signature] = value.split(".");
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
 
   const expectedSignature = signAdminSession(payload, secret);
-  if (!safeEqual(signature, expectedSignature)) return false;
+  if (!safeEqual(signature, expectedSignature)) return null;
 
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8")) as {
-      exp?: number;
+    const parsed = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf-8"),
+    ) as Partial<AdminPrincipal>;
+
+    if (
+      typeof parsed.exp !== "number" ||
+      parsed.exp <= Math.floor(Date.now() / 1000) ||
+      (parsed.mode !== "account" && parsed.mode !== "legacy") ||
+      (parsed.role !== "admin" &&
+        parsed.role !== "superadmin" &&
+        parsed.role !== "legacy")
+    ) {
+      return null;
+    }
+
+    if (parsed.mode === "account" && !parsed.userId) return null;
+
+    return {
+      exp: parsed.exp,
+      mode: parsed.mode,
+      userId: parsed.mode === "account" ? parsed.userId ?? null : null,
+      role: parsed.role,
     };
-    return typeof parsed.exp === "number" && parsed.exp > Math.floor(Date.now() / 1000);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -88,26 +123,31 @@ export function clearAdminSessionCookie() {
   return `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
-export function isAdminRequestAuthorized(request: Request) {
+export function getAdminRequestPrincipal(request: Request): AdminPrincipal | null {
   const configuredToken = configuredAdminToken();
   const header = request.headers.get("authorization") ?? "";
   const suppliedToken = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 
-  // Legacy bearer access remains available for automation/recovery when the
-  // old token is configured, but browser admin login uses an account session.
-  if (
-    configuredToken &&
-    suppliedToken &&
-    safeEqual(suppliedToken, configuredToken)
-  ) {
-    return true;
+  if (configuredToken && suppliedToken && safeEqual(suppliedToken, configuredToken)) {
+    return {
+      mode: "legacy",
+      userId: null,
+      role: "legacy",
+      exp: Math.floor(Date.now() / 1000) + 60,
+    };
   }
 
-  const session = readCookie(request, ADMIN_SESSION_COOKIE);
-  return verifyAdminSessionValue(session);
+  return verifyAdminSessionValue(readCookie(request, ADMIN_SESSION_COOKIE));
 }
 
-export function authorizeAdminRequest(request: Request) {
+export function isAdminRequestAuthorized(request: Request) {
+  return Boolean(getAdminRequestPrincipal(request));
+}
+
+export function authorizeAdminRequest(
+  request: Request,
+  options?: { superadminOnly?: boolean },
+) {
   if (!isAdminApiConfigured()) {
     return {
       ok: false as const,
@@ -118,12 +158,24 @@ export function authorizeAdminRequest(request: Request) {
     };
   }
 
-  if (!isAdminRequestAuthorized(request)) {
+  const principal = getAdminRequestPrincipal(request);
+  if (!principal) {
     return {
       ok: false as const,
       response: Response.json({ error: "Unauthorized." }, { status: 401 }),
     };
   }
 
-  return { ok: true as const };
+  if (
+    options?.superadminOnly &&
+    principal.role !== "superadmin" &&
+    principal.role !== "legacy"
+  ) {
+    return {
+      ok: false as const,
+      response: Response.json({ error: "Superadmin access required." }, { status: 403 }),
+    };
+  }
+
+  return { ok: true as const, principal };
 }

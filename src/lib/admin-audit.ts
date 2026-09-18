@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import { getAdminRequestPrincipal } from "@/lib/admin-api";
 import { supabaseInsert } from "@/lib/supabase/server";
 
 function actorKind(request: Request) {
+  const principal = getAdminRequestPrincipal(request);
+  if (principal?.mode === "account") return "admin_account";
   const auth = request.headers.get("authorization") ?? "";
   return auth.startsWith("Bearer ") ? "legacy_bearer" : "admin_session";
 }
@@ -28,8 +31,11 @@ export async function auditAdminAction(
 ) {
   try {
     const url = new URL(request.url);
+    const principal = getAdminRequestPrincipal(request);
     await supabaseInsert("admin_audit_logs", {
       actor_kind: actorKind(request),
+      actor_user_id: principal?.userId ?? null,
+      actor_role: principal?.role ?? null,
       action: input.action.slice(0, 120),
       target_type: input.targetType?.slice(0, 80) ?? null,
       target_id: input.targetId?.slice(0, 160) ?? null,

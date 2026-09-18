@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.6 — Customer Experience Finalization  
+Baseline: Nambah 0.5.7 — Security & Abuse Review  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1603,3 +1603,25 @@ midtrans-production
 The order page prefers this server value over the browser build-time environment when rendering payment labels and loading Snap. This avoids misleading environment badges when deployment configuration changes.
 
 Order API responses also expose persisted expiry/status-change/terminal timestamps consistently for customer tracking.
+
+
+---
+
+## 48. Role-bound Admin Sessions (0.5.7)
+
+Admin browser sessions now sign a principal payload containing:
+
+~~~text
+mode
+userId
+role
+exp
+~~~
+
+Account sessions are limited to 2 hours. Legacy bearer recovery remains supported, but normal browser sessions are tied to the actual `admin_users` account.
+
+`authorizeAdminRequest()` can require superadmin privileges. High-risk supplier/catalog operations such as catalog cleanup/markup, Digiflazz bootstrap/publish/mapping, and supplier price sync require `superadmin`.
+
+Admin audit records now include `actor_user_id` and `actor_role` when an account-bound session is used.
+
+Remaining Supabase dashboard action before production: enable Auth leaked-password protection. This is a provider account setting, not an application ENV.
