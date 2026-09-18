@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.7 — Security & Abuse Review**
+**0.5.8 — Production Configuration Gate**
 
 Core flow tersedia:
 
