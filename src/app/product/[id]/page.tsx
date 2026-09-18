@@ -1,3 +1,4 @@
+import AccountNav from "@/components/AccountNav";
 import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
@@ -58,7 +59,10 @@ export default async function ProductPage({
           <a href="#transaction">Transaksi</a>
           <a href="#description">Keterangan</a>
         </nav>
-        <a className="header-cta" href="#transaction">Top up sekarang</a>
+        <div className="header-actions">
+          <AccountNav />
+          <a className="header-cta" href="#transaction">Top up sekarang</a>
+        </div>
       </header>
 
       <section className="shell product-hero">

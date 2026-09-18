@@ -476,3 +476,44 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.admin-account-login {
+  margin-top: 24px;
+}
+
+.admin-login-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.admin-secondary-button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: #bbc1b7;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-secondary-button:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.admin-account-badge {
+  max-width: 240px;
+  overflow: hidden;
+  padding: 7px 9px;
+  border: 1px solid rgba(201, 255, 63, 0.14);
+  border-radius: 999px;
+  background: rgba(201, 255, 63, 0.035);
+  color: #b7c692;
+  font-size: 8px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

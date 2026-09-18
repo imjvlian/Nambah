@@ -1,3 +1,4 @@
+import AccountNav from "@/components/AccountNav";
 import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
@@ -22,7 +23,10 @@ export default async function Home() {
           <a href="#how-it-works">Cara Kerja</a>
         </nav>
 
-        <a className="header-cta" href="#catalog-start">Mulai top up</a>
+        <div className="header-actions">
+          <AccountNav />
+          <a className="header-cta" href="#catalog-start">Mulai top up</a>
+        </div>
       </header>
 
       <section className="hero shell home-v2-hero home-market-hero" id="top">

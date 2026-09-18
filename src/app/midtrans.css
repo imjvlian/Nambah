@@ -1,8 +1,8 @@
 .midtrans-native-section {
-  margin-top: 10px;
+  margin-top: 2px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #0d0f0c;
 }
 
@@ -11,13 +11,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
 }
 
 .midtrans-native-head > div {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .midtrans-native-head small,
@@ -25,32 +25,33 @@
 .midtrans-native-loading,
 .midtrans-native-warning {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .midtrans-native-head strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .midtrans-native-head p {
   margin: 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .midtrans-native-head > span {
+  flex: 0 0 auto;
   padding: 6px 8px;
   border-radius: 999px;
-  background: rgba(201, 255, 63, 0.07);
+  background: rgba(201, 255, 63, 0.065);
   color: var(--lime);
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 850;
   letter-spacing: 0.06em;
 }
 
 .midtrans-native-loading,
 .midtrans-native-warning {
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -60,21 +61,29 @@
 
 .midtrans-snap-container {
   width: 100%;
-  min-height: 620px;
+  min-height: 540px;
   background: #fff;
 }
 
 .midtrans-snap-container:empty {
-  min-height: 160px;
+  position: relative;
+  min-height: 140px;
   background:
-    linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
     #11130f;
+  background-size: 200% 100%;
+  animation: midtrans-loading 1.5s linear infinite;
+}
+
+@keyframes midtrans-loading {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 .midtrans-snap-container iframe {
   display: block;
   width: 100% !important;
-  min-height: 620px !important;
+  min-height: 540px !important;
   border: 0 !important;
 }
 
@@ -83,15 +92,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 14px;
+  padding: 10px 13px;
   border-top: 1px solid var(--line);
 }
 
 .midtrans-native-footer button {
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--lime);
-  font-size: 9px;
+  font: inherit;
+  font-size: 8px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -105,6 +116,6 @@
 
   .midtrans-snap-container,
   .midtrans-snap-container iframe {
-    min-height: 700px !important;
+    min-height: 680px !important;
   }
 }

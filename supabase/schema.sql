@@ -111,6 +111,17 @@ create table if not exists public.promotion_products (
   primary key (promotion_code, product_id)
 );
 
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'admin' check (role in ('admin', 'superadmin')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists admin_users_active_role_idx
+  on public.admin_users(active, role);
+
 create table if not exists public.affiliates (
   code text primary key,
   display_name text not null,
@@ -152,6 +163,8 @@ create index if not exists supplier_balance_snapshots_lookup_idx
 create table if not exists public.orders (
   id text primary key,
   customer_user_id uuid,
+  receipt_email text,
+  receipt_whatsapp text,
   game_id text not null references public.games(id),
   product_id text not null references public.products(id),
   payment_method_id text not null references public.payment_methods(id),
@@ -224,6 +237,40 @@ create table if not exists public.supplier_transactions (
 create index if not exists supplier_transactions_order_idx
   on public.supplier_transactions(order_id, created_at desc);
 
+create table if not exists public.supplier_webhook_events (
+  id bigint generated always as identity primary key,
+  supplier_id text not null references public.suppliers(id) on delete cascade,
+  event_type text not null,
+  request_ref text,
+  status text,
+  user_agent text,
+  payload jsonb not null,
+  received_at timestamptz not null default now()
+);
+
+create index if not exists supplier_webhook_events_lookup_idx
+  on public.supplier_webhook_events(supplier_id, request_ref, received_at desc);
+
+create table if not exists public.receipt_deliveries (
+  id bigint generated always as identity primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  channel text not null check (channel in ('email', 'whatsapp')),
+  recipient text not null,
+  provider text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'sending', 'sent', 'failed')),
+  provider_message_id text,
+  attempts integer not null default 0 check (attempts >= 0),
+  last_error text,
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (order_id, channel)
+);
+
+create index if not exists receipt_deliveries_status_idx
+  on public.receipt_deliveries(status, updated_at desc);
+
 create table if not exists public.commissions (
   id bigint generated always as identity primary key,
   affiliate_code text not null references public.affiliates(code),
@@ -269,12 +316,15 @@ alter table public.supplier_products enable row level security;
 alter table public.pricing_rules enable row level security;
 alter table public.promotions enable row level security;
 alter table public.promotion_products enable row level security;
+alter table public.admin_users enable row level security;
 alter table public.affiliates enable row level security;
 alter table public.supplier_balances enable row level security;
 alter table public.supplier_balance_snapshots enable row level security;
 alter table public.orders enable row level security;
 alter table public.payments enable row level security;
 alter table public.supplier_transactions enable row level security;
+alter table public.supplier_webhook_events enable row level security;
+alter table public.receipt_deliveries enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
 
@@ -289,12 +339,15 @@ revoke all on table public.supplier_products from anon, authenticated;
 revoke all on table public.pricing_rules from anon, authenticated;
 revoke all on table public.promotions from anon, authenticated;
 revoke all on table public.promotion_products from anon, authenticated;
+revoke all on table public.admin_users from anon, authenticated;
 revoke all on table public.affiliates from anon, authenticated;
 revoke all on table public.supplier_balances from anon, authenticated;
 revoke all on table public.supplier_balance_snapshots from anon, authenticated;
 revoke all on table public.orders from anon, authenticated;
 revoke all on table public.payments from anon, authenticated;
 revoke all on table public.supplier_transactions from anon, authenticated;
+revoke all on table public.supplier_webhook_events from anon, authenticated;
+revoke all on table public.receipt_deliveries from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;
 

@@ -9,6 +9,7 @@ import {
   validateGameAccountTarget,
 } from "@/lib/game-account";
 import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
+import { validateGuestReceiptContact } from "@/lib/customer-contact";
 import {
   createPublicPricingFallback,
   type PublicPricingResult,
@@ -165,6 +166,11 @@ export default function TopupExperience({
   const [appliedReferralCode, setAppliedReferralCode] = useState("");
   const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [viewerState, setViewerState] = useState<"loading" | "guest" | "authenticated">("loading");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestWhatsapp, setGuestWhatsapp] = useState("");
+  const [contactError, setContactError] = useState("");
   const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
   const [pricingError, setPricingError] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
@@ -198,6 +204,30 @@ export default function TopupExperience({
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
   const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
   const selectedGameArtwork = artworkByGameId[selectedGame.id];
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function resolveViewer() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!mounted) return;
+
+        setViewerState(response.ok ? "authenticated" : "guest");
+        if (response.ok) setContactError("");
+      } catch {
+        if (mounted) setViewerState("guest");
+      }
+    }
+
+    void resolveViewer();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -363,6 +393,7 @@ export default function TopupExperience({
     setSelectedPackageId(nextGame.packages[0]!.id);
     setUserId("");
     setServerId("");
+    setAccountError("");
     setUsernameCheck({ status: "idle" });
     resetPricingMessages();
     requestAnimationFrame(() => {
@@ -401,12 +432,41 @@ export default function TopupExperience({
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice("");
+    setAccountError("");
+    setContactError("");
 
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
     if (!account.ok) {
-      setNotice(account.error);
+      setAccountError(account.error);
+      requestAnimationFrame(() => {
+        document.getElementById("account-data")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
       return;
     }
+
+    let guestContact: { email: string; whatsapp: string } | null = null;
+    if (viewerState === "loading") {
+      setContactError("Status akun masih diperiksa. Coba lagi sebentar.");
+      return;
+    }
+    if (viewerState === "guest") {
+      const contact = validateGuestReceiptContact(guestEmail, guestWhatsapp);
+      if (!contact.ok) {
+        setContactError(contact.error);
+        requestAnimationFrame(() => {
+          document.getElementById("receipt-contact")?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        });
+        return;
+      }
+      guestContact = { email: contact.email, whatsapp: contact.whatsapp };
+    }
+
     if (!serverPricing) {
       setNotice(pricingError || "Harga belum tervalidasi. Coba lagi.");
       return;
@@ -429,14 +489,21 @@ export default function TopupExperience({
           targetServerId: account.serverId,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
+          ...(guestContact
+            ? {
+                receiptEmail: guestContact.email,
+                receiptWhatsapp: guestContact.whatsapp,
+              }
+            : {}),
         }),
       });
-      const data = (await response.json()) as { error?: string; order?: { id: string } };
+      const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Gagal membuat pembayaran Midtrans Sandbox.");
         return;
       }
-      router.push(`/order/${encodeURIComponent(data.order.id)}`);
+      const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
+      router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
       setNotice("Tidak bisa menyiapkan pembayaran Sandbox. Coba lagi.");
     } finally {
@@ -540,7 +607,16 @@ export default function TopupExperience({
             <span className="preview-badge">{catalogSource === "supabase" ? "Sandbox Checkout" : "MVP Pricing"}</span>
           </div>
 
-          <div className="form-block account-form-block">
+          <div className="form-block account-form-block" id="account-data">
+            {accountError && (
+              <div className="account-validation-error" role="alert" aria-live="assertive">
+                <span className="account-validation-error-icon" aria-hidden="true">!</span>
+                <span className="account-validation-error-copy">
+                  <strong>Data akun belum lengkap</strong>
+                  <small>{accountError}</small>
+                </span>
+              </div>
+            )}
             <div className="form-label">
               <span className="step-number">1</span>
               <div>
@@ -558,6 +634,7 @@ export default function TopupExperience({
                   value={userId}
                   onChange={(event) => {
                     setUserId(sanitizeAccountField(event.target.value, accountSchema.user));
+                    setAccountError("");
                     setUsernameCheck({ status: "idle" });
                   }}
                 />
@@ -572,6 +649,7 @@ export default function TopupExperience({
                     value={serverId}
                     onChange={(event) => {
                       setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
+                      setAccountError("");
                       setUsernameCheck({ status: "idle" });
                     }}
                   />
@@ -622,6 +700,66 @@ export default function TopupExperience({
               </div>
             )}
           </div>
+
+          {viewerState === "guest" && (
+            <div className="form-block guest-receipt-block" id="receipt-contact">
+              {contactError && (
+                <div className="account-validation-error" role="alert" aria-live="assertive">
+                  <span className="account-validation-error-icon" aria-hidden="true">!</span>
+                  <span className="account-validation-error-copy">
+                    <strong>Kontak receipt belum lengkap</strong>
+                    <small>{contactError}</small>
+                  </span>
+                </div>
+              )}
+
+              <div className="form-label">
+                <span className="step-number">✉</span>
+                <div>
+                  <strong>Kontak receipt</strong>
+                  <small>Karena kamu belum login, receipt transaksi akan menggunakan email dan WhatsApp ini.</small>
+                </div>
+              </div>
+
+              <div className="input-grid two guest-receipt-fields">
+                <label>
+                  <span>Email</span>
+                  <input
+                    autoComplete="email"
+                    inputMode="email"
+                    type="email"
+                    maxLength={254}
+                    placeholder="nama@email.com"
+                    value={guestEmail}
+                    onChange={(event) => {
+                      setGuestEmail(event.target.value);
+                      setContactError("");
+                    }}
+                  />
+                </label>
+
+                <label>
+                  <span>Nomor WhatsApp</span>
+                  <input
+                    autoComplete="tel"
+                    inputMode="tel"
+                    type="tel"
+                    maxLength={20}
+                    placeholder="081234567890"
+                    value={guestWhatsapp}
+                    onChange={(event) => {
+                      setGuestWhatsapp(event.target.value);
+                      setContactError("");
+                    }}
+                  />
+                </label>
+              </div>
+
+              <p className="guest-receipt-note">
+                Kontak ini hanya disimpan pada order untuk status dan receipt transaksi.
+              </p>
+            </div>
+          )}
 
           <div className="form-block nominal-form-block nominal-form-grouped">
             <div className="form-label">

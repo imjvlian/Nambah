@@ -1,6 +1,9 @@
+import { fulfillPaidOrder } from "@/lib/fulfillment";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
+import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { isTerminalStatus } from "./order-status";
 
 type OrderRow = {
   id: string;
@@ -113,7 +116,7 @@ function nextOrderStatus(
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -206,7 +209,7 @@ export async function applyMidtransStatus(
 
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -222,6 +225,22 @@ export async function applyMidtransStatus(
   const paymentStatus = normalizePaymentStatus(payload.transaction_status);
   const orderStatus = nextOrderStatus(order.status, payload);
   const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+
+  // Update timestamps for status changes
+  const updatePayload: Record<string, unknown> = {};
+  if (orderStatus !== order.status) {
+    updatePayload.status = orderStatus;
+    updatePayload.status_changed_at = now;
+    if (isTerminalStatus(orderStatus)) {
+      updatePayload.terminal_at = now;
+    }
+    if (orderStatus === "paid" && (order.status === "pending_payment" || order.status === null)) {
+      updatePayload.paid_at = payload.settlement_time ?? now;
+    }
+    updatePayload.updated_at = now;
+  } else {
+    updatePayload.updated_at = now;
+  }
 
   const paymentUpdate = await supabaseUpdate<PaymentRow>(
     "payments",
@@ -245,15 +264,16 @@ export async function applyMidtransStatus(
   }
 
   if (orderStatus !== order.status) {
-    await supabaseUpdate(
-      "orders",
-      {
-        status: orderStatus,
-        ...(orderStatus === "paid" ? { paid_at: payload.settlement_time ?? now } : {}),
-        updated_at: now,
-      },
-      { filters: { id: `eq.${orderId}` } },
-    );
+    const orderUpdatePayload: Record<string, unknown> = { status: orderStatus, updated_at: now };
+    if (orderStatus === "paid") {
+      orderUpdatePayload.paid_at = payload.settlement_time ?? now;
+    }
+    if (isTerminalStatus(orderStatus)) {
+      orderUpdatePayload.terminal_at = now;
+    }
+    orderUpdatePayload.status_changed_at = now;
+
+    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
   }
 
   await supabaseInsert("midtrans_payment_events", {
@@ -270,7 +290,53 @@ export async function applyMidtransStatus(
     received_at: now,
   });
 
+  // Payment success and fulfillment are deliberately decoupled. A supplier
+  // outage must never erase a verified Midtrans payment. Repeated webhook or
+  // manual refresh calls are safe because fulfillment uses a deterministic
+  // supplier request_ref per order.
+  if (orderStatus === "paid" || orderStatus === "processing") {
+    try {
+      await fulfillPaidOrder(orderId);
+    } catch (error) {
+      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
+    }
+  }
+
   const publicOrder = await getPublicOrder(orderId);
   if (!publicOrder) throw new Error(`Order ${orderId} hilang setelah update.`);
+
+  // Receipt delivery is intentionally retried from the payment/status path as
+  // well as fulfillment. This covers orders that were already success before
+  // Brevo was enabled and explicit provider failures from an earlier attempt.
+  // deliverSuccessReceipt is idempotent after a successful send.
+  if (publicOrder.status === "success") {
+    try {
+      const receipt = await deliverSuccessReceipt(orderId);
+      if (
+        receipt.status !== "sent" &&
+        receipt.status !== "disabled" &&
+        receipt.status !== "sending"
+      ) {
+        console.warn(`Receipt for order ${orderId}: ${receipt.status}`);
+      }
+    } catch (error) {
+      console.error(`Receipt retry failed for order ${orderId}`, error);
+    }
+  }
+
   return publicOrder;
+}
+
+
+export async function isOrderOwnedByUser(orderId: string, userId: string) {
+  if (!orderId || !userId) return false;
+  const rows = await supabaseSelect<{ id: string }>("orders", {
+    select: "id",
+    filters: {
+      id: `eq.${orderId}`,
+      customer_user_id: `eq.${userId}`,
+    },
+    limit: 1,
+  });
+  return rows.length > 0;
 }

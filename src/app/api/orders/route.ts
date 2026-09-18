@@ -1,7 +1,20 @@
+import {
+  appendResolvedNambahAuthCookies,
+  resolveNambahAuth,
+} from "@/lib/nambah-auth";
 import { randomUUID } from "node:crypto";
+import {
+  isValidReceiptEmail,
+  normalizeReceiptEmail,
+  validateGuestReceiptContact,
+} from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
 import { getPublicOrder } from "@/lib/order-service";
+import {
+  createOrderAccessCookie,
+  createOrderAccessCredential,
+} from "@/lib/order-access";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
 import { isSupabaseConfigured, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
@@ -16,6 +29,8 @@ type CreateOrderBody = {
   targetServerId?: string;
   promoCode?: string;
   referralCode?: string;
+  receiptEmail?: string;
+  receiptWhatsapp?: string;
 };
 
 type GameAccountRow = {
@@ -65,6 +80,29 @@ export async function POST(request: Request) {
 
   const targetUserId = clean(body.targetUserId, 64);
   const targetServerId = clean(body.targetServerId, 64);
+  const auth = await resolveNambahAuth(request);
+
+  let receiptEmail = "";
+  let receiptWhatsapp = "";
+  if (auth.user) {
+    receiptEmail = normalizeReceiptEmail(auth.user.email);
+    if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
+      return Response.json(
+        { error: "Email akun Nambah tidak tersedia untuk receipt." },
+        { status: 409 },
+      );
+    }
+  } else {
+    const contact = validateGuestReceiptContact(
+      body.receiptEmail,
+      body.receiptWhatsapp,
+    );
+    if (!contact.ok) {
+      return Response.json({ error: contact.error }, { status: 400 });
+    }
+    receiptEmail = contact.email;
+    receiptWhatsapp = contact.whatsapp;
+  }
 
   const pricingContext = await getPricingContext({
     gameId: body.gameId,
@@ -148,10 +186,15 @@ export async function POST(request: Request) {
 
   const orderId = createOrderId();
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const access = createOrderAccessCredential();
 
   try {
     await supabaseInsert("orders", {
       id: orderId,
+      customer_user_id: auth.user?.id ?? null,
+      receipt_email: receiptEmail,
+      receipt_whatsapp: receiptWhatsapp || null,
       game_id: game.id,
       product_id: selectedPackage.id,
       payment_method_id: paymentMethod.id,
@@ -173,8 +216,12 @@ export async function POST(request: Request) {
       affiliate_rate: pricing.affiliateRate,
       affiliate_commission: pricing.affiliateCommission,
       nambah_profit: pricing.nambahProfit,
+      access_token_hash: access.tokenHash,
       created_at: now,
       updated_at: now,
+      expires_at: expiresAt,
+      status_changed_at: now,
+      terminal_at: null,
     });
 
     await supabaseInsert("payments", {
@@ -196,6 +243,8 @@ export async function POST(request: Request) {
         itemId: selectedPackage.id,
         itemName: `${game.name} - ${selectedPackage.label}`,
         enabledPayments,
+        customerEmail: receiptEmail,
+        customerPhone: receiptWhatsapp || undefined,
       });
     } catch (error) {
       await Promise.all([
@@ -227,7 +276,19 @@ export async function POST(request: Request) {
     const order = await getPublicOrder(orderId);
     if (!order) throw new Error("Order tidak ditemukan setelah dibuat.");
 
-    return Response.json({ order }, { status: 201 });
+    const responseHeaders = new Headers({
+      "Cache-Control": "private, no-store",
+    });
+    responseHeaders.append("Set-Cookie", createOrderAccessCookie(orderId, access.token));
+    appendResolvedNambahAuthCookies(responseHeaders, auth);
+
+    return Response.json(
+      { order, accessToken: access.token },
+      {
+        status: 201,
+        headers: responseHeaders,
+      },
+    );
   } catch (error) {
     console.error("Midtrans Sandbox order creation failed", error);
     return Response.json(

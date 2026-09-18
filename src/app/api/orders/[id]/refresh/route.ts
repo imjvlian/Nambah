@@ -1,11 +1,20 @@
 import { getMidtransTransactionStatus } from "@/lib/midtrans/client";
-import { applyMidtransStatus, getPublicOrder } from "@/lib/order-service";
+import {
+  applyMidtransStatus,
+  getPublicOrder,
+  isOrderOwnedByUser,
+} from "@/lib/order-service";
+import {
+  appendResolvedNambahAuthCookies,
+  resolveNambahAuth,
+} from "@/lib/nambah-auth";
+import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isSupabaseConfigured()) {
@@ -19,6 +28,24 @@ export async function POST(
   }
 
   try {
+    const token = readOrderAccessToken(request);
+    let authorized = Boolean(token && (await verifyOrderAccess(orderId, token)));
+    let auth = null as Awaited<ReturnType<typeof resolveNambahAuth>> | null;
+
+    if (!authorized) {
+      auth = await resolveNambahAuth(request);
+      authorized = Boolean(
+        auth.user && (await isOrderOwnedByUser(orderId, auth.user.id)),
+      );
+    }
+
+    const headers = new Headers({ "Cache-Control": "private, no-store" });
+    if (auth) appendResolvedNambahAuthCookies(headers, auth);
+
+    if (!authorized) {
+      return Response.json({ error: "Akses tidak sah." }, { status: 401, headers });
+    }
+
     const existing = await getPublicOrder(orderId);
     if (!existing) {
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });
@@ -26,7 +53,7 @@ export async function POST(
 
     const payload = await getMidtransTransactionStatus(orderId);
     const order = await applyMidtransStatus(payload, "status_api", false);
-    return Response.json({ order });
+    return Response.json({ order }, { headers });
   } catch (error) {
     console.error("Midtrans status refresh failed", error);
     return Response.json(

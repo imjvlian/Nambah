@@ -9,6 +9,7 @@ import "./product-grouped-nominals.css";
 import "./account-auto-check.css";
 import "./order.css";
 import "./admin.css";
+import "./admin-control-center.css";
 import "./admin-automation.css";
 import "./admin-source-of-truth.css";
 import "./midtrans.css";
@@ -16,6 +17,8 @@ import "./admin-digiflazz.css";
 import "./admin-digiflazz-v2.css";
 import "./admin-publish-checkbox.css";
 import "./admin-supplier-link.css";
+import "./product-checkout-rail-v2.css";
+import "./auth.css";
 
 export const metadata: Metadata = {
   title: "Nambah — Top Up Cepat, Main Lagi",

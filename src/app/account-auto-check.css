@@ -1,3 +1,46 @@
+.account-validation-error {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border: 1px solid rgba(231, 106, 106, 0.38);
+  border-radius: 12px;
+  background: rgba(187, 63, 63, 0.09);
+  color: #e6b6b6;
+}
+
+.account-validation-error-icon {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(231, 106, 106, 0.58);
+  border-radius: 50%;
+  color: #f08f8f;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.account-validation-error-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.account-validation-error-copy strong {
+  color: #efc1c1;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.account-validation-error-copy small {
+  color: #c98f8f;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .account-auto-check {
   margin-top: 12px;
 }
@@ -94,5 +137,31 @@
   .account-check-copy {
     display: grid;
     gap: 2px;
+  }
+}
+
+
+.guest-receipt-block {
+  scroll-margin-top: 130px;
+}
+
+.guest-receipt-block .form-label {
+  margin-bottom: 14px;
+}
+
+.guest-receipt-fields input {
+  width: 100%;
+}
+
+.guest-receipt-note {
+  margin: 10px 0 0;
+  color: #777f75;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 620px) {
+  .guest-receipt-fields {
+    grid-template-columns: 1fr !important;
   }
 }

@@ -14,8 +14,15 @@ function configuredAdminToken() {
   return process.env.NAMBAH_ADMIN_API_TOKEN?.trim() ?? "";
 }
 
-function signAdminSession(payload: string, token: string) {
-  return createHmac("sha256", token).update(payload).digest("base64url");
+function configuredAdminSessionSecret() {
+  return (
+    process.env.NAMBAH_ADMIN_SESSION_SECRET?.trim() ||
+    configuredAdminToken()
+  );
+}
+
+function signAdminSession(payload: string, secret: string) {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
 function readCookie(request: Request, name: string) {
@@ -28,7 +35,7 @@ function readCookie(request: Request, name: string) {
 }
 
 export function isAdminApiConfigured() {
-  return Boolean(configuredAdminToken());
+  return Boolean(configuredAdminSessionSecret());
 }
 
 export function verifyAdminToken(suppliedToken: string) {
@@ -39,8 +46,8 @@ export function verifyAdminToken(suppliedToken: string) {
 }
 
 export function createAdminSessionValue(now = Date.now()) {
-  const token = configuredAdminToken();
-  if (!token) throw new Error("Admin API token belum dikonfigurasi.");
+  const secret = configuredAdminSessionSecret();
+  if (!secret) throw new Error("Admin session secret belum dikonfigurasi.");
 
   const payload = Buffer.from(
     JSON.stringify({
@@ -48,17 +55,17 @@ export function createAdminSessionValue(now = Date.now()) {
     }),
   ).toString("base64url");
 
-  return `${payload}.${signAdminSession(payload, token)}`;
+  return `${payload}.${signAdminSession(payload, secret)}`;
 }
 
 export function verifyAdminSessionValue(value: string) {
-  const token = configuredAdminToken();
-  if (!token || !value) return false;
+  const secret = configuredAdminSessionSecret();
+  if (!secret || !value) return false;
 
   const [payload, signature] = value.split(".");
   if (!payload || !signature) return false;
 
-  const expectedSignature = signAdminSession(payload, token);
+  const expectedSignature = signAdminSession(payload, secret);
   if (!safeEqual(signature, expectedSignature)) return false;
 
   try {
@@ -83,11 +90,18 @@ export function clearAdminSessionCookie() {
 
 export function isAdminRequestAuthorized(request: Request) {
   const configuredToken = configuredAdminToken();
-  if (!configuredToken) return false;
-
   const header = request.headers.get("authorization") ?? "";
   const suppliedToken = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (suppliedToken && safeEqual(suppliedToken, configuredToken)) return true;
+
+  // Legacy bearer access remains available for automation/recovery when the
+  // old token is configured, but browser admin login uses an account session.
+  if (
+    configuredToken &&
+    suppliedToken &&
+    safeEqual(suppliedToken, configuredToken)
+  ) {
+    return true;
+  }
 
   const session = readCookie(request, ADMIN_SESSION_COOKIE);
   return verifyAdminSessionValue(session);
@@ -98,7 +112,7 @@ export function authorizeAdminRequest(request: Request) {
     return {
       ok: false as const,
       response: Response.json(
-        { error: "Admin API token belum dikonfigurasi." },
+        { error: "Admin session secret belum dikonfigurasi." },
         { status: 503 },
       ),
     };
