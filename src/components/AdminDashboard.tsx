@@ -279,6 +279,21 @@ type FinancePayload = {
   }>;
 };
 
+type ReadinessPayload = {
+  stage: string;
+  readyForStagingE2E: boolean;
+  blockers: number;
+  warnings: number;
+  fulfillmentMode: string;
+  flowTest: boolean;
+  checks: Array<{
+    id: string;
+    label: string;
+    status: "pass" | "warning" | "blocker";
+    detail: string;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -406,6 +421,7 @@ export default function AdminDashboard() {
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
   const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessPayload | null>(null);
   const [promoDraft, setPromoDraft] = useState({
     code: "",
     name: "",
@@ -640,9 +656,8 @@ export default function AdminDashboard() {
         checked?: number;
         ok?: number;
         warning?: number;
-        error?: number;
+        errors?: number;
         rows?: FinancePayload["rows"];
-        errorMessage?: string;
         error?: string;
       };
       if (!response.ok) {
@@ -653,7 +668,7 @@ export default function AdminDashboard() {
         "Finance check selesai: " +
           (data.checked ?? 0) +
           " order · " +
-          (data.error ?? 0) +
+          (data.errors ?? 0) +
           " error · " +
           (data.warning ?? 0) +
           " warning.",
@@ -667,6 +682,15 @@ export default function AdminDashboard() {
     } finally {
       setBusy("");
     }
+  }
+
+  async function loadReadiness() {
+    const response = await fetch("/api/admin/readiness", { cache: "no-store" });
+    const data = (await response.json()) as ReadinessPayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Readiness check gagal dimuat.");
+    }
+    setReadiness(data);
   }
 
   async function runReconciliation() {
@@ -728,6 +752,7 @@ export default function AdminDashboard() {
       if (section === "promotions") await loadPromotions();
       if (section === "users") await loadUsers();
       if (section === "finance") await loadFinance();
+      if (section === "system") await loadReadiness();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -848,7 +873,14 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData]);
+    if (section === "system" && !readiness) {
+      void loadReadiness().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Readiness check gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, readiness]);
 
   async function logout() {
     setBusy("logout");
@@ -2226,6 +2258,36 @@ export default function AdminDashboard() {
                 </span>
               </div>
 
+              {readiness && (
+                <div className="acc-readiness-panel">
+                  <div className="acc-readiness-head">
+                    <div>
+                      <small>STAGING E2E READINESS</small>
+                      <strong>
+                        {readiness.readyForStagingE2E
+                          ? "Ready for E2E"
+                          : readiness.blockers + " blocker"}
+                      </strong>
+                    </div>
+                    <span>
+                      {readiness.warnings} warning · {readiness.checks.length} checks
+                    </span>
+                  </div>
+                  <div className="acc-readiness-list">
+                    {readiness.checks.map((check) => (
+                      <div key={check.id}>
+                        <span className={"acc-health " + check.status} />
+                        <div>
+                          <strong>{check.label}</strong>
+                          <small>{check.detail}</small>
+                        </div>
+                        <b>{check.status}</b>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="acc-roadmap-grid">
                 <RoadmapCard
                   title="Digiflazz webhook apply"
@@ -2244,13 +2306,13 @@ export default function AdminDashboard() {
                 />
                 <RoadmapCard
                   title="Rate limit & abuse guard"
-                  status="planned"
-                  copy="Checkout, checker, auth, dan admin endpoint diberi limit serta observability."
+                  status="live"
+                  copy="Durable database limiter melindungi login, signup, account checker, dan order creation."
                 />
                 <RoadmapCard
-                  title="Health & alerts"
-                  status="planned"
-                  copy="Service health, low balance, provider failures, dan operational alerts."
+                  title="Health & readiness"
+                  status="live"
+                  copy="Public health probe, admin staging checklist, migration detection, audit log, dan integration readiness aktif."
                 />
                 <RoadmapCard
                   title="Live safety gate"

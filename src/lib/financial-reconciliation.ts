@@ -383,7 +383,7 @@ export async function runFinancialReconciliation(limit = 100) {
     checked: rows.length,
     ok: rows.filter((row) => row.result === "ok").length,
     warning: rows.filter((row) => row.result === "warning").length,
-    error: rows.filter((row) => row.result === "error").length,
+    errors: rows.filter((row) => row.result === "error").length,
     rows,
   };
 }

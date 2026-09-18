@@ -20,6 +20,7 @@ import {
   validateRequestedPoints,
 } from "@/lib/loyalty";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { reservePromotionForOrder, syncPromotionLifecycle } from "@/lib/promotion-service";
 import { getPublicOrder } from "@/lib/order-service";
 import {
@@ -69,6 +70,13 @@ function clean(value?: string, maxLength = 80) {
 }
 
 export async function POST(request: Request) {
+  const limited = await rateLimitResponse(request, {
+    scope: "order-create",
+    limit: 15,
+    windowSeconds: 10 * 60,
+  });
+  if (limited) return limited;
+
   if (!isSupabaseConfigured()) {
     return Response.json(
       { error: "Database Nambah belum dikonfigurasi untuk membuat order." },

@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { runFinancialReconciliation } from "@/lib/financial-reconciliation";
 import { supabaseSelect } from "@/lib/supabase/server";
 
@@ -66,6 +67,15 @@ export async function POST(request: Request) {
 
   try {
     const result = await runFinancialReconciliation(100);
+    await auditAdminAction(request, {
+      action: "finance.reconcile",
+      targetType: "system",
+      metadata: {
+        checked: result.checked,
+        errors: result.errors,
+        warning: result.warning,
+      },
+    });
     return Response.json(result);
   } catch (error) {
     console.error("Admin finance reconciliation failed", error);

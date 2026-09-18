@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       checked: result.checked,
       ok: result.ok,
       warning: result.warning,
-      error: result.error,
+      errors: result.errors,
     });
   } catch (error) {
     console.error("Financial reconciliation cron failed", error);

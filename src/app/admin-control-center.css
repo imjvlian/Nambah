@@ -1164,3 +1164,79 @@
     grid-column: 1 / -1;
   }
 }
+
+
+.acc-readiness-panel {
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid rgba(201,255,63,.15);
+  border-radius: 16px;
+  background: #0d0f0c;
+}
+
+.acc-readiness-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.acc-readiness-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.acc-readiness-head small {
+  color: var(--lime);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.acc-readiness-head strong {
+  font-size: 13px;
+}
+
+.acc-readiness-head > span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.acc-readiness-list > div {
+  display: grid;
+  grid-template-columns: 10px minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.045);
+}
+
+.acc-readiness-list > div > div {
+  display: grid;
+  gap: 3px;
+}
+
+.acc-readiness-list strong {
+  font-size: 9px;
+}
+
+.acc-readiness-list small,
+.acc-readiness-list b {
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.acc-health.pass {
+  background: var(--lime);
+}
+
+.acc-health.warning {
+  background: #e0bd80;
+}
+
+.acc-health.blocker {
+  background: #df8d8d;
+}

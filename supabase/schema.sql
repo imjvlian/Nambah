@@ -309,6 +309,26 @@ create index if not exists point_ledger_order_idx
   on public.point_ledger(order_id, created_at desc)
   where order_id is not null;
 
+create table if not exists public.rate_limit_buckets (
+  bucket_key text primary key,
+  hit_count integer not null default 0 check (hit_count >= 0),
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_audit_logs (
+  id bigint generated always as identity primary key,
+  actor_kind text not null check (actor_kind in ('admin_session','legacy_bearer')),
+  action text not null,
+  target_type text,
+  target_id text,
+  method text not null,
+  path text not null,
+  client_hash text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.financial_reconciliations (
   order_id text primary key references public.orders(id) on delete cascade,
   result text not null check (result in ('ok','warning','error')),
@@ -378,6 +398,8 @@ alter table public.supplier_webhook_events enable row level security;
 alter table public.receipt_deliveries enable row level security;
 alter table public.loyalty_accounts enable row level security;
 alter table public.point_ledger enable row level security;
+alter table public.rate_limit_buckets enable row level security;
+alter table public.admin_audit_logs enable row level security;
 alter table public.financial_reconciliations enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
@@ -404,6 +426,8 @@ revoke all on table public.supplier_webhook_events from anon, authenticated;
 revoke all on table public.receipt_deliveries from anon, authenticated;
 revoke all on table public.loyalty_accounts from anon, authenticated;
 revoke all on table public.point_ledger from anon, authenticated;
+revoke all on table public.rate_limit_buckets from anon, authenticated;
+revoke all on table public.admin_audit_logs from anon, authenticated;
 revoke all on table public.financial_reconciliations from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;

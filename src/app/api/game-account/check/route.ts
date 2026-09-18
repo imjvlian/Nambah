@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { getGameAccountSchema, validateGameAccountTarget } from "@/lib/game-account";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 import { checkVolseverGame } from "@/lib/volsever/client";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -223,6 +224,13 @@ function mimihBusinessError(rc: string, message?: string) {
 }
 
 export async function POST(request: Request) {
+  const durableLimit = await rateLimitResponse(request, {
+    scope: "game-account-check",
+    limit: 30,
+    windowSeconds: 10 * 60,
+  });
+  if (durableLimit) return durableLimit;
+
   if (!isSupabaseConfigured()) {
     return Response.json(
       { error: "Konfigurasi database Nambah belum lengkap." },

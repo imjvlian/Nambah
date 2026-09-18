@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { runNambahReconciliation } from "@/lib/reconciliation";
 
 export const runtime = "nodejs";
@@ -12,6 +13,15 @@ export async function POST(request: Request) {
     const result = await runNambahReconciliation({
       source: "admin",
       limit: 20,
+    });
+    await auditAdminAction(request, {
+      action: "reconciliation.run",
+      targetType: "system",
+      metadata: {
+        ordersChecked: result.orders.checked,
+        supplierChecked: result.supplier.checked,
+        receiptsRetried: result.receipts.retried,
+      },
     });
     return Response.json(result);
   } catch (error) {

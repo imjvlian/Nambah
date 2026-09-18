@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 
 export const runtime = "nodejs";
@@ -18,6 +19,12 @@ export async function POST(
 
   try {
     const result = await deliverSuccessReceipt(orderId);
+    await auditAdminAction(request, {
+      action: "receipt.retry",
+      targetType: "order",
+      targetId: orderId,
+      metadata: { status: result.status },
+    });
     return Response.json({ result });
   } catch (error) {
     console.error("Admin receipt retry failed", error);

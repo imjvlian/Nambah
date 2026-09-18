@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import {
   supabaseDelete,
   supabaseInsert,
@@ -162,6 +163,12 @@ export async function POST(request: Request) {
       );
     }
 
+    await auditAdminAction(request, {
+      action: "promotion.create",
+      targetType: "promotion",
+      targetId: code,
+      metadata: { active: body.active !== false, type, value },
+    });
     return Response.json({ ok: true, code });
   } catch (error) {
     console.error("Admin promotions POST failed", error);
@@ -245,6 +252,14 @@ export async function PATCH(request: Request) {
       }
     }
 
+    await auditAdminAction(request, {
+      action: "promotion.update",
+      targetType: "promotion",
+      targetId: code,
+      metadata: {
+        fields: Object.keys(body).filter((key) => key !== "code"),
+      },
+    });
     return Response.json({ ok: true, code });
   } catch (error) {
     console.error("Admin promotions PATCH failed", error);

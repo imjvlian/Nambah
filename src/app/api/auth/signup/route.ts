@@ -4,6 +4,7 @@ import {
   publicNambahUser,
   signUpNambah,
 } from "@/lib/nambah-auth";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,13 @@ function cleanText(value: unknown, maxLength: number) {
 }
 
 export async function POST(request: Request) {
+  const limited = await rateLimitResponse(request, {
+    scope: "auth-signup",
+    limit: 5,
+    windowSeconds: 60 * 60,
+  });
+  if (limited) return limited;
+
   let body: {
     displayName?: unknown;
     email?: unknown;

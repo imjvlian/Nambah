@@ -4,6 +4,7 @@ import {
   publicNambahUser,
   signInNambah,
 } from "@/lib/nambah-auth";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,13 @@ function cleanEmail(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const limited = await rateLimitResponse(request, {
+    scope: "auth-login",
+    limit: 10,
+    windowSeconds: 10 * 60,
+  });
+  if (limited) return limited;
+
   let body: { email?: unknown; password?: unknown };
   try {
     body = (await request.json()) as { email?: unknown; password?: unknown };

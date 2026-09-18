@@ -248,6 +248,16 @@ export async function GET(request: Request) {
               : "VOLSEVER_API_KEY belum terpasang.",
           ),
           service(
+            "hardening",
+            "Security Hardening",
+            configured("NAMBAH_ADMIN_SESSION_SECRET") &&
+              configured("CRON_SECRET"),
+            configured("NAMBAH_RATE_LIMIT_SECRET")
+              ? "Security headers, durable limiter, audit log dan readiness checks aktif."
+              : "Hardening aktif; NAMBAH_RATE_LIMIT_SECRET direkomendasikan.",
+            configured("NAMBAH_RATE_LIMIT_SECRET") ? "live" : "attention",
+          ),
+          service(
             "reconciliation",
             "Reconciliation",
             configured("CRON_SECRET"),
