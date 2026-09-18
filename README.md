@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.1 — Staging Test Lab**
+**0.5.2 — Automated Status Regression**
 
 Core flow tersedia:
 

@@ -7,6 +7,11 @@ import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
+import {
+  nextOrderStatusFromPayment,
+  normalizePaymentStatus,
+  type NormalizedPaymentStatus,
+} from "@/lib/payment-status-policy";
 
 type OrderRow = {
   id: string;
@@ -61,63 +66,6 @@ type PaymentRow = {
 };
 
 type MidtransSource = "webhook" | "status_api";
-
-type PaymentStatus =
-  | "pending"
-  | "settlement"
-  | "capture"
-  | "deny"
-  | "cancel"
-  | "expire"
-  | "refund"
-  | "failure";
-
-function normalizePaymentStatus(status: string | undefined): PaymentStatus {
-  switch (status) {
-    case "settlement":
-    case "capture":
-    case "deny":
-    case "cancel":
-    case "expire":
-    case "refund":
-    case "failure":
-      return status;
-    case "partial_refund":
-      return "refund";
-    default:
-      return "pending";
-  }
-}
-
-function nextOrderStatus(
-  current: PublicOrderStatus,
-  payload: MidtransStatusPayload,
-): PublicOrderStatus {
-  const status = payload.transaction_status ?? "pending";
-  const fraudStatus = payload.fraud_status?.toLowerCase();
-
-  if (status === "refund" || status === "partial_refund") return "refunded";
-  if (current === "refunded") return current;
-
-  const paid =
-    status === "settlement" ||
-    (status === "capture" && (!fraudStatus || fraudStatus === "accept"));
-
-  if (paid) {
-    if (current === "processing" || current === "success") return current;
-    return "paid";
-  }
-
-  if (current === "paid" || current === "processing" || current === "success") {
-    return current;
-  }
-
-  if (status === "expire" || status === "cancel") return "cancelled";
-  if (status === "failure") return "failed";
-
-  // A denied attempt in Snap can still be retried under the same order ID.
-  return "pending_payment";
-}
 
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
@@ -231,8 +179,13 @@ export async function applyMidtransStatus(
   }
 
   const now = new Date().toISOString();
-  const paymentStatus = normalizePaymentStatus(payload.transaction_status);
-  const orderStatus = nextOrderStatus(order.status, payload);
+  const paymentStatus: NormalizedPaymentStatus = normalizePaymentStatus(
+    payload.transaction_status,
+  );
+  const orderStatus = nextOrderStatusFromPayment(order.status, {
+    transactionStatus: payload.transaction_status,
+    fraudStatus: payload.fraud_status,
+  });
   const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
 
   // Update timestamps for status changes

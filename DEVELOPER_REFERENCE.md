@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.1 — Staging Test Lab  
+Baseline: Nambah 0.5.2 — Automated Status Regression  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1496,3 +1496,23 @@ npm ci
 npm run test
 npm run build
 ~~~
+
+
+---
+
+## 43. Automated Status Regression (0.5.2)
+
+Pure state-mapping rules are isolated from provider/database I/O:
+
+- `src/lib/payment-status-policy.ts`
+- `src/lib/digiflazz-status-policy.ts`
+
+Regression coverage verifies:
+
+- Midtrans settlement and accepted capture become paid.
+- delayed pending/deny/expire cannot regress paid/processing/success.
+- refund/partial refund becomes refunded.
+- Digiflazz Sukses/Gagal/Pending normalization.
+- only success/failed are terminal supplier statuses.
+
+These tests run in CI before `next build`.

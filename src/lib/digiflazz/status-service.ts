@@ -1,4 +1,5 @@
 import type { DigiflazzTransactionData } from "@/lib/digiflazz/client";
+import { normalizeDigiflazzStatus } from "@/lib/digiflazz-status-policy";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
@@ -61,14 +62,6 @@ export type DigiflazzApplyResult = {
 
 function clean(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
-function normalizeStatus(value: string): SupplierStatus | "unknown" {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "sukses" || normalized === "success") return "success";
-  if (normalized === "gagal" || normalized === "failed") return "failed";
-  if (normalized === "pending") return "pending";
-  return "unknown";
 }
 
 function callbackMessage(data: DigiflazzTransactionData) {
@@ -181,7 +174,7 @@ export async function applyDigiflazzTransactionStatus(
 ): Promise<DigiflazzApplyResult> {
   const requestRef = clean(data.ref_id, 160);
   const callbackStatus = clean(data.status, 80);
-  const incomingStatus = normalizeStatus(callbackStatus);
+  const incomingStatus = normalizeDigiflazzStatus(callbackStatus);
 
   if (!requestRef) {
     return {

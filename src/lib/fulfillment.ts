@@ -6,6 +6,7 @@ import {
 import { renderFulfillmentTarget } from "@/lib/fulfillment-target";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { consumeDigiflazzTestScenario } from "@/lib/test-lab";
+import { normalizeDigiflazzStatus } from "@/lib/digiflazz-status-policy";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
@@ -421,13 +422,6 @@ async function syncExistingTerminalTransaction(
   }
 
   return false;
-}
-
-function normalizeDigiflazzStatus(status: string) {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === "sukses" || normalized === "success") return "success" as const;
-  if (normalized === "gagal" || normalized === "failed") return "failed" as const;
-  return "pending" as const;
 }
 
 async function runSimulation(
