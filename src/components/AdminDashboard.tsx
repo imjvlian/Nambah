@@ -2152,9 +2152,13 @@ export default function AdminDashboard() {
                     <span>{promo.redeemed} used · {promo.reserved} reserved</span>
                     <button
                       type="button"
+                      className={`promo-status-toggle ${promo.active ? "is-active" : "is-inactive"}`}
+                      aria-pressed={promo.active}
+                      aria-label={`${promo.code}: ${promo.active ? "nonaktifkan" : "aktifkan"} promo`}
                       disabled={Boolean(busy)}
                       onClick={() => void togglePromotion(promo.code, !promo.active)}
                     >
+                      <span className="promo-status-dot" aria-hidden="true" />
                       {promo.active ? "Active" : "Inactive"}
                     </button>
                   </div>
