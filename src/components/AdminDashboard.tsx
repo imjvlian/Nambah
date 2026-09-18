@@ -231,6 +231,30 @@ type PromotionPayload = {
   }>;
 };
 
+type AdminOrderDetail = {
+  order: Record<string, unknown>;
+  payments: Array<Record<string, unknown>>;
+  supplierTransactions: Array<Record<string, unknown>>;
+  receipts: Array<Record<string, unknown>>;
+  commissions: Array<Record<string, unknown>>;
+  points: Array<Record<string, unknown>>;
+  promotionRedemptions: Array<Record<string, unknown>>;
+};
+
+type AdminUsersPayload = {
+  users: Array<{
+    userId: string;
+    displayName: string | null;
+    whatsapp: string | null;
+    preferredReceiptChannel: string;
+    profileUpdatedAt: string | null;
+    orders: number;
+    success: number;
+    spend: number;
+    lastOrderAt: string | null;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -354,6 +378,8 @@ export default function AdminDashboard() {
   const [pointsData, setPointsData] = useState<AdminPointsPayload | null>(null);
   const [affiliateData, setAffiliateData] = useState<AffiliatePayload | null>(null);
   const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
+  const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+  const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
   const [promoDraft, setPromoDraft] = useState({
     code: "",
     name: "",
@@ -516,6 +542,60 @@ export default function AdminDashboard() {
     }
   }
 
+  async function inspectOrder(orderId: string) {
+    setBusy("inspect:" + orderId);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/orders/" + encodeURIComponent(orderId),
+        { cache: "no-store" },
+      );
+      const data = (await response.json()) as AdminOrderDetail & {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Detail order gagal dimuat.");
+      }
+      setOrderDetail(data);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Detail order gagal dimuat.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function retryAdminReceipt(orderId: string) {
+    setBusy("receipt:" + orderId);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/orders/" + encodeURIComponent(orderId) + "/receipt",
+        { method: "POST" },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Receipt gagal dikirim ulang.");
+      }
+      await inspectOrder(orderId);
+      setNotice("Receipt diproses ulang.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Receipt gagal dikirim ulang.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function loadUsers() {
+    const response = await fetch("/api/admin/users", { cache: "no-store" });
+    const data = (await response.json()) as AdminUsersPayload & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Data user gagal dimuat.");
+    setUsersData(data);
+  }
+
   async function runReconciliation() {
     setBusy("reconciliation");
     setNotice("");
@@ -573,6 +653,7 @@ export default function AdminDashboard() {
       if (section === "points") await loadPoints();
       if (section === "affiliates") await loadAffiliates();
       if (section === "promotions") await loadPromotions();
+      if (section === "users") await loadUsers();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -677,7 +758,14 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData]);
+    if (section === "users" && !usersData) {
+      void loadUsers().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Data user gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData]);
 
   async function logout() {
     setBusy("logout");
@@ -1189,8 +1277,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Universal account checker"
-                    status="planned"
-                    copy="Router checker per-game berbasis Volsever dengan fallback yang aman."
+                    status="live"
+                    copy="Validasi schema per game + provider routing configurable, dengan local-only fallback yang tidak memblokir checkout."
                   />
                   <RoadmapCard
                     title="Production hardening"
@@ -1256,15 +1344,84 @@ export default function AdminDashboard() {
                       <span>{formatTime(order.createdAt)}</span>
                     </div>
                     <strong>{formatIDR(order.finalPrice)}</strong>
-                    <span className={`acc-status ${order.status}`}>
-                      {STATUS_LABEL[order.status] ?? order.status}
-                    </span>
+                    <div className="acc-order-status-action">
+                      <span className={`acc-status ${order.status}`}>
+                        {STATUS_LABEL[order.status] ?? order.status}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void inspectOrder(order.id)}
+                      >
+                        Inspect
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {filteredOrders.length === 0 && (
                   <div className="acc-empty">Tidak ada order yang cocok.</div>
                 )}
               </div>
+
+              {orderDetail && (
+                <section className="acc-order-inspector">
+                  <div className="acc-order-inspector-head">
+                    <div>
+                      <small>ORDER INSPECTOR</small>
+                      <strong>{String(orderDetail.order.id ?? "-")}</strong>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() =>
+                          void retryAdminReceipt(
+                            String(orderDetail.order.id ?? ""),
+                          )
+                        }
+                      >
+                        Retry receipt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOrderDetail(null)}
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="acc-order-inspector-grid">
+                    <article>
+                      <small>Order financial</small>
+                      <pre>{JSON.stringify(orderDetail.order, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Payment</small>
+                      <pre>{JSON.stringify(orderDetail.payments, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Supplier / SN</small>
+                      <pre>{JSON.stringify(orderDetail.supplierTransactions, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Receipt</small>
+                      <pre>{JSON.stringify(orderDetail.receipts, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Commission</small>
+                      <pre>{JSON.stringify(orderDetail.commissions, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Points / Promo</small>
+                      <pre>{JSON.stringify({
+                        points: orderDetail.points,
+                        promotions: orderDetail.promotionRedemptions,
+                      }, null, 2)}</pre>
+                    </article>
+                  </div>
+                </section>
+              )}
             </>
           )}
 
@@ -1825,29 +1982,32 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Accounts"
                 title="Users & access"
-                copy="Customer account dan RBAC admin sudah live. Management user tetap dipisahkan dari password/auth provider."
+                copy="Lookup customer memakai profile server-side dan agregasi transaksi tanpa mengekspos credential auth."
               />
-              <div className="acc-roadmap-grid">
-                <RoadmapCard
-                  title="Customer account"
-                  status="live"
-                  copy="Register, login, logout, session refresh, order history, dan order ownership."
-                />
-                <RoadmapCard
-                  title="Admin RBAC"
-                  status="live"
-                  copy="admin_users dengan role admin/superadmin dan server-side authorization."
-                />
-                <RoadmapCard
-                  title="Customer profile"
-                  status="planned"
-                  copy="Nama, WhatsApp terverifikasi, preferensi receipt, dan data profil non-auth."
-                />
-                <RoadmapCard
-                  title="User management"
-                  status="planned"
-                  copy="Search user, disable access, inspect order history, dan audit action admin."
-                />
+              <div className="acc-table-card">
+                <div className="acc-users-head">
+                  <span>User</span>
+                  <span>WhatsApp</span>
+                  <span>Orders</span>
+                  <span>Success spend</span>
+                </div>
+                {(usersData?.users ?? []).slice(0, 100).map((item) => (
+                  <div className="acc-users-row" key={item.userId}>
+                    <div>
+                      <strong>{item.displayName ?? item.userId.slice(0, 8) + "…"}</strong>
+                      <span>{item.userId}</span>
+                    </div>
+                    <span>{item.whatsapp ?? "-"}</span>
+                    <strong>{item.orders} · {item.success} success</strong>
+                    <div>
+                      <strong>{formatIDR(item.spend)}</strong>
+                      <span>{formatTime(item.lastOrderAt)}</span>
+                    </div>
+                  </div>
+                ))}
+                {usersData && usersData.users.length === 0 && (
+                  <div className="acc-empty">Belum ada customer account activity.</div>
+                )}
               </div>
             </>
           )}
