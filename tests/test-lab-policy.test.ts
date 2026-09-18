@@ -4,6 +4,7 @@ import {
   isTestLabScenario,
   isTestLabScope,
   normalizeTestLabRemainingUses,
+  resolvePersistedTestScenario,
 } from "../src/lib/test-lab-policy.ts";
 
 test("accepts only supported supplier scenarios", () => {
@@ -24,4 +25,10 @@ test("normalizes bounded next-n usage", () => {
   assert.equal(normalizeTestLabRemainingUses("next-n", 5), 5);
   assert.throws(() => normalizeTestLabRemainingUses("next-n", 0));
   assert.throws(() => normalizeTestLabRemainingUses("next-n", 101));
+});
+
+test("persisted order scenario wins during reconciliation", () => {
+  assert.equal(resolvePersistedTestScenario("pending-success", "failed"), "pending-success");
+  assert.equal(resolvePersistedTestScenario(null, "failed"), "failed");
+  assert.equal(resolvePersistedTestScenario("digiflazz-live", "success"), "success");
 });

@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.2 — Automated Status Regression  
+Baseline: Nambah 0.5.3 — Fulfillment Reliability  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1516,3 +1516,25 @@ Regression coverage verifies:
 - only success/failed are terminal supplier statuses.
 
 These tests run in CI before `next build`.
+
+
+---
+
+## 44. Pending Fulfillment Reliability (0.5.3)
+
+Digiflazz test reconciliation now reuses the scenario frozen on the order.
+
+For a Test Lab order:
+
+~~~text
+initial dispatch
+→ order.test_scenario = pending-success / pending-failed
+→ supplier transaction remains pending
+→ reconciliation
+→ persisted order scenario wins over current global ENV
+→ same deterministic request_ref is reused
+~~~
+
+This prevents a pending staging transaction from changing meaning after an ENV change or another admin Test Lab scenario.
+
+Fallback to `NAMBAH_DIGIFLAZZ_TEST_OUTCOME` is used only when the order has no valid frozen test scenario.

@@ -40,3 +40,10 @@ export function normalizeTestLabRemainingUses(
   }
   return parsed;
 }
+
+export function resolvePersistedTestScenario(
+  persisted: unknown,
+  fallback: TestLabScenario,
+): TestLabScenario {
+  return isTestLabScenario(persisted) ? persisted : fallback;
+}

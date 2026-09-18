@@ -10,6 +10,7 @@ import {
   getFulfillmentMode,
 } from "@/lib/fulfillment";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
+import { resolvePersistedTestScenario } from "@/lib/test-lab-policy";
 import { supabaseSelect } from "@/lib/supabase/server";
 
 type ReconcileSource = "admin" | "cron";
@@ -30,6 +31,10 @@ type RecoverableOrderRow = {
   id: string;
   status: "paid" | "processing";
   updated_at: string;
+};
+
+type TestScenarioOrderRow = {
+  test_scenario: string | null;
 };
 
 type ReceiptDeliveryRow = {
@@ -211,10 +216,21 @@ export async function runNambahReconciliation(input?: {
     try {
       const supplierResult =
         fulfillmentMode === "digiflazz-test"
-          ? await runDigiflazzTestTransaction({
-              outcome: configuredTestOutcome(),
-              refId: transaction.request_ref,
-            })
+          ? await (async () => {
+              const [scenarioOrder] =
+                await supabaseSelect<TestScenarioOrderRow>("orders", {
+                  select: "test_scenario",
+                  filters: { id: `eq.${transaction.order_id}` },
+                  limit: 1,
+                });
+              return runDigiflazzTestTransaction({
+                outcome: resolvePersistedTestScenario(
+                  scenarioOrder?.test_scenario,
+                  configuredTestOutcome(),
+                ),
+                refId: transaction.request_ref,
+              });
+            })()
           : await (async () => {
               assertLiveFulfillmentSafety();
               if (!transaction.supplier_sku || !transaction.target) {
