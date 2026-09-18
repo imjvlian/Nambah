@@ -11,6 +11,7 @@ type AdminSection =
   | "catalog"
   | "supplier"
   | "receipts"
+  | "points"
   | "promotions"
   | "affiliates"
   | "users"
@@ -142,6 +143,45 @@ type ReceiptRow = {
   updatedAt: string;
 };
 
+type AdminPointsPayload = {
+  stats: {
+    accounts: number;
+    outstanding: number;
+    reserved: number;
+    available: number;
+    lifetimeEarned: number;
+    lifetimeRedeemed: number;
+  };
+  rules: {
+    pointValueIdr: number;
+    earnEveryIdr: number;
+    minimumRedeem: number;
+    redeemStep: number;
+    maxRedeemRate: number;
+  };
+  accounts: Array<{
+    userId: string;
+    balance: number;
+    reserved: number;
+    available: number;
+    lifetimeEarned: number;
+    lifetimeRedeemed: number;
+    updatedAt: string;
+  }>;
+  ledger: Array<{
+    id: number;
+    userId: string;
+    orderId: string | null;
+    type: string;
+    pointsDelta: number;
+    reservedDelta: number;
+    balanceAfter: number;
+    reservedAfter: number;
+    note: string | null;
+    createdAt: string;
+  }>;
+};
+
 type BootstrapResult = {
   summary?: {
     autoMapped?: number;
@@ -160,6 +200,7 @@ const NAV: Array<{
   { id: "catalog", label: "Catalog", short: "CA" },
   { id: "supplier", label: "Supplier", short: "SU" },
   { id: "receipts", label: "Receipts", short: "RE" },
+  { id: "points", label: "Nambah Points", short: "NP" },
   { id: "promotions", label: "Promotions", short: "PR" },
   { id: "affiliates", label: "Affiliates", short: "AF" },
   { id: "users", label: "Users", short: "US" },
@@ -261,6 +302,7 @@ export default function AdminDashboard() {
   const [catalog, setCatalog] = useState<CatalogPayload | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
+  const [pointsData, setPointsData] = useState<AdminPointsPayload | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
@@ -327,6 +369,17 @@ export default function AdminDashboard() {
     setReceipts(data.receipts ?? []);
   }
 
+  async function loadPoints() {
+    const response = await fetch("/api/admin/points", { cache: "no-store" });
+    const data = (await response.json()) as AdminPointsPayload & {
+      error?: string;
+    };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Nambah Points gagal dimuat.");
+    }
+    setPointsData(data);
+  }
+
   async function runReconciliation() {
     setBusy("reconciliation");
     setNotice("");
@@ -381,6 +434,7 @@ export default function AdminDashboard() {
       if (section === "orders") await loadOrders();
       if (section === "catalog" || section === "supplier") await loadCatalog();
       if (section === "receipts") await loadReceipts();
+      if (section === "points") await loadPoints();
       setNotice("Data admin diperbarui.");
     } catch (error) {
       setNotice(
@@ -464,7 +518,14 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length]);
+    if (section === "points" && !pointsData) {
+      void loadPoints().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Nambah Points gagal dimuat.",
+        ),
+      );
+    }
+  }, [section, authState, orders.length, receipts.length, pointsData]);
 
   async function logout() {
     setBusy("logout");
@@ -956,8 +1017,8 @@ export default function AdminDashboard() {
                   />
                   <RoadmapCard
                     title="Nambah Points"
-                    status="foundation"
-                    copy="Ledger, earning, reservation, redemption, restore, dan refund-safe reversal sudah tersedia; customer UI menyusul."
+                    status="live"
+                    copy="Saldo account, checkout redemption, success earning, customer ledger, dan admin monitoring aktif."
                   />
                   <RoadmapCard
                     title="Affiliate lifecycle"
@@ -1340,6 +1401,104 @@ export default function AdminDashboard() {
                 {receipts.length === 0 && (
                   <div className="acc-empty">Belum ada log receipt.</div>
                 )}
+              </div>
+            </>
+          )}
+
+          {section === "points" && pointsData && (
+            <>
+              <SectionHead
+                eyebrow="Loyalty"
+                title="Nambah Points"
+                copy="Outstanding liability, reservation, account balance, dan immutable ledger points."
+              />
+
+              <div className="acc-metrics">
+                <article>
+                  <small>Outstanding</small>
+                  <strong>{pointsData.stats.outstanding.toLocaleString("id-ID")} pts</strong>
+                  <span>≈ {formatIDR(pointsData.stats.outstanding * pointsData.rules.pointValueIdr)}</span>
+                </article>
+                <article>
+                  <small>Available</small>
+                  <strong>{pointsData.stats.available.toLocaleString("id-ID")} pts</strong>
+                  <span>{pointsData.stats.accounts} akun loyalty</span>
+                </article>
+                <article>
+                  <small>Reserved</small>
+                  <strong>{pointsData.stats.reserved.toLocaleString("id-ID")} pts</strong>
+                  <span>Checkout belum final</span>
+                </article>
+                <article>
+                  <small>Lifetime redeemed</small>
+                  <strong>{pointsData.stats.lifetimeRedeemed.toLocaleString("id-ID")} pts</strong>
+                  <span>Dari {pointsData.stats.lifetimeEarned.toLocaleString("id-ID")} earned</span>
+                </article>
+              </div>
+
+              <div className="acc-points-rules">
+                <span>1 pt / {formatIDR(pointsData.rules.earnEveryIdr)}</span>
+                <span>1 pt = {formatIDR(pointsData.rules.pointValueIdr)}</span>
+                <span>Min. {pointsData.rules.minimumRedeem} pts</span>
+                <span>Step {pointsData.rules.redeemStep} pts</span>
+                <span>Max {Math.round(pointsData.rules.maxRedeemRate * 100)}% subtotal</span>
+              </div>
+
+              <div className="acc-grid-two acc-points-grid">
+                <div className="acc-table-card">
+                  <div className="acc-points-head">
+                    <span>User</span>
+                    <span>Available</span>
+                    <span>Reserved</span>
+                  </div>
+                  {pointsData.accounts.slice(0, 20).map((account) => (
+                    <div className="acc-points-row" key={account.userId}>
+                      <div>
+                        <strong>{account.userId.slice(0, 8)}…</strong>
+                        <small>{formatTime(account.updatedAt)}</small>
+                      </div>
+                      <strong>{account.available.toLocaleString("id-ID")} pts</strong>
+                      <span>{account.reserved.toLocaleString("id-ID")} pts</span>
+                    </div>
+                  ))}
+                  {pointsData.accounts.length === 0 && (
+                    <div className="acc-empty">Belum ada loyalty account.</div>
+                  )}
+                </div>
+
+                <div className="acc-table-card">
+                  <div className="acc-points-ledger-head">
+                    <span>Aktivitas terbaru</span>
+                    <span>Delta</span>
+                  </div>
+                  {pointsData.ledger.slice(0, 25).map((entry) => (
+                    <div className="acc-points-ledger-row" key={entry.id}>
+                      <div>
+                        <strong>{entry.type}</strong>
+                        <small>
+                          {entry.orderId ??
+                            entry.userId.slice(0, 8) + "…"} · {formatTime(entry.createdAt)}
+                        </small>
+                      </div>
+                      <b
+                        className={
+                          entry.pointsDelta > 0
+                            ? "positive"
+                            : entry.pointsDelta < 0
+                              ? "negative"
+                              : ""
+                        }
+                      >
+                        {entry.pointsDelta !== 0
+                          ? (entry.pointsDelta > 0 ? "+" : "") +
+                            entry.pointsDelta.toLocaleString("id-ID")
+                          : (entry.reservedDelta > 0 ? "+" : "") +
+                            entry.reservedDelta.toLocaleString("id-ID") +
+                            " res."}
+                      </b>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}

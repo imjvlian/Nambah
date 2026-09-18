@@ -19,6 +19,7 @@ import "./admin-publish-checkbox.css";
 import "./admin-supplier-link.css";
 import "./product-checkout-rail-v2.css";
 import "./auth.css";
+import "./points.css";
 
 export const metadata: Metadata = {
   title: "Nambah — Top Up Cepat, Main Lagi",

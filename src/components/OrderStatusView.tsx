@@ -583,6 +583,12 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               {pricing.referralDiscount > 0 && (
                 <div className="referral-saving"><span>Referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
               )}
+              {pricing.pointsDiscount > 0 && (
+                <div className="points-saving"><span>Nambah Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+              )}
+              {pricing.pointsEarned > 0 && (
+                <div className="points-earned"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
+              )}
               <div><span>Biaya pembayaran</span><strong>{formatIDR(pricing.customerPaymentFee)}</strong></div>
             </div>
 

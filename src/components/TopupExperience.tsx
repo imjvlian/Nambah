@@ -33,6 +33,21 @@ type UsernameCheckState = {
 };
 type NominalSectionId = "special" | "first-top-up" | "weekly-monthly" | "top-up";
 
+type PointsSummary = {
+  balance: number;
+  reserved: number;
+  available: number;
+  lifetimeEarned: number;
+  lifetimeRedeemed: number;
+  rules: {
+    pointValueIdr: number;
+    earnEveryIdr: number;
+    minimumRedeem: number;
+    redeemStep: number;
+    maxRedeemRate: number;
+  };
+};
+
 type TopupExperienceProps = {
   games: Game[];
   paymentMethods: PublicPaymentMethod[];
@@ -168,6 +183,10 @@ export default function TopupExperience({
   const [notice, setNotice] = useState("");
   const [accountError, setAccountError] = useState("");
   const [viewerState, setViewerState] = useState<"loading" | "guest" | "authenticated">("loading");
+  const [pointsSummary, setPointsSummary] = useState<PointsSummary | null>(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [pointsLoading, setPointsLoading] = useState(false);
+  const [pointsError, setPointsError] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestWhatsapp, setGuestWhatsapp] = useState("");
   const [contactError, setContactError] = useState("");
@@ -205,6 +224,32 @@ export default function TopupExperience({
   const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
   const selectedGameArtwork = artworkByGameId[selectedGame.id];
 
+  const maxPointsForOrder = useMemo(() => {
+    if (!pointsSummary) return 0;
+    const subtotalBeforePoints = Math.max(
+      0,
+      pricing.sellingPrice -
+        pricing.promotionDiscount -
+        pricing.referralDiscount,
+    );
+    const maxDiscount = Math.floor(
+      subtotalBeforePoints * pointsSummary.rules.maxRedeemRate,
+    );
+    const maxFromOrder = Math.floor(
+      maxDiscount / pointsSummary.rules.pointValueIdr,
+    );
+    const step = pointsSummary.rules.redeemStep;
+    const orderStepped = Math.floor(maxFromOrder / step) * step;
+    const availableStepped =
+      Math.floor(pointsSummary.available / step) * step;
+    return Math.max(0, Math.min(orderStepped, availableStepped));
+  }, [
+    pointsSummary,
+    pricing.sellingPrice,
+    pricing.promotionDiscount,
+    pricing.referralDiscount,
+  ]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -217,7 +262,36 @@ export default function TopupExperience({
         if (!mounted) return;
 
         setViewerState(response.ok ? "authenticated" : "guest");
-        if (response.ok) setContactError("");
+        if (response.ok) {
+          setContactError("");
+          setPointsLoading(true);
+          try {
+            const pointsResponse = await fetch("/api/account/points", {
+              cache: "no-store",
+              credentials: "same-origin",
+            });
+            const pointsData = (await pointsResponse.json()) as {
+              points?: PointsSummary;
+              error?: string;
+            };
+            if (!mounted) return;
+            if (pointsResponse.ok && pointsData.points) {
+              setPointsSummary(pointsData.points);
+              setPointsError("");
+            } else {
+              setPointsError(
+                pointsData.error ?? "Nambah Points belum dapat dimuat.",
+              );
+            }
+          } catch {
+            if (mounted) setPointsError("Nambah Points belum dapat dimuat.");
+          } finally {
+            if (mounted) setPointsLoading(false);
+          }
+        } else {
+          setPointsSummary(null);
+          setPointsToRedeem(0);
+        }
       } catch {
         if (mounted) setViewerState("guest");
       }
@@ -248,6 +322,7 @@ export default function TopupExperience({
             paymentId: paymentMethod.id,
             promoCode: appliedPromoCode,
             referralCode: appliedReferralCode,
+            pointsToRedeem,
           }),
           signal: controller.signal,
         });
@@ -255,6 +330,7 @@ export default function TopupExperience({
         const data = (await response.json()) as {
           error?: string;
           pricing?: PublicPricingResult;
+          points?: PointsSummary | null;
         };
 
         if (!mounted) return;
@@ -266,6 +342,7 @@ export default function TopupExperience({
         }
 
         setServerPricing(data.pricing);
+        if (data.points) setPointsSummary(data.points);
         if (appliedPromoCode && data.pricing.promoCode === appliedPromoCode) {
           setPromoMessage(`${appliedPromoCode} aktif. Harga sudah dihitung ulang.`);
         }
@@ -291,6 +368,7 @@ export default function TopupExperience({
     paymentMethod.id,
     appliedPromoCode,
     appliedReferralCode,
+    pointsToRedeem,
   ]);
 
   useEffect(() => {
@@ -385,6 +463,7 @@ export default function TopupExperience({
     setNotice("");
     setPromoMessage("");
     setReferralMessage("");
+    setPointsToRedeem(0);
   }
 
   function chooseGame(gameId: string) {
@@ -403,6 +482,7 @@ export default function TopupExperience({
 
   function applyPromo() {
     const normalized = promoInput.trim().toUpperCase();
+    setPointsToRedeem(0);
     setNotice("");
     setPricingError("");
     if (!normalized) {
@@ -417,6 +497,7 @@ export default function TopupExperience({
 
   function applyReferral() {
     const normalized = referralInput.trim().toUpperCase();
+    setPointsToRedeem(0);
     setNotice("");
     setPricingError("");
     if (!normalized) {
@@ -489,6 +570,7 @@ export default function TopupExperience({
           targetServerId: account.serverId,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
+          pointsToRedeem,
           ...(guestContact
             ? {
                 receiptEmail: guestContact.email,
@@ -891,6 +973,103 @@ export default function TopupExperience({
             )}
           </div>
 
+          <div className="form-block points-checkout-block">
+            <div className="form-label">
+              <span className="step-number">N+</span>
+              <div>
+                <strong>Nambah Points</strong>
+                <small>
+                  {viewerState === "authenticated"
+                    ? "Gunakan points sebagai potongan. Points baru didapat setelah transaksi berhasil."
+                    : "Login untuk mengumpulkan dan menggunakan Nambah Points."}
+                </small>
+              </div>
+            </div>
+
+            {viewerState === "authenticated" ? (
+              pointsLoading ? (
+                <div className="points-checkout-loading">Memuat saldo points...</div>
+              ) : pointsSummary ? (
+                <div className="points-checkout-card">
+                  <div className="points-checkout-balance">
+                    <div>
+                      <small>Points tersedia</small>
+                      <strong>{pointsSummary.available.toLocaleString("id-ID")} pts</strong>
+                      <span>
+                        ≈ {formatIDR(pointsSummary.available * pointsSummary.rules.pointValueIdr)}
+                      </span>
+                    </div>
+                    <div className="points-earn-preview">
+                      <small>Estimasi dari order ini</small>
+                      <strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong>
+                      <span>masuk setelah status success</span>
+                    </div>
+                  </div>
+
+                  {maxPointsForOrder >= pointsSummary.rules.minimumRedeem ? (
+                    <>
+                      <div className="points-redeem-head">
+                        <span>Gunakan</span>
+                        <strong>
+                          {pointsToRedeem.toLocaleString("id-ID")} pts
+                          {pointsToRedeem > 0
+                            ? " · -" +
+                              formatIDR(
+                                pointsToRedeem *
+                                  pointsSummary.rules.pointValueIdr,
+                              )
+                            : ""}
+                        </strong>
+                      </div>
+                      <input
+                        className="points-range"
+                        type="range"
+                        min={0}
+                        max={maxPointsForOrder}
+                        step={pointsSummary.rules.redeemStep}
+                        value={Math.min(pointsToRedeem, maxPointsForOrder)}
+                        onChange={(event) => {
+                          setPointsError("");
+                          setPointsToRedeem(Number(event.target.value));
+                        }}
+                        aria-label="Nambah Points yang digunakan"
+                      />
+                      <div className="points-redeem-actions">
+                        <span>
+                          Maks. {maxPointsForOrder.toLocaleString("id-ID")} pts · {Math.round(pointsSummary.rules.maxRedeemRate * 100)}% subtotal
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPointsToRedeem(maxPointsForOrder)}
+                        >
+                          Pakai maksimal
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="points-checkout-note">
+                      Saldo belum mencapai minimum {pointsSummary.rules.minimumRedeem} points atau margin transaksi belum memungkinkan redemption.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="inline-message warning">
+                  {pointsError || "Nambah Points belum dapat dimuat."}
+                </p>
+              )
+            ) : (
+              <div className="points-guest-callout">
+                <span>N+</span>
+                <p>
+                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk ke akun Nambah sebelum checkout untuk mulai mengumpulkan points.
+                </p>
+              </div>
+            )}
+            {pointsError && pointsSummary && (
+              <p className="inline-message warning">{pointsError}</p>
+            )}
+          </div>
+
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">4</span>
@@ -921,6 +1100,12 @@ export default function TopupExperience({
             )}
             {pricing.referralDiscount > 0 && (
               <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
+            )}
+            {pricing.pointsDiscount > 0 && (
+              <div className="summary-line points-benefit"><span>Nambah Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+            )}
+            {viewerState === "authenticated" && pricing.pointsEarned > 0 && (
+              <div className="summary-line points-earn"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
             )}
             <div className="summary-line">
               <span>Biaya pembayaran</span>

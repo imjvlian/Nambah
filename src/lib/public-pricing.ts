@@ -14,6 +14,9 @@ export type PublicPricingResult = Pick<
   | "referralRequestedDiscount"
   | "referralDiscount"
   | "referralDiscountCapped"
+  | "pointsDiscount"
+  | "pointsRedeemed"
+  | "pointsEarned"
   | "affiliateRate"
   | "customerPaymentFee"
   | "finalPrice"
@@ -34,6 +37,9 @@ export function toPublicPricing(pricing: PricingResult): PublicPricingResult {
     referralRequestedDiscount: pricing.referralRequestedDiscount,
     referralDiscount: pricing.referralDiscount,
     referralDiscountCapped: pricing.referralDiscountCapped,
+    pointsDiscount: pricing.pointsDiscount,
+    pointsRedeemed: pricing.pointsRedeemed,
+    pointsEarned: pricing.pointsEarned,
     affiliateRate: pricing.affiliateRate,
     customerPaymentFee: pricing.customerPaymentFee,
     finalPrice: pricing.finalPrice,
@@ -60,6 +66,9 @@ export function createPublicPricingFallback(item: GamePackage): PublicPricingRes
     referralRequestedDiscount: 0,
     referralDiscount: 0,
     referralDiscountCapped: false,
+    pointsDiscount: 0,
+    pointsRedeemed: 0,
+    pointsEarned: 0,
     affiliateRate: 0,
     customerPaymentFee: 0,
     finalPrice: item.sellingPrice,

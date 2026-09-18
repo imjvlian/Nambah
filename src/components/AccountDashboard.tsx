@@ -16,10 +16,41 @@ type AccountOrder = {
   id: string;
   status: string;
   finalPrice: number;
+  pointsRedeemed: number;
+  pointsDiscount: number;
+  pointsEarned: number;
   createdAt: string;
   updatedAt: string;
   gameName: string;
   packageLabel: string;
+};
+
+type PointsSummary = {
+  balance: number;
+  reserved: number;
+  available: number;
+  lifetimeEarned: number;
+  lifetimeRedeemed: number;
+  rules: {
+    pointValueIdr: number;
+    earnEveryIdr: number;
+    minimumRedeem: number;
+    redeemStep: number;
+    maxRedeemRate: number;
+  };
+};
+
+type PointLedger = {
+  id: number;
+  orderId: string | null;
+  type: string;
+  pointsDelta: number;
+  reservedDelta: number;
+  balanceAfter: number;
+  reservedAfter: number;
+  note: string | null;
+  expiresAt: string | null;
+  createdAt: string;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,6 +63,17 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Dibatalkan",
 };
 
+const POINT_TYPE_LABEL: Record<string, string> = {
+  reserve: "Points direservasi",
+  redeem: "Points digunakan",
+  release: "Reservasi dilepas",
+  earn: "Points didapat",
+  refund: "Points dikembalikan",
+  reversal: "Points dibatalkan",
+  expire: "Points kedaluwarsa",
+  admin_adjustment: "Penyesuaian admin",
+};
+
 function formatDate(value: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -42,9 +84,17 @@ function formatDate(value: string | null) {
   }).format(date);
 }
 
+function signedPoints(value: number) {
+  if (value > 0) return "+" + value.toLocaleString("id-ID");
+  return value.toLocaleString("id-ID");
+}
+
 export default function AccountDashboard() {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [orders, setOrders] = useState<AccountOrder[]>([]);
+  const [points, setPoints] = useState<PointsSummary | null>(null);
+  const [ledger, setLedger] = useState<PointLedger[]>([]);
+  const [pointsError, setPointsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -75,22 +125,45 @@ export default function AccountDashboard() {
         if (!active) return;
         setUser(meData.user);
 
-        const ordersResponse = await fetch("/api/account/orders", {
-          cache: "no-store",
-          credentials: "same-origin",
-        });
+        const [ordersResponse, pointsResponse] = await Promise.all([
+          fetch("/api/account/orders", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
+          fetch("/api/account/points", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
+        ]);
+
         const ordersData = (await ordersResponse.json()) as {
           orders?: AccountOrder[];
           error?: string;
         };
-
         if (!ordersResponse.ok) {
           throw new Error(
             ordersData.error ?? "Riwayat transaksi belum dapat dimuat.",
           );
         }
 
-        if (active) setOrders(ordersData.orders ?? []);
+        const pointsData = (await pointsResponse.json()) as {
+          points?: PointsSummary;
+          ledger?: PointLedger[];
+          error?: string;
+        };
+
+        if (!active) return;
+        setOrders(ordersData.orders ?? []);
+
+        if (pointsResponse.ok && pointsData.points) {
+          setPoints(pointsData.points);
+          setLedger(pointsData.ledger ?? []);
+          setPointsError("");
+        } else {
+          setPointsError(
+            pointsData.error ?? "Nambah Points belum dapat dimuat.",
+          );
+        }
       } catch (loadError) {
         if (active) {
           setError(
@@ -149,8 +222,14 @@ export default function AccountDashboard() {
           <h1>{user.displayName}</h1>
           <p>{user.email}</p>
           <div className="account-profile-meta">
-            <span>{user.emailConfirmed ? "Email terverifikasi" : "Email belum terverifikasi"}</span>
-            {user.createdAt && <span>Bergabung {formatDate(user.createdAt)}</span>}
+            <span>
+              {user.emailConfirmed
+                ? "Email terverifikasi"
+                : "Email belum terverifikasi"}
+            </span>
+            {user.createdAt && (
+              <span>Bergabung {formatDate(user.createdAt)}</span>
+            )}
           </div>
         </div>
         <button
@@ -163,19 +242,127 @@ export default function AccountDashboard() {
         </button>
       </section>
 
+      <section className="account-points-card">
+        <div className="account-points-hero">
+          <div>
+            <span className="eyebrow">Nambah Points</span>
+            <h2>
+              {points ? points.available.toLocaleString("id-ID") : "—"}{" "}
+              <small>pts</small>
+            </h2>
+            <p>
+              {points
+                ? "Setara sekitar " +
+                  formatIDR(
+                    points.available * points.rules.pointValueIdr,
+                  ) +
+                  " untuk transaksi berikutnya."
+                : pointsError || "Saldo points sedang dimuat."}
+            </p>
+          </div>
+          {points && (
+            <div className="account-points-stats">
+              <article>
+                <small>Reserved</small>
+                <strong>{points.reserved.toLocaleString("id-ID")} pts</strong>
+              </article>
+              <article>
+                <small>Lifetime earned</small>
+                <strong>
+                  {points.lifetimeEarned.toLocaleString("id-ID")} pts
+                </strong>
+              </article>
+              <article>
+                <small>Lifetime redeemed</small>
+                <strong>
+                  {points.lifetimeRedeemed.toLocaleString("id-ID")} pts
+                </strong>
+              </article>
+            </div>
+          )}
+        </div>
+
+        {points && (
+          <div className="account-points-rule">
+            <span>1 point / {formatIDR(points.rules.earnEveryIdr)}</span>
+            <span>1 point = {formatIDR(points.rules.pointValueIdr)}</span>
+            <span>Min. redeem {points.rules.minimumRedeem} pts</span>
+            <span>
+              Maks. {Math.round(points.rules.maxRedeemRate * 100)}% subtotal
+            </span>
+          </div>
+        )}
+
+        <div className="account-points-ledger">
+          <div className="account-points-ledger-head">
+            <strong>Aktivitas points</strong>
+            <span>30 aktivitas terbaru</span>
+          </div>
+          {ledger.length === 0 ? (
+            <div className="account-points-empty">
+              Belum ada aktivitas points. Points masuk setelah transaksi login
+              berstatus berhasil.
+            </div>
+          ) : (
+            ledger.map((entry) => (
+              <div className="account-point-row" key={entry.id}>
+                <span
+                  className={"account-point-icon type-" + entry.type}
+                >
+                  N+
+                </span>
+                <div>
+                  <strong>
+                    {POINT_TYPE_LABEL[entry.type] ?? entry.type}
+                  </strong>
+                  <small>
+                    {entry.orderId ?? "Akun"} · {formatDate(entry.createdAt)}
+                  </small>
+                </div>
+                <b
+                  className={
+                    entry.pointsDelta > 0
+                      ? "positive"
+                      : entry.pointsDelta < 0
+                        ? "negative"
+                        : ""
+                  }
+                >
+                  {entry.pointsDelta === 0
+                    ? entry.reservedDelta > 0
+                      ? "reserve " +
+                        entry.reservedDelta.toLocaleString("id-ID")
+                      : entry.reservedDelta < 0
+                        ? "release " +
+                          Math.abs(entry.reservedDelta).toLocaleString("id-ID")
+                        : "0"
+                    : signedPoints(entry.pointsDelta)}{" "}
+                  pts
+                </b>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       <section className="account-orders-card">
         <div className="account-section-head">
           <div>
             <span className="eyebrow">Transaksi</span>
             <h2>Riwayat pesanan.</h2>
           </div>
-          <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
+          <Link className="header-cta" href="/#catalog-start">
+            Top up lagi
+          </Link>
         </div>
 
         {orders.length === 0 ? (
           <div className="account-empty">
             <strong>Belum ada transaksi di akun ini.</strong>
-            <p>Pesanan baru yang dibuat saat kamu login akan muncul otomatis di sini.</p>
+            <p>
+              Pesanan baru yang dibuat saat kamu login akan muncul otomatis di
+              sini.
+            </p>
             <Link className="primary-button" href="/#catalog-start">
               Mulai top up <span>→</span>
             </Link>
@@ -183,11 +370,34 @@ export default function AccountDashboard() {
         ) : (
           <div className="account-order-list">
             {orders.map((order) => (
-              <Link className="account-order-row" href={`/order/${encodeURIComponent(order.id)}`} key={order.id}>
+              <Link
+                className="account-order-row"
+                href={"/order/" + encodeURIComponent(order.id)}
+                key={order.id}
+              >
                 <div className="account-order-product">
                   <small>{order.id}</small>
                   <strong>{order.gameName}</strong>
                   <span>{order.packageLabel}</span>
+                  {(order.pointsEarned > 0 ||
+                    order.pointsRedeemed > 0) && (
+                    <span className="account-order-points">
+                      {order.pointsRedeemed > 0
+                        ? "-" +
+                          order.pointsRedeemed.toLocaleString("id-ID") +
+                          " pts dipakai"
+                        : ""}
+                      {order.pointsRedeemed > 0 &&
+                      order.pointsEarned > 0
+                        ? " · "
+                        : ""}
+                      {order.pointsEarned > 0
+                        ? "+" +
+                          order.pointsEarned.toLocaleString("id-ID") +
+                          " pts"
+                        : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="account-order-time">
                   <small>Dibuat</small>
@@ -197,7 +407,11 @@ export default function AccountDashboard() {
                   <small>Total</small>
                   <strong>{formatIDR(order.finalPrice)}</strong>
                 </div>
-                <span className={`account-order-status status-${order.status}`}>
+                <span
+                  className={
+                    "account-order-status status-" + order.status
+                  }
+                >
                   {STATUS_LABEL[order.status] ?? order.status}
                 </span>
               </Link>
