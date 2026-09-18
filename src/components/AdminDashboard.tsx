@@ -955,6 +955,11 @@ export default function AdminDashboard() {
                     copy="Pricing dan database promo aktif; management UI lengkap masih berikutnya."
                   />
                   <RoadmapCard
+                    title="Nambah Points"
+                    status="foundation"
+                    copy="Ledger, earning, reservation, redemption, restore, dan refund-safe reversal sudah tersedia; customer UI menyusul."
+                  />
+                  <RoadmapCard
                     title="Affiliate lifecycle"
                     status="foundation"
                     copy="Referral pricing dan tabel commission tersedia; lifecycle pending/available/withdraw masih perlu otomasi."

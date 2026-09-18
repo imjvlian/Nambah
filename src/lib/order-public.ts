@@ -44,6 +44,9 @@ export type PublicOrder = {
     sellingPrice: number;
     promotionDiscount: number;
     referralDiscount: number;
+    pointsDiscount: number;
+    pointsRedeemed: number;
+    pointsEarned: number;
     customerPaymentFee: number;
     finalPrice: number;
   };

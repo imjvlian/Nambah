@@ -1,4 +1,8 @@
 import type { PaymentMethod } from "@/lib/catalog";
+import {
+  POINT_VALUE_IDR,
+  calculateEarnedPoints,
+} from "@/lib/loyalty";
 import type { ReferralProgram } from "@/lib/referrals";
 import type { SupplierPricedPackage } from "@/lib/supplier-pricing";
 
@@ -48,6 +52,11 @@ export type PricingResult = {
   referralRequestedDiscount: number;
   referralDiscount: number;
   referralDiscountCapped: boolean;
+  pointsDiscount: number;
+  pointsRedeemed: number;
+  pointsEarned: number;
+  pointsRewardValue: number;
+  loyaltyEligibleSpend: number;
   customerPaymentFee: number;
   merchantPaymentCost: number;
   finalPrice: number;
@@ -146,29 +155,41 @@ function evaluatePrice({
   paymentMethod,
   promotionDiscount,
   referralDiscount,
+  pointsDiscount,
   affiliateRate,
+  loyaltyEligible,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
   promotionDiscount: number;
   referralDiscount: number;
+  pointsDiscount: number;
   affiliateRate: number;
+  loyaltyEligible: boolean;
 }) {
-  const discountedSubtotal = Math.max(
+  const loyaltyEligibleSpend = Math.max(
     0,
-    item.sellingPrice - promotionDiscount - referralDiscount,
+    item.sellingPrice - promotionDiscount - referralDiscount - pointsDiscount,
   );
+
+  const pointsEarned = loyaltyEligible
+    ? calculateEarnedPoints(loyaltyEligibleSpend)
+    : 0;
+  const pointsRewardValue = pointsEarned * POINT_VALUE_IDR;
 
   const customerPaymentFee =
     paymentMethod.customerFeeFlat +
-    percentageOf(discountedSubtotal, paymentMethod.customerFeePercent);
-  const finalPrice = discountedSubtotal + customerPaymentFee;
+    percentageOf(loyaltyEligibleSpend, paymentMethod.customerFeePercent);
+  const finalPrice = loyaltyEligibleSpend + customerPaymentFee;
 
   const merchantPaymentCost =
     paymentMethod.merchantFeeFlat +
     percentageOf(finalPrice, paymentMethod.merchantFeePercent);
 
-  const netProfitBeforeAffiliate = finalPrice - item.supplierCost - merchantPaymentCost;
+  // Earned points are treated as a loyalty liability immediately so referral
+  // commission and the minimum-profit guard cannot silently consume the reward.
+  const netProfitBeforeAffiliate =
+    finalPrice - item.supplierCost - merchantPaymentCost - pointsRewardValue;
   const affiliateCommission =
     affiliateRate > 0
       ? Math.max(0, Math.floor(netProfitBeforeAffiliate * affiliateRate))
@@ -176,6 +197,9 @@ function evaluatePrice({
   const nambahProfit = netProfitBeforeAffiliate - affiliateCommission;
 
   return {
+    loyaltyEligibleSpend,
+    pointsEarned,
+    pointsRewardValue,
     customerPaymentFee,
     finalPrice,
     merchantPaymentCost,
@@ -219,14 +243,22 @@ export function calculatePricing({
   paymentMethod,
   promotion,
   referral,
+  pointsDiscount = 0,
+  loyaltyEligible = false,
   minimumNambahProfit = MINIMUM_NAMBAH_PROFIT,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
   promotion: Promotion | null;
   referral: ReferralProgram | null;
+  pointsDiscount?: number;
+  loyaltyEligible?: boolean;
   minimumNambahProfit?: number;
 }): PricingResult {
+  const normalizedPointsDiscount =
+    Number.isInteger(pointsDiscount) && pointsDiscount > 0
+      ? pointsDiscount
+      : 0;
   const promo = calculatePromotionDiscount(item.sellingPrice, promotion);
   const referralBenefit = calculateReferralRequestedDiscount(
     item.sellingPrice,
@@ -241,7 +273,9 @@ export function calculatePricing({
       paymentMethod,
       promotionDiscount: promo.amount,
       referralDiscount,
+      pointsDiscount: normalizedPointsDiscount,
       affiliateRate,
+      loyaltyEligible,
     });
 
   const baseEvaluation = evaluate(0);
@@ -259,9 +293,20 @@ export function calculatePricing({
     referralDiscount > 0 && referralDiscount < referralBenefit.amount;
 
   let rejectionReason = promo.rejectionReason ?? referralBenefit.rejectionReason;
+  const subtotalBeforePoints = Math.max(
+    0,
+    item.sellingPrice - promo.amount - referralDiscount,
+  );
+
+  if (!rejectionReason && normalizedPointsDiscount > subtotalBeforePoints) {
+    rejectionReason = "Nambah Points melebihi subtotal yang dapat didiskon.";
+  }
 
   if (!rejectionReason && baseEvaluation.nambahProfit < minimumNambahProfit) {
-    rejectionReason = `Biaya transaksi membuat profit Nambah di bawah batas minimum ${formatIDR(minimumNambahProfit)}.`;
+    rejectionReason =
+      normalizedPointsDiscount > 0
+        ? `Penggunaan Nambah Points membuat profit di bawah batas minimum ${formatIDR(minimumNambahProfit)}.`
+        : `Biaya transaksi membuat profit Nambah di bawah batas minimum ${formatIDR(minimumNambahProfit)}.`;
   }
 
   if (
@@ -289,6 +334,11 @@ export function calculatePricing({
     referralRequestedDiscount: referralBenefit.amount,
     referralDiscount,
     referralDiscountCapped,
+    pointsDiscount: normalizedPointsDiscount,
+    pointsRedeemed: Math.floor(normalizedPointsDiscount / POINT_VALUE_IDR),
+    pointsEarned: finalEvaluation.pointsEarned,
+    pointsRewardValue: finalEvaluation.pointsRewardValue,
+    loyaltyEligibleSpend: finalEvaluation.loyaltyEligibleSpend,
     customerPaymentFee: finalEvaluation.customerPaymentFee,
     merchantPaymentCost: finalEvaluation.merchantPaymentCost,
     finalPrice: finalEvaluation.finalPrice,

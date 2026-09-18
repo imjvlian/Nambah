@@ -1,5 +1,6 @@
 import { runDigiflazzTestTransaction, type DigiflazzTestOutcome } from "@/lib/digiflazz/client";
 import { isFlowTestMode } from "@/lib/flow-test";
+import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
@@ -225,7 +226,7 @@ async function finalizeOrder(
   status: "success" | "failed",
 ) {
   const now = new Date().toISOString();
-  await supabaseUpdate(
+  const updated = await supabaseUpdate<{ id: string; status: PublicOrderStatus }>(
     "orders",
     {
       status,
@@ -234,8 +235,21 @@ async function finalizeOrder(
       ...(status === "success" ? { fulfilled_at: now } : {}),
       updated_at: now,
     },
-    { filters: { id: `eq.${orderId}` } },
+    {
+      filters: {
+        id: `eq.${orderId}`,
+        status: "in.(paid,processing)",
+      },
+    },
   );
+
+  if (updated.length === 0) return;
+
+  try {
+    await syncOrderPointsLifecycle(orderId, status);
+  } catch (error) {
+    console.error(`Nambah Points finalization failed for order ${orderId}`, error);
+  }
 
   if (status === "success") {
     await tryDeliverReceipt(orderId);
@@ -247,15 +261,34 @@ async function syncExistingTerminalTransaction(
   transaction: SupplierTransactionRow,
 ) {
   if (transaction.status === "success") {
+    if (
+      order.status === "refunded" ||
+      order.status === "cancelled" ||
+      order.status === "failed"
+    ) {
+      return true;
+    }
     if (order.status !== "success") {
       await finalizeOrder(order.id, "success");
     } else {
+      try {
+        await syncOrderPointsLifecycle(order.id, "success");
+      } catch (error) {
+        console.error(`Nambah Points resync failed for order ${order.id}`, error);
+      }
       await tryDeliverReceipt(order.id);
     }
     return true;
   }
 
   if (transaction.status === "failed") {
+    if (
+      order.status === "success" ||
+      order.status === "refunded" ||
+      order.status === "cancelled"
+    ) {
+      return true;
+    }
     if (order.status !== "failed") await finalizeOrder(order.id, "failed");
     return true;
   }

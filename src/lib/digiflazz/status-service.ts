@@ -1,5 +1,6 @@
 import type { DigiflazzTransactionData } from "@/lib/digiflazz/client";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
+import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
   supabaseSelect,
@@ -349,6 +350,15 @@ export async function applyDigiflazzTransactionStatus(
     if (latestOrder.status === "success") {
       receiptTriggered = await maybeSendReceipt(order.id);
     }
+  }
+
+  try {
+    await syncOrderPointsLifecycle(order.id, latestOrder.status);
+  } catch (error) {
+    console.error(
+      `Nambah Points callback sync failed for order ${order.id}`,
+      error,
+    );
   }
 
   const orderBecameExpected =

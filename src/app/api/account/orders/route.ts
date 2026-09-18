@@ -11,6 +11,9 @@ type AccountOrderRow = {
   id: string;
   status: string;
   final_price: number | string;
+  points_redeemed: number | string;
+  points_discount: number | string;
+  points_earned: number | string;
   created_at: string;
   updated_at: string;
   game: { name: string; short_name: string } | null;
@@ -31,7 +34,7 @@ export async function GET(request: Request) {
 
     const rows = await supabaseSelect<AccountOrderRow>("orders", {
       select:
-        "id,status,final_price,created_at,updated_at,game:games(name,short_name),product:products(label)",
+        "id,status,final_price,points_redeemed,points_discount,points_earned,created_at,updated_at,game:games(name,short_name),product:products(label)",
       filters: {
         customer_user_id: `eq.${auth.user.id}`,
       },
@@ -45,6 +48,9 @@ export async function GET(request: Request) {
           id: row.id,
           status: row.status,
           finalPrice: Number(row.final_price),
+          pointsRedeemed: Number(row.points_redeemed),
+          pointsDiscount: Number(row.points_discount),
+          pointsEarned: Number(row.points_earned),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           gameName: row.game?.name ?? row.game?.short_name ?? "Produk digital",

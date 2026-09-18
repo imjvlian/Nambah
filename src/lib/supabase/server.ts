@@ -199,3 +199,27 @@ export async function supabaseUpdate<T>(
 
   return (await response.json()) as T[];
 }
+
+
+export async function supabaseRpc<T>(
+  functionName: string,
+  body: Record<string, unknown> = {},
+): Promise<T> {
+  const { url, secretKey } = requireSupabaseConfig();
+
+  const response = await fetch(`${url}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: createHeaders(secretKey),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Supabase RPC ${functionName} failed (${response.status}): ${responseBody}`,
+    );
+  }
+
+  return (responseBody ? JSON.parse(responseBody) : null) as T;
+}

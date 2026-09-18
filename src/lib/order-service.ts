@@ -1,6 +1,7 @@
 import { fulfillPaidOrder } from "@/lib/fulfillment";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
+import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
@@ -19,6 +20,9 @@ type OrderRow = {
   customer_payment_fee: number | string;
   promotion_discount: number | string;
   referral_discount: number | string;
+  points_redeemed: number | string;
+  points_discount: number | string;
+  points_earned: number | string;
   final_price: number | string;
   created_at: string;
   updated_at: string;
@@ -116,7 +120,7 @@ function nextOrderStatus(
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -191,6 +195,9 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       sellingPrice: Number(order.selling_price),
       promotionDiscount: Number(order.promotion_discount),
       referralDiscount: Number(order.referral_discount),
+      pointsDiscount: Number(order.points_discount),
+      pointsRedeemed: Number(order.points_redeemed),
+      pointsEarned: Number(order.points_earned),
       customerPaymentFee: Number(order.customer_payment_fee),
       finalPrice: Number(order.final_price),
     },
@@ -209,7 +216,7 @@ export async function applyMidtransStatus(
 
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -274,6 +281,14 @@ export async function applyMidtransStatus(
     orderUpdatePayload.status_changed_at = now;
 
     await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
+  }
+
+  try {
+    await syncOrderPointsLifecycle(orderId, orderStatus);
+  } catch (error) {
+    // Payment truth must not be rolled back by a loyalty subsystem issue.
+    // Repeated status checks and fulfillment finalization will retry idempotently.
+    console.error(`Nambah Points lifecycle sync failed for order ${orderId}`, error);
   }
 
   await supabaseInsert("midtrans_payment_events", {

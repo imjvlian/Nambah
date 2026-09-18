@@ -9,6 +9,14 @@ import {
   validateGuestReceiptContact,
 } from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
+import {
+  getPointsSummary,
+  maxRedeemablePointsForSubtotal,
+  pointsToIdr,
+  reserveOrderPoints,
+  restoreOrderPointsRedemption,
+  validateRequestedPoints,
+} from "@/lib/loyalty";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
 import { getPublicOrder } from "@/lib/order-service";
 import {
@@ -31,6 +39,7 @@ type CreateOrderBody = {
   referralCode?: string;
   receiptEmail?: string;
   receiptWhatsapp?: string;
+  pointsToRedeem?: number;
 };
 
 type GameAccountRow = {
@@ -165,11 +174,73 @@ export async function POST(request: Request) {
     );
   }
 
+  const pointsRequest = validateRequestedPoints(body.pointsToRedeem);
+  if (!pointsRequest.ok) {
+    return Response.json({ error: pointsRequest.error }, { status: 400 });
+  }
+
+  const basePricing = calculatePricing({
+    item: selectedPackage,
+    paymentMethod,
+    promotion,
+    referral,
+    loyaltyEligible: Boolean(auth.user),
+    minimumNambahProfit,
+  });
+
+  if (!basePricing.safeToCheckout) {
+    return Response.json(
+      { error: basePricing.rejectionReason ?? "Harga belum aman untuk checkout." },
+      { status: 409 },
+    );
+  }
+
+  let pointsDiscount = 0;
+  if (pointsRequest.points > 0) {
+    if (!auth.user) {
+      return Response.json(
+        { error: "Login diperlukan untuk menggunakan Nambah Points." },
+        { status: 401 },
+      );
+    }
+
+    const points = await getPointsSummary(auth.user.id);
+    if (points.available < pointsRequest.points) {
+      return Response.json(
+        { error: `Nambah Points tersedia hanya ${points.available} points.` },
+        { status: 409 },
+      );
+    }
+
+    const subtotalBeforePoints = Math.max(
+      0,
+      basePricing.sellingPrice -
+        basePricing.promotionDiscount -
+        basePricing.referralDiscount,
+    );
+    const maxPoints = maxRedeemablePointsForSubtotal(subtotalBeforePoints);
+    if (pointsRequest.points > maxPoints) {
+      return Response.json(
+        {
+          error:
+            maxPoints > 0
+              ? `Maksimum penggunaan untuk transaksi ini adalah ${maxPoints} Nambah Points.`
+              : "Nambah Points belum dapat digunakan pada transaksi ini.",
+        },
+        { status: 409 },
+      );
+    }
+
+    pointsDiscount = pointsToIdr(pointsRequest.points);
+  }
+
   const pricing = calculatePricing({
     item: selectedPackage,
     paymentMethod,
     promotion,
     referral,
+    pointsDiscount,
+    loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
   });
 
@@ -211,6 +282,9 @@ export async function POST(request: Request) {
       merchant_payment_cost: pricing.merchantPaymentCost,
       promotion_discount: pricing.promotionDiscount,
       referral_discount: pricing.referralDiscount,
+      points_redeemed: pricing.pointsRedeemed,
+      points_discount: pricing.pointsDiscount,
+      points_earned: pricing.pointsEarned,
       final_price: pricing.finalPrice,
       net_profit_before_affiliate: pricing.netProfitBeforeAffiliate,
       affiliate_rate: pricing.affiliateRate,
@@ -223,6 +297,28 @@ export async function POST(request: Request) {
       status_changed_at: now,
       terminal_at: null,
     });
+
+    if (pricing.pointsRedeemed > 0 && auth.user) {
+      try {
+        await reserveOrderPoints(orderId, auth.user.id);
+      } catch (error) {
+        await supabaseUpdate(
+          "orders",
+          {
+            status: "cancelled",
+            status_changed_at: new Date().toISOString(),
+            terminal_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { filters: { id: `eq.${orderId}` } },
+        );
+        throw new Error(
+          error instanceof Error
+            ? `Nambah Points gagal direservasi: ${error.message}`
+            : "Nambah Points gagal direservasi.",
+        );
+      }
+    }
 
     await supabaseInsert("payments", {
       order_id: orderId,
@@ -248,6 +344,14 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       await Promise.all([
+        pricing.pointsRedeemed > 0
+          ? restoreOrderPointsRedemption(orderId).catch((restoreError) =>
+              console.error(
+                `Failed to restore points after Snap error for ${orderId}`,
+                restoreError,
+              ),
+            )
+          : Promise.resolve(),
         supabaseUpdate(
           "orders",
           { status: "cancelled", updated_at: new Date().toISOString() },
