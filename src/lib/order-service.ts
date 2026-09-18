@@ -1,6 +1,7 @@
 import { fulfillPaidOrder } from "@/lib/fulfillment";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
+import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
 
@@ -303,6 +304,26 @@ export async function applyMidtransStatus(
 
   const publicOrder = await getPublicOrder(orderId);
   if (!publicOrder) throw new Error(`Order ${orderId} hilang setelah update.`);
+
+  // Receipt delivery is intentionally retried from the payment/status path as
+  // well as fulfillment. This covers orders that were already success before
+  // Brevo was enabled and explicit provider failures from an earlier attempt.
+  // deliverSuccessReceipt is idempotent after a successful send.
+  if (publicOrder.status === "success") {
+    try {
+      const receipt = await deliverSuccessReceipt(orderId);
+      if (
+        receipt.status !== "sent" &&
+        receipt.status !== "disabled" &&
+        receipt.status !== "sending"
+      ) {
+        console.warn(`Receipt for order ${orderId}: ${receipt.status}`);
+      }
+    } catch (error) {
+      console.error(`Receipt retry failed for order ${orderId}`, error);
+    }
+  }
+
   return publicOrder;
 }
 

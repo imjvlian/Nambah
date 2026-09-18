@@ -373,3 +373,37 @@ export async function deliverSuccessReceipt(
     return { orderId, status: "failed" };
   }
 }
+
+
+function maskEmail(value: string) {
+  const [local, domain] = value.split("@");
+  if (!local || !domain) return value;
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"*".repeat(Math.max(2, local.length - visible.length))}@${domain}`;
+}
+
+export async function getReceiptDeliveryStatus(orderId: string) {
+  const context = await loadReceiptContext(orderId);
+  const delivery = await getDelivery(orderId);
+
+  return {
+    orderId,
+    orderStatus: context?.order.status ?? null,
+    hasRecipient: Boolean(context?.order.receipt_email),
+    recipient: context?.order.receipt_email
+      ? maskEmail(context.order.receipt_email)
+      : null,
+    delivery: delivery
+      ? {
+          channel: delivery.channel,
+          provider: delivery.provider,
+          status: delivery.status,
+          attempts: Number(delivery.attempts || 0),
+          providerMessageId: delivery.provider_message_id,
+          lastError: delivery.last_error,
+          sentAt: delivery.sent_at,
+          updatedAt: delivery.updated_at,
+        }
+      : null,
+  };
+}
