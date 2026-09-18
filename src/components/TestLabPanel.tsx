@@ -16,6 +16,21 @@ type State = {
   safetyReason: string;
 };
 
+function scenarioLabel(value?: Scenario) {
+  if (value === "success") return "Success";
+  if (value === "failed") return "Failed";
+  if (value === "pending-success") return "Pending → Success";
+  if (value === "pending-failed") return "Pending → Failed";
+  return "—";
+}
+
+function scopeLabel(value?: Scope) {
+  if (value === "next-order") return "Next order";
+  if (value === "next-n") return "Next N orders";
+  if (value === "until-changed") return "Until changed";
+  return "—";
+}
+
 export default function TestLabPanel() {
   const [state, setState] = useState<State | null>(null);
   const [scenario, setScenario] = useState<Scenario>("success");
@@ -76,8 +91,8 @@ export default function TestLabPanel() {
   }
 
   return (
-    <main className="acc-page">
-      <section className="acc-workspace" style={{ marginLeft: 0 }}>
+    <main className="acc-page acc-page-standalone">
+      <section className="acc-workspace">
         <header className="acc-topbar">
           <div>
             <small>Admin / System</small>
@@ -89,62 +104,84 @@ export default function TestLabPanel() {
         </header>
 
         <div className="acc-content">
-          <section className="acc-hero">
+          <section className="acc-hero acc-hero-standalone">
             <div>
-              <span className="acc-eyebrow">0.5.1 · Safe staging</span>
+              <span className="acc-eyebrow">Safe staging</span>
               <h1>Uji fulfillment tanpa ubah ENV.</h1>
               <p>
-                Scenario hanya berlaku pada digiflazz-test. Test Lab tidak memiliki
-                jalur untuk mengaktifkan fulfillment live.
+                Atur respons Digiflazz testing:true untuk order staging berikutnya.
+                Test Lab tidak mempunyai jalur untuk mengaktifkan fulfillment live.
               </p>
             </div>
+
+            <article className={"acc-hero-status testlab-state-" + (state?.enabled ? "active" : "disabled")}>
+              <div className="acc-hero-status-head">
+                <span>Current state</span>
+                <i className="acc-health-dot" aria-hidden="true" />
+              </div>
+              <strong>{state?.enabled ? "Active" : "Disabled"}</strong>
+              <small>{state?.safetyReason ?? "Memuat safety state..."}</small>
+              <div className="testlab-hero-meta">
+                <span>{scenarioLabel(state?.scenario)}</span>
+                <span>{scopeLabel(state?.scope)}</span>
+              </div>
+            </article>
           </section>
 
-          {notice && <div className="acc-global-notice" role="status">{notice}</div>}
+          {notice && (
+            <div className="acc-global-notice acc-inline-notice" role="status">
+              {notice}
+            </div>
+          )}
 
-          <div className="acc-grid-two">
-            <div className="acc-panel">
+          <div className="acc-grid-two testlab-grid">
+            <section className="acc-panel">
               <div className="acc-section-head">
                 <div>
                   <span className="acc-eyebrow">Supplier scenario</span>
                   <h2>Digiflazz testing:true</h2>
-                  <p>Pilih respons supplier untuk order staging berikutnya.</p>
+                  <p>Pilih perilaku supplier untuk checkout staging berikutnya.</p>
                 </div>
               </div>
 
-              <label>
-                Scenario
-                <select value={scenario} onChange={(e) => setScenario(e.target.value as Scenario)}>
-                  <option value="success">Success</option>
-                  <option value="failed">Failed</option>
-                  <option value="pending-success">Pending → Success</option>
-                  <option value="pending-failed">Pending → Failed</option>
-                </select>
-              </label>
-
-              <label>
-                Scope
-                <select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
-                  <option value="next-order">Next order only</option>
-                  <option value="next-n">Next N orders</option>
-                  <option value="until-changed">Until changed</option>
-                </select>
-              </label>
-
-              {scope === "next-n" && (
-                <label>
-                  Jumlah order
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={count}
-                    onChange={(e) => setCount(e.target.value)}
-                  />
+              <div className="testlab-form-grid">
+                <label className="acc-field">
+                  <span>Scenario</span>
+                  <select value={scenario} onChange={(event) => setScenario(event.target.value as Scenario)}>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                    <option value="pending-success">Pending → Success</option>
+                    <option value="pending-failed">Pending → Failed</option>
+                  </select>
+                  <small>Menentukan respons awal dan terminal supplier.</small>
                 </label>
-              )}
 
-              <div className="acc-action-panel">
+                <label className="acc-field">
+                  <span>Scope</span>
+                  <select value={scope} onChange={(event) => setScope(event.target.value as Scope)}>
+                    <option value="next-order">Next order only</option>
+                    <option value="next-n">Next N orders</option>
+                    <option value="until-changed">Until changed</option>
+                  </select>
+                  <small>Batasi berapa order yang menggunakan scenario ini.</small>
+                </label>
+
+                {scope === "next-n" && (
+                  <label className="acc-field">
+                    <span>Jumlah order</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={count}
+                      onChange={(event) => setCount(event.target.value)}
+                    />
+                    <small>Minimal 1, maksimal 100 order.</small>
+                  </label>
+                )}
+              </div>
+
+              <div className="acc-action-panel testlab-actions">
                 <button
                   type="button"
                   disabled={busy || !state?.safeToEnable}
@@ -161,27 +198,54 @@ export default function TestLabPanel() {
                   Disable
                 </button>
               </div>
-            </div>
 
-            <div className="acc-panel">
+              {!state?.safeToEnable && state && (
+                <div className="testlab-safety-warning">
+                  <strong>Activation locked</strong>
+                  <span>{state.safetyReason}</span>
+                </div>
+              )}
+            </section>
+
+            <section className="acc-panel testlab-state-panel">
               <div className="acc-section-head">
                 <div>
-                  <span className="acc-eyebrow">Current state</span>
-                  <h2>{state?.enabled ? "ACTIVE" : "DISABLED"}</h2>
-                  <p>{state?.safetyReason ?? "Memuat safety state..."}</p>
+                  <span className="acc-eyebrow">Frozen test state</span>
+                  <h2>Order menyimpan scenario sendiri.</h2>
+                  <p>
+                    Perubahan setting setelah checkout tidak mengubah scenario yang
+                    sudah dibekukan pada order.
+                  </p>
                 </div>
               </div>
-              <div className="acc-system-note">
-                <div><small>Scenario</small><strong>{state?.scenario ?? "-"}</strong></div>
-                <div><small>Scope</small><strong>{state?.scope ?? "-"}</strong></div>
-                <div><small>Remaining</small><strong>{state?.remainingUses ?? "∞"}</strong></div>
+
+              <div className="acc-system-note testlab-system-note">
+                <div>
+                  <small>Scenario</small>
+                  <strong>{scenarioLabel(state?.scenario)}</strong>
+                </div>
+                <div>
+                  <small>Scope</small>
+                  <strong>{scopeLabel(state?.scope)}</strong>
+                </div>
+                <div>
+                  <small>Remaining</small>
+                  <strong>{state?.remainingUses ?? "∞"}</strong>
+                </div>
+                <div>
+                  <small>Safe to enable</small>
+                  <strong>{state?.safeToEnable ? "YES" : "NO"}</strong>
+                </div>
               </div>
-              <p>
-                Setiap order yang memakai scenario admin menyimpan snapshot
-                <code> provider_mode</code>, <code>test_scenario</code>, dan
-                <code> test_scenario_source</code> untuk audit.
-              </p>
-            </div>
+
+              <div className="testlab-audit-note">
+                <span>Audit snapshot</span>
+                <p>
+                  Setiap order test menyimpan <code>provider_mode</code>,{" "}
+                  <code>test_scenario</code>, dan <code>test_scenario_source</code>.
+                </p>
+              </div>
+            </section>
           </div>
         </div>
       </section>
