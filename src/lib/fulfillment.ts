@@ -1,5 +1,6 @@
 import { runDigiflazzTestTransaction, type DigiflazzTestOutcome } from "@/lib/digiflazz/client";
 import { isFlowTestMode } from "@/lib/flow-test";
+import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
   supabaseSelect,
@@ -210,6 +211,15 @@ async function markOrderProcessing(order: OrderRow) {
   );
 }
 
+async function tryDeliverReceipt(orderId: string) {
+  try {
+    await deliverSuccessReceipt(orderId);
+  } catch (error) {
+    // Receipt delivery must never roll back successful fulfillment.
+    console.error(`Receipt trigger failed for order ${orderId}`, error);
+  }
+}
+
 async function finalizeOrder(
   orderId: string,
   status: "success" | "failed",
@@ -226,6 +236,10 @@ async function finalizeOrder(
     },
     { filters: { id: `eq.${orderId}` } },
   );
+
+  if (status === "success") {
+    await tryDeliverReceipt(orderId);
+  }
 }
 
 async function syncExistingTerminalTransaction(
@@ -233,7 +247,11 @@ async function syncExistingTerminalTransaction(
   transaction: SupplierTransactionRow,
 ) {
   if (transaction.status === "success") {
-    if (order.status !== "success") await finalizeOrder(order.id, "success");
+    if (order.status !== "success") {
+      await finalizeOrder(order.id, "success");
+    } else {
+      await tryDeliverReceipt(order.id);
+    }
     return true;
   }
 
@@ -368,6 +386,10 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResu
     order.status === "refunded" ||
     order.status === "cancelled"
   ) {
+    if (order.status === "success") {
+      await tryDeliverReceipt(order.id);
+    }
+
     return {
       mode: getFulfillmentMode(),
       orderId: order.id,

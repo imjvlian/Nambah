@@ -237,6 +237,26 @@ create table if not exists public.supplier_transactions (
 create index if not exists supplier_transactions_order_idx
   on public.supplier_transactions(order_id, created_at desc);
 
+create table if not exists public.receipt_deliveries (
+  id bigint generated always as identity primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  channel text not null check (channel in ('email', 'whatsapp')),
+  recipient text not null,
+  provider text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'sending', 'sent', 'failed')),
+  provider_message_id text,
+  attempts integer not null default 0 check (attempts >= 0),
+  last_error text,
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (order_id, channel)
+);
+
+create index if not exists receipt_deliveries_status_idx
+  on public.receipt_deliveries(status, updated_at desc);
+
 create table if not exists public.commissions (
   id bigint generated always as identity primary key,
   affiliate_code text not null references public.affiliates(code),
@@ -289,6 +309,7 @@ alter table public.supplier_balance_snapshots enable row level security;
 alter table public.orders enable row level security;
 alter table public.payments enable row level security;
 alter table public.supplier_transactions enable row level security;
+alter table public.receipt_deliveries enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
 
@@ -310,6 +331,7 @@ revoke all on table public.supplier_balance_snapshots from anon, authenticated;
 revoke all on table public.orders from anon, authenticated;
 revoke all on table public.payments from anon, authenticated;
 revoke all on table public.supplier_transactions from anon, authenticated;
+revoke all on table public.receipt_deliveries from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;
 
