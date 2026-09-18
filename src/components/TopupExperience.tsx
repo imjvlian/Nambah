@@ -9,6 +9,7 @@ import {
   validateGameAccountTarget,
 } from "@/lib/game-account";
 import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
+import { validateGuestReceiptContact } from "@/lib/customer-contact";
 import {
   createPublicPricingFallback,
   type PublicPricingResult,
@@ -166,6 +167,10 @@ export default function TopupExperience({
   const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [viewerState, setViewerState] = useState<"loading" | "guest" | "authenticated">("loading");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestWhatsapp, setGuestWhatsapp] = useState("");
+  const [contactError, setContactError] = useState("");
   const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
   const [pricingError, setPricingError] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
@@ -199,6 +204,30 @@ export default function TopupExperience({
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
   const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
   const selectedGameArtwork = artworkByGameId[selectedGame.id];
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function resolveViewer() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!mounted) return;
+
+        setViewerState(response.ok ? "authenticated" : "guest");
+        if (response.ok) setContactError("");
+      } catch {
+        if (mounted) setViewerState("guest");
+      }
+    }
+
+    void resolveViewer();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -404,6 +433,7 @@ export default function TopupExperience({
     event.preventDefault();
     setNotice("");
     setAccountError("");
+    setContactError("");
 
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
     if (!account.ok) {
@@ -416,6 +446,27 @@ export default function TopupExperience({
       });
       return;
     }
+
+    let guestContact: { email: string; whatsapp: string } | null = null;
+    if (viewerState === "loading") {
+      setContactError("Status akun masih diperiksa. Coba lagi sebentar.");
+      return;
+    }
+    if (viewerState === "guest") {
+      const contact = validateGuestReceiptContact(guestEmail, guestWhatsapp);
+      if (!contact.ok) {
+        setContactError(contact.error);
+        requestAnimationFrame(() => {
+          document.getElementById("receipt-contact")?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        });
+        return;
+      }
+      guestContact = { email: contact.email, whatsapp: contact.whatsapp };
+    }
+
     if (!serverPricing) {
       setNotice(pricingError || "Harga belum tervalidasi. Coba lagi.");
       return;
@@ -438,6 +489,12 @@ export default function TopupExperience({
           targetServerId: account.serverId,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
+          ...(guestContact
+            ? {
+                receiptEmail: guestContact.email,
+                receiptWhatsapp: guestContact.whatsapp,
+              }
+            : {}),
         }),
       });
       const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
@@ -643,6 +700,66 @@ export default function TopupExperience({
               </div>
             )}
           </div>
+
+          {viewerState === "guest" && (
+            <div className="form-block guest-receipt-block" id="receipt-contact">
+              {contactError && (
+                <div className="account-validation-error" role="alert" aria-live="assertive">
+                  <span className="account-validation-error-icon" aria-hidden="true">!</span>
+                  <span className="account-validation-error-copy">
+                    <strong>Kontak receipt belum lengkap</strong>
+                    <small>{contactError}</small>
+                  </span>
+                </div>
+              )}
+
+              <div className="form-label">
+                <span className="step-number">✉</span>
+                <div>
+                  <strong>Kontak receipt</strong>
+                  <small>Karena kamu belum login, receipt transaksi akan menggunakan email dan WhatsApp ini.</small>
+                </div>
+              </div>
+
+              <div className="input-grid two guest-receipt-fields">
+                <label>
+                  <span>Email</span>
+                  <input
+                    autoComplete="email"
+                    inputMode="email"
+                    type="email"
+                    maxLength={254}
+                    placeholder="nama@email.com"
+                    value={guestEmail}
+                    onChange={(event) => {
+                      setGuestEmail(event.target.value);
+                      setContactError("");
+                    }}
+                  />
+                </label>
+
+                <label>
+                  <span>Nomor WhatsApp</span>
+                  <input
+                    autoComplete="tel"
+                    inputMode="tel"
+                    type="tel"
+                    maxLength={20}
+                    placeholder="081234567890"
+                    value={guestWhatsapp}
+                    onChange={(event) => {
+                      setGuestWhatsapp(event.target.value);
+                      setContactError("");
+                    }}
+                  />
+                </label>
+              </div>
+
+              <p className="guest-receipt-note">
+                Kontak ini hanya disimpan pada order untuk status dan receipt transaksi.
+              </p>
+            </div>
+          )}
 
           <div className="form-block nominal-form-block nominal-form-grouped">
             <div className="form-label">

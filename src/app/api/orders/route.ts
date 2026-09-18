@@ -3,6 +3,11 @@ import {
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
 import { randomUUID } from "node:crypto";
+import {
+  isValidReceiptEmail,
+  normalizeReceiptEmail,
+  validateGuestReceiptContact,
+} from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { createMidtransSnapTransaction, isMidtransSandboxConfigured } from "@/lib/midtrans/client";
 import { getPublicOrder } from "@/lib/order-service";
@@ -24,6 +29,8 @@ type CreateOrderBody = {
   targetServerId?: string;
   promoCode?: string;
   referralCode?: string;
+  receiptEmail?: string;
+  receiptWhatsapp?: string;
 };
 
 type GameAccountRow = {
@@ -73,6 +80,29 @@ export async function POST(request: Request) {
 
   const targetUserId = clean(body.targetUserId, 64);
   const targetServerId = clean(body.targetServerId, 64);
+  const auth = await resolveNambahAuth(request);
+
+  let receiptEmail = "";
+  let receiptWhatsapp = "";
+  if (auth.user) {
+    receiptEmail = normalizeReceiptEmail(auth.user.email);
+    if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
+      return Response.json(
+        { error: "Email akun Nambah tidak tersedia untuk receipt." },
+        { status: 409 },
+      );
+    }
+  } else {
+    const contact = validateGuestReceiptContact(
+      body.receiptEmail,
+      body.receiptWhatsapp,
+    );
+    if (!contact.ok) {
+      return Response.json({ error: contact.error }, { status: 400 });
+    }
+    receiptEmail = contact.email;
+    receiptWhatsapp = contact.whatsapp;
+  }
 
   const pricingContext = await getPricingContext({
     gameId: body.gameId,
@@ -154,7 +184,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Total pembayaran tidak valid." }, { status: 409 });
   }
 
-  const auth = await resolveNambahAuth(request);
   const orderId = createOrderId();
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -164,6 +193,8 @@ export async function POST(request: Request) {
     await supabaseInsert("orders", {
       id: orderId,
       customer_user_id: auth.user?.id ?? null,
+      receipt_email: receiptEmail,
+      receipt_whatsapp: receiptWhatsapp || null,
       game_id: game.id,
       product_id: selectedPackage.id,
       payment_method_id: paymentMethod.id,
@@ -212,6 +243,8 @@ export async function POST(request: Request) {
         itemId: selectedPackage.id,
         itemName: `${game.name} - ${selectedPackage.label}`,
         enabledPayments,
+        customerEmail: receiptEmail,
+        customerPhone: receiptWhatsapp || undefined,
       });
     } catch (error) {
       await Promise.all([

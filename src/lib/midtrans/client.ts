@@ -65,6 +65,8 @@ export async function createMidtransSnapTransaction(input: {
   itemId: string;
   itemName: string;
   enabledPayments: string[];
+  customerEmail?: string;
+  customerPhone?: string;
 }) {
   const serverKey = requireServerKey();
   const controller = new AbortController();
@@ -94,6 +96,14 @@ export async function createMidtransSnapTransaction(input: {
           },
         ],
         enabled_payments: input.enabledPayments,
+        ...((input.customerEmail || input.customerPhone)
+          ? {
+              customer_details: {
+                ...(input.customerEmail ? { email: input.customerEmail } : {}),
+                ...(input.customerPhone ? { phone: input.customerPhone } : {}),
+              },
+            }
+          : {}),
         expiry: {
           unit: "minutes",
           duration: 30,

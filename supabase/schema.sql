@@ -163,6 +163,8 @@ create index if not exists supplier_balance_snapshots_lookup_idx
 create table if not exists public.orders (
   id text primary key,
   customer_user_id uuid,
+  receipt_email text,
+  receipt_whatsapp text,
   game_id text not null references public.games(id),
   product_id text not null references public.products(id),
   payment_method_id text not null references public.payment_methods(id),

@@ -139,3 +139,29 @@
     gap: 2px;
   }
 }
+
+
+.guest-receipt-block {
+  scroll-margin-top: 130px;
+}
+
+.guest-receipt-block .form-label {
+  margin-bottom: 14px;
+}
+
+.guest-receipt-fields input {
+  width: 100%;
+}
+
+.guest-receipt-note {
+  margin: 10px 0 0;
+  color: #777f75;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 620px) {
+  .guest-receipt-fields {
+    grid-template-columns: 1fr !important;
+  }
+}
