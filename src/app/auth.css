@@ -55,6 +55,59 @@
   white-space: nowrap;
 }
 
+.account-nav-user-with-points {
+  max-width: none;
+  padding-right: 7px;
+}
+
+.account-nav-points {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 2px;
+  padding: 0 8px 0 5px;
+  border: 1px solid rgba(201, 255, 63, 0.18);
+  border-radius: 999px;
+  background: rgba(201, 255, 63, 0.055);
+  color: var(--lime);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.account-nav-points i {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 6px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.account-nav-points strong {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 700px) {
+  .account-nav-user-with-points > b {
+    display: none;
+  }
+
+  .account-nav-user-with-points {
+    padding-left: 6px;
+  }
+
+  .account-nav-points {
+    margin-left: 0;
+  }
+}
+
 .auth-page,
 .account-page {
   min-height: 100vh;
