@@ -1,9 +1,9 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.9.0 — Release Candidate
+Baseline: Nambah 1.0.0 — Stable Code Baseline
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
-Baseline commit reviewed: 8831f43d1221fab3efb0f7b9a23916bd553b7f1b  
+Baseline commit reviewed: d8176e6a8acc601413dcb8ff374687bcc9fd6433  
 Last reviewed: 2026-09-18
 
 Dokumen ini adalah referensi developer utama untuk memahami, mengubah, dan menambah fitur Nambah tanpa merusak alur pembayaran, fulfillment, loyalty, atau keamanan.
@@ -1701,3 +1701,26 @@ Vercel cron memakai UTC dan mengirim request ke production deployment. Endpoint 
 Deploy platform selain Vercel harus menjadwalkan endpoint yang sama dengan scheduler masing-masing.
 
 Release version tidak pernah menyalakan real-money. Production Midtrans dan Digiflazz live tetap dikendalikan oleh ENV + readiness gate + explicit owner approval.
+
+
+---
+
+## 51. Nambah 1.0.0 Stable Code Baseline
+
+Version 1.0.0 freezes the first production-capable code baseline.
+
+Release guarantees:
+
+1. automated policy regression tests run before every production build in CI;
+2. payment truth remains server-side;
+3. supplier fulfillment remains idempotent and separately recoverable;
+4. live Digiflazz requires explicit double opt-in;
+5. staging supplier scenarios can be exercised without real supplier spend;
+6. Points, promotion, commission, withdrawal, receipt, and reconciliation lifecycles are durable;
+7. admin high-risk operations are role-bound and audited;
+8. operational incidents and financial mismatches are observable;
+9. environment, test, production, release, and rollback guides live in the repository.
+
+A 1.0.0 code deployment is allowed to remain in staging configuration indefinitely.
+
+Real-money launch is a separate operational decision and requires all production readiness blockers to be closed. In particular, do not infer or auto-fill `fulfillment_target_template`; every enabled-live product/game target format must be verified against its supplier contract.

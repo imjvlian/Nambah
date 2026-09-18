@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.9.0 — Release Candidate**
+**1.0.0 — Stable Code Baseline**
 
 Core flow tersedia:
 
@@ -15,12 +15,6 @@ catalog → account validation → pricing → promo/referral/points
 ```
 
 Staging Test Lab tersedia di `/admin/test-lab` untuk memilih scenario Digiflazz `testing:true` tanpa mengubah ENV/redeploy. Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
-
-Deployment staging saat ini:
-
-```text
-https://nambah.vercel.app
-```
 
 ## Development
 
@@ -64,7 +58,7 @@ Migration fitur terbaru:
 
 Default scheduled operations untuk Vercel didefinisikan di `vercel.json`. Semua endpoint cron tetap memerlukan `CRON_SECRET`.
 
-Versi 1.0.0 tidak identik dengan live-money ON; activation provider production tetap mempunyai gate operasional terpisah.
+**1.0.0 berarti code baseline stabil, bukan live-money otomatis aktif.** Aktivasi Midtrans Production dan Digiflazz live tetap mempunyai ENV gate, catalog readiness gate, manual provider setup, dan explicit owner approval.
 
 ## Environment penting
 

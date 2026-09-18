@@ -2322,7 +2322,9 @@ export default function AdminDashboard() {
                 <div className="acc-readiness-panel">
                   <div className="acc-readiness-head">
                     <div>
-                      <small>{readiness.version} · PRODUCTION CANDIDATE</small>
+                      <small>
+                        {readiness.version} · {readiness.stage.toUpperCase().replaceAll("-", " ")}
+                      </small>
                       <strong>
                         {readiness.automatedProductionReady
                           ? "Automated production checks pass"
@@ -2362,9 +2364,9 @@ export default function AdminDashboard() {
                   copy="Endpoint cron + manual admin memulihkan order tertunda, supplier pending test, dan receipt failed secara idempotent."
                 />
                 <RoadmapCard
-                  title="Commission lifecycle"
+                  title="Affiliate lifecycle & payout"
                   status="live"
-                  copy="Commission pending saat paid/processing, available saat success, dan cancelled saat failure/refund."
+                  copy="Commission mengikuti status order, withdrawal memakai atomic allocation, dan payout dikonfirmasi superadmin."
                 />
                 <RoadmapCard
                   title="Rate limit & abuse guard"
@@ -2372,9 +2374,9 @@ export default function AdminDashboard() {
                   copy="Durable database limiter melindungi login, signup, account checker, dan order creation."
                 />
                 <RoadmapCard
-                  title="0.5.0 production candidate"
+                  title="1.0.0 stable code baseline"
                   status="live"
-                  copy="Health/readiness, sandbox-production payment switch, live-money double gate, financial reconciliation, rate limit, dan audit tersedia untuk final launch verification."
+                  copy="CI tests/build, environment guide, E2E test guide, release checklist, monitoring, recovery, dan launch safety gate tersedia untuk operasional production."
                 />
                 <RoadmapCard
                   title="Live safety gate"

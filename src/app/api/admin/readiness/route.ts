@@ -351,8 +351,8 @@ export async function GET(request: Request) {
   ).length;
 
   return Response.json({
-    version: "0.9.0",
-    stage: "release-candidate",
+    version: "1.0.0",
+    stage: "stable-code",
     readyForStagingE2E: stagingBlockers === 0,
     automatedProductionReady: productionBlockers === 0,
     blockers: productionBlockers,
