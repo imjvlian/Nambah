@@ -2288,6 +2288,9 @@ export default function AdminDashboard() {
               </div>
 
               <div className="acc-action-panel">
+                <Link className="acc-inline-button" href="/admin/operations">
+                  Open Operations Center →
+                </Link>
                 <Link className="acc-inline-button" href="/admin/test-lab">
                   Open Staging Test Lab →
                 </Link>

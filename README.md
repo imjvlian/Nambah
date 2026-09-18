@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.4 — Financial & Loyalty Hardening**
+**0.5.5 — Operations & Monitoring**
 
 Core flow tersedia:
 
@@ -48,6 +48,7 @@ Migration fitur terbaru:
 019 Staging Test Lab + operational indexes
 020 Points lots + expiry
 021 Points reverse/reservation consistency
+022 Operational incidents
 ```
 
 Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).

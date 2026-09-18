@@ -1,6 +1,6 @@
 # Nambah Developer Reference
 
-Baseline: Nambah 0.5.4 — Financial & Loyalty Hardening  
+Baseline: Nambah 0.5.5 — Operations & Monitoring  
 Repository: https://github.com/imjvlian/Nambah  
 Branch: main  
 Baseline commit reviewed: 6135c697cf78498a512d1d262f278baed617bfed  
@@ -1566,3 +1566,24 @@ GET  /api/cron/points-expiry
 ~~~
 
 Both use the atomic `nambah_points_expire` RPC. Cron authorization continues to use `CRON_SECRET`; no new ENV is required.
+
+
+---
+
+## 46. Operations Health & Recovery Center (0.5.5)
+
+Operations UI: `/admin/operations`  
+Admin API: `GET /api/admin/operations/health`  
+Cron API: `GET /api/cron/operations-health`
+
+The detector tracks:
+
+- paid/processing orders stuck over 5 minutes;
+- supplier transactions pending over 5 minutes;
+- failed and stale-sending receipts;
+- financial reconciliation errors from the last 24 hours;
+- low/critical Digiflazz balance snapshots.
+
+Incidents are deduplicated by fingerprint in `operational_incidents`. Resolved conditions are closed automatically. Critical cron incidents can notify Telegram with a one-hour notification cooldown.
+
+The Operations Center can trigger existing order/supplier/receipt reconciliation and financial reconciliation without direct SQL.
