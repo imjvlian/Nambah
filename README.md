@@ -43,6 +43,7 @@ Migration fitur terbaru:
 016 Live fulfillment targets
 017 Financial reconciliation
 018 Production hardening
+019 Account check cache
 ```
 
 Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).
@@ -84,6 +85,7 @@ Lihat `.env.example` untuk seluruh opsi.
 - Digiflazz menggunakan deterministic request ref, signed callback, terminal guards, reconciliation, dan frozen max price.
 - Points memakai atomic ledger/reservation untuk mencegah double-spend.
 - Promo quota memakai reservation lifecycle.
+- Hasil pengecekan akun yang berhasil disimpan di `account_check_cache` supaya provider eksternal tidak dipanggil ulang. Cache bersifat durable dan hanya menyimpan hasil sukses.
 - Affiliate commission mengikuti status order dan net profit.
 - Financial reconciliation hanya mendeteksi mismatch; tidak memindahkan uang otomatis.
 - Admin mutations penting dicatat ke audit log.

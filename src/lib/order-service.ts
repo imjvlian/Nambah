@@ -26,6 +26,9 @@ type OrderRow = {
   points_discount: number | string;
   points_earned: number | string;
   final_price: number | string;
+  expires_at: string | null;
+  status_changed_at: string | null;
+  terminal_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -167,6 +170,13 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     id: order.id,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
+    // Wajib diteruskan: tanpa ini `calculateCountdown` di OrderStatusView
+    // selalu menerima `undefined` sehingga countdown "kedaluwarsa dalam 30
+    // menit" tidak pernah tampil, padahal server memang menegakkan
+    // `expires_at` lewat sweeper order kedaluwarsa.
+    expiresAt: order.expires_at,
+    statusChangedAt: order.status_changed_at,
+    terminalAt: order.terminal_at,
     mode: "midtrans-sandbox",
     status: order.status,
     product: {

@@ -417,7 +417,7 @@ export default function TopupExperience({
             server: normalizedServerId,
             message:
               data.message ??
-              "Format akun valid; auto-check provider belum tersedia.",
+              "Format akun sudah sesuai, pengecekan otomatis tidak tersedia untuk produk ini.",
           });
           return;
         }
@@ -593,7 +593,7 @@ export default function TopupExperience({
       });
       const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans.");
+        setNotice(data.error ?? "Gagal membuat pembayaran.");
         return;
       }
       const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
@@ -666,7 +666,7 @@ export default function TopupExperience({
           <h2>Top up tanpa muter-muter.</h2>
           <p>
             Harga, promo, dan benefit referral dihitung otomatis, lalu
-            divalidasi ulang oleh Nambah sebelum pembayaran dibuat.
+            disesuaikan dengan kode yang kamu pakai sebelum pembayaran dibuat.
           </p>
           <div className="trust-list">
             <span><b>01</b> Harga jelas</span>
@@ -758,7 +758,7 @@ export default function TopupExperience({
                       <span className="account-check-icon" aria-hidden="true">↻</span>
                       <span className="account-check-copy">
                         <strong>Memeriksa akun...</strong>
-                        <small>ID dan Zone sedang divalidasi.</small>
+                        <small>Sebentar, kami cek ID dan Zone kamu.</small>
                       </span>
                     </>
                   ) : usernameCheck.status === "success" ? (
@@ -949,7 +949,7 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">3</span>
-              <div><strong>Promo & referral</strong><small>Kode selalu divalidasi oleh backend, bukan dipercaya dari browser.</small></div>
+              <div><strong>Promo & referral</strong><small>Kode promo dan referral otomatis dihitung dan langsung berlaku saat pembayaran.</small></div>
             </div>
 
             <div className="discount-stack">
@@ -975,7 +975,7 @@ export default function TopupExperience({
 
             {pricing.referralCode && pricing.referralDiscount > 0 && (
               <p className="referral-active">
-                Referral {pricing.referralCode} aktif · kamu hemat {formatIDR(pricing.referralDiscount)} · partner mendapat {Math.round(pricing.affiliateRate * 100)}% dari net profit.
+                Referral {pricing.referralCode} aktif · kamu hemat {formatIDR(pricing.referralDiscount)}.
                 {pricing.referralDiscountCapped ? " Benefit disesuaikan otomatis agar transaksi tetap aman." : ""}
               </p>
             )}
@@ -1084,7 +1084,7 @@ export default function TopupExperience({
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">4</span>
-              <div><strong>Metode pembayaran</strong><small>Metode pembayaran diproses melalui Midtrans. Environment sandbox/production dikontrol oleh server Nambah.</small></div>
+              <div><strong>Metode pembayaran</strong><small>Pilih metode yang paling nyaman. Pembayaran diverifikasi otomatis sebelum pesanan diproses.</small></div>
             </div>
             <div className="payment-list">
               {paymentMethods.map((method) => (

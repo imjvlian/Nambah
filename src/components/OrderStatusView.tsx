@@ -263,10 +263,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         embedId: SNAP_EMBED_ID,
         ...snapCallbacks(order.id),
       });
-      setNotice("Pembayaran Midtrans siap digunakan.");
+      setNotice("Pembayaran siap digunakan.");
     } catch {
       embeddedOrderRef.current = null;
-      setNotice("Embedded Midtrans belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
+      setNotice("Pembayaran belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
     }
   }, [order?.id, order?.status, order?.payment.snapToken, snapReady, accessToken]);
 
@@ -321,7 +321,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
       const data = (await response.json()) as OrderApiResponse;
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Gagal membuat pembayaran Midtrans.");
+        setNotice(data.error ?? "Gagal membuat pembayaran.");
         return;
       }
 
@@ -411,9 +411,25 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const timelineIndex = isPreview
     ? 0
     : Math.max(0, TIMELINE_STEPS.findIndex((step) => step.status === liveStatus));
+  // Countdown sudah lewat tapi status masih `pending_payment`: order baru saja
+  // melewati batas, atau cron sweeper belum sempat membatalkannya (jalur
+  // paling lama 10 menit, plus 5 menit grace di `order-expiry.ts`).
+  //
+  // Tanpa penanganan ini tombol "Buka pembayaran" tetap tampil. Customer
+  // mengkliknya, membuka halaman Midtrans, lalu ditolak karena Snap-nya sudah
+  // kedaluwarsa — dead end. Sembunyikan CTA bayar dan
+  // tawarkan pesanan baru, karena itu satu-satunya jalan keluar yang berhasil.
+  const paymentWindowClosed =
+    liveStatus === "pending_payment" && countdown.isExpired;
+
   const statusActions = isPreview
     ? []
-    : STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy");
+    : paymentWindowClosed
+      ? [
+          { label: "Buat pesanan baru", action: "new_order" as const },
+          { label: "Periksa status", action: "refresh" as const },
+        ]
+      : STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy");
 
   const paymentType = order?.payment.paymentType ?? null;
   const paymentChannel = paymentTypeLabel(paymentType);
@@ -447,21 +463,29 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <h1>{isPreview ? "Siap membuat pembayaran." : STATUS_LABEL[liveStatus]}</h1>
             <p>
               {isPreview
-                ? "Harga akan divalidasi ulang di server sebelum order dan token pembayaran dibuat."
-                : STATUS_DESCRIPTION[liveStatus]}
+                ? "Harga sudah disesuaikan dengan promo, referral, dan points yang kamu pakai."
+                : paymentWindowClosed
+                  ? "Waktu pembayaran untuk pesanan ini sudah habis. Buat pesanan baru untuk melanjutkan."
+                  : STATUS_DESCRIPTION[liveStatus]}
             </p>
             {!isPreview && (
               <div className="order-status-meta">
                 {liveStatus === "pending_payment" && countdown.totalSeconds > 0 && !countdown.isExpired && (
                   <span className="order-countdown">Sisa waktu {countdown.display}</span>
                 )}
-                {countdown.isExpired && <span className="order-countdown expired">Waktu habis</span>}
+                {/* Badge "Waktu habis" hanya relevan selama masih menunggu
+                    pembayaran. Tanpa gate status ini, order yang sukses tapi
+                    dibuat lebih dari 30 menit lalu tetap akan menampilkan
+                    "Waktu habis" karena `countdown.isExpired` true. */}
+                {liveStatus === "pending_payment" && countdown.isExpired && (
+                  <span className="order-countdown expired">Waktu habis</span>
+                )}
                 {lastChecked && <span className="order-last-checked">Diperiksa {lastChecked}</span>}
               </div>
             )}
           </div>
           <span className="order-mode-badge">
-            {isPreview ? "Ringkasan" : "Pembayaran"}
+            {isPreview ? "Pratinjau" : "Pembayaran"}
           </span>
         </div>
 
@@ -478,7 +502,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 </div>
               </div>
               <span className="order-status-pill">
-                {isPreview ? "Belum dibuat" : STATUS_LABEL[liveStatus]}
+                {isPreview ? "Menunggu pembayaran" : STATUS_LABEL[liveStatus]}
               </span>
             </div>
 
@@ -527,6 +551,23 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   {busy ? "Memproses..." : "Buat pembayaran"}
                 </button>
               </div>
+            ) : paymentWindowClosed ? (
+              // Snap embed tidak dimuat kalau jendela pembayaran sudah tutup:
+              // token-nya kedaluwarsa di sisi Midtrans, jadi container akan
+              // gagal render dan tombol "Buka pembayaran cadangan" jadi buntu.
+              <div className="order-payment-preview">
+                <div>
+                  <small>Pembayaran</small>
+                  <strong>Waktu pembayaran habis</strong>
+                  <p>
+                    {payment.name} tidak lagi berlaku untuk pesanan ini. Buat pesanan
+                    baru untuk melanjutkan top up.
+                  </p>
+                </div>
+                <button type="button" onClick={() => router.push("/#topup")}>
+                  Buat pesanan baru
+                </button>
+              </div>
             ) : liveStatus === "pending_payment" ? (
               <div className="midtrans-native-section">
                 <div className="midtrans-native-head">
@@ -550,7 +591,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <div id={SNAP_EMBED_ID} className="midtrans-snap-container" />
 
                 <div className="midtrans-native-footer">
-                  <span>Pembayaran diverifikasi langsung oleh server Nambah.</span>
+                  <span>Pembayaran diverifikasi otomatis sebelum pesanan diproses.</span>
                   {(!midtransClientKey || !snapReady) && redirectUrl && (
                     <button type="button" onClick={openFallbackPayment}>Buka pembayaran cadangan</button>
                   )}
@@ -576,7 +617,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <span>Ringkasan pesanan</span>
                 <small>{displayId}</small>
               </div>
-              <small>{isPreview ? "Ringkasan" : "Aktif"}</small>
+              <small>{isPreview ? "Pratinjau" : STATUS_LABEL[liveStatus]}</small>
             </div>
 
             <dl className="order-detail-list">

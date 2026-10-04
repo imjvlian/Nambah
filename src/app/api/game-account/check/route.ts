@@ -1,4 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import {
+  readCachedAccountCheck,
+  writeCachedAccountCheck,
+} from "@/lib/account-check-cache";
 import { getGameAccountSchema, validateGameAccountTarget } from "@/lib/game-account";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 import { checkVolseverGame } from "@/lib/volsever/client";
@@ -167,19 +171,22 @@ async function callMimihRegionApi(input: {
 }
 
 function mimihBusinessError(rc: string, message?: string) {
+  // `rc` dan `message` mentah dari provider hanya boleh masuk ke server log.
+  // User menerima teks generik supaya tidak melihat detail integrasi internal.
   switch (rc) {
     case "40":
       return Response.json(
-        { error: "Format request pengecekan akun ditolak provider.", source: "mimih" },
+        { error: "Data akun yang dimasukkan belum tepat. Periksa ID dan Zone kamu.", source: "mimih" },
         { status: 400 },
       );
     case "41":
     case "42":
     case "57":
     case "58":
+      console.error(`Mimih account checker unavailable (rc=${rc})`, message);
       return Response.json(
         {
-          error: "Fallback checker Mimih belum tersedia. Periksa konfigurasi provider.",
+          error: "Pengecekan akun sedang tidak tersedia. Kamu tetap bisa checkout tanpa cek otomatis.",
           retryable: true,
           source: "mimih",
         },
@@ -196,9 +203,10 @@ function mimihBusinessError(rc: string, message?: string) {
       );
     case "53":
     case "99":
+      console.error(`Mimih account checker provider error (rc=${rc})`, message);
       return Response.json(
         {
-          error: "Provider validasi akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
+          error: "Pengecekan akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
           retryable: true,
           source: "mimih",
         },
@@ -213,9 +221,13 @@ function mimihBusinessError(rc: string, message?: string) {
         { status: 422 },
       );
     default:
+      // Jangan pernah kirim `message` mentah provider ke user: isinya bisa
+      // memuat teks teknis/URL endpoint internal pihak ketiga.
+      console.error(`Mimih account checker unhandled rc=${rc}`, message);
       return Response.json(
         {
-          error: message?.trim() || "Pengecekan akun gagal diproses oleh provider.",
+          error: "Pengecekan akun sedang mengalami gangguan. Silakan coba lagi sebentar.",
+          retryable: true,
           source: "mimih",
         },
         { status: 502 },
@@ -317,21 +329,40 @@ export async function POST(request: Request) {
     });
   }
 
+  // Dua lapis cache sebelum menyentuh provider eksternal:
+  // L1 = memory instance ini, L2 = table `account_check_cache` (durable,
+  // bertahan lintas cold start dan dibagi antar instance).
   const cacheKey = `${game.id}:${userId}:${serverId ?? ""}`;
-  const cached = accountCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  const inMemory = accountCache.get(cacheKey);
+  if (inMemory && inMemory.expiresAt > Date.now()) {
     return Response.json({
-      nickname: cached.nickname,
-      server: cached.server,
-      region: cached.region,
-      countryCode: cached.countryCode,
+      nickname: inMemory.nickname,
+      server: inMemory.server,
+      region: inMemory.region,
       verified: true,
-      regionVerified: Boolean(cached.region),
-      cached: true,
-      source: cached.source,
     });
   }
-  if (cached) accountCache.delete(cacheKey);
+  if (inMemory) accountCache.delete(cacheKey);
+
+  const stored = await readCachedAccountCheck(game.id, userId, serverId);
+  if (stored) {
+    // Warm L1 supaya request berikutnya di instance ini tidak perlu query DB.
+    accountCache.set(cacheKey, {
+      nickname: stored.nickname,
+      server: stored.server ?? serverId ?? "",
+      region: stored.region,
+      countryCode: null,
+      source: stored.provider,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+
+    return Response.json({
+      nickname: stored.nickname,
+      server: stored.server ?? serverId ?? null,
+      region: stored.region,
+      verified: true,
+    });
+  }
 
   if (rateLimitExceeded(getClientKey(request))) {
     return Response.json(
@@ -358,15 +389,21 @@ export async function POST(request: Request) {
         expiresAt: Date.now() + CACHE_TTL_MS,
       });
 
+      await writeCachedAccountCheck({
+        gameId: game.id,
+        userId,
+        serverId,
+        nickname: result.nickname,
+        resolvedServer: result.server ?? serverId ?? null,
+        region: result.region,
+        provider: "volsever",
+      });
+
       return Response.json({
         nickname: result.nickname,
         server: result.server ?? serverId ?? null,
         region: result.region,
-        countryCode: result.countryCode,
         verified: true,
-        regionVerified: Boolean(result.region),
-        cached: false,
-        source: "volsever",
       });
     }
 
@@ -459,7 +496,7 @@ export async function POST(request: Request) {
       return Response.json(
         {
           pending: true,
-          message: data?.message?.trim() || "Pengecekan akun masih diproses.",
+          message: "Pengecekan akun masih diproses.",
           source: "mimih",
         },
         { status: 202 },
@@ -484,7 +521,7 @@ export async function POST(request: Request) {
     if (!nickname) {
       return Response.json(
         {
-          error: "Akun ditemukan, tetapi nickname tidak tersedia dari provider.",
+          error: "Akun kamu terdeteksi, tapi nama panggilan belum bisa dimuat. Silakan coba lagi sebentar.",
           retryable: true,
           source: "mimih",
         },
@@ -504,18 +541,24 @@ export async function POST(request: Request) {
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
+    await writeCachedAccountCheck({
+      gameId: game.id,
+      userId,
+      serverId,
+      nickname,
+      resolvedServer: serverId ?? null,
+      region,
+      provider: "mimih",
+    });
+
+    // Hanya field yang benar-benar dipakai UI yang dikirim ke browser. Detail
+    // integrasi (provider fallback, cache hit, allowed product types, negara)
+    // dicatat di server saja supaya rantai vendor tidak bocor ke user.
     return Response.json({
       nickname,
       server: serverId,
       region,
-      countryCode,
-      allowedProductTypes: data?.allowed_product_types ?? [],
-      providerCached: Boolean(data?.cached),
       verified: true,
-      regionVerified: Boolean(region),
-      cached: false,
-      source: "mimih",
-      fallbackFrom: "volsever",
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

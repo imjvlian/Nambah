@@ -32,8 +32,8 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 9px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .admin-automation-grid {
@@ -69,8 +69,8 @@
 .admin-automation-fields label > span,
 .admin-tool-preview small {
   color: var(--muted);
-  font-size: 8px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .admin-automation-card-head strong {
@@ -83,8 +83,8 @@
   border-radius: 999px;
   background: rgba(201, 255, 63, 0.07);
   color: var(--lime);
-  font-size: 8px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .admin-automation-fields {
@@ -130,7 +130,7 @@
   right: 11px;
   transform: translateY(-50%);
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .admin-formula {
@@ -144,7 +144,7 @@
   border-radius: 8px;
   background: #0c0e0b;
   color: #81897d;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .admin-tool-preview {
@@ -180,7 +180,7 @@
   gap: 12px;
   padding: 8px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .admin-price-preview-list small {
@@ -198,7 +198,7 @@
 
 .admin-cleanup-list code {
   color: #7d8578;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .admin-tool-actions {
@@ -216,7 +216,7 @@
   background: var(--surface-2);
   color: #d9ded5;
   font: inherit;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }

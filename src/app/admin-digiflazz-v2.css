@@ -64,7 +64,7 @@
   background: var(--surface-2);
   color: #d9ded5;
   font: inherit;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -98,8 +98,8 @@
 .catalog-advanced-filters label > span {
   padding-left: 2px;
   color: #727a6d;
-  font-size: 8px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .catalog-compact-select select,
@@ -112,7 +112,7 @@
   background: #0d0f0c;
   color: #d9ded5;
   font: inherit;
-  font-size: 9px;
+  font-size: 12px;
   outline: 0;
 }
 
@@ -161,7 +161,7 @@
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.045);
   color: #71786d;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .clean-table {
@@ -218,7 +218,7 @@
 .catalog-publish-copy small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -249,7 +249,7 @@
 
 .catalog-switch b {
   width: 30px;
-  font-size: 8px;
+  font-size: 12px;
   text-align: center;
 }
 

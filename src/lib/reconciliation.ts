@@ -1,3 +1,4 @@
+import { purgeExpiredAccountChecks } from "@/lib/account-check-cache";
 import {
   runDigiflazzPrepaidTransaction,
   runDigiflazzTestTransaction,
@@ -10,6 +11,7 @@ import {
   getFulfillmentMode,
 } from "@/lib/fulfillment";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
+import { sweepExpiredPendingOrders } from "@/lib/order-expiry";
 import { supabaseSelect } from "@/lib/supabase/server";
 
 type ReconcileSource = "admin" | "cron";
@@ -52,6 +54,13 @@ export type ReconciliationResult = {
     pending: number;
     failed: number;
   };
+  expiry: {
+    checked: number;
+    cancelled: number;
+    alreadySettled: number;
+    paymentDetected: number;
+    failed: number;
+  };
   supplier: {
     checked: number;
     applied: number;
@@ -64,6 +73,9 @@ export type ReconciliationResult = {
     sent: number;
     stillFailed: number;
     staleSending: number;
+  };
+  accountCheckCache: {
+    purged: number;
   };
   issues: Array<{
     kind: "order" | "supplier" | "receipt";
@@ -139,6 +151,13 @@ export async function runNambahReconciliation(input?: {
       pending: 0,
       failed: 0,
     },
+    expiry: {
+      checked: 0,
+      cancelled: 0,
+      alreadySettled: 0,
+      paymentDetected: 0,
+      failed: 0,
+    },
     supplier: {
       checked: 0,
       applied: 0,
@@ -152,8 +171,32 @@ export async function runNambahReconciliation(input?: {
       stillFailed: 0,
       staleSending: 0,
     },
+    accountCheckCache: {
+      purged: 0,
+    },
     issues: [],
   };
+
+  // Sweep order kedaluwarsa DIJALANKAN DULUAN. Order `pending_payment` yang sudah
+  // lewat `expires_at` tidak tersentuh bagian manapun dari reconciler ini
+  // sebelumnya (hanya `paid`/`processing` yang diproses), padahal order itu
+  // sedang mengunci `reserved_points` customer dan kuota promo. Melepasnya lebih
+  // dulu berarti saldo customer yang tersedia sudah benar sebelum bagian lain
+  // membaca data.
+  try {
+    const expiry = await sweepExpiredPendingOrders(limit);
+    result.expiry.checked = expiry.checked;
+    result.expiry.cancelled = expiry.cancelled;
+    result.expiry.alreadySettled = expiry.alreadySettled;
+    result.expiry.paymentDetected = expiry.paymentDetected;
+    result.expiry.failed = expiry.failures.length;
+
+    for (const failure of expiry.failures) {
+      issue(result, "order", failure.orderId, new Error(failure.message));
+    }
+  } catch (error) {
+    issue(result, "order", "expired_order_sweep", error);
+  }
 
   const recoverableOrders = await supabaseSelect<RecoverableOrderRow>("orders", {
     select: "id,status,updated_at",
@@ -304,6 +347,15 @@ export async function runNambahReconciliation(input?: {
   // message before the local sent state was persisted. Surface these for
   // manual/provider reconciliation to avoid duplicate receipts.
   result.receipts.staleSending = staleSending.length;
+
+  // Housekeeping for the durable account-check cache. Kedaluwarsa sudah tidak
+  // dibaca oleh reader (expires_at dicek di query), jadi purge ini murni agar
+  // tabel tidak tumbuh tanpa batas.
+  try {
+    result.accountCheckCache.purged = await purgeExpiredAccountChecks();
+  } catch (error) {
+    issue(result, "order", "account_check_cache", error);
+  }
 
   result.finishedAt = new Date().toISOString();
   return result;

@@ -29,8 +29,29 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+      "https://nambah.vercel.app",
+  ),
   title: "Nambah — Top Up Cepat, Main Lagi",
-  description: "Top up game dan voucher digital dengan proses simpel dan transparan.",
+  description:
+    "Top up game dan voucher digital dengan proses simpel dan transparan.",
+  applicationName: "Nambah",
+  keywords: ["top up game", "voucher digital", "pulsa", "Nambah"],
+  openGraph: {
+    type: "website",
+    siteName: "Nambah",
+    title: "Nambah — Top Up Cepat, Main Lagi",
+    description:
+      "Top up game dan voucher digital dengan proses simpel dan transparan.",
+    locale: "id_ID",
+  },
+  twitter: {
+    card: "summary",
+    title: "Nambah — Top Up Cepat, Main Lagi",
+    description:
+      "Top up game dan voucher digital dengan proses simpel dan transparan.",
+  },
 };
 
 export default function RootLayout({

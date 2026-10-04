@@ -5,6 +5,7 @@ import {
 } from "@/lib/loyalty";
 import type { ReferralProgram } from "@/lib/referrals";
 import type { SupplierPricedPackage } from "@/lib/supplier-pricing";
+import { rejectionCodeCopy, type RejectionCode } from "@/lib/user-copy";
 
 export const DEFAULT_AFFILIATE_RATE = 0.2;
 export const MINIMUM_NAMBAH_PROFIT = 500;
@@ -67,6 +68,12 @@ export type PricingResult = {
   minimumNambahProfit: number;
   safeToCheckout: boolean;
   rejectionReason: string | null;
+  /**
+   * Kode alasan stabil untuk log/reconciliation server-side.
+   * `rejectionReason` sudah aman untuk user; kode ini yang dipakai developer
+   * ketika perlu tahu penyebab bisnis tanpa membocorkan angka profit/margin.
+   */
+  rejectionCode: RejectionCode | null;
 };
 
 function percentageOf(amount: number, percentage: number) {
@@ -93,12 +100,22 @@ export function findPromotion(code: string) {
 }
 
 function calculatePromotionDiscount(sellingPrice: number, promotion: Promotion | null) {
-  if (!promotion) return { amount: 0, rejectionReason: null as string | null };
+  if (!promotion) {
+    return {
+      amount: 0,
+      rejectionReason: null as string | null,
+      rejectionCode: null as RejectionCode | null,
+    };
+  }
 
   if (sellingPrice < promotion.minimumOrder) {
     return {
       amount: 0,
-      rejectionReason: `Minimum transaksi untuk ${promotion.code} adalah ${formatIDR(promotion.minimumOrder)}.`,
+      rejectionReason: rejectionCodeCopy("promo_minimum_order", {
+        code: promotion.code,
+        minimumOrder: formatIDR(promotion.minimumOrder),
+      }),
+      rejectionCode: "promo_minimum_order" as const,
     };
   }
 
@@ -110,6 +127,7 @@ function calculatePromotionDiscount(sellingPrice: number, promotion: Promotion |
   return {
     amount: promotion.maxDiscount ? Math.min(rawDiscount, promotion.maxDiscount) : rawDiscount,
     rejectionReason: null as string | null,
+    rejectionCode: null as RejectionCode | null,
   };
 }
 
@@ -118,12 +136,22 @@ function calculateReferralRequestedDiscount(
   referral: ReferralProgram | null,
   promotion: Promotion | null,
 ) {
-  if (!referral) return { amount: 0, rejectionReason: null as string | null };
+  if (!referral) {
+    return {
+      amount: 0,
+      rejectionReason: null as string | null,
+      rejectionCode: null as RejectionCode | null,
+    };
+  }
 
   if (sellingPrice < referral.minimumOrder) {
     return {
       amount: 0,
-      rejectionReason: `Minimum transaksi untuk referral ${referral.code} adalah ${formatIDR(referral.minimumOrder)}.`,
+      rejectionReason: rejectionCodeCopy("referral_minimum_order", {
+        code: referral.code,
+        minimumOrder: formatIDR(referral.minimumOrder),
+      }),
+      rejectionCode: "referral_minimum_order" as const,
     };
   }
 
@@ -133,7 +161,11 @@ function calculateReferralRequestedDiscount(
   ) {
     return {
       amount: 0,
-      rejectionReason: `Referral ${referral.code} tidak dapat digabung dengan promo ${promotion.code}.`,
+      rejectionReason: rejectionCodeCopy("referral_not_stackable", {
+        code: referral.code,
+        otherCode: promotion.code,
+      }),
+      rejectionCode: "referral_not_stackable" as const,
     };
   }
 
@@ -147,6 +179,7 @@ function calculateReferralRequestedDiscount(
       ? Math.min(rawDiscount, referral.maxUserBenefit)
       : rawDiscount,
     rejectionReason: null as string | null,
+    rejectionCode: null as RejectionCode | null,
   };
 }
 
@@ -293,20 +326,24 @@ export function calculatePricing({
     referralDiscount > 0 && referralDiscount < referralBenefit.amount;
 
   let rejectionReason = promo.rejectionReason ?? referralBenefit.rejectionReason;
+  let rejectionCode: RejectionCode | null =
+    promo.rejectionCode ?? referralBenefit.rejectionCode;
+
   const subtotalBeforePoints = Math.max(
     0,
     item.sellingPrice - promo.amount - referralDiscount,
   );
 
   if (!rejectionReason && normalizedPointsDiscount > subtotalBeforePoints) {
-    rejectionReason = "Nambah Points melebihi subtotal yang dapat didiskon.";
+    rejectionReason = rejectionCodeCopy("points_exceed_subtotal");
+    rejectionCode = "points_exceed_subtotal";
   }
 
+  // Penyebab di bawah ini murni internal (profit/margin). Angka ambang tidak
+  // boleh sampai ke user — teks generik dipakai, kode disimpan untuk log.
   if (!rejectionReason && baseEvaluation.nambahProfit < minimumNambahProfit) {
-    rejectionReason =
-      normalizedPointsDiscount > 0
-        ? `Penggunaan Nambah Points membuat profit di bawah batas minimum ${formatIDR(minimumNambahProfit)}.`
-        : `Biaya transaksi membuat profit Nambah di bawah batas minimum ${formatIDR(minimumNambahProfit)}.`;
+    rejectionReason = rejectionCodeCopy("profit_below_minimum");
+    rejectionCode = "profit_below_minimum";
   }
 
   if (
@@ -315,7 +352,10 @@ export function calculatePricing({
     referralBenefit.amount > 0 &&
     referralDiscount === 0
   ) {
-    rejectionReason = `Benefit referral ${referral.code} tidak dapat diterapkan pada produk ini karena margin terlalu tipis.`;
+    rejectionReason = rejectionCodeCopy("referral_margin_too_thin", {
+      code: referral.code,
+    });
+    rejectionCode = "referral_margin_too_thin";
   }
 
   return {
@@ -349,5 +389,6 @@ export function calculatePricing({
     minimumNambahProfit,
     safeToCheckout: rejectionReason === null,
     rejectionReason,
+    rejectionCode,
   };
 }

@@ -153,7 +153,7 @@
 }
 
 .home-market-board-copy small {
-  color: #687064;
+  color: #8f9788;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -194,7 +194,7 @@
 
 .home-market-board-meta small {
   overflow: hidden;
-  color: #6d7469;
+  color: #8a9286;
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -408,7 +408,7 @@
   position: absolute;
   top: 14px;
   right: 14px;
-  color: #555d52;
+  color: #7d857a;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -634,7 +634,7 @@
 }
 
 .home-oura-refine .catalog-section .game-copy small {
-  color: #757d72;
+  color: #8a9286;
   font-size: 11px;
 }
 

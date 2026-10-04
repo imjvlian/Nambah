@@ -202,15 +202,33 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
   };
 }
 
-export function sanitizeAccountField(value: string, field: AccountField) {
-  const sanitized =
-    field.sanitize === "digits"
-      ? value.replace(/\D/g, "")
-      : field.sanitize === "username"
-        ? value.replace(/[^A-Za-z0-9_]/g, "")
-        : value.replace(/[^A-Za-z0-9@._+\- ]/g, "");
+/**
+ * Buang karakter yang tidak valid dari sebuah field akun.
+ *
+ * Sengaja TIDAK memotong panjang. Pemotongan hanya aman untuk membatasi ketikan
+ * di form (`sanitizeAccountField`), karena user masih melihat dan memperbaiki
+ * input-nya sendiri. Di jalur validasi server memotong berarti mengubah ID
+ * tujuan menjadi ID yang berbeda tanpa ada yang tahu — lalu ID salah itu yang
+ * dikirim ke supplier dan customer membayar top-up untuk akun yang bukan miliknya.
+ */
+export function stripAccountFieldCharacters(value: string, field: AccountField) {
+  return field.sanitize === "digits"
+    ? value.replace(/\D/g, "")
+    : field.sanitize === "username"
+      ? value.replace(/[^A-Za-z0-9_]/g, "")
+      : value.replace(/[^A-Za-z0-9@._+\- ]/g, "");
+}
 
-  return sanitized.slice(0, field.maxLength);
+/**
+ * Sanitasi untuk input form: buang karakter invalid DAN potong ke `maxLength`.
+ *
+ * Dipakai `onChange` di form, jadi nilai yang tampil selalu sudah valid dan
+ * user tidak bisa mengetik melewati batas. Validasi server TIDAK boleh memakai
+ * fungsi ini — pakai `stripAccountFieldCharacters` + `pattern` supaya input
+ * kelewat panjang ditolak dengan pesan, bukan diam-diam dipotong.
+ */
+export function sanitizeAccountField(value: string, field: AccountField) {
+  return stripAccountFieldCharacters(value, field).slice(0, field.maxLength);
 }
 
 export function validateGameAccountTarget(
@@ -219,7 +237,13 @@ export function validateGameAccountTarget(
   rawServerId?: string,
 ): AccountValidationResult {
   const schema = getGameAccountSchema(game);
-  const userId = sanitizeAccountField(rawUserId, schema.user).trim();
+
+  // Dipakai `stripAccountFieldCharacters`, bukan `sanitizeAccountField`: kalau
+  // input dipotong di sini, pattern tetap lolos dan ID hasil potong dikirim ke
+  // supplier. Kuantifier panjang di setiap `pattern` (mis. `{3,64}`) sudah
+  // menegakkan batas maksimum, jadi input kepanjangan ditolak di bawah dengan
+  // `invalidMessage` yang sudah ada.
+  const userId = stripAccountFieldCharacters(rawUserId, schema.user).trim();
 
   if (!userId) {
     return { ok: false, error: `${schema.user.label} wajib diisi.` };
@@ -230,7 +254,10 @@ export function validateGameAccountTarget(
 
   if (!schema.server) return { ok: true, userId };
 
-  const serverId = sanitizeAccountField(rawServerId ?? "", schema.server).trim();
+  const serverId = stripAccountFieldCharacters(
+    rawServerId ?? "",
+    schema.server,
+  ).trim();
   if (!serverId) {
     return { ok: false, error: `${schema.server.label} wajib diisi.` };
   }

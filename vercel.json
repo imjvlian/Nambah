@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/financial-reconcile",
+      "schedule": "17 * * * *"
+    },
+    {
+      "path": "/api/cron/digiflazz-balance",
+      "schedule": "43 * * * *"
+    }
+  ]
+}

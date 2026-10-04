@@ -25,7 +25,7 @@
 .midtrans-native-loading,
 .midtrans-native-warning {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .midtrans-native-head strong {
@@ -35,7 +35,7 @@
 .midtrans-native-head p {
   margin: 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .midtrans-native-head > span {
@@ -44,8 +44,8 @@
   border-radius: 999px;
   background: rgba(201, 255, 63, 0.065);
   color: var(--lime);
-  font-size: 7px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 800;
   letter-spacing: 0.06em;
 }
 
@@ -102,7 +102,7 @@
   background: transparent;
   color: var(--lime);
   font: inherit;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }

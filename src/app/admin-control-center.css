@@ -39,7 +39,7 @@
 
 .acc-brand small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -71,14 +71,14 @@
   place-items: center;
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 7px;
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: .04em;
 }
 
 .acc-nav button b {
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .acc-nav button:hover {
@@ -139,12 +139,12 @@
 }
 
 .acc-admin-user strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-admin-user small {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
@@ -155,7 +155,7 @@
   background: transparent;
   color: #9aa095;
   cursor: pointer;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -185,8 +185,8 @@
 
 .acc-topbar small {
   color: var(--muted);
-  font-size: 7px;
-  font-weight: 750;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .acc-topbar strong {
@@ -213,7 +213,7 @@
   background: rgba(255,255,255,.02);
   color: #bdc3b8;
   cursor: pointer;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -228,7 +228,7 @@
   border-radius: 999px;
   background: rgba(255, 184, 77, .05);
   color: #e4bf82;
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: .08em;
 }
@@ -240,7 +240,7 @@
   border-radius: 10px;
   background: rgba(201,255,63,.035);
   color: #c4d2a2;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-content {
@@ -259,7 +259,7 @@
 
 .acc-eyebrow {
   color: var(--lime);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: .13em;
   text-transform: uppercase;
@@ -310,7 +310,7 @@
 .acc-balance span {
   display: block;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .acc-balance strong {
@@ -344,7 +344,7 @@
 .acc-metrics span {
   display: block;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .acc-metrics strong {
@@ -380,7 +380,7 @@
 
 .acc-section-head p {
   max-width: 680px;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-order-list,
@@ -412,7 +412,7 @@
 .acc-order-row small,
 .acc-order-row span {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .acc-order-row strong {
@@ -420,7 +420,7 @@
 }
 
 .acc-order-row > b {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-status {
@@ -429,8 +429,8 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: #aab1a5;
-  font-size: 7px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -470,18 +470,18 @@
 }
 
 .acc-service-row strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-service-row small {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
 .acc-service-row > b {
   color: #8d9589;
-  font-size: 7px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
@@ -534,14 +534,14 @@
 .acc-roadmap-card p {
   margin: 13px 0 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
 .acc-roadmap-status {
   padding: 4px 6px;
   border-radius: 999px;
-  font-size: 6px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -582,7 +582,7 @@
   outline: 0;
   background: #0d0f0c;
   color: #d9ded3;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-table-card {
@@ -603,7 +603,7 @@
   padding: 11px 15px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: .07em;
   text-transform: uppercase;
@@ -631,12 +631,12 @@
 .acc-receipts-row span,
 .acc-receipts-row small {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .acc-orders-row strong,
 .acc-receipts-row strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-catalog-card {
@@ -660,7 +660,7 @@
   background: #151813;
   color: #ccd1c6;
   cursor: pointer;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -716,7 +716,7 @@
 .acc-module-summary span {
   display: block;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .acc-module-summary strong {
@@ -741,7 +741,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: #969d92;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .acc-service-grid {
@@ -772,13 +772,13 @@
 .acc-service-grid p {
   margin: 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.55;
 }
 
 .acc-service-grid b {
   color: #8e968b;
-  font-size: 6px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
@@ -799,7 +799,7 @@
 .acc-system-note small {
   display: block;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .acc-system-note strong {
@@ -811,7 +811,7 @@
 .acc-empty {
   padding: 28px 16px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -970,8 +970,8 @@
   background: #11140f;
   color: #bfc5ba;
   cursor: pointer;
-  font-size: 7px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .acc-order-inspector {
@@ -998,7 +998,7 @@
 
 .acc-order-inspector-head small {
   color: var(--lime);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: .08em;
 }
@@ -1026,8 +1026,8 @@
 
 .acc-order-inspector-grid article > small {
   color: #9fa69a;
-  font-size: 7px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .acc-order-inspector-grid pre {
@@ -1035,7 +1035,7 @@
   margin: 9px 0 0;
   overflow: auto;
   color: #b8c0b3;
-  font-size: 7px;
+  font-size: 11px;
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1053,7 +1053,7 @@
   padding: 11px 14px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -1071,13 +1071,13 @@
 }
 
 .acc-users-row strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-users-row span {
   overflow: hidden;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1109,7 +1109,7 @@
   padding: 11px 14px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -1121,13 +1121,13 @@
 }
 
 .acc-finance-row > strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-finance-row > span,
 .acc-finance-row small {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .acc-finance-row > div {
@@ -1190,7 +1190,7 @@
 
 .acc-readiness-head small {
   color: var(--lime);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: .08em;
 }
@@ -1201,7 +1201,7 @@
 
 .acc-readiness-head > span {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .acc-readiness-list > div {
@@ -1220,13 +1220,13 @@
 }
 
 .acc-readiness-list strong {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .acc-readiness-list small,
 .acc-readiness-list b {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .acc-health.pass {

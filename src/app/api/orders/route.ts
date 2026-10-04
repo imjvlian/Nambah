@@ -16,12 +16,12 @@ import {
   maxRedeemablePointsForSubtotal,
   pointsToIdr,
   reserveOrderPoints,
-  restoreOrderPointsRedemption,
   validateRequestedPoints,
 } from "@/lib/loyalty";
 import { createMidtransSnapTransaction, isMidtransConfigured } from "@/lib/midtrans/client";
 import { rateLimitResponse } from "@/lib/rate-limit";
-import { reservePromotionForOrder, syncPromotionLifecycle } from "@/lib/promotion-service";
+import { reservePromotionForOrder } from "@/lib/promotion-service";
+import { cancelOrderWithCleanup } from "@/lib/order-cancellation";
 import { getPublicOrder } from "@/lib/order-service";
 import {
   createOrderAccessCookie,
@@ -65,10 +65,6 @@ function createOrderId(now = new Date()) {
   return `NBH-${date}-${suffix}`;
 }
 
-function clean(value?: string, maxLength = 80) {
-  return value?.trim().slice(0, maxLength) ?? "";
-}
-
 export async function POST(request: Request) {
   const limited = await rateLimitResponse(request, {
     scope: "order-create",
@@ -98,8 +94,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "Request order tidak valid." }, { status: 400 });
   }
 
-  const targetUserId = clean(body.targetUserId, 64);
-  const targetServerId = clean(body.targetServerId, 64);
+  // Sengaja TIDAK dipotong di sini. Nilai mentah diteruskan ke
+  // `validateGameAccountTarget`, yang menolak input kelewat panjang dengan pesan
+  // milik game tersebut. Versi lama memakai `clean(value, 64)` yang memotong
+  // diam-diam: User ID 70 karakter jadi 64, lolos validasi, lalu ID yang salah
+  // itu dikirim ke supplier.
+  const targetUserId = body.targetUserId ?? "";
+  const targetServerId = body.targetServerId ?? "";
   const auth = await resolveNambahAuth(request);
 
   let receiptEmail = "";
@@ -290,6 +291,20 @@ export async function POST(request: Request) {
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const access = createOrderAccessCredential();
 
+  // Pembuatan order di bawah ini adalah saga 6 langkah, bukan transaksi: ada
+  // panggilan ke Midtrans di tengah-tengahnya, jadi membungkusnya dalam DB
+  // transaction tidak mungkin. Kalau proses mati (timeout, cold start, deploy)
+  // di salah satu langkah, order tetap ada dengan status `pending_payment`.
+  //
+  // Jendela bocornya dibatasi oleh sweeper kedaluwarsa (`lib/order-expiry.ts`):
+  // order yatim seperti itu akan dibatalkan dan reservasi points/promo-nya
+  // dilepas paling lama `expires_at` + grace 5 menit + selisih cron (10 menit).
+  // Sebelumnya tidak ada penanganan apa pun, jadi reservasi terkunci permanen.
+  //
+  // Karena itu SEMUA jalur pembatalan di dalam saga ini harus lewat
+  // `cancelOrderWithCleanup` — helper itu idempoten lewat compare-and-swap pada
+  // `status`, jadi dipanggil dari jalur kompensasi maupun sweeper tidak akan
+  // saling menimpa.
   try {
     await supabaseInsert("orders", {
       id: orderId,
@@ -332,16 +347,7 @@ export async function POST(request: Request) {
       try {
         await reserveOrderPoints(orderId, auth.user.id);
       } catch (error) {
-        await supabaseUpdate(
-          "orders",
-          {
-            status: "cancelled",
-            status_changed_at: new Date().toISOString(),
-            terminal_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          { filters: { id: `eq.${orderId}` } },
-        );
+        await cancelOrderWithCleanup(orderId, "points_reservation_failed");
         throw new Error(
           error instanceof Error
             ? `Nambah Points gagal direservasi: ${error.message}`
@@ -354,21 +360,9 @@ export async function POST(request: Request) {
       try {
         await reservePromotionForOrder(orderId);
       } catch (error) {
-        await Promise.all([
-          pricing.pointsRedeemed > 0
-            ? restoreOrderPointsRedemption(orderId).catch(() => undefined)
-            : Promise.resolve(),
-          supabaseUpdate(
-            "orders",
-            {
-              status: "cancelled",
-              status_changed_at: new Date().toISOString(),
-              terminal_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { filters: { id: `eq.${orderId}` } },
-          ),
-        ]);
+        // `cancelOrderWithCleanup` melepas points DAN promo sekaligus, jadi
+        // jalur ini tidak perlu kompensasi terpisah.
+        await cancelOrderWithCleanup(orderId, "promo_reservation_failed");
         throw new Error(
           error instanceof Error
             ? `Promo gagal direservasi: ${error.message}`
@@ -400,34 +394,15 @@ export async function POST(request: Request) {
         customerPhone: receiptWhatsapp || undefined,
       });
     } catch (error) {
-      await Promise.all([
-        pricing.pointsRedeemed > 0
-          ? restoreOrderPointsRedemption(orderId).catch((restoreError) =>
-              console.error(
-                `Failed to restore points after Snap error for ${orderId}`,
-                restoreError,
-              ),
-            )
-          : Promise.resolve(),
-        pricing.promoCode
-          ? syncPromotionLifecycle(orderId, "cancelled").catch((promoError) =>
-              console.error(
-                `Failed to release promo after Snap error for ${orderId}`,
-                promoError,
-              ),
-            )
-          : Promise.resolve(),
-        supabaseUpdate(
-          "orders",
-          { status: "cancelled", updated_at: new Date().toISOString() },
-          { filters: { id: `eq.${orderId}` } },
-        ),
-        supabaseUpdate(
-          "payments",
-          { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
-          { filters: { order_id: `eq.${orderId}`, provider: "eq.midtrans" } },
-        ),
-      ]);
+      // Jalur ini sebelumnya hanya set `status` + `updated_at` tanpa
+      // `terminal_at`/`status_changed_at`, jadi order terminal tapi tidak
+      // ditandai terminal. Sekarang lewat helper yang sama seperti jalur lain.
+      await cancelOrderWithCleanup(orderId, "snap_create_failed");
+      await supabaseUpdate(
+        "payments",
+        { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
+        { filters: { order_id: `eq.${orderId}`, provider: "eq.midtrans" } },
+      );
       throw error;
     }
 

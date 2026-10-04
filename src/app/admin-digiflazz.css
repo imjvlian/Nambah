@@ -28,7 +28,7 @@
   border-radius: 10px;
   color: var(--muted);
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .supplier-browser-header nav a.active {
@@ -115,7 +115,7 @@
 
 .supplier-browser-stats small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-browser-stats strong {
@@ -188,8 +188,8 @@
 .supplier-browser-filter-grid label > span {
   padding-left: 2px;
   color: var(--muted);
-  font-size: 8px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .supplier-browser-filter-grid select {
@@ -209,7 +209,7 @@
 
 .supplier-browser-filter-footer > span {
   color: #7f877b;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-browser-filter-footer button {
@@ -246,7 +246,7 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -278,7 +278,7 @@
 .supplier-browser-statuses small,
 .supplier-browser-mapped small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .supplier-browser-product strong,
@@ -295,7 +295,7 @@
   border-radius: 6px;
   background: #0b0d0a;
   color: #a8b0a3;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .supplier-browser-product p {
@@ -303,7 +303,7 @@
   margin: 2px 0 0;
   overflow: hidden;
   color: #747b70;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -317,7 +317,7 @@
   width: fit-content;
   padding: 5px 7px;
   border-radius: 999px;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -349,12 +349,12 @@
 
 .supplier-publish-button strong {
   color: #d9ded5;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-publish-button small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -429,7 +429,7 @@
 
 .supplier-browser-pagination span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-browser-pagination button {

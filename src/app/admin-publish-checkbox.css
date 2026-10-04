@@ -28,8 +28,8 @@
   min-height: 38px;
   padding: 0 10px;
   color: #d9ded5;
-  font-size: 9px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .supplier-publication-select-all input,
@@ -50,7 +50,7 @@
   background: var(--surface-2);
   color: #d9ded5;
   font: inherit;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -67,7 +67,7 @@
 
 .supplier-publication-save > span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-publication-save > span strong {
@@ -112,12 +112,12 @@
 
 .supplier-publication-choice strong {
   color: #d9ded5;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .supplier-publication-choice small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .supplier-publication-choice.checked {

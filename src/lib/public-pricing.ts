@@ -17,13 +17,18 @@ export type PublicPricingResult = Pick<
   | "pointsDiscount"
   | "pointsRedeemed"
   | "pointsEarned"
-  | "affiliateRate"
   | "customerPaymentFee"
   | "finalPrice"
   | "safeToCheckout"
   | "rejectionReason"
 >;
 
+/**
+ * Catatan keamanan: `affiliateRate`, `supplierCost`, `nambahProfit`,
+ * `netProfitBeforeAffiliate`, `minimumNambahProfit`, dan `rejectionCode`
+ * SENGAJA tidak ada di payload ini. Nilai-nilai tersebut hanya boleh keluar
+ * lewat endpoint admin/reconciliation yang sudah pakai autentikasi.
+ */
 export function toPublicPricing(pricing: PricingResult): PublicPricingResult {
   return {
     sellingPrice: pricing.sellingPrice,
@@ -40,7 +45,6 @@ export function toPublicPricing(pricing: PricingResult): PublicPricingResult {
     pointsDiscount: pricing.pointsDiscount,
     pointsRedeemed: pricing.pointsRedeemed,
     pointsEarned: pricing.pointsEarned,
-    affiliateRate: pricing.affiliateRate,
     customerPaymentFee: pricing.customerPaymentFee,
     finalPrice: pricing.finalPrice,
     safeToCheckout: pricing.safeToCheckout,
@@ -69,7 +73,6 @@ export function createPublicPricingFallback(item: GamePackage): PublicPricingRes
     pointsDiscount: 0,
     pointsRedeemed: 0,
     pointsEarned: 0,
-    affiliateRate: 0,
     customerPaymentFee: 0,
     finalPrice: item.sellingPrice,
     safeToCheckout: true,
