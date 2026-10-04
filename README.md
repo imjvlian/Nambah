@@ -4,7 +4,7 @@ Nambah adalah web top-up digital berbasis Next.js 16 dengan Supabase PostgreSQL,
 
 ## Status
 
-**0.5.0 — Production Candidate**
+**1.0.0 — Stable Code Baseline**
 
 Core flow tersedia:
 
@@ -14,19 +14,15 @@ catalog → account validation → pricing → promo/referral/points
 → webhook/reconciliation → receipt → affiliate/finance/admin
 ```
 
-Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
-
-Deployment staging saat ini:
-
-```text
-https://nambah.vercel.app
-```
+Staging Test Lab tersedia di `/admin/test-lab` untuk memilih scenario Digiflazz `testing:true` tanpa mengubah ENV/redeploy. Live money **tidak aktif otomatis**. Default Midtrans adalah sandbox dan Digiflazz live memiliki double explicit opt-in.
 
 ## Development
 
 ```bash
 npm ci
 npm run dev
+npm run test
+npm run build
 ```
 
 ## Database
@@ -43,10 +39,30 @@ Migration fitur terbaru:
 016 Live fulfillment targets
 017 Financial reconciliation
 018 Production hardening
+<<<<<<< HEAD
 019 Account check cache
+=======
+019 Staging Test Lab + operational indexes
+020 Points lots + expiry
+021 Points reverse/reservation consistency
+022 Operational incidents
+023 Admin principal audit
+024 Affiliate withdrawal workflow
+>>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
 ```
 
-Detail deployment dan launch ada di [PRODUCTION.md](./PRODUCTION.md).
+## Dokumentasi
+
+- [Developer Reference](./DEVELOPER_REFERENCE.md) — architecture, API, service, database, invariants.
+- [Environment Guide](./ENVIRONMENT_GUIDE.md) — local, staging, production, secret dan live-money gate.
+- [Test Guide](./TEST_GUIDE.md) — automated + manual E2E regression.
+- [Release Checklist](./RELEASE_CHECKLIST.md) — sign-off, launch dan rollback.
+- [Production Guide](./PRODUCTION.md) — deployment dan controlled production launch.
+- [Changelog](./CHANGELOG.md) — milestone release.
+
+Default scheduled operations untuk Vercel didefinisikan di `vercel.json`. Semua endpoint cron tetap memerlukan `CRON_SECRET`.
+
+**1.0.0 berarti code baseline stabil, bukan live-money otomatis aktif.** Aktivasi Midtrans Production dan Digiflazz live tetap mempunyai ENV gate, catalog readiness gate, manual provider setup, dan explicit owner approval.
 
 ## Environment penting
 

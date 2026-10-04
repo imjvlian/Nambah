@@ -34,7 +34,7 @@ function chunk<T>(items: T[], size: number) {
 }
 
 export async function POST(request: Request) {
-  const auth = authorizeAdminRequest(request);
+  const auth = authorizeAdminRequest(request, { superadminOnly: true });
   if (!auth.ok) return auth.response;
 
   let body: CleanupBody = {};

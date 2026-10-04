@@ -5,6 +5,8 @@ import {
 } from "@/lib/digiflazz/client";
 import { renderFulfillmentTarget } from "@/lib/fulfillment-target";
 import { isFlowTestMode } from "@/lib/flow-test";
+import { consumeDigiflazzTestScenario } from "@/lib/test-lab";
+import { normalizeDigiflazzStatus } from "@/lib/digiflazz-status-policy";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
@@ -422,13 +424,6 @@ async function syncExistingTerminalTransaction(
   return false;
 }
 
-function normalizeDigiflazzStatus(status: string) {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === "sukses" || normalized === "success") return "success" as const;
-  if (normalized === "gagal" || normalized === "failed") return "failed" as const;
-  return "pending" as const;
-}
-
 async function runSimulation(
   order: OrderRow,
   transaction: SupplierTransactionRow,
@@ -470,14 +465,29 @@ async function runDigiflazzTest(
   transaction: SupplierTransactionRow,
   requestRef: string,
 ): Promise<FulfillmentResult> {
-  const outcome = getDigiflazzTestOutcome();
+  const assignment = await consumeDigiflazzTestScenario(
+    getDigiflazzTestOutcome(),
+  );
+  const outcome = assignment.scenario;
+
+  await supabaseUpdate(
+    "orders",
+    {
+      test_scenario: outcome,
+      test_scenario_source: assignment.source,
+      updated_at: new Date().toISOString(),
+    },
+    { filters: { id: `eq.${order.id}` } },
+  );
 
   try {
     const result = await runDigiflazzTestTransaction({
       outcome,
       refId: requestRef,
     });
-    const status = normalizeDigiflazzStatus(result.status);
+    const normalizedStatus = normalizeDigiflazzStatus(result.status);
+    const status =
+      normalizedStatus === "unknown" ? "pending" : normalizedStatus;
     const now = new Date().toISOString();
 
     await supabaseUpdate(
@@ -537,7 +547,9 @@ async function runDigiflazzLive(
       useCallback: true,
       allowDot: config.allowDot,
     });
-    const status = normalizeDigiflazzStatus(result.status);
+    const normalizedStatus = normalizeDigiflazzStatus(result.status);
+    const status =
+      normalizedStatus === "unknown" ? "pending" : normalizedStatus;
     const now = new Date().toISOString();
 
     await supabaseUpdate(
@@ -632,6 +644,17 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResu
   }
 
   const mode = getFulfillmentMode();
+
+  await supabaseUpdate(
+    "orders",
+    {
+      environment: isFlowTestMode() ? "staging" : "production",
+      provider_mode: mode,
+      updated_at: new Date().toISOString(),
+    },
+    { filters: { id: `eq.${order.id}` } },
+  );
+
   if (mode === "disabled") {
     return {
       mode,

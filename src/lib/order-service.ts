@@ -1,5 +1,8 @@
 import { fulfillPaidOrder } from "@/lib/fulfillment";
-import type { MidtransStatusPayload } from "@/lib/midtrans/client";
+import {
+  getMidtransEnvironment,
+  type MidtransStatusPayload,
+} from "@/lib/midtrans/client";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
@@ -7,6 +10,11 @@ import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
+import {
+  nextOrderStatusFromPayment,
+  normalizePaymentStatus,
+  type NormalizedPaymentStatus,
+} from "@/lib/payment-status-policy";
 
 type OrderRow = {
   id: string;
@@ -31,6 +39,9 @@ type OrderRow = {
   terminal_at: string | null;
   created_at: string;
   updated_at: string;
+  expires_at: string | null;
+  status_changed_at: string | null;
+  terminal_at: string | null;
 };
 
 type GameRow = {
@@ -64,63 +75,6 @@ type PaymentRow = {
 };
 
 type MidtransSource = "webhook" | "status_api";
-
-type PaymentStatus =
-  | "pending"
-  | "settlement"
-  | "capture"
-  | "deny"
-  | "cancel"
-  | "expire"
-  | "refund"
-  | "failure";
-
-function normalizePaymentStatus(status: string | undefined): PaymentStatus {
-  switch (status) {
-    case "settlement":
-    case "capture":
-    case "deny":
-    case "cancel":
-    case "expire":
-    case "refund":
-    case "failure":
-      return status;
-    case "partial_refund":
-      return "refund";
-    default:
-      return "pending";
-  }
-}
-
-function nextOrderStatus(
-  current: PublicOrderStatus,
-  payload: MidtransStatusPayload,
-): PublicOrderStatus {
-  const status = payload.transaction_status ?? "pending";
-  const fraudStatus = payload.fraud_status?.toLowerCase();
-
-  if (status === "refund" || status === "partial_refund") return "refunded";
-  if (current === "refunded") return current;
-
-  const paid =
-    status === "settlement" ||
-    (status === "capture" && (!fraudStatus || fraudStatus === "accept"));
-
-  if (paid) {
-    if (current === "processing" || current === "success") return current;
-    return "paid";
-  }
-
-  if (current === "paid" || current === "processing" || current === "success") {
-    return current;
-  }
-
-  if (status === "expire" || status === "cancel") return "cancelled";
-  if (status === "failure") return "failed";
-
-  // A denied attempt in Snap can still be retried under the same order ID.
-  return "pending_payment";
-}
 
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
@@ -170,6 +124,7 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     id: order.id,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
+<<<<<<< HEAD
     // Wajib diteruskan: tanpa ini `calculateCountdown` di OrderStatusView
     // selalu menerima `undefined` sehingga countdown "kedaluwarsa dalam 30
     // menit" tidak pernah tampil, padahal server memang menegakkan
@@ -178,7 +133,16 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     statusChangedAt: order.status_changed_at,
     terminalAt: order.terminal_at,
     mode: "midtrans-sandbox",
+=======
+    mode:
+      getMidtransEnvironment() === "production"
+        ? "midtrans-production"
+        : "midtrans-sandbox",
+>>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
     status: order.status,
+    expiresAt: order.expires_at,
+    statusChangedAt: order.status_changed_at,
+    terminalAt: order.terminal_at,
     product: {
       gameId: game.id,
       gameName: game.name,
@@ -241,8 +205,13 @@ export async function applyMidtransStatus(
   }
 
   const now = new Date().toISOString();
-  const paymentStatus = normalizePaymentStatus(payload.transaction_status);
-  const orderStatus = nextOrderStatus(order.status, payload);
+  const paymentStatus: NormalizedPaymentStatus = normalizePaymentStatus(
+    payload.transaction_status,
+  );
+  const orderStatus = nextOrderStatusFromPayment(order.status, {
+    transactionStatus: payload.transaction_status,
+    fraudStatus: payload.fraud_status,
+  });
   const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
 
   // Update timestamps for status changes

@@ -189,12 +189,14 @@ type AffiliatePayload = {
     active: number;
     pending: number;
     available: number;
+    reserved: number;
     withdrawn: number;
     cancelled: number;
   };
   affiliates: Array<{
     code: string;
     displayName: string;
+    userId: string | null;
     commissionRate: number;
     status: string;
     createdAt: string;
@@ -516,6 +518,34 @@ export default function AdminDashboard() {
       throw new Error(data.error ?? "Nambah Points gagal dimuat.");
     }
     setPointsData(data);
+  }
+
+  async function runPointsExpiry() {
+    setBusy("points-expiry");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/points/expire", {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        lotsProcessed?: number;
+        pointsExpired?: number;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Expiry Nambah Points gagal.");
+      }
+      await loadPoints();
+      setNotice(
+        `Points expiry selesai: ${data.pointsExpired ?? 0} pts expired dari ${data.lotsProcessed ?? 0} lot.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Expiry Nambah Points gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
   }
 
   async function loadAffiliates() {
@@ -1843,7 +1873,17 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Loyalty"
                 title="Nambah Points"
-                copy="Outstanding liability, reservation, account balance, dan immutable ledger points."
+                copy="Outstanding liability, reservation, FIFO lots, expiry, dan immutable ledger points."
+                action={
+                  <button
+                    className="acc-primary-link"
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void runPointsExpiry()}
+                  >
+                    {busy === "points-expiry" ? "Expiring..." : "Run expiry"}
+                  </button>
+                }
               />
 
               <div className="acc-metrics">
@@ -2112,9 +2152,13 @@ export default function AdminDashboard() {
                     <span>{promo.redeemed} used · {promo.reserved} reserved</span>
                     <button
                       type="button"
+                      className={`promo-status-toggle ${promo.active ? "is-active" : "is-inactive"}`}
+                      aria-pressed={promo.active}
+                      aria-label={`${promo.code}: ${promo.active ? "nonaktifkan" : "aktifkan"} promo`}
                       disabled={Boolean(busy)}
                       onClick={() => void togglePromotion(promo.code, !promo.active)}
                     >
+                      <span className="promo-status-dot" aria-hidden="true" />
                       {promo.active ? "Active" : "Inactive"}
                     </button>
                   </div>
@@ -2128,7 +2172,12 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Partners"
                 title="Affiliate"
-                copy="Commission lifecycle mengikuti status order dan dihitung dari net profit yang sudah memperhitungkan biaya Points."
+                copy="Commission lifecycle mengikuti status order, withdrawal memakai allocation ledger, dan payout tetap dikonfirmasi operator."
+                action={
+                  <Link className="acc-primary-link" href="/admin/affiliates">
+                    Open withdrawal center →
+                  </Link>
+                }
               />
               <div className="acc-metrics">
                 <article>
@@ -2144,7 +2193,7 @@ export default function AdminDashboard() {
                 <article>
                   <small>Available</small>
                   <strong>{formatIDR(affiliateData.stats.available)}</strong>
-                  <span>Siap withdrawal</span>
+                  <span>{formatIDR(affiliateData.stats.reserved)} reserved</span>
                 </article>
                 <article>
                   <small>Withdrawn</small>
@@ -2250,6 +2299,12 @@ export default function AdminDashboard() {
               </div>
 
               <div className="acc-action-panel">
+                <Link className="acc-inline-button" href="/admin/operations">
+                  Open Operations Center →
+                </Link>
+                <Link className="acc-inline-button" href="/admin/test-lab">
+                  Open Staging Test Lab →
+                </Link>
                 <button
                   type="button"
                   onClick={() => void runReconciliation()}
@@ -2271,7 +2326,9 @@ export default function AdminDashboard() {
                 <div className="acc-readiness-panel">
                   <div className="acc-readiness-head">
                     <div>
-                      <small>{readiness.version} · PRODUCTION CANDIDATE</small>
+                      <small>
+                        {readiness.version} · {readiness.stage.toUpperCase().replaceAll("-", " ")}
+                      </small>
                       <strong>
                         {readiness.automatedProductionReady
                           ? "Automated production checks pass"
@@ -2311,9 +2368,9 @@ export default function AdminDashboard() {
                   copy="Endpoint cron + manual admin memulihkan order tertunda, supplier pending test, dan receipt failed secara idempotent."
                 />
                 <RoadmapCard
-                  title="Commission lifecycle"
+                  title="Affiliate lifecycle & payout"
                   status="live"
-                  copy="Commission pending saat paid/processing, available saat success, dan cancelled saat failure/refund."
+                  copy="Commission mengikuti status order, withdrawal memakai atomic allocation, dan payout dikonfirmasi superadmin."
                 />
                 <RoadmapCard
                   title="Rate limit & abuse guard"
@@ -2321,9 +2378,9 @@ export default function AdminDashboard() {
                   copy="Durable database limiter melindungi login, signup, account checker, dan order creation."
                 />
                 <RoadmapCard
-                  title="0.5.0 production candidate"
+                  title="1.0.0 stable code baseline"
                   status="live"
-                  copy="Health/readiness, sandbox-production payment switch, live-money double gate, financial reconciliation, rate limit, dan audit tersedia untuk final launch verification."
+                  copy="CI tests/build, environment guide, E2E test guide, release checklist, monitoring, recovery, dan launch safety gate tersedia untuk operasional production."
                 />
                 <RoadmapCard
                   title="Live safety gate"

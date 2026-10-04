@@ -6,6 +6,21 @@ import { supabaseSelect } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+type ProductTargetRow = {
+  id: string;
+  game_id: string;
+  fulfillment_target_template: string | null;
+};
+
+type GameTargetRow = {
+  id: string;
+  fulfillment_target_template: string | null;
+};
+
+type SupplierMappingRow = {
+  product_id: string;
+};
+
 type Check = {
   id: string;
   label: string;
@@ -58,6 +73,10 @@ export async function GET(request: Request) {
     financeMigration,
     rateLimitMigration,
     auditMigration,
+    testLabMigration,
+    pointsLotsMigration,
+    operationsMigration,
+    affiliateWithdrawalMigration,
   ] = await Promise.all([
     tableExists("loyalty_accounts"),
     tableExists("commissions"),
@@ -72,7 +91,41 @@ export async function GET(request: Request) {
     tableExists("financial_reconciliations"),
     tableExists("rate_limit_buckets"),
     tableExists("admin_audit_logs"),
+    tableExists("staging_test_lab"),
+    tableExists("point_lots"),
+    tableExists("operational_incidents"),
+    tableExists("affiliate_withdrawal_allocations"),
   ]);
+
+  const [activeProducts, activeGames, activeMappings] = await Promise.all([
+    supabaseSelect<ProductTargetRow>("products", {
+      select: "id,game_id,fulfillment_target_template",
+      filters: { active: "eq.true" },
+      limit: 5000,
+    }),
+    supabaseSelect<GameTargetRow>("games", {
+      select: "id,fulfillment_target_template",
+      filters: { active: "eq.true" },
+      limit: 1000,
+    }),
+    supabaseSelect<SupplierMappingRow>("supplier_products", {
+      select: "product_id",
+      filters: { active: "eq.true" },
+      limit: 5000,
+    }),
+  ]);
+
+  const gameTargets = new Map(
+    activeGames.map((game) => [game.id, game.fulfillment_target_template?.trim() || ""]),
+  );
+  const mappedProducts = new Set(activeMappings.map((item) => item.product_id));
+  const missingSupplierMappings = activeProducts.filter(
+    (product) => !mappedProducts.has(product.id),
+  );
+  const missingTargetTemplates = activeProducts.filter(
+    (product) =>
+      !(product.fulfillment_target_template?.trim() || gameTargets.get(product.game_id)),
+  );
 
   const liveEnabled =
     enabled("NAMBAH_ALLOW_LIVE_FULFILLMENT") &&
@@ -142,6 +195,10 @@ export async function GET(request: Request) {
       ["migration-finance", "Migration 017 Finance", financeMigration],
       ["migration-rate-limit", "Migration 018 Rate limit", rateLimitMigration],
       ["migration-audit", "Migration 018 Audit", auditMigration],
+      ["migration-test-lab", "Migration 019 Staging Test Lab", testLabMigration],
+      ["migration-points-lots", "Migration 020 Points lots", pointsLotsMigration],
+      ["migration-operations", "Migration 022 Operational incidents", operationsMigration],
+      ["migration-affiliate-withdrawal", "Migration 024 Affiliate withdrawal", affiliateWithdrawalMigration],
     ].map(([id, label, ok]) => ({
       id: String(id),
       label: String(label),
@@ -149,6 +206,26 @@ export async function GET(request: Request) {
       status: ok ? ("pass" as const) : ("blocker" as const),
       detail: ok ? "Terdeteksi." : "Belum terdeteksi di database.",
     })),
+    {
+      id: "live-supplier-mapping",
+      label: "Live supplier mapping coverage",
+      scope: "production",
+      status: missingSupplierMappings.length === 0 ? "pass" : "blocker",
+      detail:
+        missingSupplierMappings.length === 0
+          ? `${activeProducts.length} active products have active supplier mappings.`
+          : `${missingSupplierMappings.length} active product(s) have no active supplier mapping.`,
+    },
+    {
+      id: "live-target-template",
+      label: "Fulfillment target coverage",
+      scope: "production",
+      status: missingTargetTemplates.length === 0 ? "pass" : "blocker",
+      detail:
+        missingTargetTemplates.length === 0
+          ? "Every active product resolves an explicit fulfillment target template."
+          : `${missingTargetTemplates.length} active product(s) have no product/game fulfillment target template.`,
+    },
     {
       id: "midtrans-server-production",
       label: "Midtrans backend production mode",
@@ -274,8 +351,8 @@ export async function GET(request: Request) {
   ).length;
 
   return Response.json({
-    version: "0.5.0",
-    stage: "production-candidate",
+    version: "1.0.0",
+    stage: "stable-code",
     readyForStagingE2E: stagingBlockers === 0,
     automatedProductionReady: productionBlockers === 0,
     blockers: productionBlockers,
@@ -286,6 +363,11 @@ export async function GET(request: Request) {
     midtransEnvironment: {
       server: serverMidtransEnvironment,
       client: publicMidtransEnvironment,
+    },
+    catalogCoverage: {
+      activeProducts: activeProducts.length,
+      missingSupplierMappings: missingSupplierMappings.map((item) => item.id).slice(0, 50),
+      missingTargetTemplates: missingTargetTemplates.map((item) => item.id).slice(0, 50),
     },
     manualChecklist: [
       "Midtrans Payment Notification URL mengarah ke /api/webhooks/midtrans.",

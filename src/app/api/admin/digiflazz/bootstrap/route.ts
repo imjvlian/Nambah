@@ -5,7 +5,7 @@ import { DigiflazzApiError } from "@/lib/digiflazz/client";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const auth = authorizeAdminRequest(request);
+  const auth = authorizeAdminRequest(request, { superadminOnly: true });
   if (!auth.ok) return auth.response;
 
   let body: { apply?: boolean; remap?: boolean } = {};

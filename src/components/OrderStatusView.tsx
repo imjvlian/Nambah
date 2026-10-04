@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AccountNav from "@/components/AccountNav";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -76,11 +77,22 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const embeddedOrderRef = useRef<string | null>(null);
   const midtransClientKey =
     process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
-  const midtransEnvironment =
+  const configuredMidtransEnvironment =
     process.env.NEXT_PUBLIC_MIDTRANS_ENVIRONMENT?.trim().toLowerCase() ===
     "production"
       ? "production"
       : "sandbox";
+<<<<<<< HEAD
+=======
+  const midtransEnvironment =
+    order?.mode === "midtrans-production"
+      ? "production"
+      : order?.mode === "midtrans-sandbox"
+        ? "sandbox"
+        : configuredMidtransEnvironment;
+  const midtransLabel =
+    midtransEnvironment === "production" ? "Midtrans" : "Midtrans Sandbox";
+>>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
   const midtransSnapUrl =
     midtransEnvironment === "production"
       ? "https://app.midtrans.com/snap/snap.js"
@@ -364,6 +376,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <span className="brand-mark">N+</span>
             <span>Nambah</span>
           </Link>
+          <div className="header-actions">
+            <AccountNav />
+          </div>
         </header>
         <section className="order-status-shell shell">
           <div className="order-empty-card">Memuat status pesanan...</div>
@@ -380,7 +395,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <span className="brand-mark">N+</span>
             <span>Nambah</span>
           </Link>
-          <Link className="header-cta" href="/#topup">Top up lagi</Link>
+          <div className="header-actions">
+            <AccountNav />
+            <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
+          </div>
         </header>
         <section className="order-status-shell shell">
           <div className="order-empty-card">
@@ -453,7 +471,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           <span>Nambah</span>
         </Link>
         <div className="order-header-center">Status pesanan</div>
-        <Link className="header-cta" href="/#topup">Top up lagi</Link>
+        <div className="header-actions">
+          <AccountNav />
+          <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
+        </div>
       </header>
 
       <section className="order-status-shell shell">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import AffiliateAccountPanel from "@/components/AffiliateAccountPanel";
 
 type AccountUser = {
   id: string;
@@ -379,7 +380,7 @@ export default function AccountDashboard() {
         )}
       </section>
 
-      <section className="account-points-card">
+      <section className="account-points-card" id="nambah-points">
         <div className="account-points-hero">
           <div>
             <span className="eyebrow">Nambah Points</span>
@@ -481,6 +482,8 @@ export default function AccountDashboard() {
           )}
         </div>
       </section>
+
+      <AffiliateAccountPanel />
 
       <section className="account-orders-card">
         <div className="account-section-head">

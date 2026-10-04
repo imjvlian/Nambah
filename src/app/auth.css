@@ -610,3 +610,183 @@
     padding-inline: 20px;
   }
 }
+
+
+/* 1.0.4 — persistent header identity, Points, and admin dashboard route */
+.account-nav-cluster {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.account-admin-route,
+.account-header-points {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.account-admin-route {
+  gap: 7px;
+  padding: 0 11px 0 6px;
+  border: 1px solid rgba(111,156,255,.18);
+  background: rgba(111,156,255,.045);
+  color: #b8c9ee;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.account-admin-route > span {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(111,156,255,.14);
+  color: #c6d5f5;
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: .03em;
+}
+
+.account-admin-route:hover {
+  transform: translateY(-1px);
+  border-color: rgba(111,156,255,.32);
+  background: rgba(111,156,255,.075);
+  color: #d7e2fa;
+}
+
+.account-header-points {
+  gap: 5px;
+  padding: 0 9px 0 5px;
+  border: 1px solid rgba(201,255,63,.2);
+  background:
+    linear-gradient(135deg, rgba(201,255,63,.075), rgba(201,255,63,.025));
+  color: var(--lime);
+}
+
+.account-header-points > i {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: -.03em;
+}
+
+.account-header-points > strong {
+  font-size: 10px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+.account-header-points > small {
+  color: #9eae78;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.account-header-points:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201,255,63,.34);
+  background: rgba(201,255,63,.09);
+}
+
+.account-points-card {
+  scroll-margin-top: 92px;
+}
+
+@media (max-width: 900px) {
+  .account-admin-route > b {
+    display: none;
+  }
+
+  .account-admin-route {
+    width: 36px;
+    padding: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .account-nav-cluster {
+    gap: 5px;
+  }
+
+  .account-header-points {
+    min-height: 34px;
+    padding-right: 7px;
+  }
+
+  .account-header-points > i {
+    width: 22px;
+    height: 22px;
+  }
+
+  .account-header-points > strong {
+    font-size: 9px;
+  }
+
+  .account-header-points > small {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .header-actions > .header-cta {
+    display: none;
+  }
+
+  .account-nav-user {
+    min-width: 34px;
+    width: 34px;
+    padding: 0;
+  }
+
+  .account-nav-user > span {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 440px) {
+  .account-admin-route {
+    width: 32px;
+    min-height: 32px;
+  }
+
+  .account-admin-route > span {
+    width: 21px;
+    height: 21px;
+    font-size: 6px;
+  }
+
+  .account-header-points {
+    min-height: 32px;
+    padding: 0 7px 0 4px;
+  }
+
+  .account-header-points > i {
+    width: 20px;
+    height: 20px;
+    font-size: 6px;
+  }
+
+  .account-header-points > strong {
+    font-size: 8px;
+  }
+}

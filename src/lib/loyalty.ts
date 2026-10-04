@@ -216,3 +216,11 @@ export async function syncOrderPointsLifecycle(
     await reverseOrderEarnedPoints(orderId);
   }
 }
+
+export async function expireNambahPoints(limit = 100) {
+  const safeLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+  return supabaseRpc<{ lotsProcessed?: number; pointsExpired?: number }>(
+    "nambah_points_expire",
+    { p_limit: safeLimit },
+  );
+}
