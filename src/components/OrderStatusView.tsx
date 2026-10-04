@@ -9,6 +9,7 @@ import {
   previewOrderStorageKey,
   type PreviewOrder,
 } from "@/lib/order-preview";
+import { paymentTypeLabel } from "@/lib/payment-label";
 import { formatIDR } from "@/lib/pricing";
 import {
   STATUS_CTA,
@@ -80,8 +81,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     "production"
       ? "production"
       : "sandbox";
-  const midtransLabel =
-    midtransEnvironment === "production" ? "Midtrans" : "Midtrans Sandbox";
   const midtransSnapUrl =
     midtransEnvironment === "production"
       ? "https://app.midtrans.com/snap/snap.js"
@@ -108,7 +107,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
   async function refreshStatus(id: string) {
     setBusy(true);
-    setNotice("Memeriksa status langsung ke Midtrans...");
+    setNotice("Memeriksa status pembayaran...");
 
     try {
       const url = new URL(`/api/orders/${encodeURIComponent(id)}/refresh`, window.location.origin);
@@ -121,7 +120,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       const data = (await response.json()) as OrderApiResponse;
 
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Status Midtrans belum dapat diperbarui.");
+        setNotice(data.error ?? "Status pembayaran belum dapat diperbarui.");
         return;
       }
 
@@ -139,7 +138,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return {
       language: "id",
       onSuccess: () => {
-        setNotice("Pembayaran selesai. Nambah sedang memverifikasi ke Midtrans...");
+        setNotice("Pembayaran selesai. Nambah sedang memverifikasi pembayaran...");
         void refreshStatus(id);
       },
       onPending: () => {
@@ -417,6 +416,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     : STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy");
 
   const paymentType = order?.payment.paymentType ?? null;
+  const paymentChannel = paymentTypeLabel(paymentType);
   const redirectUrl = order?.payment.redirectUrl ?? null;
 
   return (
@@ -443,7 +443,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <section className="order-status-shell shell">
         <div className="order-status-title">
           <div>
-            <span className="eyebrow">{isPreview ? "Checkout preview" : "Status pesanan"}</span>
+            <span className="eyebrow">{isPreview ? "Ringkasan pesanan" : "Status pesanan"}</span>
             <h1>{isPreview ? "Siap membuat pembayaran." : STATUS_LABEL[liveStatus]}</h1>
             <p>
               {isPreview
@@ -461,11 +461,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             )}
           </div>
           <span className="order-mode-badge">
-            {isPreview
-              ? "PREVIEW"
-              : midtransEnvironment === "production"
-                ? "LIVE PAYMENT"
-                : "SANDBOX"}
+            {isPreview ? "Ringkasan" : "Pembayaran"}
           </span>
         </div>
 
@@ -528,7 +524,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <p>{payment.detail}</p>
                 </div>
                 <button type="button" disabled={busy} onClick={() => void createPaymentOrder()}>
-                  {busy ? "Memproses..." : midtransEnvironment === "production" ? "Buat pembayaran" : "Buat pembayaran Sandbox"}
+                  {busy ? "Memproses..." : "Buat pembayaran"}
                 </button>
               </div>
             ) : liveStatus === "pending_payment" ? (
@@ -539,16 +535,16 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>{midtransLabel}</span>
+                  <span>Diverifikasi Nambah</span>
                 </div>
 
                 {!midtransClientKey && (
                   <div className="midtrans-native-warning">
-                    NEXT_PUBLIC_MIDTRANS_CLIENT_KEY belum tersedia. Embedded checkout tidak dapat dimuat.
+                    Pembayaran belum dapat dimuat. Silakan muat ulang halaman.
                   </div>
                 )}
                 {midtransClientKey && !snapReady && (
-                  <div className="midtrans-native-loading">Memuat pembayaran Midtrans...</div>
+                  <div className="midtrans-native-loading">Memuat pembayaran...</div>
                 )}
 
                 <div id={SNAP_EMBED_ID} className="midtrans-snap-container" />
@@ -580,7 +576,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <span>Ringkasan pesanan</span>
                 <small>{displayId}</small>
               </div>
-              <small>{isPreview ? "Preview" : midtransEnvironment === "production" ? "Production" : "Sandbox"}</small>
+              <small>{isPreview ? "Ringkasan" : "Aktif"}</small>
             </div>
 
             <dl className="order-detail-list">
@@ -590,7 +586,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               {account.serverId && <div><dt>Server / Zone</dt><dd>{account.serverId}</dd></div>}
               {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
               {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
-              {paymentType && <div><dt>Channel</dt><dd>{paymentType}</dd></div>}
+              {paymentChannel && <div><dt>Channel</dt><dd>{paymentChannel}</dd></div>}
             </dl>
 
             <div className="order-price-breakdown">

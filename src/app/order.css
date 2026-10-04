@@ -1,7 +1,7 @@
 .order-header-center {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.03em;
 }
 
@@ -25,8 +25,8 @@
 .order-empty-card h1 {
   margin: 10px 0 9px;
   font-size: clamp(36px, 4.4vw, 58px);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
 }
 
 .order-status-title p,
@@ -50,11 +50,11 @@
 .order-last-checked {
   display: inline-flex;
   align-items: center;
-  min-height: 25px;
-  padding: 0 9px;
+  min-height: 26px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 9px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .order-countdown {
@@ -83,9 +83,9 @@
   width: fit-content;
   border-radius: 999px;
   white-space: nowrap;
-  font-size: 8px;
-  font-weight: 850;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .order-mode-badge {
@@ -155,7 +155,7 @@
 .order-id-row small,
 .order-payment-preview small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-product-identity strong {
@@ -196,7 +196,7 @@
 }
 
 .order-id-row strong {
-  font-size: 10px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -223,8 +223,8 @@
   background: rgba(255, 255, 255, 0.035);
   color: #aeb4aa;
   font: inherit;
-  font-size: 8px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
 }
@@ -274,8 +274,8 @@
 }
 
 .timeline-marker span {
-  font-size: 7px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .order-timeline-item.current .timeline-marker {
@@ -291,7 +291,7 @@
 
 .order-timeline-item strong {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.3;
 }
 
@@ -299,7 +299,7 @@
   max-width: 130px;
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -332,7 +332,7 @@
 .order-payment-preview p {
   margin: 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-payment-preview button {
@@ -343,14 +343,14 @@
   background: var(--surface-2);
   color: var(--muted);
   font: inherit;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .order-preview-note {
   margin: 10px 2px 0;
   color: #81877d;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.55;
 }
 
@@ -376,14 +376,14 @@
 }
 
 .order-summary-head span {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .order-summary-head small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -415,7 +415,7 @@
 .order-detail-list dt,
 .order-detail-list dd {
   margin: 0;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-detail-list dt {
@@ -426,7 +426,7 @@
   max-width: 62%;
   overflow-wrap: anywhere;
   color: #d1d6cc;
-  font-weight: 750;
+  font-weight: 600;
   text-align: right;
 }
 
@@ -439,12 +439,12 @@
 .order-price-breakdown > div {
   padding: 5px 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-price-breakdown strong {
   color: #cbd0c7;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-price-breakdown .saving,
@@ -463,8 +463,8 @@
 
 .order-grand-total span {
   color: var(--muted);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .order-grand-total strong {
@@ -485,8 +485,8 @@
   padding: 0 14px;
   border-radius: 11px;
   font: inherit;
-  font-size: 9px;
-  font-weight: 850;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
 }
@@ -532,8 +532,8 @@
   background: transparent;
   color: #737a70;
   font: inherit;
-  font-size: 8px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
@@ -641,12 +641,12 @@
   }
 
   .order-timeline-item strong {
-    font-size: 10px;
+    font-size: 13px;
   }
 
   .order-timeline-item p {
     max-width: none;
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 

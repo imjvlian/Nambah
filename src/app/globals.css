@@ -10,6 +10,20 @@
   --paper: #f1f4e9;
   --ink: #11130f;
   --radius: 22px;
+
+  /* Typography scale */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 34px;
+  --text-3xl: 46px;
+  --leading-tight: 1.2;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
 }
 
 * {
@@ -27,7 +41,8 @@ body {
     radial-gradient(circle at 50% -15%, rgba(201, 255, 63, 0.08), transparent 32rem),
     var(--bg);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -433,7 +448,7 @@ button {
 
 .game-copy small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .card-arrow {
@@ -489,7 +504,7 @@ button {
 
 .trust-list b {
   color: var(--lime);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
 }
 
@@ -532,7 +547,7 @@ button {
 .order-summary small,
 .price-placeholder small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .selected-product strong {
@@ -661,16 +676,16 @@ button {
 }
 
 .package-option span {
-  font-size: 11px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.35;
 }
 
 .package-option small {
   width: fit-content;
   color: var(--lime);
-  font-size: 8px;
-  font-weight: 850;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -725,12 +740,12 @@ button {
 }
 
 .payment-option strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .payment-option small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .order-summary {
@@ -766,8 +781,8 @@ button {
   border-radius: 10px;
   background: rgba(201, 255, 63, 0.05);
   color: #c6d0bd;
-  font-size: 10px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .how-section {
@@ -791,8 +806,8 @@ button {
 
 .how-grid article > span {
   color: var(--lime);
-  font-size: 10px;
-  font-weight: 900;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .how-grid h3 {
@@ -804,7 +819,7 @@ button {
 .how-grid p {
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -816,7 +831,7 @@ button {
   gap: 20px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .site-footer > span {

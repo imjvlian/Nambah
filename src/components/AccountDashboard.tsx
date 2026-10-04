@@ -71,14 +71,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const POINT_TYPE_LABEL: Record<string, string> = {
-  reserve: "Points direservasi",
+  reserve: "Points ditahan",
   redeem: "Points digunakan",
-  release: "Reservasi dilepas",
+  release: "Points dilepas",
   earn: "Points didapat",
   refund: "Points dikembalikan",
   reversal: "Points dibatalkan",
   expire: "Points kedaluwarsa",
-  admin_adjustment: "Penyesuaian admin",
+  admin_adjustment: "Penyesuaian",
 };
 
 function formatDate(value: string | null) {
@@ -467,10 +467,10 @@ export default function AccountDashboard() {
                 >
                   {entry.pointsDelta === 0
                     ? entry.reservedDelta > 0
-                      ? "reserve " +
+                      ? "ditahan " +
                         entry.reservedDelta.toLocaleString("id-ID")
                       : entry.reservedDelta < 0
-                        ? "release " +
+                        ? "dilepas " +
                           Math.abs(entry.reservedDelta).toLocaleString("id-ID")
                         : "0"
                     : signedPoints(entry.pointsDelta)}{" "}

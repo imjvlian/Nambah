@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import "./catalog-categories.css";
 import "./home-v2.css";
@@ -21,6 +22,12 @@ import "./product-checkout-rail-v2.css";
 import "./auth.css";
 import "./points.css";
 
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
 export const metadata: Metadata = {
   title: "Nambah — Top Up Cepat, Main Lagi",
   description: "Top up game dan voucher digital dengan proses simpel dan transparan.",
@@ -32,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
+    <html lang="id" className={inter.variable}>
       <body>{children}</body>
     </html>
   );

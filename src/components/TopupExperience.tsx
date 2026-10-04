@@ -665,9 +665,8 @@ export default function TopupExperience({
           <span className="eyebrow">Checkout</span>
           <h2>Top up tanpa muter-muter.</h2>
           <p>
-            {catalogSource === "supabase"
-              ? "Katalog dan pricing dibaca dari database Nambah. Harga final divalidasi ulang saat order Midtrans dibuat."
-              : "Harga Nambah, promo, dan benefit referral dihitung terpisah. Static fallback tetap aktif sampai database Nambah dihubungkan."}
+            Harga, promo, dan benefit referral dihitung otomatis, lalu
+            divalidasi ulang oleh Nambah sebelum pembayaran dibuat.
           </p>
           <div className="trust-list">
             <span><b>01</b> Harga jelas</span>
@@ -698,7 +697,7 @@ export default function TopupExperience({
                 <strong>{selectedGame.name}</strong>
               </div>
             </div>
-            <span className="preview-badge">{catalogSource === "supabase" ? "Secure Checkout" : "MVP Pricing"}</span>
+            <span className="preview-badge">Pembayaran aman</span>
           </div>
 
           <div className="form-block account-form-block" id="account-data">
