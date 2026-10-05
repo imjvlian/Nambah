@@ -82,8 +82,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     "production"
       ? "production"
       : "sandbox";
-<<<<<<< HEAD
-=======
   const midtransEnvironment =
     order?.mode === "midtrans-production"
       ? "production"
@@ -92,7 +90,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         : configuredMidtransEnvironment;
   const midtransLabel =
     midtransEnvironment === "production" ? "Midtrans" : "Midtrans Sandbox";
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
   const midtransSnapUrl =
     midtransEnvironment === "production"
       ? "https://app.midtrans.com/snap/snap.js"

@@ -39,9 +39,6 @@ type OrderRow = {
   terminal_at: string | null;
   created_at: string;
   updated_at: string;
-  expires_at: string | null;
-  status_changed_at: string | null;
-  terminal_at: string | null;
 };
 
 type GameRow = {
@@ -124,7 +121,6 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     id: order.id,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
-<<<<<<< HEAD
     // Wajib diteruskan: tanpa ini `calculateCountdown` di OrderStatusView
     // selalu menerima `undefined` sehingga countdown "kedaluwarsa dalam 30
     // menit" tidak pernah tampil, padahal server memang menegakkan
@@ -132,17 +128,11 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     expiresAt: order.expires_at,
     statusChangedAt: order.status_changed_at,
     terminalAt: order.terminal_at,
-    mode: "midtrans-sandbox",
-=======
     mode:
       getMidtransEnvironment() === "production"
         ? "midtrans-production"
         : "midtrans-sandbox",
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
     status: order.status,
-    expiresAt: order.expires_at,
-    statusChangedAt: order.status_changed_at,
-    terminalAt: order.terminal_at,
     product: {
       gameId: game.id,
       gameName: game.name,
