@@ -3,7 +3,7 @@ import { supabaseSelect } from "@/lib/supabase/server";
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const GEMINI_MODEL =
-  process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+  process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 const GEMINI_API_KEY =
   process.env.GEMINI_API_KEY?.trim() ||
   process.env.GOOGLE_API_KEY?.trim() ||
