@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import ChatWidget from "@/components/ChatWidget";
 import "./globals.css";
 import "./catalog-categories.css";
 import "./home-v2.css";
@@ -61,7 +62,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ChatWidget />
+      </body>
     </html>
   );
 }
