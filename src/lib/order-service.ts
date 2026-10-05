@@ -71,6 +71,12 @@ type PaymentRow = {
   paid_at: string | null;
 };
 
+type SupplierTransactionPublicRow = {
+  order_id: string;
+  status: string;
+  serial_number: string | null;
+};
+
 type MidtransSource = "webhook" | "status_api";
 
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
@@ -83,7 +89,7 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
 
   if (!order) return null;
 
-  const [gameRows, productRows, paymentMethodRows, paymentRows] = await Promise.all([
+  const [gameRows, productRows, paymentMethodRows, paymentRows, supplierTxRows] = await Promise.all([
     supabaseSelect<GameRow>("games", {
       select: "id,name,short_name,accent,initials",
       filters: { id: `eq.${order.game_id}` },
@@ -106,12 +112,19 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       order: "created_at.desc",
       limit: 1,
     }),
+    supabaseSelect<SupplierTransactionPublicRow>("supplier_transactions", {
+      select: "order_id,status,serial_number",
+      filters: { order_id: `eq.${order.id}` },
+      order: "created_at.desc",
+      limit: 1,
+    }),
   ]);
 
   const game = gameRows[0];
   const product = productRows[0];
   const paymentMethod = paymentMethodRows[0];
   const payment = paymentRows[0];
+  const supplierTx = supplierTxRows[0];
 
   if (!game || !product || !paymentMethod) {
     throw new Error(`Order ${order.id} memiliki referensi katalog yang tidak lengkap.`);
@@ -169,6 +182,11 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     },
     ...(order.promotion_code ? { promoCode: order.promotion_code } : {}),
     ...(order.affiliate_code ? { referralCode: order.affiliate_code } : {}),
+    // SN hanya diekspos saat order sukses — pada status lain nilainya
+    // belum final (atau transaksi gagal) dan bisa menyesatkan customer.
+    ...(order.status === "success" && supplierTx?.serial_number
+      ? { serialNumber: supplierTx.serial_number }
+      : {}),
   };
 }
 

@@ -52,4 +52,7 @@ export type PublicOrder = {
   };
   promoCode?: string;
   referralCode?: string;
+  // SN supplier (bukti pembelian, mis. SN pulsa/token). Hanya diisi saat
+  // order berstatus `success`; sengaja tidak diekspos pada status lain.
+  serialNumber?: string | null;
 };

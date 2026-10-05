@@ -290,6 +290,17 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
   }
 
+  async function copySerialNumber() {
+    const sn = order?.serialNumber ?? "";
+    if (!sn) return;
+    try {
+      await navigator.clipboard.writeText(sn);
+      setNotice("Serial number disalin.");
+    } catch {
+      setNotice("Gagal menyalin serial number.");
+    }
+  }
+
   function openFallbackPayment() {
     if (order?.payment.redirectUrl) {
       window.open(order.payment.redirectUrl, "_blank", "noopener,noreferrer");
@@ -420,6 +431,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const pricing = preview?.pricing ?? order!.pricing;
   const promoCode = preview?.promoCode ?? order?.promoCode;
   const referralCode = preview?.referralCode ?? order?.referralCode;
+  const serialNumber = order?.serialNumber ?? null;
   const displayId = preview?.id ?? order!.id;
   const createdAt = preview?.createdAt ?? order!.createdAt;
   const liveStatus = order?.status ?? "pending_payment";
@@ -646,6 +658,21 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
               {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
               {paymentChannel && <div><dt>Channel</dt><dd>{paymentChannel}</dd></div>}
+              {!isPreview && liveStatus === "success" && serialNumber && (
+                <div>
+                  <dt>Serial Number (SN)</dt>
+                  <dd>
+                    {serialNumber}{" "}
+                    <button
+                      type="button"
+                      className="order-action-button secondary"
+                      onClick={() => void copySerialNumber()}
+                    >
+                      Salin
+                    </button>
+                  </dd>
+                </div>
+              )}
             </dl>
 
             <div className="order-price-breakdown">
