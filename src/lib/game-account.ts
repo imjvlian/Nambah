@@ -25,6 +25,9 @@ export type GameAccountSchema = {
     | "genshin"
     | "roblox"
     | "valorant"
+    | "wuthering-waves"
+    | "phone"
+    | "numeric-bill"
     | "numeric-player"
     | "generic";
   user: AccountField;
@@ -132,6 +135,40 @@ const GENSHIN_SERVER: AccountField = {
   options: GENSHIN_SERVER_OPTIONS,
 };
 
+// Server Wuthering Waves: 5 region resmi Kuro Games. Dropdown supaya tidak
+// ada typo yang terkirim ke supplier.
+const WUTHERING_SERVER_OPTIONS = ["America", "Europe", "Asia", "SEA", "HMT"];
+
+const WUTHERING_SERVER: AccountField = {
+  label: "Server",
+  placeholder: "Pilih server",
+  inputMode: "text",
+  maxLength: 7,
+  sanitize: "identifier",
+  pattern: /^(America|Europe|Asia|SEA|HMT)$/,
+  invalidMessage: "Pilih salah satu server: America, Europe, Asia, SEA, atau HMT.",
+  options: WUTHERING_SERVER_OPTIONS,
+};
+
+// Pulsa & e-money: targetnya nomor HP Indonesia, bukan teks bebas.
+const PHONE_USER: AccountField = {
+  label: "Nomor HP",
+  placeholder: "Contoh: 081234567890",
+  inputMode: "numeric",
+  maxLength: 14,
+  sanitize: "digits",
+  pattern: /^08\d{8,12}$/,
+  invalidMessage: "Nomor HP harus diawali 08 dan terdiri dari 10–14 digit.",
+};
+
+// Tagihan (PLN, gas, TV berbayar): targetnya nomor pelanggan numerik.
+const BILL_USER: AccountField = {
+  ...GENERIC_NUMERIC_USER,
+  label: "Nomor Pelanggan / ID",
+  placeholder: "Masukkan nomor pelanggan / ID",
+  invalidMessage: "Nomor pelanggan / ID harus 4–20 digit.",
+};
+
 export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSchema {
   const identity = normalizeIdentity(game);
   const requiresServer = Boolean(game.requiresServer);
@@ -218,6 +255,24 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
+  if (/wuthering|\bwuwa\b/.test(identity)) {
+    return {
+      kind: "wuthering-waves",
+      user: {
+        ...GENERIC_NUMERIC_USER,
+        label: "UID",
+        placeholder: "Masukkan UID Wuthering Waves",
+        pattern: /^\d{8,12}$/,
+        invalidMessage: "UID Wuthering Waves harus 8–12 digit.",
+      },
+      ...(requiresServer ? { server: WUTHERING_SERVER } : {}),
+      checker: "universal",
+      helper: requiresServer
+        ? "Masukkan UID dan pilih server akun Wuthering Waves."
+        : "Masukkan UID akun Wuthering Waves.",
+    };
+  }
+
   if (/free fire|\bff\b|pubg|honor of kings|\bhok\b/.test(identity)) {
     return {
       kind: "numeric-player",
@@ -227,6 +282,32 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
       helper: requiresServer
         ? "Masukkan Player ID dan Server / Zone ID sesuai akun game."
         : "Masukkan Player ID sesuai akun game.",
+    };
+  }
+
+  // Pulsa operator & dompet digital: target selalu nomor HP.
+  if (
+    /telkomsel|indosat|\bxl\b|axis|\btri\b|smartfren|by u|\bdana\b|go pay|gopay|\bovo\b|shopee pay|link aja/.test(
+      identity,
+    )
+  ) {
+    return {
+      kind: "phone",
+      user: PHONE_USER,
+      ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
+      checker: null,
+      helper: "Masukkan nomor HP tujuan yang aktif dan benar.",
+    };
+  }
+
+  // Tagihan: PLN, gas, TV berbayar — target nomor pelanggan numerik.
+  if (/pln|pertamina|k vision|kvision/.test(identity)) {
+    return {
+      kind: "numeric-bill",
+      user: BILL_USER,
+      ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
+      checker: null,
+      helper: "Masukkan nomor pelanggan / ID sesuai tagihan.",
     };
   }
 

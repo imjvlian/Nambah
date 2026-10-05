@@ -96,6 +96,63 @@ test("roblox: satu kolom username", () => {
   });
 });
 
+test("wuthering waves: dua kolom, server hanya 5 region resmi", () => {
+  const game = {
+    id: "wuthering-waves",
+    name: "Wuthering Waves",
+    requiresServer: true,
+  };
+  const schema = getGameAccountSchema(game);
+  assert.equal(schema.kind, "wuthering-waves");
+  assert.deepEqual(schema.server?.options, ["America", "Europe", "Asia", "SEA", "HMT"]);
+
+  assert.deepEqual(validateGameAccountTarget(game, "700123456", "SEA"), {
+    ok: true,
+    userId: "700123456",
+    serverId: "SEA",
+  });
+
+  const serverNgawur = validateGameAccountTarget(game, "700123456", "sea-1");
+  assert.equal(serverNgawur.ok, false);
+});
+
+test("pulsa & e-money: satu kolom nomor HP 08, huruf ditolak", () => {
+  for (const game of [
+    { id: "telkomsel", name: "Telkomsel" },
+    { id: "xl", name: "XL" },
+    { id: "dana", name: "DANA" },
+    { id: "go-pay", name: "GoPay" },
+    { id: "shopee-pay", name: "ShopeePay" },
+  ]) {
+    const schema = getGameAccountSchema(game);
+    assert.equal(schema.kind, "phone", `${game.id} harus memakai skema phone`);
+    assert.equal(schema.server, undefined);
+
+    assert.deepEqual(validateGameAccountTarget(game, "0812 3456 7890"), {
+      ok: true,
+      userId: "081234567890",
+    });
+
+    const bukanHp = validateGameAccountTarget(game, "userabc");
+    assert.equal(bukanHp.ok, false, `${game.id} harus menolak non-HP`);
+  }
+});
+
+test("tagihan (PLN dsb.): satu kolom nomor pelanggan numerik", () => {
+  const game = { id: "pln", name: "PLN" };
+  const schema = getGameAccountSchema(game);
+  assert.equal(schema.kind, "numeric-bill");
+  assert.equal(schema.server, undefined);
+
+  assert.deepEqual(validateGameAccountTarget(game, "521234567890"), {
+    ok: true,
+    userId: "521234567890",
+  });
+
+  const huruf = validateGameAccountTarget(game, "pelanggan1");
+  assert.equal(huruf.ok, false);
+});
+
 test("game tidak dikenal: skema generic longgar tapi tetap tervalidasi", () => {
   const game = { id: "game-baru", name: "Game Baru" };
   const schema = getGameAccountSchema(game);
