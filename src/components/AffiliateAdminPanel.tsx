@@ -19,6 +19,11 @@ type AffiliatePayload = {
     displayName: string;
     userId: string | null;
     commissionRate: number;
+    userBenefitType: "flat" | "percentage";
+    userBenefitValue: number;
+    minimumOrder: number;
+    maxUserBenefit: number | null;
+    stackableWithPromotions: boolean;
     status: string;
     createdAt: string;
   }>;
@@ -80,7 +85,9 @@ export default function AffiliateAdminPanel() {
     userBenefitValue: "0",
     minimumOrder: "0",
     userId: "",
+    status: "active",
   });
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -220,12 +227,107 @@ export default function AffiliateAdminPanel() {
         userBenefitValue: "0",
         minimumOrder: "0",
         userId: "",
+        status: "active",
       });
       await load();
       setNotice(`Affiliate ${body.affiliate?.code ?? ""} berhasil dibuat.`);
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Affiliate gagal dibuat.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function startEdit(item: AffiliatePayload["affiliates"][number]) {
+    setEditingCode(item.code);
+    setCreateDraft({
+      displayName: item.displayName,
+      code: item.code,
+      commissionRate: String(Math.round(item.commissionRate * 100)),
+      userBenefitType: item.userBenefitType,
+      userBenefitValue: String(item.userBenefitValue),
+      minimumOrder: String(item.minimumOrder),
+      userId: item.userId ?? "",
+      status: item.status,
+    });
+    setNotice(`Mode edit: ${item.code}. Kode tidak dapat diubah.`);
+  }
+
+  function cancelEdit() {
+    setEditingCode(null);
+    setCreateDraft({
+      displayName: "",
+      code: "",
+      commissionRate: "20",
+      userBenefitType: "flat",
+      userBenefitValue: "0",
+      minimumOrder: "0",
+      userId: "",
+      status: "active",
+    });
+    setNotice("");
+  }
+
+  async function saveEdit() {
+    if (!editingCode) return;
+    setBusy("create");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/affiliates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: editingCode,
+          displayName: createDraft.displayName,
+          commissionRate: Number(createDraft.commissionRate) / 100,
+          userBenefitType: createDraft.userBenefitType,
+          userBenefitValue: Number(createDraft.userBenefitValue),
+          minimumOrder: Number(createDraft.minimumOrder),
+          status: createDraft.status,
+        }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Affiliate gagal diperbarui.");
+      }
+      const saved = editingCode;
+      cancelEdit();
+      await load();
+      setNotice(`Affiliate ${saved} berhasil diperbarui.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Affiliate gagal diperbarui.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function deleteAffiliate(code: string) {
+    const confirmed = window.confirm(
+      `Hapus affiliate ${code}? Aksi ini hanya bisa dilakukan bila kode belum memiliki riwayat komisi/withdrawal.`,
+    );
+    if (!confirmed) return;
+
+    setBusy("delete:" + code);
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/admin/affiliates?code=${encodeURIComponent(code)}`,
+        { method: "DELETE" },
+      );
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Affiliate gagal dihapus.");
+      }
+      if (editingCode === code) cancelEdit();
+      await load();
+      setNotice(`Affiliate ${code} berhasil dihapus.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Affiliate gagal dihapus.",
       );
     } finally {
       setBusy("");
@@ -332,11 +434,12 @@ export default function AffiliateAdminPanel() {
           <div className="acc-panel">
             <div className="acc-section-head">
               <div>
-                <span className="acc-eyebrow">New partner</span>
-                <h2>Buat affiliate code baru.</h2>
+                <span className="acc-eyebrow">{editingCode ? "Edit partner" : "New partner"}</span>
+                <h2>{editingCode ? `Edit affiliate ${editingCode}.` : "Buat affiliate code baru."}</h2>
                 <p>
-                  Kode boleh dikosongkan untuk auto-generate dari display name.
-                  Assign ke user terdaftar bisa langsung atau belakangan.
+                  {editingCode
+                    ? "Kode tidak dapat diubah. Simpan untuk menerapkan perubahan, atau batal untuk kembali."
+                    : "Kode boleh dikosongkan untuk auto-generate dari display name. Assign ke user terdaftar bisa langsung atau belakangan."}
                 </p>
               </div>
             </div>
@@ -361,6 +464,7 @@ export default function AffiliateAdminPanel() {
                 <input
                   placeholder="Kosongkan untuk auto-generate"
                   value={createDraft.code}
+                  disabled={Boolean(editingCode)}
                   onChange={(event) =>
                     setCreateDraft((current) => ({
                       ...current,
@@ -368,7 +472,11 @@ export default function AffiliateAdminPanel() {
                     }))
                   }
                 />
-                <small>Huruf besar/angka/-/_. Ini yang diketik customer saat checkout.</small>
+                <small>
+                  {editingCode
+                    ? "Kode adalah primary key dan tidak dapat diubah."
+                    : "Huruf besar/angka/-/_. Ini yang diketik customer saat checkout."}
+                </small>
               </label>
 
               <label className="acc-field">
@@ -436,36 +544,70 @@ export default function AffiliateAdminPanel() {
                 <small>Order di bawah nilai ini tidak mendapat benefit.</small>
               </label>
 
-              <label className="acc-field">
-                <span>Assign ke user</span>
-                <select
-                  value={createDraft.userId}
-                  onChange={(event) =>
-                    setCreateDraft((current) => ({
-                      ...current,
-                      userId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Tanpa user (assign nanti)</option>
-                  {users.map((user) => (
-                    <option key={user.userId} value={user.userId}>
-                      {userLabel(user)}
-                    </option>
-                  ))}
-                </select>
-                <small>Opsional. Hanya user yang sudah terdaftar.</small>
-              </label>
+              {editingCode ? (
+                <label className="acc-field">
+                  <span>Status</span>
+                  <select
+                    value={createDraft.status}
+                    onChange={(event) =>
+                      setCreateDraft((current) => ({
+                        ...current,
+                        status: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                  <small>Suspended/inactive: kode tidak bisa dipakai customer.</small>
+                </label>
+              ) : (
+                <label className="acc-field">
+                  <span>Assign ke user</span>
+                  <select
+                    value={createDraft.userId}
+                    onChange={(event) =>
+                      setCreateDraft((current) => ({
+                        ...current,
+                        userId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Tanpa user (assign nanti)</option>
+                    {users.map((user) => (
+                      <option key={user.userId} value={user.userId}>
+                        {userLabel(user)}
+                      </option>
+                    ))}
+                  </select>
+                  <small>Opsional. Hanya user yang sudah terdaftar.</small>
+                </label>
+              )}
             </div>
 
             <div className="acc-action-panel">
               <button
                 type="button"
                 disabled={busy === "create" || !canPayout || !createDraft.displayName.trim()}
-                onClick={() => void createAffiliate()}
+                onClick={() => void (editingCode ? saveEdit() : createAffiliate())}
               >
-                {busy === "create" ? "Creating..." : "Buat affiliate"}
+                {busy === "create"
+                  ? "Saving..."
+                  : editingCode
+                    ? "Simpan perubahan"
+                    : "Buat affiliate"}
               </button>
+              {editingCode && (
+                <button
+                  type="button"
+                  className="admin-secondary-button"
+                  disabled={busy === "create"}
+                  onClick={cancelEdit}
+                >
+                  Batal edit
+                </button>
+              )}
             </div>
           </div>
 
@@ -527,6 +669,7 @@ export default function AffiliateAdminPanel() {
                 <span>User</span>
                 <span>Rate</span>
                 <span>Status</span>
+                <span>Aksi</span>
               </div>
               {(affiliates?.affiliates ?? []).map((item) => (
                 <div className="acc-receipts-row" key={item.code}>
@@ -541,6 +684,22 @@ export default function AffiliateAdminPanel() {
                   </span>
                   <strong>{Math.round(item.commissionRate * 100)}%</strong>
                   <span className={"acc-status " + item.status}>{item.status}</span>
+                  <div className="acc-action-panel">
+                    <button
+                      type="button"
+                      disabled={!canPayout || Boolean(busy)}
+                      onClick={() => startEdit(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canPayout || Boolean(busy)}
+                      onClick={() => void deleteAffiliate(item.code)}
+                    >
+                      {busy === "delete:" + item.code ? "Menghapus..." : "Hapus"}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

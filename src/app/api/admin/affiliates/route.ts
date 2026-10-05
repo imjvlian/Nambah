@@ -1,7 +1,12 @@
 import { randomInt } from "node:crypto";
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
-import { supabaseInsert, supabaseSelect } from "@/lib/supabase/server";
+import {
+  supabaseDelete,
+  supabaseInsert,
+  supabaseSelect,
+  supabaseUpdate,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -36,6 +41,11 @@ type AffiliateRow = {
   display_name: string;
   user_id: string | null;
   commission_rate: number | string;
+  user_benefit_type: string;
+  user_benefit_value: number | string;
+  minimum_order: number | string;
+  max_user_benefit: number | string | null;
+  stackable_with_promotions: boolean;
   status: string;
   created_at: string;
 };
@@ -73,7 +83,8 @@ export async function GET(request: Request) {
     const [affiliates, commissions, withdrawals, allocations] =
       await Promise.all([
         supabaseSelect<AffiliateRow>("affiliates", {
-          select: "code,display_name,user_id,commission_rate,status,created_at",
+          select:
+            "code,display_name,user_id,commission_rate,user_benefit_type,user_benefit_value,minimum_order,max_user_benefit,stackable_with_promotions,status,created_at",
           order: "created_at.desc",
           limit: 1000,
         }),
@@ -160,6 +171,12 @@ export async function GET(request: Request) {
         displayName: row.display_name,
         userId: row.user_id,
         commissionRate: Number(row.commission_rate),
+        userBenefitType: row.user_benefit_type,
+        userBenefitValue: Number(row.user_benefit_value),
+        minimumOrder: Number(row.minimum_order),
+        maxUserBenefit:
+          row.max_user_benefit === null ? null : Number(row.max_user_benefit),
+        stackableWithPromotions: row.stackable_with_promotions,
         status: row.status,
         createdAt: row.created_at,
       })),
@@ -365,6 +382,199 @@ export async function POST(request: Request) {
     console.error("Affiliate create failed", error);
     return Response.json(
       { error: "Affiliate gagal dibuat." },
+      { status: 502 },
+    );
+  }
+}
+
+const AFFILIATE_STATUSES = new Set(["active", "inactive", "suspended"]);
+
+export async function PATCH(request: Request) {
+  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  if (!auth.ok) return auth.response;
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const code = normalizeCode(typeof body.code === "string" ? body.code : "");
+    if (!code) {
+      return Response.json({ error: "Kode affiliate wajib diisi." }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+
+    if (body.displayName !== undefined) {
+      const displayName =
+        typeof body.displayName === "string" ? body.displayName.trim() : "";
+      if (displayName.length < 3 || displayName.length > 80) {
+        return Response.json(
+          { error: "Display name wajib 3–80 karakter." },
+          { status: 400 },
+        );
+      }
+      updates.display_name = displayName;
+    }
+
+    if (body.commissionRate !== undefined) {
+      const commissionRate = Number(body.commissionRate);
+      if (!Number.isFinite(commissionRate) || commissionRate < 0 || commissionRate > 1) {
+        return Response.json(
+          { error: "Commission rate harus antara 0 dan 1." },
+          { status: 400 },
+        );
+      }
+      updates.commission_rate = commissionRate;
+    }
+
+    if (body.userBenefitType !== undefined) {
+      const userBenefitType =
+        typeof body.userBenefitType === "string" ? body.userBenefitType.trim() : "";
+      if (!BENEFIT_TYPES.has(userBenefitType)) {
+        return Response.json(
+          { error: "User benefit type harus flat atau percentage." },
+          { status: 400 },
+        );
+      }
+      updates.user_benefit_type = userBenefitType;
+    }
+
+    if (body.userBenefitValue !== undefined) {
+      const userBenefitValue = Number(body.userBenefitValue);
+      if (!Number.isFinite(userBenefitValue) || userBenefitValue < 0) {
+        return Response.json(
+          { error: "User benefit value tidak boleh negatif." },
+          { status: 400 },
+        );
+      }
+      updates.user_benefit_value = userBenefitValue;
+    }
+
+    if (body.minimumOrder !== undefined) {
+      const minimumOrder = Math.round(Number(body.minimumOrder));
+      if (!Number.isFinite(minimumOrder) || minimumOrder < 0) {
+        return Response.json(
+          { error: "Minimum order tidak boleh negatif." },
+          { status: 400 },
+        );
+      }
+      updates.minimum_order = minimumOrder;
+    }
+
+    if (body.maxUserBenefit !== undefined) {
+      const maxUserBenefit =
+        body.maxUserBenefit === null || body.maxUserBenefit === ""
+          ? null
+          : Math.round(Number(body.maxUserBenefit));
+      if (maxUserBenefit !== null && (!Number.isFinite(maxUserBenefit) || maxUserBenefit < 0)) {
+        return Response.json(
+          { error: "Max user benefit tidak boleh negatif." },
+          { status: 400 },
+        );
+      }
+      updates.max_user_benefit = maxUserBenefit;
+    }
+
+    if (body.stackableWithPromotions !== undefined) {
+      updates.stackable_with_promotions = Boolean(body.stackableWithPromotions);
+    }
+
+    if (body.status !== undefined) {
+      const status = typeof body.status === "string" ? body.status.trim() : "";
+      if (!AFFILIATE_STATUSES.has(status)) {
+        return Response.json(
+          { error: "Status harus active, inactive, atau suspended." },
+          { status: 400 },
+        );
+      }
+      updates.status = status;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return Response.json(
+        { error: "Tidak ada perubahan yang dikirim." },
+        { status: 400 },
+      );
+    }
+    updates.updated_at = new Date().toISOString();
+
+    const rows = await supabaseUpdate<{ code: string }>("affiliates", updates, {
+      filters: { code: `eq.${code}` },
+    });
+    if (rows.length === 0) {
+      return Response.json({ error: "Affiliate tidak ditemukan." }, { status: 404 });
+    }
+
+    await auditAdminAction(request, {
+      action: "affiliate.update",
+      targetType: "affiliate",
+      targetId: code,
+      metadata: updates,
+    });
+
+    return Response.json({ affiliate: { code }, updated: Object.keys(updates) });
+  } catch (error) {
+    console.error("Affiliate update failed", error);
+    return Response.json(
+      { error: "Affiliate gagal diperbarui." },
+      { status: 502 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  if (!auth.ok) return auth.response;
+
+  try {
+    const url = new URL(request.url);
+    const code = normalizeCode(url.searchParams.get("code") ?? "");
+    if (!code) {
+      return Response.json({ error: "Kode affiliate wajib diisi." }, { status: 400 });
+    }
+
+    // Kode affiliate direferensikan commissions & withdrawals (FK). Menghapus
+    // affiliate bersejarah merusak ledger — tolak dan arahkan ke suspend.
+    const [commissionRefs, withdrawalRefs] = await Promise.all([
+      supabaseSelect<{ id: number }>("commissions", {
+        select: "id",
+        filters: { affiliate_code: `eq.${code}` },
+        limit: 1,
+      }),
+      supabaseSelect<{ id: number }>("affiliate_withdrawals", {
+        select: "id",
+        filters: { affiliate_code: `eq.${code}` },
+        limit: 1,
+      }),
+    ]);
+
+    if (commissionRefs.length > 0 || withdrawalRefs.length > 0) {
+      return Response.json(
+        {
+          error:
+            `Kode ${code} memiliki riwayat komisi/withdrawal dan tidak dapat dihapus. ` +
+            "Ubah status ke suspended supaya tidak bisa dipakai lagi.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const deleted = await supabaseDelete<{ code: string }>("affiliates", {
+      filters: { code: `eq.${code}` },
+    });
+    if (deleted.length === 0) {
+      return Response.json({ error: "Affiliate tidak ditemukan." }, { status: 404 });
+    }
+
+    await auditAdminAction(request, {
+      action: "affiliate.delete",
+      targetType: "affiliate",
+      targetId: code,
+    });
+
+    return Response.json({ deleted: code });
+  } catch (error) {
+    console.error("Affiliate delete failed", error);
+    return Response.json(
+      { error: "Affiliate gagal dihapus." },
       { status: 502 },
     );
   }
