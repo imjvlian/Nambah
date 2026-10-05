@@ -1,6 +1,10 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
-import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import {
+  supabaseAuthAdminGetUser,
+  supabaseUpdate,
+  supabaseUpsert,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -29,22 +33,28 @@ export async function POST(request: Request) {
       return Response.json({ error: "User ID tidak valid." }, { status: 400 });
     }
 
-    // Assign hanya ke user yang benar-benar terdaftar (ada profilnya).
+    // Verifikasi ke Supabase Auth (bukan customer_profiles) lalu pastikan
+    // baris profil minimal ada — sama seperti jalur create affiliate.
     if (userId) {
-      const [profile] = await supabaseSelect<{ user_id: string }>(
-        "customer_profiles",
-        {
-          select: "user_id",
-          filters: { user_id: `eq.${userId}` },
-          limit: 1,
-        },
-      );
-      if (!profile) {
+      const authUser = await supabaseAuthAdminGetUser(userId);
+      if (!authUser) {
         return Response.json(
-          { error: "User belum terdaftar sebagai customer Nambah." },
+          { error: "User dengan ID ini tidak ditemukan di sistem auth." },
           { status: 400 },
         );
       }
+      await supabaseUpsert(
+        "customer_profiles",
+        {
+          user_id: userId,
+          preferred_receipt_channel: "email",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+          prefer: "resolution=merge-duplicates,return=representation",
+        },
+      );
     }
 
     const rows = await supabaseUpdate<{ code: string; user_id: string | null }>(

@@ -100,6 +100,37 @@ export type SupabaseAuthAdminUser = {
 };
 
 /**
+ * Cek satu user Auth by ID. Mengembalikan null bila tidak ditemukan.
+ * Dipakai untuk memvalidasi "user terdaftar" — sumber kebenarannya adalah
+ * Supabase Auth, bukan `customer_profiles` (yang baru terisi setelah user
+ * menyimpan profilnya).
+ */
+export async function supabaseAuthAdminGetUser(
+  userId: string,
+): Promise<SupabaseAuthAdminUser | null> {
+  const { url, secretKey } = requireSupabaseConfig();
+
+  const response = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+    method: "GET",
+    headers: {
+      apikey: secretKey,
+      Authorization: `Bearer ${secretKey}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase Auth admin get failed (${response.status}): ${body}`);
+  }
+
+  const payload = (await response.json()) as SupabaseAuthAdminUser;
+  return payload?.id ? payload : null;
+}
+
+/**
  * Daftar user Supabase Auth (server-side only). Dipakai admin untuk memetakan
  * UUID -> email, karena `customer_profiles` tidak menyimpan email.
  */

@@ -2,10 +2,12 @@ import { randomInt } from "node:crypto";
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
 import {
+  supabaseAuthAdminGetUser,
   supabaseDelete,
   supabaseInsert,
   supabaseSelect,
   supabaseUpdate,
+  supabaseUpsert,
 } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -300,7 +302,10 @@ export async function POST(request: Request) {
 
     const stackableWithPromotions = body.stackableWithPromotions !== false;
 
-    // Assign hanya ke user yang benar-benar terdaftar (ada profilnya).
+    // "Terdaftar" diverifikasi ke Supabase Auth (sumber kebenaran akun),
+    // BUKAN ke customer_profiles — tabel itu baru terisi setelah user menyimpan
+    // profilnya, sehingga akun baru yang belum mengisi profil pernah tertolak
+    // dengan pesan "belum terdaftar" yang menyesatkan.
     const rawUserId =
       typeof body.userId === "string" ? body.userId.trim() : "";
     let userId: string | null = null;
@@ -308,20 +313,27 @@ export async function POST(request: Request) {
       if (!validUuid(rawUserId)) {
         return Response.json({ error: "User ID tidak valid." }, { status: 400 });
       }
-      const [profile] = await supabaseSelect<{ user_id: string }>(
-        "customer_profiles",
-        {
-          select: "user_id",
-          filters: { user_id: `eq.${rawUserId}` },
-          limit: 1,
-        },
-      );
-      if (!profile) {
+      const authUser = await supabaseAuthAdminGetUser(rawUserId);
+      if (!authUser) {
         return Response.json(
-          { error: "User belum terdaftar sebagai customer Nambah." },
+          { error: "User dengan ID ini tidak ditemukan di sistem auth." },
           { status: 400 },
         );
       }
+      // Pastikan baris profil minimal ada supaya konsisten dengan tab Users
+      // dan fitur lain yang membaca customer_profiles.
+      await supabaseUpsert(
+        "customer_profiles",
+        {
+          user_id: rawUserId,
+          preferred_receipt_channel: "email",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+          prefer: "resolution=merge-duplicates,return=representation",
+        },
+      );
       userId = rawUserId;
     }
 
