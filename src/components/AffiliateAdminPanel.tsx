@@ -142,6 +142,20 @@ export default function AffiliateAdminPanel() {
     [withdrawals],
   );
 
+  // UUID -> display name user terdaftar, supaya kolom User tidak menampilkan
+  // UUID mentah yang tidak terbaca.
+  const userNameById = useMemo(
+    () =>
+      new Map(
+        users.map((user) => [
+          user.userId,
+          user.displayName ??
+            (user.whatsapp ? `WA ${user.whatsapp}` : user.userId.slice(0, 8) + "…"),
+        ]),
+      ),
+    [users],
+  );
+
   async function linkUser() {
     setBusy("link");
     setNotice("");
@@ -319,89 +333,126 @@ export default function AffiliateAdminPanel() {
                 </p>
               </div>
             </div>
+            <div className="testlab-form-grid">
+              <label className="acc-field">
+                <span>Display name</span>
+                <input
+                  placeholder="Contoh: Creator Budi"
+                  value={createDraft.displayName}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
+                  }
+                />
+                <small>Wajib. Nama yang tampil di laporan affiliate.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Kode affiliate</span>
+                <input
+                  placeholder="Kosongkan untuk auto-generate"
+                  value={createDraft.code}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      code: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+                <small>Huruf besar/angka/-/_. Ini yang diketik customer saat checkout.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Komisi (%)</span>
+                <input
+                  placeholder="Default 20"
+                  inputMode="decimal"
+                  value={createDraft.commissionRate}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      commissionRate: event.target.value,
+                    }))
+                  }
+                />
+                <small>Persen dari profit yang jadi komisi partner.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Tipe benefit pembeli</span>
+                <select
+                  value={createDraft.userBenefitType}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      userBenefitType: event.target.value as "flat" | "percentage",
+                    }))
+                  }
+                >
+                  <option value="flat">Flat (IDR)</option>
+                  <option value="percentage">Percentage (%)</option>
+                </select>
+                <small>Bentuk diskon untuk customer yang memakai kode.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Nilai benefit</span>
+                <input
+                  placeholder="Contoh: 500 (flat) atau 3 (%)"
+                  inputMode="numeric"
+                  value={createDraft.userBenefitValue}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      userBenefitValue: event.target.value,
+                    }))
+                  }
+                />
+                <small>Besar diskon sesuai tipe benefit di atas.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Min. order benefit (IDR)</span>
+                <input
+                  placeholder="0 = tanpa minimum"
+                  inputMode="numeric"
+                  value={createDraft.minimumOrder}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      minimumOrder: event.target.value,
+                    }))
+                  }
+                />
+                <small>Order di bawah nilai ini tidak mendapat benefit.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Assign ke user</span>
+                <select
+                  value={createDraft.userId}
+                  onChange={(event) =>
+                    setCreateDraft((current) => ({
+                      ...current,
+                      userId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Tanpa user (assign nanti)</option>
+                  {users.map((user) => (
+                    <option key={user.userId} value={user.userId}>
+                      {user.displayName ?? user.userId.slice(0, 8) + "…"}
+                      {user.whatsapp ? ` · ${user.whatsapp}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>Opsional. Hanya user yang sudah terdaftar.</small>
+              </label>
+            </div>
+
             <div className="acc-action-panel">
-              <input
-                placeholder="Display name (wajib)"
-                value={createDraft.displayName}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    displayName: event.target.value,
-                  }))
-                }
-              />
-              <input
-                placeholder="Kode (opsional, auto)"
-                value={createDraft.code}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    code: event.target.value.toUpperCase(),
-                  }))
-                }
-              />
-              <input
-                placeholder="Komisi % (default 20)"
-                inputMode="decimal"
-                value={createDraft.commissionRate}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    commissionRate: event.target.value,
-                  }))
-                }
-              />
-              <select
-                value={createDraft.userBenefitType}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    userBenefitType: event.target.value as "flat" | "percentage",
-                  }))
-                }
-              >
-                <option value="flat">Benefit flat (IDR)</option>
-                <option value="percentage">Benefit percentage (%)</option>
-              </select>
-              <input
-                placeholder="Nilai benefit pembeli"
-                inputMode="numeric"
-                value={createDraft.userBenefitValue}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    userBenefitValue: event.target.value,
-                  }))
-                }
-              />
-              <input
-                placeholder="Min. order benefit (IDR)"
-                inputMode="numeric"
-                value={createDraft.minimumOrder}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    minimumOrder: event.target.value,
-                  }))
-                }
-              />
-              <select
-                value={createDraft.userId}
-                onChange={(event) =>
-                  setCreateDraft((current) => ({
-                    ...current,
-                    userId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Tanpa user (assign nanti)</option>
-                {users.map((user) => (
-                  <option key={user.userId} value={user.userId}>
-                    {user.displayName ?? user.userId.slice(0, 8) + "…"}
-                    {user.whatsapp ? ` · ${user.whatsapp}` : ""}
-                  </option>
-                ))}
-              </select>
               <button
                 type="button"
                 disabled={busy === "create" || !canPayout || !createDraft.displayName.trim()}
@@ -478,7 +529,11 @@ export default function AffiliateAdminPanel() {
                     <strong>{item.code}</strong>
                     <span>{item.displayName}</span>
                   </div>
-                  <span>{item.userId ?? "Belum linked"}</span>
+                  <span>
+                    {item.userId
+                      ? (userNameById.get(item.userId) ?? item.userId)
+                      : "Belum linked"}
+                  </span>
                   <strong>{Math.round(item.commissionRate * 100)}%</strong>
                   <span className={"acc-status " + item.status}>{item.status}</span>
                 </div>
