@@ -91,7 +91,11 @@ export default function AffiliateAdminPanel() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
-  const canPayout = role === "superadmin";
+  // Aksi payout (approve/paid withdrawal) tetap level tertinggi karena
+  // menyentuh uang keluar; pengelolaan affiliate (buat/edit/hapus/link)
+  // cukup admin ke atas.
+  const canPayout = role === "superadmin" || role === "legacy";
+  const canManage = canPayout || role === "admin";
 
   async function load() {
     const [affiliateResponse, withdrawalResponse, sessionResponse, usersResponse] =
@@ -589,7 +593,7 @@ export default function AffiliateAdminPanel() {
             <div className="acc-action-panel">
               <button
                 type="button"
-                disabled={busy === "create" || !canPayout || !createDraft.displayName.trim()}
+                disabled={busy === "create" || !canManage || !createDraft.displayName.trim()}
                 onClick={() => void (editingCode ? saveEdit() : createAffiliate())}
               >
                 {busy === "create"
@@ -656,7 +660,7 @@ export default function AffiliateAdminPanel() {
               </select>
               <button
                 type="button"
-                disabled={busy === "link" || !canPayout}
+                disabled={busy === "link" || !canManage}
                 onClick={() => void linkUser()}
               >
                 {busy === "link" ? "Saving..." : "Save user link"}
@@ -687,14 +691,14 @@ export default function AffiliateAdminPanel() {
                   <div className="acc-action-panel">
                     <button
                       type="button"
-                      disabled={!canPayout || Boolean(busy)}
+                      disabled={!canManage || Boolean(busy)}
                       onClick={() => startEdit(item)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
-                      disabled={!canPayout || Boolean(busy)}
+                      disabled={!canManage || Boolean(busy)}
                       onClick={() => void deleteAffiliate(item.code)}
                     >
                       {busy === "delete:" + item.code ? "Menghapus..." : "Hapus"}

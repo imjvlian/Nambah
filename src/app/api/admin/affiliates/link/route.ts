@@ -9,7 +9,7 @@ function validUuid(value: string) {
 }
 
 export async function POST(request: Request) {
-  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
   try {

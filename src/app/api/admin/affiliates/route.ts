@@ -202,7 +202,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  // Admin ke atas (admin/superadmin/legacy) boleh mengelola affiliate.
+  // Payout withdrawal tetap superadmin-only di endpoint withdrawals.
+  const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
   try {
@@ -390,7 +392,7 @@ export async function POST(request: Request) {
 const AFFILIATE_STATUSES = new Set(["active", "inactive", "suspended"]);
 
 export async function PATCH(request: Request) {
-  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
   try {
@@ -521,7 +523,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = authorizeAdminRequest(request, { superadminOnly: true });
+  const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
   try {
