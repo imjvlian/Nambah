@@ -1,6 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
-import { supabaseUpdate } from "@/lib/supabase/server";
+import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,24 @@ export async function POST(request: Request) {
     }
     if (userId && !validUuid(userId)) {
       return Response.json({ error: "User ID tidak valid." }, { status: 400 });
+    }
+
+    // Assign hanya ke user yang benar-benar terdaftar (ada profilnya).
+    if (userId) {
+      const [profile] = await supabaseSelect<{ user_id: string }>(
+        "customer_profiles",
+        {
+          select: "user_id",
+          filters: { user_id: `eq.${userId}` },
+          limit: 1,
+        },
+      );
+      if (!profile) {
+        return Response.json(
+          { error: "User belum terdaftar sebagai customer Nambah." },
+          { status: 400 },
+        );
+      }
     }
 
     const rows = await supabaseUpdate<{ code: string; user_id: string | null }>(

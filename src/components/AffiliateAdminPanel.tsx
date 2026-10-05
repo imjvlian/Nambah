@@ -54,22 +54,39 @@ function formatDate(value: string | null) {
   }).format(date);
 }
 
+type RegisteredUser = {
+  userId: string;
+  displayName: string | null;
+  whatsapp: string | null;
+};
+
 export default function AffiliateAdminPanel() {
   const [affiliates, setAffiliates] = useState<AffiliatePayload | null>(null);
   const [withdrawals, setWithdrawals] = useState<WithdrawalPayload["withdrawals"]>([]);
+  const [users, setUsers] = useState<RegisteredUser[]>([]);
   const [role, setRole] = useState("");
   const [linkDraft, setLinkDraft] = useState({ code: "", userId: "" });
+  const [createDraft, setCreateDraft] = useState({
+    displayName: "",
+    code: "",
+    commissionRate: "20",
+    userBenefitType: "flat" as "flat" | "percentage",
+    userBenefitValue: "0",
+    minimumOrder: "0",
+    userId: "",
+  });
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
   const canPayout = role === "superadmin";
 
   async function load() {
-    const [affiliateResponse, withdrawalResponse, sessionResponse] =
+    const [affiliateResponse, withdrawalResponse, sessionResponse, usersResponse] =
       await Promise.all([
         fetch("/api/admin/affiliates", { cache: "no-store" }),
         fetch("/api/admin/affiliates/withdrawals", { cache: "no-store" }),
         fetch("/api/admin/session", { cache: "no-store" }),
+        fetch("/api/admin/users", { cache: "no-store" }),
       ]);
 
     if (
@@ -88,6 +105,9 @@ export default function AffiliateAdminPanel() {
       role?: string;
       error?: string;
     };
+    const usersData = usersResponse.ok
+      ? ((await usersResponse.json()) as { users?: RegisteredUser[] })
+      : { users: [] };
 
     if (!affiliateResponse.ok) {
       throw new Error(affiliateData.error ?? "Affiliate gagal dimuat.");
@@ -98,6 +118,7 @@ export default function AffiliateAdminPanel() {
 
     setAffiliates(affiliateData);
     setWithdrawals(withdrawalData.withdrawals ?? []);
+    setUsers(usersData.users ?? []);
     setRole(sessionData.role ?? "");
     if (!linkDraft.code && affiliateData.affiliates[0]) {
       setLinkDraft((current) => ({
@@ -139,6 +160,51 @@ export default function AffiliateAdminPanel() {
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Affiliate gagal dihubungkan.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function createAffiliate() {
+    setBusy("create");
+    setNotice("");
+    try {
+      const rate = Number(createDraft.commissionRate) / 100;
+      const response = await fetch("/api/admin/affiliates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: createDraft.displayName,
+          code: createDraft.code || undefined,
+          commissionRate: rate,
+          userBenefitType: createDraft.userBenefitType,
+          userBenefitValue: Number(createDraft.userBenefitValue),
+          minimumOrder: Number(createDraft.minimumOrder),
+          userId: createDraft.userId || undefined,
+        }),
+      });
+      const body = (await response.json()) as {
+        affiliate?: { code: string };
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Affiliate gagal dibuat.");
+      }
+      setCreateDraft({
+        displayName: "",
+        code: "",
+        commissionRate: "20",
+        userBenefitType: "flat",
+        userBenefitValue: "0",
+        minimumOrder: "0",
+        userId: "",
+      });
+      await load();
+      setNotice(`Affiliate ${body.affiliate?.code ?? ""} berhasil dibuat.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Affiliate gagal dibuat.",
       );
     } finally {
       setBusy("");
@@ -245,10 +311,114 @@ export default function AffiliateAdminPanel() {
           <div className="acc-panel">
             <div className="acc-section-head">
               <div>
+                <span className="acc-eyebrow">New partner</span>
+                <h2>Buat affiliate code baru.</h2>
+                <p>
+                  Kode boleh dikosongkan untuk auto-generate dari display name.
+                  Assign ke user terdaftar bisa langsung atau belakangan.
+                </p>
+              </div>
+            </div>
+            <div className="acc-action-panel">
+              <input
+                placeholder="Display name (wajib)"
+                value={createDraft.displayName}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    displayName: event.target.value,
+                  }))
+                }
+              />
+              <input
+                placeholder="Kode (opsional, auto)"
+                value={createDraft.code}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    code: event.target.value.toUpperCase(),
+                  }))
+                }
+              />
+              <input
+                placeholder="Komisi % (default 20)"
+                inputMode="decimal"
+                value={createDraft.commissionRate}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    commissionRate: event.target.value,
+                  }))
+                }
+              />
+              <select
+                value={createDraft.userBenefitType}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    userBenefitType: event.target.value as "flat" | "percentage",
+                  }))
+                }
+              >
+                <option value="flat">Benefit flat (IDR)</option>
+                <option value="percentage">Benefit percentage (%)</option>
+              </select>
+              <input
+                placeholder="Nilai benefit pembeli"
+                inputMode="numeric"
+                value={createDraft.userBenefitValue}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    userBenefitValue: event.target.value,
+                  }))
+                }
+              />
+              <input
+                placeholder="Min. order benefit (IDR)"
+                inputMode="numeric"
+                value={createDraft.minimumOrder}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    minimumOrder: event.target.value,
+                  }))
+                }
+              />
+              <select
+                value={createDraft.userId}
+                onChange={(event) =>
+                  setCreateDraft((current) => ({
+                    ...current,
+                    userId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Tanpa user (assign nanti)</option>
+                {users.map((user) => (
+                  <option key={user.userId} value={user.userId}>
+                    {user.displayName ?? user.userId.slice(0, 8) + "…"}
+                    {user.whatsapp ? ` · ${user.whatsapp}` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={busy === "create" || !canPayout || !createDraft.displayName.trim()}
+                onClick={() => void createAffiliate()}
+              >
+                {busy === "create" ? "Creating..." : "Buat affiliate"}
+              </button>
+            </div>
+          </div>
+
+          <div className="acc-panel">
+            <div className="acc-section-head">
+              <div>
                 <span className="acc-eyebrow">Ownership</span>
                 <h2>Hubungkan affiliate ke akun Nambah.</h2>
                 <p>
-                  User ID berasal dari Admin → Users. Satu akun hanya dapat
+                  Pilih user terdaftar. Satu akun hanya dapat
                   memiliki satu affiliate link.
                 </p>
               </div>
@@ -269,8 +439,7 @@ export default function AffiliateAdminPanel() {
                   </option>
                 ))}
               </select>
-              <input
-                placeholder="User UUID (kosong = unlink)"
+              <select
                 value={linkDraft.userId}
                 onChange={(event) =>
                   setLinkDraft((current) => ({
@@ -278,7 +447,15 @@ export default function AffiliateAdminPanel() {
                     userId: event.target.value,
                   }))
                 }
-              />
+              >
+                <option value="">— Tidak terhubung (unlink) —</option>
+                {users.map((user) => (
+                  <option key={user.userId} value={user.userId}>
+                    {user.displayName ?? user.userId.slice(0, 8) + "…"}
+                    {user.whatsapp ? ` · ${user.whatsapp}` : ""}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 disabled={busy === "link" || !canPayout}
