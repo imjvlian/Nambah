@@ -110,15 +110,33 @@ function getDigiflazzErrorDetail(value: unknown) {
     return { message: null as string | null, code: null as string | null };
   }
 
-  const payload = value as DigiflazzErrorPayload;
-  const message = asNonEmptyString(payload.message) ?? asNonEmptyString(payload.error);
-  const code =
-    asNonEmptyString(payload.rc) ??
-    asNonEmptyString(payload.response_code) ??
-    (typeof payload.rc === "number" ? String(payload.rc) : null) ??
-    (typeof payload.response_code === "number" ? String(payload.response_code) : null);
+  // Error transaksi Digiflazz dibungkus amplop `data` (mis. rc 45 IP whitelist),
+  // sedangkan error endpoint lain ada di level teratas. Baca amplop dulu,
+  // lalu fallback ke level teratas supaya pesan asli tidak pernah tertelan.
+  const top = value as DigiflazzErrorPayload & { data?: unknown };
+  const nested =
+    top.data && typeof top.data === "object" && !Array.isArray(top.data)
+      ? (top.data as DigiflazzErrorPayload)
+      : null;
 
-  return { message, code };
+  const pick = (payload: DigiflazzErrorPayload) => ({
+    message: asNonEmptyString(payload.message) ?? asNonEmptyString(payload.error),
+    code:
+      asNonEmptyString(payload.rc) ??
+      asNonEmptyString(payload.response_code) ??
+      (typeof payload.rc === "number" ? String(payload.rc) : null) ??
+      (typeof payload.response_code === "number" ? String(payload.response_code) : null),
+  });
+
+  const fromNested = nested
+    ? pick(nested)
+    : { message: null as string | null, code: null as string | null };
+  const fromTop = pick(top);
+
+  return {
+    message: fromNested.message ?? fromTop.message,
+    code: fromNested.code ?? fromTop.code,
+  };
 }
 
 function isLikelyRetryableDigiflazzMessage(message: string | null) {
