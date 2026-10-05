@@ -244,8 +244,11 @@ async function generateGeminiReply(input: {
 }): Promise<string | null> {
   if (!GEMINI_API_KEY) return null;
 
+  // Gemini butuh waktu >12s saat cold start (konteks katalog ikut terkirim).
+  // 25 detik masih jauh di dalam batas function Vercel, tapi cukup lapang
+  // supaya pesan pertama tidak dibatalkan di tengah jalan.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), 25_000);
 
   try {
     const response = await fetch(
@@ -263,7 +266,7 @@ async function generateGeminiReply(input: {
           })),
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 450,
+            maxOutputTokens: 350,
           },
         }),
       },
