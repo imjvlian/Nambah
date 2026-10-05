@@ -7,11 +7,11 @@
     },
     {
       "path": "/api/cron/financial-reconcile",
-      "schedule": "0 3 * * *"
+      "schedule": "17 * * * *"
     },
     {
       "path": "/api/cron/digiflazz-balance",
-      "schedule": "0 3 * * *"
+      "schedule": "43 * * * *"
     }
   ]
 }
