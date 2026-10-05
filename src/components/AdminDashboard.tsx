@@ -248,6 +248,7 @@ type AdminUsersPayload = {
   users: Array<{
     userId: string;
     displayName: string | null;
+    email: string | null;
     whatsapp: string | null;
     preferredReceiptChannel: string;
     profileUpdatedAt: string | null;
@@ -2251,8 +2252,12 @@ export default function AdminDashboard() {
                 {(usersData?.users ?? []).slice(0, 100).map((item) => (
                   <div className="acc-users-row" key={item.userId}>
                     <div>
-                      <strong>{item.displayName ?? item.userId.slice(0, 8) + "…"}</strong>
-                      <span>{item.userId}</span>
+                      <strong>
+                        {item.displayName ?? item.email ?? item.userId.slice(0, 8) + "…"}
+                      </strong>
+                      <span>
+                        {item.displayName && item.email ? item.email : item.userId}
+                      </span>
                     </div>
                     <span>{item.whatsapp ?? "-"}</span>
                     <strong>{item.orders} · {item.success} success</strong>
