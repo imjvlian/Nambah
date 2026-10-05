@@ -2174,9 +2174,14 @@ export default function AdminDashboard() {
                 title="Affiliate"
                 copy="Commission lifecycle mengikuti status order, withdrawal memakai allocation ledger, dan payout tetap dikonfirmasi operator."
                 action={
-                  <Link className="acc-primary-link" href="/admin/affiliates">
-                    Open withdrawal center →
-                  </Link>
+                  <div className="acc-action-panel">
+                    <Link className="acc-inline-button" href="/admin/affiliates">
+                      + Buat affiliate
+                    </Link>
+                    <Link className="acc-primary-link" href="/admin/affiliates">
+                      Open withdrawal center →
+                    </Link>
+                  </div>
                 }
               />
               <div className="acc-metrics">
