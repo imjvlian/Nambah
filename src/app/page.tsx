@@ -34,7 +34,7 @@ export default async function Home() {
           <span className="eyebrow">Top up digital · 24/7</span>
           <h1>Top up cepat.<br /><em>Lanjut main.</em></h1>
           <p>
-            Pilih game atau kebutuhan digitalmu, bayar dengan cara yang simpel, lalu pantau prosesnya dengan jelas.
+            Tinggal pilih, Bayar, Lanjut Nambah Rank.
           </p>
           <div className="hero-actions">
             <a className="primary-button" href="#catalog-start">Top up sekarang <span>↓</span></a>

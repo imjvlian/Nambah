@@ -665,7 +665,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     {serialNumber}{" "}
                     <button
                       type="button"
-                      className="order-action-button secondary"
+                      className="order-secondary-link"
                       onClick={() => void copySerialNumber()}
                     >
                       Salin
