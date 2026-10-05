@@ -57,8 +57,14 @@ function formatDate(value: string | null) {
 type RegisteredUser = {
   userId: string;
   displayName: string | null;
+  email: string | null;
   whatsapp: string | null;
 };
+
+function userLabel(user: RegisteredUser) {
+  const primary = user.displayName ?? user.email ?? user.userId.slice(0, 8) + "…";
+  return user.whatsapp ? `${primary} · ${user.whatsapp}` : primary;
+}
 
 export default function AffiliateAdminPanel() {
   const [affiliates, setAffiliates] = useState<AffiliatePayload | null>(null);
@@ -150,6 +156,7 @@ export default function AffiliateAdminPanel() {
         users.map((user) => [
           user.userId,
           user.displayName ??
+            user.email ??
             (user.whatsapp ? `WA ${user.whatsapp}` : user.userId.slice(0, 8) + "…"),
         ]),
       ),
@@ -443,8 +450,7 @@ export default function AffiliateAdminPanel() {
                   <option value="">Tanpa user (assign nanti)</option>
                   {users.map((user) => (
                     <option key={user.userId} value={user.userId}>
-                      {user.displayName ?? user.userId.slice(0, 8) + "…"}
-                      {user.whatsapp ? ` · ${user.whatsapp}` : ""}
+                      {userLabel(user)}
                     </option>
                   ))}
                 </select>
@@ -502,8 +508,7 @@ export default function AffiliateAdminPanel() {
                 <option value="">— Tidak terhubung (unlink) —</option>
                 {users.map((user) => (
                   <option key={user.userId} value={user.userId}>
-                    {user.displayName ?? user.userId.slice(0, 8) + "…"}
-                    {user.whatsapp ? ` · ${user.whatsapp}` : ""}
+                    {userLabel(user)}
                   </option>
                 ))}
               </select>

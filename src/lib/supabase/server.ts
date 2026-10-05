@@ -94,6 +94,44 @@ export async function supabaseSelect<T>(
   return (await response.json()) as T[];
 }
 
+export type SupabaseAuthAdminUser = {
+  id: string;
+  email?: string | null;
+};
+
+/**
+ * Daftar user Supabase Auth (server-side only). Dipakai admin untuk memetakan
+ * UUID -> email, karena `customer_profiles` tidak menyimpan email.
+ */
+export async function supabaseAuthAdminListUsers(
+  perPage = 1000,
+): Promise<SupabaseAuthAdminUser[]> {
+  const { url, secretKey } = requireSupabaseConfig();
+
+  const response = await fetch(
+    `${url}/auth/v1/admin/users?per_page=${perPage}`,
+    {
+      method: "GET",
+      headers: {
+        apikey: secretKey,
+        Authorization: `Bearer ${secretKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase Auth admin list failed (${response.status}): ${body}`);
+  }
+
+  const payload = (await response.json()) as
+    | { users?: SupabaseAuthAdminUser[] }
+    | SupabaseAuthAdminUser[];
+  return Array.isArray(payload) ? payload : (payload.users ?? []);
+}
+
 export async function supabaseSelectPage<T>(
   table: string,
   options: SupabaseSelectPageOptions,

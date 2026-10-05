@@ -1,5 +1,8 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect } from "@/lib/supabase/server";
+import {
+  supabaseAuthAdminListUsers,
+  supabaseSelect,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -24,7 +27,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
-    const [profiles, orders] = await Promise.all([
+    const [profiles, orders, authUsers] = await Promise.all([
       supabaseSelect<ProfileRow>("customer_profiles", {
         select:
           "user_id,display_name,whatsapp,preferred_receipt_channel,created_at,updated_at",
@@ -36,7 +39,16 @@ export async function GET(request: Request) {
         order: "created_at.desc",
         limit: 5000,
       }),
+      // Email hanya ada di Supabase Auth, bukan di customer_profiles.
+      // Gagal mengambilnya tidak boleh mematikan seluruh lookup.
+      supabaseAuthAdminListUsers().catch(() => []),
     ]);
+
+    const emailById = new Map(
+      authUsers
+        .filter((user) => user.email)
+        .map((user) => [user.id, user.email as string]),
+    );
 
     const stats = new Map<
       string,
@@ -77,6 +89,7 @@ export async function GET(request: Request) {
         return {
           userId,
           displayName: profile?.display_name ?? null,
+          email: emailById.get(userId) ?? null,
           whatsapp: profile?.whatsapp ?? null,
           preferredReceiptChannel:
             profile?.preferred_receipt_channel ?? "email",
