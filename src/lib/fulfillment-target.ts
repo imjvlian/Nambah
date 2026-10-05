@@ -59,7 +59,8 @@ export function renderFulfillmentTarget(
     throw new Error("customer_no hasil format berada di luar batas aman.");
   }
 
-  if (!/^[A-Za-z0-9@._+|:\-]+$/.test(target)) {
+  // `#` diizinkan karena Riot ID Valorant (format Nama#Tag) masuk customer_no.
+  if (!/^[A-Za-z0-9@._+|:#\-]+$/.test(target)) {
     throw new Error(
       "customer_no hasil format mengandung karakter yang tidak diizinkan.",
     );

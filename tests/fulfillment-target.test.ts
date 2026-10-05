@@ -20,6 +20,13 @@ test("renders user and server target", () => {
   );
 });
 
+test("allows # for Riot ID customer_no (Valorant)", () => {
+  assert.equal(
+    renderFulfillmentTarget("{user_id}", { userId: "Joko#1234" }).customerNo,
+    "Joko#1234",
+  );
+});
+
 test("rejects unsafe or incomplete templates", () => {
   assert.throws(() => renderFulfillmentTarget("", { userId: "123" }));
   assert.throws(() =>

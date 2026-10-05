@@ -735,17 +735,35 @@ export default function TopupExperience({
               {accountSchema.server && (
                 <label>
                   <span>{accountSchema.server.label}</span>
-                  <input
-                    inputMode={accountSchema.server.inputMode}
-                    maxLength={accountSchema.server.maxLength}
-                    placeholder={accountSchema.server.placeholder}
-                    value={serverId}
-                    onChange={(event) => {
-                      setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
-                      setAccountError("");
-                      setUsernameCheck({ status: "idle" });
-                    }}
-                  />
+                  {accountSchema.server.options ? (
+                    <select
+                      value={serverId}
+                      onChange={(event) => {
+                        setServerId(event.target.value);
+                        setAccountError("");
+                        setUsernameCheck({ status: "idle" });
+                      }}
+                    >
+                      <option value="">{accountSchema.server.placeholder}</option>
+                      {accountSchema.server.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      inputMode={accountSchema.server.inputMode}
+                      maxLength={accountSchema.server.maxLength}
+                      placeholder={accountSchema.server.placeholder}
+                      value={serverId}
+                      onChange={(event) => {
+                        setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
+                        setAccountError("");
+                        setUsernameCheck({ status: "idle" });
+                      }}
+                    />
+                  )}
                 </label>
               )}
             </div>

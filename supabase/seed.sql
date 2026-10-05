@@ -24,6 +24,11 @@ on conflict (id) do update set
   sort_order = excluded.sort_order,
   updated_at = now();
 
+-- Template customer_no supplier per game (lihat migration
+-- 20261005_020_game_fulfillment_target_templates.sql untuk penjelasan).
+update public.games set fulfillment_target_template = '{user_id}{server_id}' where id = 'mobile-legends';
+update public.games set fulfillment_target_template = '{user_id}' where id in ('genshin-impact','free-fire','pubg-mobile','honor-of-kings','valorant','roblox','steam-wallet');
+
 insert into public.products (id, game_id, label, note, selling_price, reference_price, active, sort_order) values
   ('ml-5', 'mobile-legends', '5 Diamonds', null, 2000, 2500, true, 10),
   ('ml-12', 'mobile-legends', '12 Diamonds', null, 4500, 5000, true, 20),

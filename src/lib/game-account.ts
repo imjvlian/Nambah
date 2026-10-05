@@ -13,10 +13,20 @@ export type AccountField = {
   sanitize: "digits" | "username" | "identifier";
   pattern: RegExp;
   invalidMessage: string;
+  // Bila terisi, field dirender sebagai <select> berisi nilai-nilai ini
+  // (bukan input teks bebas) dan validasi menolak nilai di luar daftar.
+  options?: string[];
 };
 
 export type GameAccountSchema = {
-  kind: "mobile-legends" | "magic-chess" | "genshin" | "roblox" | "numeric-player" | "generic";
+  kind:
+    | "mobile-legends"
+    | "magic-chess"
+    | "genshin"
+    | "roblox"
+    | "valorant"
+    | "numeric-player"
+    | "generic";
   user: AccountField;
   server?: AccountField;
   checker: "mobile-legends" | "universal" | null;
@@ -95,6 +105,33 @@ const GENERIC_SERVER: AccountField = {
   invalidMessage: "Server / Region tidak valid.",
 };
 
+// Riot ID Valorant berformat `Nama#Tag` — `#` wajib diizinkan, kalau tidak
+// customer tidak akan pernah lolos validasi untuk game ini.
+const VALORANT_USER: AccountField = {
+  label: "Riot ID",
+  placeholder: "Contoh: Joko#1234",
+  inputMode: "text",
+  maxLength: 22,
+  sanitize: "identifier",
+  pattern: /^[A-Za-z0-9 ]{3,16}#[A-Za-z0-9]{3,5}$/,
+  invalidMessage: "Riot ID harus berformat Nama#Tag (contoh: Joko#1234).",
+};
+
+// Server Genshin hanya punya 4 nilai sah dari publisher. Dibuat dropdown
+// supaya typo seperti `asia`/`ASIA` tidak terkirim ke supplier.
+const GENSHIN_SERVER_OPTIONS = ["Asia", "America", "Europe", "TW/HK/MO"];
+
+const GENSHIN_SERVER: AccountField = {
+  label: "Server / Region",
+  placeholder: "Pilih server",
+  inputMode: "text",
+  maxLength: 8,
+  sanitize: "identifier",
+  pattern: /^(Asia|America|Europe|TW\/HK\/MO)$/,
+  invalidMessage: "Pilih salah satu server: Asia, America, Europe, atau TW/HK/MO.",
+  options: GENSHIN_SERVER_OPTIONS,
+};
+
 export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSchema {
   const identity = normalizeIdentity(game);
   const requiresServer = Boolean(game.requiresServer);
@@ -145,18 +182,10 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
         pattern: /^\d{9,10}$/,
         invalidMessage: "UID Genshin harus 9–10 digit.",
       },
-      ...(requiresServer
-        ? {
-            server: {
-              ...GENERIC_SERVER,
-              label: "Server / Region",
-              placeholder: "Contoh: Asia",
-            },
-          }
-        : {}),
+      ...(requiresServer ? { server: GENSHIN_SERVER } : {}),
       checker: "universal",
       helper: requiresServer
-        ? "Masukkan UID dan nama server/region akun Genshin."
+        ? "Masukkan UID dan pilih server/region akun Genshin."
         : "Masukkan UID akun Genshin.",
     };
   }
@@ -176,6 +205,16 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
       ...(requiresServer ? { server: GENERIC_SERVER } : {}),
       checker: "universal",
       helper: "Pastikan username atau User ID Roblox tepat sebelum pembayaran.",
+    };
+  }
+
+  if (/valorant|\bvalo\b/.test(identity)) {
+    return {
+      kind: "valorant",
+      user: VALORANT_USER,
+      ...(requiresServer ? { server: GENERIC_SERVER } : {}),
+      checker: "universal",
+      helper: "Masukkan Riot ID lengkap dengan tag, contoh: Joko#1234.",
     };
   }
 
@@ -216,7 +255,7 @@ export function stripAccountFieldCharacters(value: string, field: AccountField) 
     ? value.replace(/\D/g, "")
     : field.sanitize === "username"
       ? value.replace(/[^A-Za-z0-9_]/g, "")
-      : value.replace(/[^A-Za-z0-9@._+\- ]/g, "");
+      : value.replace(/[^A-Za-z0-9@._+\-#/ ]/g, "");
 }
 
 /**
