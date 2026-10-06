@@ -122,6 +122,11 @@ export default async function Home() {
           <span>Nambah</span>
         </a>
         <p>Top up cepat. Lanjut main.</p>
+        <nav className="site-footer-legal" aria-label="Dokumen legal">
+          <a href="/privacy">Privasi</a>
+          <a href="/terms">Ketentuan</a>
+          <a href="/refund">Refund</a>
+        </nav>
         <span>© 2026 Nambah.</span>
       </footer>
     </main>

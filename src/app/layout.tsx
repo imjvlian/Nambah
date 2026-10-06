@@ -23,6 +23,7 @@ import "./product-checkout-rail-v2.css";
 import "./auth.css";
 import "./points.css";
 import "./promo-banner.css";
+import "./legal.css";
 
 const inter = Inter({
   subsets: ["latin"],
