@@ -21,6 +21,10 @@
 }
 
 .promo-slide-banner {
+  /* Rasio frame dikunci 3:1 mengikuti kanvas banner 1200×400,
+     sehingga `cover` tidak lagi memotong desain. */
+  aspect-ratio: 3 / 1;
+  min-height: 0;
   background-size: cover;
   background-position: center;
   padding: 0;
@@ -28,11 +32,12 @@
 
 .promo-slide-overlay {
   flex: 1;
+  align-self: stretch;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  min-height: 200px;
+  min-height: 0;
   padding: 26px;
   background: linear-gradient(
     180deg,
@@ -190,6 +195,12 @@
     flex-direction: column;
     align-items: flex-start;
     min-height: 200px;
+  }
+
+  /* Di layar kecil frame banner dibuat lebih tinggi (16/9) supaya teks
+     overlay tetap muat; crop-nya terkontrol di sisi kiri-kanan saja. */
+  .promo-slide-banner {
+    aspect-ratio: 16 / 9;
   }
 
   .promo-slide-cta {
