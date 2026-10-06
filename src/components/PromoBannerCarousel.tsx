@@ -220,14 +220,11 @@ export default function PromoBannerCarousel() {
               key={dotIndex}
               type="button"
               role="tab"
+              aria-label={`Slide ${dotIndex + 1}`}
               aria-selected={dotIndex === current}
               className={dotIndex === current ? "active" : ""}
               onClick={() => setIndex(dotIndex)}
-            >
-              <span className="sr-only">
-                Slide {dotIndex + 1}
-              </span>
-            </button>
+            />
           ))}
         </div>
       )}
