@@ -2773,6 +2773,86 @@
           "bytes": 10509
         }
       ]
+    },
+    "axis": {
+      "name": "AXIS",
+      "cover": "/product-assets/brands/axis.svg",
+      "assets": []
+    },
+    "by-u": {
+      "name": "by.U",
+      "cover": "/product-assets/brands/by-u.svg",
+      "assets": []
+    },
+    "dana": {
+      "name": "DANA",
+      "cover": "/product-assets/brands/dana.svg",
+      "assets": []
+    },
+    "go-pay": {
+      "name": "GoPay",
+      "cover": "/product-assets/brands/go-pay.svg",
+      "assets": []
+    },
+    "indosat": {
+      "name": "Indosat Ooredoo Hutchison",
+      "cover": "/product-assets/brands/indosat.svg",
+      "assets": []
+    },
+    "k-vision-dan-gol": {
+      "name": "K-Vision & GOL",
+      "cover": "/product-assets/brands/k-vision-dan-gol.png",
+      "assets": []
+    },
+    "ovo": {
+      "name": "OVO",
+      "cover": "/product-assets/brands/ovo.svg",
+      "assets": []
+    },
+    "pertamina-gas": {
+      "name": "Pertamina Gas",
+      "cover": "/product-assets/brands/pertamina-gas.svg",
+      "assets": []
+    },
+    "pln": {
+      "name": "PLN",
+      "cover": "/product-assets/brands/pln.svg",
+      "assets": []
+    },
+    "roblox": {
+      "name": "Roblox",
+      "cover": "/product-assets/brands/roblox.svg",
+      "assets": []
+    },
+    "shopee-pay": {
+      "name": "ShopeePay",
+      "cover": "/product-assets/brands/shopee-pay.svg",
+      "assets": []
+    },
+    "smartfren": {
+      "name": "Smartfren",
+      "cover": "/product-assets/brands/smartfren.svg",
+      "assets": []
+    },
+    "telkomsel": {
+      "name": "Telkomsel",
+      "cover": "/product-assets/brands/telkomsel.svg",
+      "assets": []
+    },
+    "tri": {
+      "name": "Tri",
+      "cover": "/product-assets/brands/tri.svg",
+      "assets": []
+    },
+    "xl": {
+      "name": "XL",
+      "cover": "/product-assets/brands/xl.svg",
+      "assets": []
+    },
+    "wuthering-waves": {
+      "name": "Wuthering Waves",
+      "cover": "/product-assets/brands/wuthering-waves.svg",
+      "assets": []
     }
   }
 }
