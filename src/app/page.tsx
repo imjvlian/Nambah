@@ -32,37 +32,10 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="hero shell home-v2-hero home-market-hero" id="top">
-        <div className="hero-copy home-market-copy">
-          <span className="eyebrow">Top up digital · 24/7</span>
-          <h1>Top up cepat.<br /><em>Lanjut main.</em></h1>
-          <p>
-            Tinggal pilih, Bayar, Lanjut Nambah Rank.
-          </p>
-          <div className="hero-actions">
-            <a className="primary-button" href="#catalog-start">Top up sekarang <span>↓</span></a>
-            <a className="text-link" href="#how-it-works">Cara kerja</a>
-          </div>
-        </div>
-
-        <aside className="home-market-board" aria-label="Layanan Nambah">
-          <div className="home-market-board-head">
-            <span className="home-market-board-mark">N+</span>
-            <span className="home-market-live"><i /> ONLINE</span>
-          </div>
-          <div className="home-market-board-copy">
-            <small>SEMUA DALAM SATU FLOW</small>
-            <strong>Pilih.<br />Bayar.<br /><em>Beres.</em></strong>
-          </div>
-          <div className="home-market-board-meta">
-            <span><b>QRIS</b><small>Pembayaran simpel</small></span>
-            <span><b>24/7</b><small>Katalog selalu siap</small></span>
-            <span><b>TRACKED</b><small>Status lebih jelas</small></span>
-          </div>
-        </aside>
+      <section id="top" aria-label="Sorotan utama">
+        <h1 className="sr-only">Top up cepat. Lanjut main.</h1>
+        <PromoBannerCarousel />
       </section>
-
-      <PromoBannerCarousel />
       <PromoPopup />
 
       <section className="shell home-trust-strip" aria-label="Keunggulan layanan">
