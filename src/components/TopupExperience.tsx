@@ -1111,6 +1111,7 @@ export default function TopupExperience({
             )}
           </div>
 
+          <div className="checkout-rail">
           <div className="form-block">
             <div className="form-label">
               <span className="step-number">4</span>
@@ -1158,6 +1159,7 @@ export default function TopupExperience({
           <button className="primary-button full" disabled={isSubmitting || pricingLoading || Boolean(pricingError)} type="submit">
             {isSubmitting ? "Membuat pembayaran..." : pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
           </button>
+          </div>
           {notice && <p className="form-notice" role="status">{notice}</p>}
         </form>
       </section>

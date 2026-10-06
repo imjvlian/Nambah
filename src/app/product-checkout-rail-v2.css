@@ -286,3 +286,46 @@
     margin-top: 536px;
   }
 }
+
+/* 1.0.13 — rail kanan jadi SATU kontainer sticky.
+   Menggantikan 3 sticky terpisah dengan `top` hardcode (146/468/704) yang rapuh
+   di berbagai tinggi layar. Selector lama memakai direct-child `.order-card >`,
+   sehingga otomatis nonaktif begitu elemen dibungkus .checkout-rail. */
+.checkout-rail {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .product-page .order-card > .checkout-rail {
+    grid-column: 2;
+    grid-row: 1 / 6;
+    position: sticky;
+    top: 146px;
+    z-index: 7;
+    width: 100%;
+    max-height: calc(100dvh - 170px);
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  /* Saat blok kontak struk guest menempati puncak rail, rail turun di bawahnya. */
+  .product-page .order-card:has(> .guest-receipt-block) > .checkout-rail {
+    top: 322px;
+    max-height: calc(100dvh - 346px);
+  }
+}
+
+@media (min-width: 1280px) and (max-height: 820px) {
+  .product-page .order-card > .checkout-rail {
+    top: 128px;
+    max-height: calc(100dvh - 152px);
+  }
+
+  .product-page .order-card:has(> .guest-receipt-block) > .checkout-rail {
+    top: 288px;
+    max-height: calc(100dvh - 312px);
+  }
+}
