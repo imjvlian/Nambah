@@ -1,5 +1,6 @@
 import AccountNav from "@/components/AccountNav";
 import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
+import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
 
@@ -58,6 +59,8 @@ export default async function Home() {
           </div>
         </aside>
       </section>
+
+      <PromoBannerCarousel />
 
       <section className="shell home-trust-strip" aria-label="Keunggulan layanan">
         <article>

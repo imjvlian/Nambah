@@ -2062,6 +2062,13 @@ export default function AdminDashboard() {
                 eyebrow="Growth"
                 title="Promotions"
                 copy="Campaign promo dikelola tanpa SQL, dengan quota reservation yang aman terhadap checkout paralel."
+                action={
+                  <div className="acc-action-panel">
+                    <Link className="acc-inline-button" href="/admin/banners">
+                      Kelola banner beranda →
+                    </Link>
+                  </div>
+                }
               />
 
               <div className="acc-module-summary">
