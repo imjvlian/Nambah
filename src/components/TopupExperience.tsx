@@ -9,6 +9,7 @@ import {
   validateGameAccountTarget,
 } from "@/lib/game-account";
 import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
+import { sortNominalItems } from "@/lib/nominal-sort";
 import { validateGuestReceiptContact } from "@/lib/customer-contact";
 import {
   createPublicPricingFallback,
@@ -137,7 +138,7 @@ function getNominalSectionId(item: Game["packages"][number]): NominalSectionId {
   }
 
   if (
-    /(weekly elite pack|monthly elite pack|weekly epic pack|monthly epic pack|weekly pack|monthly pack|paket mingguan|paket bulanan)/i.test(
+    /(weekly elite pack|monthly elite pack|weekly epic pack|monthly epic pack|weekly pack|monthly pack|weekly card|monthly card|paket mingguan|paket bulanan)/i.test(
       text,
     )
   ) {
@@ -145,7 +146,7 @@ function getNominalSectionId(item: Game["packages"][number]): NominalSectionId {
   }
 
   if (
-    /(weekly diamond pass|twilight pass|starlight|battle pass|booyah pass|elite pass|membership|member|special item|special pack|special|\bpass\b)/i.test(
+    /(weekly diamond pass|twilight pass|starlight|battle pass|booyah pass|elite pass|membership|member|welkin|lunite subscription|special item|special pack|special|\bpass\b)/i.test(
       text,
     )
   ) {
@@ -212,7 +213,9 @@ export default function TopupExperience({
     () =>
       NOMINAL_SECTIONS.map((section) => ({
         ...section,
-        items: selectedGame.packages.filter((item) => getNominalSectionId(item) === section.id),
+        items: sortNominalItems(
+          selectedGame.packages.filter((item) => getNominalSectionId(item) === section.id),
+        ),
       })).filter((section) => section.items.length > 0),
     [selectedGame],
   );
