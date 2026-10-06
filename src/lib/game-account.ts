@@ -29,6 +29,8 @@ export type GameAccountSchema = {
     | "phone"
     | "numeric-bill"
     | "numeric-player"
+    | "alphanumeric-player"
+    | "contact"
     | "generic";
   user: AccountField;
   server?: AccountField;
@@ -169,6 +171,31 @@ const BILL_USER: AccountField = {
   invalidMessage: "Nomor pelanggan / ID harus 4–20 digit.",
 };
 
+// Point Blank: targetnya login ID Zepetto yang alfanumerik (bukan murni angka),
+// jadi skema numeric-player akan menolak ID yang sah.
+const POINT_BLANK_USER: AccountField = {
+  label: "User ID",
+  placeholder: "Masukkan User ID Point Blank",
+  inputMode: "text",
+  maxLength: 24,
+  sanitize: "username",
+  pattern: /^[A-Za-z0-9_]{4,24}$/,
+  invalidMessage: "User ID Point Blank harus 4–24 karakter (huruf, angka, atau _).",
+};
+
+// SKU voucher kode redeem (Steam Wallet Code, Google Play, PSN, Garena Shells,
+// eFootball): produk dikirim berupa SN kode, jadi customer_no supplier cukup
+// berisi kontak referensi — email atau nomor HP aktif.
+const CONTACT_USER: AccountField = {
+  label: "Email / No. HP",
+  placeholder: "Contoh: nama@email.com atau 081234567890",
+  inputMode: "text",
+  maxLength: 64,
+  sanitize: "identifier",
+  pattern: /^(08\d{8,12}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/,
+  invalidMessage: "Masukkan email yang valid atau nomor HP diawali 08 (10–14 digit).",
+};
+
 export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSchema {
   const identity = normalizeIdentity(game);
   const requiresServer = Boolean(game.requiresServer);
@@ -245,7 +272,9 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
-  if (/valorant|\bvalo\b/.test(identity)) {
+  // Valorant, Wild Rift, dan Legends of Runeterra sama-sama game Riot —
+  // fulfillment Digiflazz untuk ketiganya memakai Riot ID (Nama#Tag).
+  if (/valorant|\bvalo\b|wild rift|runeterra/.test(identity)) {
     return {
       kind: "valorant",
       user: VALORANT_USER,
@@ -273,7 +302,22 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
-  if (/free fire|\bff\b|pubg|honor of kings|\bhok\b/.test(identity)) {
+  // Point Blank harus dicek SEBELUM numeric-player: login ID-nya alfanumerik.
+  if (/point blank/.test(identity)) {
+    return {
+      kind: "alphanumeric-player",
+      user: POINT_BLANK_USER,
+      ...(requiresServer ? { server: GENERIC_SERVER } : {}),
+      checker: "universal",
+      helper: "Masukkan User ID Point Blank (login ID) dengan benar.",
+    };
+  }
+
+  if (
+    /free fire|\bff\b|pubg|honor of kings|\bhok\b|arena of valor|\baov\b|delta force|fc mobile|marvel rivals|aniimo/.test(
+      identity,
+    )
+  ) {
     return {
       kind: "numeric-player",
       user: GENERIC_NUMERIC_USER,
@@ -282,6 +326,20 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
       helper: requiresServer
         ? "Masukkan Player ID dan Server / Zone ID sesuai akun game."
         : "Masukkan Player ID sesuai akun game.",
+    };
+  }
+
+  // SKU voucher kode redeem: SN kode adalah produknya, customer_no cukup
+  // kontak referensi. Diletakkan setelah cabang game spesifik supaya game
+  // seperti Free Fire (publisher Garena) tidak terseret ke sini.
+  if (/steam|google play|playstation|\bgarena\b|efootball/.test(identity)) {
+    return {
+      kind: "contact",
+      user: CONTACT_USER,
+      ...(requiresServer ? { server: GENERIC_SERVER } : {}),
+      checker: null,
+      helper:
+        "Kode voucher dikirim ke halaman status order. Masukkan email atau nomor HP aktif sebagai referensi pengiriman.",
     };
   }
 

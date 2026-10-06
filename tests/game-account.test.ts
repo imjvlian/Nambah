@@ -153,6 +153,90 @@ test("tagihan (PLN dsb.): satu kolom nomor pelanggan numerik", () => {
   assert.equal(huruf.ok, false);
 });
 
+test("wild rift & runeterra: satu kolom Riot ID seperti valorant", () => {
+  for (const game of [
+    { id: "league-of-legends-wild-rift", name: "League Of Legends Wild Rift" },
+    { id: "legends-of-runeterra", name: "Legends Of Runeterra" },
+  ]) {
+    const schema = getGameAccountSchema(game);
+    assert.equal(schema.kind, "valorant", `${game.id} harus memakai skema Riot ID`);
+
+    assert.deepEqual(validateGameAccountTarget(game, "Joko#1234"), {
+      ok: true,
+      userId: "Joko#1234",
+    });
+
+    const tanpaTag = validateGameAccountTarget(game, "Joko");
+    assert.equal(tanpaTag.ok, false, `${game.id} harus menolak Riot ID tanpa tag`);
+  }
+});
+
+test("aov / delta force / fc mobile / marvel rivals / aniimo / ff max: player id numerik", () => {
+  for (const game of [
+    { id: "arena-of-valor", name: "Arena Of Valor" },
+    { id: "delta-force", name: "Delta Force" },
+    { id: "fc-mobile", name: "FC Mobile" },
+    { id: "marvel-rivals", name: "Marvel Rivals" },
+    { id: "aniimo", name: "Aniimo" },
+    { id: "free-fire-max", name: "Free Fire Max" },
+  ]) {
+    const schema = getGameAccountSchema(game);
+    assert.equal(schema.kind, "numeric-player", `${game.id} harus memakai skema numeric-player`);
+
+    assert.deepEqual(validateGameAccountTarget(game, "512345678"), {
+      ok: true,
+      userId: "512345678",
+    });
+
+    const huruf = validateGameAccountTarget(game, "abcdef");
+    assert.equal(huruf.ok, false, `${game.id} harus menolak non-numerik`);
+  }
+});
+
+test("point blank: user id alfanumerik, bukan murni numerik", () => {
+  const game = { id: "point-blank", name: "Point Blank" };
+  const schema = getGameAccountSchema(game);
+  assert.equal(schema.kind, "alphanumeric-player");
+
+  assert.deepEqual(validateGameAccountTarget(game, "Zepetto_01"), {
+    ok: true,
+    userId: "Zepetto_01",
+  });
+  assert.deepEqual(validateGameAccountTarget(game, "12345678"), {
+    ok: true,
+    userId: "12345678",
+  });
+
+  const terlaluPendek = validateGameAccountTarget(game, "ab");
+  assert.equal(terlaluPendek.ok, false);
+});
+
+test("voucher kode redeem (steam, google play, psn, garena, efootball): email atau no HP", () => {
+  for (const game of [
+    { id: "steam-wallet", name: "Steam Wallet" },
+    { id: "steam-wallet-idr", name: "Steam Wallet (IDR)" },
+    { id: "google-play-indonesia", name: "Google Play Indonesia" },
+    { id: "playstation", name: "Playstation" },
+    { id: "garena", name: "Garena" },
+    { id: "efootball", name: "Efootball" },
+  ]) {
+    const schema = getGameAccountSchema(game);
+    assert.equal(schema.kind, "contact", `${game.id} harus memakai skema contact`);
+
+    assert.deepEqual(validateGameAccountTarget(game, "nama@email.com"), {
+      ok: true,
+      userId: "nama@email.com",
+    });
+    assert.deepEqual(validateGameAccountTarget(game, "081234567890"), {
+      ok: true,
+      userId: "081234567890",
+    });
+
+    const ngawur = validateGameAccountTarget(game, "bukan-email");
+    assert.equal(ngawur.ok, false, `${game.id} harus menolak input bukan email/HP`);
+  }
+});
+
 test("game tidak dikenal: skema generic longgar tapi tetap tervalidasi", () => {
   const game = { id: "game-baru", name: "Game Baru" };
   const schema = getGameAccountSchema(game);
