@@ -572,6 +572,80 @@
   grid-template-columns: minmax(280px,1fr) 210px 180px;
 }
 
+.acc-filterbar-tools {
+  grid-template-columns: 170px 190px minmax(230px,auto) 1fr auto;
+  align-items: center;
+}
+
+.acc-bulk-adjust {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.acc-bulk-adjust input {
+  width: 74px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: 0;
+  background: #0d0f0c;
+  color: #d9ded3;
+  font-size: 12px;
+}
+
+.acc-bulk-adjust span {
+  color: #8b9287;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.acc-bulk-adjust button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: #d9ded3;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.acc-bulk-adjust button:hover:not(:disabled) {
+  border-color: rgba(201, 255, 63, 0.45);
+  color: var(--lime);
+}
+
+.acc-bulk-adjust button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.acc-filter-count {
+  color: #8b9287;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.acc-save-all {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .acc-filterbar-tools {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .acc-filter-count {
+    text-align: left;
+  }
+}
+
 .acc-filterbar input,
 .acc-filterbar select {
   min-width: 0;

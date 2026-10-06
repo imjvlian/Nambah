@@ -367,6 +367,31 @@ function draftFromProduct(product: CatalogProduct): DraftProduct {
   };
 }
 
+function roundTo100(value: number) {
+  return Math.max(0, Math.round(value / 100) * 100);
+}
+
+function isDraftDirty(product: CatalogProduct, draft: DraftProduct) {
+  return (
+    draft.label !== product.label ||
+    draft.note !== (product.note ?? "") ||
+    Number(draft.sellingPrice) !== product.sellingPrice ||
+    Number(draft.referencePrice) !== product.referencePrice ||
+    draft.active !== product.active ||
+    draft.supplierSku.trim() !== (product.supplier.sku ?? "")
+  );
+}
+
+function marginOf(product: CatalogProduct, sellingPrice: number) {
+  const cost = product.supplier.cost;
+  if (cost === null || !Number.isFinite(sellingPrice) || sellingPrice <= 0) {
+    return null;
+  }
+  const margin = sellingPrice - cost;
+  const percent = cost > 0 ? (margin / cost) * 100 : 0;
+  return { margin, percent };
+}
+
 function SectionHead({
   eyebrow,
   title,
@@ -448,6 +473,9 @@ export default function AdminDashboard() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [mappingFilter, setMappingFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [marginFilter, setMarginFilter] = useState("all");
+  const [bulkPercent, setBulkPercent] = useState("5");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -974,63 +1002,10 @@ export default function AdminDashboard() {
     const draft = drafts[product.id];
     if (!draft) return;
 
-    const sellingPrice = Number(draft.sellingPrice);
-    const referencePrice = Number(draft.referencePrice);
-    const nextSku = draft.supplierSku.trim();
-    const currentSku = product.supplier.sku ?? "";
-
-    if (!Number.isInteger(sellingPrice) || sellingPrice <= 0) {
-      setNotice(`${product.id}: harga jual tidak valid.`);
-      return;
-    }
-    if (!Number.isInteger(referencePrice) || referencePrice < sellingPrice) {
-      setNotice(`${product.id}: reference price harus >= harga jual.`);
-      return;
-    }
-    if (!nextSku && currentSku) {
-      setNotice(
-        `${product.id}: SKU lama tidak boleh dikosongkan dari editor ini.`,
-      );
-      return;
-    }
-
     setBusy(`save:${product.id}`);
     setNotice("");
     try {
-      const response = await fetch(
-        `/api/admin/catalog/${encodeURIComponent(product.id)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            label: draft.label,
-            note: draft.note || null,
-            sellingPrice,
-            referencePrice,
-            active: draft.active,
-          }),
-        },
-      );
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(result.error ?? "Produk gagal disimpan.");
-      }
-
-      if (nextSku && nextSku.toUpperCase() !== currentSku.toUpperCase()) {
-        const mappingResponse = await fetch("/api/admin/digiflazz/map-sku", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId: product.id,
-            supplierSku: nextSku,
-          }),
-        });
-        const mapping = (await mappingResponse.json()) as { error?: string };
-        if (!mappingResponse.ok) {
-          throw new Error(mapping.error ?? "Mapping SKU gagal.");
-        }
-      }
-
+      await persistProduct(product, draft);
       await Promise.all([loadCatalog(), loadOverview()]);
       setNotice(`${product.id} berhasil diperbarui.`);
     } catch (error) {
@@ -1142,13 +1117,177 @@ export default function AdminDashboard() {
       if (mappingFilter === "mapped" && !product.supplier.mapped) return false;
       if (mappingFilter === "unmapped" && product.supplier.mapped) return false;
       if (mappingFilter === "ready" && !product.supplier.ready) return false;
+      if (statusFilter === "active" && !product.active) return false;
+      if (statusFilter === "inactive" && product.active) return false;
+      if (statusFilter === "edited") {
+        const draft = drafts[product.id];
+        if (!draft || !isDraftDirty(product, draft)) return false;
+      }
+      if (marginFilter !== "all") {
+        const draft = drafts[product.id];
+        const info = marginOf(
+          product,
+          Number(draft?.sellingPrice ?? product.sellingPrice),
+        );
+        if (marginFilter === "loss" && (!info || info.margin >= 0)) return false;
+        if (marginFilter === "thin" && (!info || info.margin < 0 || info.percent >= 5))
+          return false;
+        if (marginFilter === "no-cost" && info !== null) return false;
+      }
       if (!keyword) return true;
 
-      return `${product.id} ${product.gameName} ${product.label} ${product.supplier.sku ?? ""}`
+      return `${product.id} ${product.gameName} ${product.gameShortName} ${product.label} ${product.supplier.sku ?? ""}`
         .toLowerCase()
         .includes(keyword);
     });
-  }, [catalog, query, gameFilter, mappingFilter]);
+  }, [catalog, query, gameFilter, mappingFilter, statusFilter, marginFilter, drafts]);
+
+  const dirtyProductCount = useMemo(() => {
+    if (!catalog) return 0;
+    return catalog.products.filter((product) => {
+      const draft = drafts[product.id];
+      return draft ? isDraftDirty(product, draft) : false;
+    }).length;
+  }, [catalog, drafts]);
+
+  function applyBulkPercent() {
+    const percent = Number(bulkPercent);
+    if (!Number.isFinite(percent) || percent === 0 || Math.abs(percent) > 90) {
+      setNotice("Persen penyesuaian harus di antara -90% dan 90% (bukan 0).");
+      return;
+    }
+    if (filteredProducts.length === 0) {
+      setNotice("Tidak ada produk terfilter untuk disesuaikan.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Sesuaikan harga jual & harga coret sebesar ${percent > 0 ? "+" : ""}${percent}% untuk ${filteredProducts.length} produk terfilter (dibulatkan ke Rp100 terdekat)? Perubahan masuk ke draft — tinjau lalu klik "Simpan semua".`,
+    );
+    if (!confirmed) return;
+
+    setDrafts((current) => {
+      const next = { ...current };
+      for (const product of filteredProducts) {
+        const draft = next[product.id] ?? draftFromProduct(product);
+        const selling = Number(draft.sellingPrice) || product.sellingPrice;
+        const reference = Number(draft.referencePrice) || product.referencePrice;
+        next[product.id] = {
+          ...draft,
+          sellingPrice: String(roundTo100(selling * (1 + percent / 100))),
+          referencePrice: String(roundTo100(reference * (1 + percent / 100))),
+        };
+      }
+      return next;
+    });
+    setNotice(
+      `Draft ${filteredProducts.length} produk disesuaikan ${percent > 0 ? "+" : ""}${percent}%. Tinjau lalu klik "Simpan semua".`,
+    );
+  }
+
+  function adjustDraftPrice(product: CatalogProduct, percent: number) {
+    const draft = drafts[product.id] ?? draftFromProduct(product);
+    const selling = Number(draft.sellingPrice) || product.sellingPrice;
+    const reference = Number(draft.referencePrice) || product.referencePrice;
+    updateDraft(product.id, {
+      sellingPrice: String(roundTo100(selling * (1 + percent / 100))),
+      referencePrice: String(roundTo100(reference * (1 + percent / 100))),
+    });
+  }
+
+  function resetDraft(product: CatalogProduct) {
+    setDrafts((current) => ({
+      ...current,
+      [product.id]: draftFromProduct(product),
+    }));
+  }
+
+  async function persistProduct(product: CatalogProduct, draft: DraftProduct) {
+    const sellingPrice = Number(draft.sellingPrice);
+    const referencePrice = Number(draft.referencePrice);
+    const nextSku = draft.supplierSku.trim();
+    const currentSku = product.supplier.sku ?? "";
+
+    if (!Number.isInteger(sellingPrice) || sellingPrice <= 0) {
+      throw new Error(`${product.id}: harga jual tidak valid.`);
+    }
+    if (!Number.isInteger(referencePrice) || referencePrice < sellingPrice) {
+      throw new Error(`${product.id}: reference price harus >= harga jual.`);
+    }
+    if (!nextSku && currentSku) {
+      throw new Error(
+        `${product.id}: SKU lama tidak boleh dikosongkan dari editor ini.`,
+      );
+    }
+
+    const response = await fetch(
+      `/api/admin/catalog/${encodeURIComponent(product.id)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: draft.label,
+          note: draft.note || null,
+          sellingPrice,
+          referencePrice,
+          active: draft.active,
+        }),
+      },
+    );
+    const result = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      throw new Error(result.error ?? `${product.id} gagal disimpan.`);
+    }
+
+    if (nextSku && nextSku.toUpperCase() !== currentSku.toUpperCase()) {
+      const mappingResponse = await fetch("/api/admin/digiflazz/map-sku", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          supplierSku: nextSku,
+        }),
+      });
+      const mapping = (await mappingResponse.json()) as { error?: string };
+      if (!mappingResponse.ok) {
+        throw new Error(mapping.error ?? `${product.id}: mapping SKU gagal.`);
+      }
+    }
+  }
+
+  async function saveAllDirty() {
+    if (!catalog) return;
+    const dirtyProducts = catalog.products.filter((product) => {
+      const draft = drafts[product.id];
+      return draft ? isDraftDirty(product, draft) : false;
+    });
+    if (dirtyProducts.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Simpan ${dirtyProducts.length} perubahan produk? Harga yang sudah tersimpan langsung berlaku di etalase.`,
+    );
+    if (!confirmed) return;
+
+    setBusy("save-all");
+    setNotice("");
+    const failures: string[] = [];
+    for (const product of dirtyProducts) {
+      const draft = drafts[product.id];
+      if (!draft) continue;
+      try {
+        await persistProduct(product, draft);
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : `${product.id} gagal.`);
+      }
+    }
+
+    await Promise.all([loadCatalog(), loadOverview()]);
+    setNotice(
+      failures.length === 0
+        ? `${dirtyProducts.length} produk berhasil disimpan.`
+        : `${dirtyProducts.length - failures.length} tersimpan, ${failures.length} gagal: ${failures.slice(0, 3).join(" · ")}`,
+    );
+    setBusy("");
+  }
 
   const filteredOrders = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -1639,6 +1778,59 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
+              <div className="acc-filterbar acc-filterbar-tools">
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">Semua status</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                  <option value="edited">Sedang diedit</option>
+                </select>
+                <select
+                  value={marginFilter}
+                  onChange={(event) => setMarginFilter(event.target.value)}
+                >
+                  <option value="all">Semua margin</option>
+                  <option value="loss">Rugi (jual &lt; modal)</option>
+                  <option value="thin">Margin tipis (&lt;5%)</option>
+                  <option value="no-cost">Tanpa data modal</option>
+                </select>
+                <div className="acc-bulk-adjust">
+                  <input
+                    type="number"
+                    min="-90"
+                    max="90"
+                    step="0.5"
+                    value={bulkPercent}
+                    onChange={(event) => setBulkPercent(event.target.value)}
+                    aria-label="Persen penyesuaian harga"
+                  />
+                  <span>%</span>
+                  <button
+                    type="button"
+                    onClick={applyBulkPercent}
+                    disabled={Boolean(busy) || filteredProducts.length === 0}
+                  >
+                    Terapkan ke {filteredProducts.length} terfilter
+                  </button>
+                </div>
+                <span className="acc-filter-count">
+                  {filteredProducts.length} dari {catalog.products.length} produk
+                </span>
+                <button
+                  className="admin-save-button acc-save-all"
+                  type="button"
+                  disabled={Boolean(busy) || dirtyProductCount === 0}
+                  onClick={() => void saveAllDirty()}
+                >
+                  {busy === "save-all"
+                    ? "Menyimpan..."
+                    : `Simpan semua (${dirtyProductCount})`}
+                </button>
+              </div>
+
               <div className="admin-catalog-card acc-catalog-card">
                 <div className="admin-table-head">
                   <span>Produk</span>
@@ -1652,9 +1844,22 @@ export default function AdminDashboard() {
                     const draft =
                       drafts[product.id] ?? draftFromProduct(product);
                     const saving = busy === `save:${product.id}`;
+                    const dirty = isDraftDirty(product, draft);
+                    const sellingValue = Number(draft.sellingPrice);
+                    const referenceValue = Number(draft.referencePrice);
+                    const margin = marginOf(product, sellingValue);
+                    const priceError =
+                      Number.isFinite(sellingValue) &&
+                      Number.isFinite(referenceValue) &&
+                      referenceValue < sellingValue;
 
                     return (
-                      <article className="admin-product-row" key={product.id}>
+                      <article
+                        className={
+                          "admin-product-row" + (dirty ? " admin-row-dirty" : "")
+                        }
+                        key={product.id}
+                      >
                         <div className="admin-product-main">
                           <small>
                             {product.gameShortName} · {product.id}
@@ -1680,31 +1885,49 @@ export default function AdminDashboard() {
                           />
                         </div>
 
-                        <div className="admin-price-fields">
-                          <label>
-                            <span>Harga jual</span>
-                            <input
-                              type="number"
-                              value={draft.sellingPrice}
-                              onChange={(event) =>
-                                updateDraft(product.id, {
-                                  sellingPrice: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Harga coret</span>
-                            <input
-                              type="number"
-                              value={draft.referencePrice}
-                              onChange={(event) =>
-                                updateDraft(product.id, {
-                                  referencePrice: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
+                        <div className="admin-price-stack">
+                          <div className="admin-price-fields">
+                            <label>
+                              <span>Harga jual</span>
+                              <input
+                                type="number"
+                                value={draft.sellingPrice}
+                                onChange={(event) =>
+                                  updateDraft(product.id, {
+                                    sellingPrice: event.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              <span>Harga coret</span>
+                              <input
+                                type="number"
+                                value={draft.referencePrice}
+                                onChange={(event) =>
+                                  updateDraft(product.id, {
+                                    referencePrice: event.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                          <div className="admin-quick-price">
+                            {[2, 5, 10].map((percent) => (
+                              <button
+                                key={percent}
+                                type="button"
+                                onClick={() => adjustDraftPrice(product, percent)}
+                              >
+                                +{percent}%
+                              </button>
+                            ))}
+                          </div>
+                          {priceError && (
+                            <span className="admin-price-hint">
+                              Harga coret lebih kecil dari harga jual.
+                            </span>
+                          )}
                         </div>
 
                         <div className="admin-supplier-fields">
@@ -1728,6 +1951,25 @@ export default function AdminDashboard() {
                                 : formatIDR(product.supplier.cost)}
                             </strong>
                           </div>
+                          {margin && (
+                            <div
+                              className={
+                                "admin-margin-line " +
+                                (margin.margin < 0
+                                  ? "negative"
+                                  : margin.percent < 5
+                                    ? "thin"
+                                    : "positive")
+                              }
+                            >
+                              <span>Margin</span>
+                              <strong>
+                                {margin.margin >= 0 ? "+" : ""}
+                                {formatIDR(margin.margin)} (
+                                {margin.percent.toFixed(1)}%)
+                              </strong>
+                            </div>
+                          )}
                         </div>
 
                         <div className="admin-status-stack">
@@ -1758,12 +2000,21 @@ export default function AdminDashboard() {
                             />
                             Aktif
                           </label>
+                          {dirty && (
+                            <button
+                              className="admin-reset-button"
+                              type="button"
+                              onClick={() => resetDraft(product)}
+                            >
+                              Reset
+                            </button>
+                          )}
                         </div>
 
                         <button
                           className="admin-save-button"
                           type="button"
-                          disabled={Boolean(busy)}
+                          disabled={Boolean(busy) || !dirty}
                           onClick={() => void saveProduct(product)}
                         >
                           {saving ? "Saving..." : "Simpan"}

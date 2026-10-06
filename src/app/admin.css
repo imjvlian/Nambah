@@ -355,6 +355,93 @@
   gap: 10px;
 }
 
+.admin-price-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-quick-price {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-quick-price button {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.admin-quick-price button:hover {
+  color: var(--lime);
+  border-color: rgba(201, 255, 63, 0.45);
+}
+
+.admin-price-hint {
+  color: #ff9b9b;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.admin-margin-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.admin-margin-line span {
+  color: var(--muted);
+}
+
+.admin-margin-line strong {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-margin-line.positive strong {
+  color: var(--lime);
+}
+
+.admin-margin-line.thin strong {
+  color: #e4bf82;
+}
+
+.admin-margin-line.negative strong {
+  color: #ff9b9b;
+}
+
+.admin-row-dirty {
+  border-left: 3px solid var(--lime);
+  padding-left: 13px;
+}
+
+.admin-reset-button {
+  width: fit-content;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.admin-reset-button:hover {
+  color: #ff9b9b;
+  border-color: rgba(255, 155, 155, 0.4);
+}
+
 .admin-cost-line strong {
   font-size: 10px;
 }
