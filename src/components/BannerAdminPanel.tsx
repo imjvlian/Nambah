@@ -12,10 +12,17 @@ type Banner = {
   ctaHref: string | null;
   promoCode: string | null;
   sortOrder: number;
+  displayMode: "carousel" | "popup" | "both";
   active: boolean;
   startsAt: string | null;
   endsAt: string | null;
   createdAt: string;
+};
+
+const DISPLAY_MODE_LABEL: Record<string, string> = {
+  carousel: "Carousel",
+  popup: "Pop-up",
+  both: "Carousel + Pop-up",
 };
 
 type BannersPayload = {
@@ -34,6 +41,7 @@ export default function BannerAdminPanel() {
     ctaHref: "",
     promoCode: "",
     sortOrder: "100",
+    displayMode: "carousel",
   });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
@@ -84,6 +92,7 @@ export default function BannerAdminPanel() {
       form.set("ctaHref", draft.ctaHref);
       form.set("promoCode", draft.promoCode);
       form.set("sortOrder", draft.sortOrder);
+      form.set("displayMode", draft.displayMode);
 
       const response = await fetch("/api/admin/banners", {
         method: "POST",
@@ -100,6 +109,7 @@ export default function BannerAdminPanel() {
         ctaHref: "",
         promoCode: "",
         sortOrder: "100",
+        displayMode: "carousel",
       });
       setFile(null);
       await load();
@@ -128,6 +138,28 @@ export default function BannerAdminPanel() {
       setNotice(`Banner ${banner.title} ${banner.active ? "dinonaktifkan" : "diaktifkan"}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Banner gagal diperbarui.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function changeDisplayMode(banner: Banner, displayMode: string) {
+    setBusy("mode:" + banner.id);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/banners", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: banner.id, displayMode }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Display mode gagal diubah.");
+      }
+      await load();
+      setNotice(`Banner ${banner.title} kini tampil di: ${DISPLAY_MODE_LABEL[displayMode] ?? displayMode}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Display mode gagal diubah.");
     } finally {
       setBusy("");
     }
@@ -278,6 +310,21 @@ export default function BannerAdminPanel() {
               </label>
 
               <label className="acc-field">
+                <span>Tampil di</span>
+                <select
+                  value={draft.displayMode}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, displayMode: event.target.value }))
+                  }
+                >
+                  <option value="carousel">Carousel beranda</option>
+                  <option value="popup">Pop-up beranda</option>
+                  <option value="both">Carousel + Pop-up</option>
+                </select>
+                <small>Pop-up muncul sebagai modal sekali per 24 jam per pengunjung.</small>
+              </label>
+
+              <label className="acc-field">
                 <span>Urutan</span>
                 <input
                   inputMode="numeric"
@@ -307,7 +354,7 @@ export default function BannerAdminPanel() {
             <div className="acc-receipts-head">
               <span>Banner</span>
               <span>CTA</span>
-              <span>Urutan</span>
+              <span>Tampil di</span>
               <span>Status</span>
               <span>Aksi</span>
             </div>
@@ -318,7 +365,17 @@ export default function BannerAdminPanel() {
                   <span>{banner.subtitle ?? banner.imageUrl.slice(0, 64) + "…"}</span>
                 </div>
                 <span>{banner.promoCode ?? banner.ctaLabel ?? "-"}</span>
-                <strong>{banner.sortOrder}</strong>
+                <select
+                  value={banner.displayMode}
+                  disabled={!canManage || Boolean(busy)}
+                  onChange={(event) => void changeDisplayMode(banner, event.target.value)}
+                >
+                  {Object.entries(DISPLAY_MODE_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
                 <span className={"acc-status " + (banner.active ? "active" : "inactive")}>
                   {banner.active ? "active" : "inactive"}
                 </span>

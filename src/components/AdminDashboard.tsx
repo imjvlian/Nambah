@@ -2156,7 +2156,15 @@ export default function AdminDashboard() {
                         ? formatIDR(promo.value)
                         : promo.value + "%"}
                     </strong>
-                    <span>{promo.quota ?? "∞"}</span>
+                    <span>
+                      {promo.quota === null
+                        ? "∞"
+                        : `${promo.redeemed + promo.reserved}/${promo.quota}`}
+                      {promo.quota !== null &&
+                        promo.redeemed + promo.reserved >= promo.quota && (
+                          <b className="acc-status failed" style={{ marginLeft: 6 }}>habis</b>
+                        )}
+                    </span>
                     <span>{promo.redeemed} used · {promo.reserved} reserved</span>
                     <button
                       type="button"

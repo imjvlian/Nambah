@@ -25,6 +25,7 @@ type BannerRow = {
   cta_href: string | null;
   promo_code: string | null;
   sort_order: number;
+  display_mode: string;
   active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -32,7 +33,9 @@ type BannerRow = {
 };
 
 const SELECT =
-  "id,title,subtitle,image_url,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,active,starts_at,ends_at,created_at";
+  "id,title,subtitle,image_url,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,active,starts_at,ends_at,created_at";
+
+const DISPLAY_MODES = new Set(["carousel", "popup", "both"]);
 
 function mapBanner(row: BannerRow) {
   return {
@@ -44,6 +47,7 @@ function mapBanner(row: BannerRow) {
     ctaHref: row.cta_href,
     promoCode: row.promo_code,
     sortOrder: row.sort_order,
+    displayMode: row.display_mode ?? "carousel",
     active: row.active,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
@@ -132,6 +136,9 @@ export async function POST(request: Request) {
       cta_label: cleanText(form.get("ctaLabel"), 40) || null,
       cta_href: cleanText(form.get("ctaHref"), 300) || null,
       promo_code: cleanText(form.get("promoCode"), 40).toUpperCase() || null,
+      display_mode: DISPLAY_MODES.has(cleanText(form.get("displayMode"), 10))
+        ? cleanText(form.get("displayMode"), 10)
+        : "carousel",
       sort_order: Math.max(0, Math.round(Number(cleanText(form.get("sortOrder"), 6)) || 100)),
       active: cleanText(form.get("active"), 10) !== "false",
       starts_at: cleanIso(cleanText(form.get("startsAt"), 40)),
@@ -187,6 +194,17 @@ export async function PATCH(request: Request) {
     }
     if (body.sortOrder !== undefined) {
       updates.sort_order = Math.max(0, Math.round(Number(body.sortOrder) || 0));
+    }
+    if (body.displayMode !== undefined) {
+      const displayMode =
+        typeof body.displayMode === "string" ? body.displayMode.trim() : "";
+      if (!DISPLAY_MODES.has(displayMode)) {
+        return Response.json(
+          { error: "Display mode harus carousel, popup, atau both." },
+          { status: 400 },
+        );
+      }
+      updates.display_mode = displayMode;
     }
     if (body.active !== undefined) updates.active = Boolean(body.active);
     if (body.startsAt !== undefined) {

@@ -12,6 +12,7 @@ type BannerRow = {
   cta_href: string | null;
   promo_code: string | null;
   sort_order: number;
+  display_mode: string;
   starts_at: string | null;
   ends_at: string | null;
 };
@@ -21,7 +22,13 @@ type PromotionRow = {
   name: string;
   type: "flat" | "percentage";
   value: number | string;
+  quota: number | null;
   ends_at: string | null;
+};
+
+type RedemptionCountRow = {
+  promotion_code: string;
+  status: string;
 };
 
 export async function GET() {
@@ -31,21 +38,36 @@ export async function GET() {
 
   try {
     const now = new Date().toISOString();
-    const [banners, promotions] = await Promise.all([
+    const [banners, promotions, redemptions] = await Promise.all([
       supabaseSelect<BannerRow>("promo_banners", {
         select:
-          "id,title,subtitle,image_url,cta_label,cta_href,promo_code,sort_order,starts_at,ends_at",
+          "id,title,subtitle,image_url,cta_label,cta_href,promo_code,sort_order,display_mode,starts_at,ends_at",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
         limit: 10,
       }).catch(() => [] as BannerRow[]),
       supabaseSelect<PromotionRow>("promotions", {
-        select: "code,name,type,value,ends_at",
+        select: "code,name,type,value,quota,ends_at",
         filters: { active: "eq.true" },
         order: "created_at.desc",
         limit: 6,
       }).catch(() => [] as PromotionRow[]),
+      supabaseSelect<RedemptionCountRow>("promotion_redemptions", {
+        select: "promotion_code,status",
+        limit: 10000,
+      }).catch(() => [] as RedemptionCountRow[]),
     ]);
+
+    // Pemakaian per kode — promo yang kuotanya sudah habis tidak boleh lagi
+    // tampil di kartu generic, walau flag active-nya belum sempat ter-flip.
+    const usageByCode = new Map<string, number>();
+    for (const row of redemptions) {
+      if (row.status !== "reserved" && row.status !== "redeemed") continue;
+      usageByCode.set(
+        row.promotion_code,
+        (usageByCode.get(row.promotion_code) ?? 0) + 1,
+      );
+    }
 
     const inPeriod = banners.filter((banner) => {
       if (banner.starts_at && banner.starts_at > now) return false;
@@ -63,9 +85,15 @@ export async function GET() {
           ctaLabel: banner.cta_label,
           ctaHref: banner.cta_href,
           promoCode: banner.promo_code,
+          displayMode: banner.display_mode ?? "carousel",
         })),
         promotions: promotions
           .filter((promo) => !promo.ends_at || promo.ends_at > now)
+          .filter(
+            (promo) =>
+              promo.quota === null ||
+              (usageByCode.get(promo.code) ?? 0) < promo.quota,
+          )
           .map((promo) => ({
             code: promo.code,
             name: promo.name,
