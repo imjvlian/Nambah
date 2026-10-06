@@ -72,6 +72,27 @@ type CleanupResult = {
   };
 };
 
+type PurgeResult = {
+  mode: "preview" | "applied";
+  summary: {
+    candidates: number;
+    deletable: number;
+    skipped: number;
+    deleted: number;
+  };
+  deletable: Array<{
+    id: string;
+    gameId: string;
+    label: string;
+  }>;
+  skipped: Array<{
+    id: string;
+    gameId: string;
+    label: string;
+    reason: string;
+  }>;
+};
+
 export default function AdminCatalogTools() {
   const [visible, setVisible] = useState(false);
   const [catalog, setCatalog] = useState<CatalogSnapshot | null>(null);
@@ -83,6 +104,7 @@ export default function AdminCatalogTools() {
   const [notice, setNotice] = useState("");
   const [markupResult, setMarkupResult] = useState<MarkupResult | null>(null);
   const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null);
+  const [purgeResult, setPurgeResult] = useState<PurgeResult | null>(null);
 
   async function loadCatalog() {
     const response = await fetch("/api/admin/catalog", { cache: "no-store" });
@@ -224,6 +246,56 @@ export default function AdminCatalogTools() {
     }
   }
 
+  async function runPurge(dryRun: boolean) {
+    if (!dryRun) {
+      const deletableCount = purgeResult?.summary.deletable ?? 0;
+      const skippedCount = purgeResult?.summary.skipped ?? 0;
+      const confirmed = window.confirm(
+        `Hapus permanen ${deletableCount} produk tanpa mapping yang bersih? ` +
+          (skippedCount > 0
+            ? `${skippedCount} produk punya riwayat order dan TETAP disimpan (nonaktifkan saja). `
+            : "") +
+          "Aksi ini tidak bisa dibatalkan.",
+      );
+      if (!confirmed) return;
+    }
+
+    setBusy(dryRun ? "purge-preview" : "purge-apply");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/admin/catalog/unmapped", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data = (await response.json()) as PurgeResult & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Hapus produk unmapped gagal.");
+
+      setPurgeResult(data);
+      if (dryRun) {
+        setNotice(
+          `Preview hapus: ${data.summary.deletable} produk bersih bisa dihapus permanen` +
+            (data.summary.skipped > 0
+              ? `, ${data.summary.skipped} punya riwayat order dan hanya boleh dinonaktifkan.`
+              : "."),
+        );
+      } else {
+        await loadCatalog();
+        setNotice(
+          `Hapus permanen selesai. ${data.summary.deleted} produk dihapus` +
+            (data.summary.skipped > 0
+              ? `, ${data.summary.skipped} produk bersejarah tetap disimpan.`
+              : "."),
+        );
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Hapus produk unmapped gagal.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (!visible || !catalog) return null;
 
   return (
@@ -344,7 +416,7 @@ export default function AdminCatalogTools() {
           </div>
 
           <p className="admin-cleanup-copy">
-            Produk tanpa SKU supplier tidak langsung dihapus. Clean menyembunyikan produk orphan agar tidak masuk katalog user, lalu menonaktifkan game yang sudah tidak punya produk aktif mapped.
+            Clean menyembunyikan produk orphan agar tidak masuk katalog user, lalu menonaktifkan game yang sudah tidak punya produk aktif mapped. Hapus permanen hanya untuk produk tanpa riwayat order; yang bersejarah otomatis dilewati dan cukup dinonaktifkan.
           </p>
 
           {cleanupResult && (
@@ -366,12 +438,45 @@ export default function AdminCatalogTools() {
             </div>
           ) : null}
 
+          {purgeResult && (
+            <div className="admin-tool-preview cleanup-preview">
+              <div><small>Bisa dihapus</small><strong>{purgeResult.summary.deletable}</strong></div>
+              <div><small>Bersejarah</small><strong>{purgeResult.summary.skipped}</strong></div>
+              <div><small>Terhapus</small><strong>{purgeResult.summary.deleted}</strong></div>
+            </div>
+          )}
+
+          {purgeResult && purgeResult.skipped.length > 0 ? (
+            <div className="admin-cleanup-list">
+              {purgeResult.skipped.slice(0, 6).map((product) => (
+                <div key={product.id}>
+                  <span>{product.label}</span>
+                  <code>{product.id} · riwayat order</code>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <div className="admin-tool-actions cleanup-actions">
             <button type="button" onClick={() => void runCleanup(true)} disabled={Boolean(busy)}>
               {busy === "cleanup-preview" ? "Mengecek..." : "Preview clean"}
             </button>
             <button className="danger" type="button" onClick={() => void runCleanup(false)} disabled={Boolean(busy)}>
               {busy === "cleanup-apply" ? "Cleaning..." : "Clean unmapped"}
+            </button>
+          </div>
+
+          <div className="admin-tool-actions cleanup-actions">
+            <button type="button" onClick={() => void runPurge(true)} disabled={Boolean(busy)}>
+              {busy === "purge-preview" ? "Mengecek..." : "Preview hapus permanen"}
+            </button>
+            <button
+              className="danger"
+              type="button"
+              onClick={() => void runPurge(false)}
+              disabled={Boolean(busy) || !purgeResult || purgeResult.mode !== "preview" || purgeResult.summary.deletable === 0}
+            >
+              {busy === "purge-apply" ? "Menghapus..." : "Hapus permanen"}
             </button>
           </div>
         </article>
