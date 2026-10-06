@@ -38,3 +38,30 @@ export function compareNominalItems<T extends NominalSortable>(a: T, b: T) {
 export function sortNominalItems<T extends NominalSortable>(items: readonly T[]): T[] {
   return [...items].sort(compareNominalItems);
 }
+
+export type NominalSortableWithNote = NominalSortable & {
+  note?: string | null;
+};
+
+const PASS_LIKE_PATTERN =
+  /(weekly diamond pass|twilight pass|starlight|battle pass|booyah pass|elite pass|membership|member|welkin|lunite subscription|weekly card|monthly card|weekly pack|monthly pack|paket mingguan|paket bulanan|\bpass\b)/i;
+
+/** Pass, membership, dan paket langganan — tipe yang harus tampil di atas. */
+export function isPassLikeItem(label: string, note?: string | null) {
+  return PASS_LIKE_PATTERN.test(`${label} ${note ?? ""}`);
+}
+
+/**
+ * Komparator untuk daftar katalog (mis. admin): pass/langganan selalu di atas,
+ * sisanya mengikuti compareNominalItems (jumlah kecil di atas, lalu harga).
+ */
+export function compareCatalogItems<T extends NominalSortableWithNote>(a: T, b: T) {
+  const passA = isPassLikeItem(a.label, a.note);
+  const passB = isPassLikeItem(b.label, b.note);
+  if (passA !== passB) return passA ? -1 : 1;
+  return compareNominalItems(a, b);
+}
+
+export function sortCatalogItems<T extends NominalSortableWithNote>(items: readonly T[]): T[] {
+  return [...items].sort(compareCatalogItems);
+}

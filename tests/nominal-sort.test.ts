@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractNominalAmount,
+  isPassLikeItem,
+  sortCatalogItems,
   sortNominalItems,
 } from "../src/lib/nominal-sort.ts";
 
@@ -53,5 +55,36 @@ test("sortNominalItems: format ribuan Indonesia terbaca benar", () => {
   assert.deepEqual(
     sorted.map((item) => item.label),
     ["100 Lattices", "1.000 Lattices", "2.180 Lattices"],
+  );
+});
+
+test("isPassLikeItem: pass/membership/card terdeteksi dari label dan note", () => {
+  assert.equal(isPassLikeItem("Weekly Diamond Pass"), true);
+  assert.equal(isPassLikeItem("Weekly Membership"), true);
+  assert.equal(isPassLikeItem("Blessing of the Welkin Moon"), true);
+  assert.equal(isPassLikeItem("Twilight Pass"), true);
+  assert.equal(isPassLikeItem("86 Diamonds", "Hemat"), false);
+  assert.equal(isPassLikeItem("60 UC"), false);
+});
+
+test("sortCatalogItems: pass di atas, lalu jumlah kecil ke besar", () => {
+  const items = [
+    { label: "172 Diamonds", note: null, sellingPrice: 42000 },
+    { label: "5 Diamonds", note: null, sellingPrice: 2000 },
+    { label: "Weekly Diamond Pass", note: null, sellingPrice: 27000 },
+    { label: "86 Diamonds", note: "Populer", sellingPrice: 21500 },
+    { label: "Weekly Membership", note: null, sellingPrice: 29000 },
+  ];
+
+  const sorted = sortCatalogItems(items);
+  assert.deepEqual(
+    sorted.map((item) => item.label),
+    [
+      "Weekly Diamond Pass",
+      "Weekly Membership",
+      "5 Diamonds",
+      "86 Diamonds",
+      "172 Diamonds",
+    ],
   );
 });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { compareCatalogItems } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
 
 type AdminSection =
@@ -1112,7 +1113,7 @@ export default function AdminDashboard() {
     if (!catalog) return [];
     const keyword = query.trim().toLowerCase();
 
-    return catalog.products.filter((product) => {
+    const filtered = catalog.products.filter((product) => {
       if (gameFilter !== "all" && product.gameId !== gameFilter) return false;
       if (mappingFilter === "mapped" && !product.supplier.mapped) return false;
       if (mappingFilter === "unmapped" && product.supplier.mapped) return false;
@@ -1140,6 +1141,14 @@ export default function AdminDashboard() {
         .toLowerCase()
         .includes(keyword);
     });
+
+    // Urutan sama seperti halaman pembelian: per game, pass/langganan di atas,
+    // lalu jumlah kecil ke besar.
+    return filtered.sort((a, b) =>
+      a.gameId === b.gameId
+        ? compareCatalogItems(a, b)
+        : a.gameId.localeCompare(b.gameId),
+    );
   }, [catalog, query, gameFilter, mappingFilter, statusFilter, marginFilter, drafts]);
 
   const dirtyProductCount = useMemo(() => {
