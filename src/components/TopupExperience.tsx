@@ -701,7 +701,11 @@ export default function TopupExperience({
             <span className="preview-badge">Pembayaran aman</span>
           </div>
 
-          <div className="form-block account-form-block" id="account-data">
+          <div
+            className="form-block account-form-block"
+            id="account-data"
+            style={{ scrollMarginTop: "90px" }}
+          >
             {accountError && (
               <div className="account-validation-error" role="alert" aria-live="assertive">
                 <span className="account-validation-error-icon" aria-hidden="true">!</span>
@@ -910,10 +914,21 @@ export default function TopupExperience({
                           onClick={() => {
                             setSelectedPackageId(item.id);
                             resetPricingMessages();
-                            // Setelah memilih item, bawa user ke bagian promo &
-                            // referral secukupnya saja (nearest) supaya kode yang
-                            // mereka punya tidak lupa dipakai — tanpa menarik
-                            // halaman mentok ke atas.
+                            // Urutan diarahkan: data akun dulu, baru promo.
+                            // Belum valid -> scroll ke step 1 + tampilkan errornya;
+                            // sudah valid -> lanjut ke promo & referral.
+                            const account = validateGameAccountTarget(
+                              selectedGame,
+                              userId,
+                              serverId,
+                            );
+                            if (!account.ok) {
+                              setAccountError(account.error);
+                              document
+                                .getElementById("account-data")
+                                ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                              return;
+                            }
                             promoSectionRef.current?.scrollIntoView({
                               behavior: "smooth",
                               block: "nearest",
