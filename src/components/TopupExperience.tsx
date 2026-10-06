@@ -910,12 +910,13 @@ export default function TopupExperience({
                           onClick={() => {
                             setSelectedPackageId(item.id);
                             resetPricingMessages();
-                            // Setelah memilih item, bawa user langsung ke bagian
-                            // promo & referral supaya kode yang mereka punya
-                            // (mis. dari banner) tidak lupa dipakai.
+                            // Setelah memilih item, bawa user ke bagian promo &
+                            // referral secukupnya saja (nearest) supaya kode yang
+                            // mereka punya tidak lupa dipakai — tanpa menarik
+                            // halaman mentok ke atas.
                             promoSectionRef.current?.scrollIntoView({
                               behavior: "smooth",
-                              block: "start",
+                              block: "nearest",
                             });
                           }}
                         >
