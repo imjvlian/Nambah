@@ -2316,6 +2316,9 @@ export default function AdminDashboard() {
               </div>
 
               <div className="acc-action-panel">
+                <Link className="acc-inline-button" href="/admin/banners">
+                  Kelola banner beranda →
+                </Link>
                 <Link className="acc-inline-button" href="/admin/operations">
                   Open Operations Center →
                 </Link>

@@ -132,6 +132,12 @@ export default function PromoBannerCarousel() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  const current = index % slides.length;
+
+  function go(delta: number) {
+    setIndex((now) => (now + delta + slides!.length) % slides!.length);
+  }
+
   return (
     <section
       className="promo-carousel shell"
@@ -140,46 +146,70 @@ export default function PromoBannerCarousel() {
       onMouseLeave={() => (hoverRef.current = false)}
     >
       <div className="promo-carousel-frame">
-        {slide.kind === "banner" ? (
-          <article
-            className="promo-slide promo-slide-banner"
-            style={{ backgroundImage: `url(${slide.banner.imageUrl})` }}
-          >
-            <div className="promo-slide-overlay">
+        <div className="promo-slide-track" key={current}>
+          {slide.kind === "banner" ? (
+            <article
+              className="promo-slide promo-slide-banner"
+              style={{ backgroundImage: `url(${slide.banner.imageUrl})` }}
+            >
+              <div className="promo-slide-overlay">
+                <div className="promo-slide-copy">
+                  <strong>{slide.banner.title}</strong>
+                  {slide.banner.subtitle && <p>{slide.banner.subtitle}</p>}
+                </div>
+                <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
+                  {slide.banner.ctaLabel ??
+                    (slide.banner.promoCode ? `Pakai kode ${slide.banner.promoCode}` : "Top up sekarang")}
+                </button>
+              </div>
+            </article>
+          ) : slide.kind === "promo" ? (
+            <article className="promo-slide promo-slide-generic">
               <div className="promo-slide-copy">
-                <strong>{slide.banner.title}</strong>
-                {slide.banner.subtitle && <p>{slide.banner.subtitle}</p>}
+                <span className="promo-slide-eyebrow">Kode promo aktif</span>
+                <strong>{slide.promo.name}</strong>
+                <p>
+                  <span className="promo-value-pill">{promoValueLabel(slide.promo)}</span>
+                  kode <b>{slide.promo.code}</b>
+                </p>
               </div>
               <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
-                {slide.banner.ctaLabel ??
-                  (slide.banner.promoCode ? `Pakai kode ${slide.banner.promoCode}` : "Top up sekarang")}
+                {copied === slide.promo.code ? "Kode disalin ✓" : "Pakai kode"}
               </button>
-            </div>
-          </article>
-        ) : slide.kind === "promo" ? (
-          <article className="promo-slide promo-slide-generic">
-            <div className="promo-slide-copy">
-              <span className="promo-slide-eyebrow">Kode promo aktif</span>
-              <strong>{slide.promo.name}</strong>
-              <p>
-                {promoValueLabel(slide.promo)} · kode <b>{slide.promo.code}</b>
-              </p>
-            </div>
-            <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
-              {copied === slide.promo.code ? "Kode disalin ✓" : "Pakai kode"}
+            </article>
+          ) : (
+            <article className="promo-slide promo-slide-generic">
+              <div className="promo-slide-copy">
+                <span className="promo-slide-eyebrow">Nambah</span>
+                <strong>{slide.title}</strong>
+                <p>{slide.copy}</p>
+              </div>
+              <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
+                Top up sekarang
+              </button>
+            </article>
+          )}
+        </div>
+
+        {slides.length > 1 && (
+          <>
+            <button
+              type="button"
+              className="promo-carousel-arrow prev"
+              aria-label="Banner sebelumnya"
+              onClick={() => go(-1)}
+            >
+              ‹
             </button>
-          </article>
-        ) : (
-          <article className="promo-slide promo-slide-generic">
-            <div className="promo-slide-copy">
-              <span className="promo-slide-eyebrow">Nambah</span>
-              <strong>{slide.title}</strong>
-              <p>{slide.copy}</p>
-            </div>
-            <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
-              Top up sekarang
+            <button
+              type="button"
+              className="promo-carousel-arrow next"
+              aria-label="Banner berikutnya"
+              onClick={() => go(1)}
+            >
+              ›
             </button>
-          </article>
+          </>
         )}
       </div>
 
@@ -190,8 +220,8 @@ export default function PromoBannerCarousel() {
               key={dotIndex}
               type="button"
               role="tab"
-              aria-selected={dotIndex === index % slides.length}
-              className={dotIndex === index % slides.length ? "active" : ""}
+              aria-selected={dotIndex === current}
+              className={dotIndex === current ? "active" : ""}
               onClick={() => setIndex(dotIndex)}
             >
               <span className="sr-only">
