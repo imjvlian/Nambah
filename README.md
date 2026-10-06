@@ -39,16 +39,13 @@ Migration fitur terbaru:
 016 Live fulfillment targets
 017 Financial reconciliation
 018 Production hardening
-<<<<<<< HEAD
 019 Account check cache
-=======
 019 Staging Test Lab + operational indexes
 020 Points lots + expiry
 021 Points reverse/reservation consistency
 022 Operational incidents
 023 Admin principal audit
 024 Affiliate withdrawal workflow
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
 ```
 
 ## Dokumentasi

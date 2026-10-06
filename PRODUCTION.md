@@ -2,22 +2,11 @@
 
 Baseline target: **1.0.0**
 
-Versi aplikasi dan aktivasi uang asli adalah dua hal terpisah. Release 1.0.0 tetap aman selama production payment/live supplier gate belum diaktifkan.
+Versi aplikasi dan aktivasi uang asli adalah dua hal terpisah. Baseline resmi saat ini adalah **1.0.0**; commit history yang menyebut `1.0.12` dianggap label incremental tetapi `package.json`, `CHANGELOG.md`, dan dokumentasi tetap memakai `1.0.0` sampai ada release bump eksplisit. Release 1.0.0 tetap aman selama production payment/live supplier gate belum diaktifkan.
 
 ## 1. Sebelum deployment
 
-<<<<<<< HEAD
-1. `20260918_012_nambah_points.sql`
-2. `20260918_013_affiliate_commissions.sql`
-3. `20260918_014_promotion_management.sql`
-4. `20260918_015_customer_profiles.sql`
-5. `20260918_016_live_fulfillment_targets.sql`
-6. `20260918_017_financial_reconciliation.sql`
-7. `20260918_018_production_hardening.sql`
-8. `20260918_019_account_check_cache.sql`
-=======
 Jalankan:
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
 
 ~~~bash
 npm ci
@@ -48,6 +37,7 @@ Database Nambah yang sudah berjalan harus mempunyai migration/features sampai:
 016 Live fulfillment targets
 017 Financial reconciliation
 018 Production hardening
+019 Account check cache
 019 Staging Test Lab
 020 Points lots + expiry
 021 Points reverse/reservation consistency
@@ -211,52 +201,54 @@ Monitoring:
 /admin → System
 ~~~
 
-<<<<<<< HEAD
+Production launch tidak boleh diteruskan bila ada unexplained critical finance mismatch/operations incident.
+
 Cron endpoints membutuhkan `Authorization: Bearer <CRON_SECRET>`. Vercel mengirim
 header itu otomatis selama env `CRON_SECRET` terisi di project.
 
 ### Jadwal cron
 
-Jadwal ada di `vercel.json` (sebelum file itu dibuat, tidak ada scheduler sama
-sekali — seluruh reconciler hanya jalan kalau admin klik manual dari panel
-admin):
+Jadwal ada di `vercel.json`. Saat ini seluruh cron distandarkan harian pada
+`0 3 * * *` agar aman untuk batas plan Hobby:
 
 | Path | Jadwal | Tugas |
 | --- | --- | --- |
-| `/api/cron/reconcile` | `0 3 * * *` (Hobby: harian) | Sweep order kedaluwarsa, retry supplier & receipt, purge cache cek akun |
-| `/api/cron/financial-reconcile` | `17 * * * *` | Rekonsiliasi keuangan (liabilitas points, promo, komisi) |
-| `/api/cron/digiflazz-balance` | `43 * * * *` | Pemantauan saldo Digiflazz |
+| `/api/cron/reconcile` | `0 3 * * *` | Sweep order kedaluwarsa, retry supplier & receipt, purge cache cek akun |
+| `/api/cron/financial-reconcile` | `0 3 * * *` | Rekonsiliasi keuangan (liabilitas points, promo, komisi) |
+| `/api/cron/digiflazz-balance` | `0 3 * * *` | Pemantauan saldo Digiflazz |
 
 > **Penting — batas plan Vercel.** Plan **Hobby hanya mengizinkan cron satu
 > kali per hari**, dan deployment akan **ditolak** (`cron duration must be at
-> least daily`) kalau ada jadwal < 1 hari. Karena itu `reconcile` diturunkan
-> ke `0 3 * * *` (harian).
+> least daily`) kalau ada jadwal < 1 hari. Karena itu seluruh jadwal di
+> `vercel.json` saat ini memakai `0 3 * * *`.
 >
-> `financial-reconcile` (17 * * * *) dan `digiflazz-balance` (43 * * * *) adalah
-> jadwal per jam. Beberapa project Hobby **hanya mengizinkan total 1 cron job**.
-> Kalau deployment gagal dengan pesan "maximum number of cron jobs" atau serupa,
-> konsolidasi semua cron ke satu waktu harian saja (mis. `0 3 * * *`) sebelum
-> deploy ulang.
+> Kalau nanti plan naik atau deployment mengizinkan jadwal lebih rapat,
+> konsolidasi/naikkan frekuensi cron harus dilakukan dengan sengaja dan
+> diuji ulang.
 >
 > Dampak jadwal harian: reservasi points/promo dari order yang terlantar masih
 > dilepas oleh sweeper, tapi bisa terlambat sampai ~24 jam (`expires_at` +
-> grace 5 menit). Ini jauh lebih baik daripada membocorkannya permanen seperti
-> sebelum Phase 0, tapi tidak secepat jeda 10 menit.
+> grace 5 menit). Ini jauh lebih baik daripada membocorkannya permanen, tapi
+> tidak secepat jadwal yang lebih rapat.
 
 Untuk memastikan cron benar-benar berjalan (bukan hanya terdaftar), cek
 `GET /api/cron/reconcile` secara manual dengan `CRON_SECRET` lalu lihat field
 `expiry` pada respons. `expiry.checked > 0` berarti sweeper menemukan order
 kedaluwarsa; `expiry.cancelled` adalah jumlah order yang benar-benar dibatalkan
 dan reservasinya dilepas.
-=======
-Production launch tidak boleh diteruskan bila ada unexplained critical finance mismatch/operations incident.
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
 
 ## 11. Supabase Auth
 
 Sebelum normal production traffic:
 
-<<<<<<< HEAD
+- production Site URL benar;
+- Redirect URLs benar;
+- Leaked Password Protection aktif;
+- secret/service-role tidak ada di client;
+- admin account/role diverifikasi.
+
+Checklist go-live:
+
 - Midtrans Payment Notification URL sudah mengarah ke webhook Nambah.
 - Digiflazz callback URL dan webhook secret sudah benar.
 - Supabase Auth Site URL + Redirect URL sudah menggunakan domain production.
@@ -270,13 +262,6 @@ Sebelum normal production traffic:
 - Jalankan satu transaksi real bernilai kecil setelah approval owner.
 - Pastikan receipt, points, promo, affiliate commission, supplier SN, dan order status semuanya konsisten.
 - Baru setelah itu buka traffic production.
-=======
-- production Site URL benar;
-- Redirect URLs benar;
-- Leaked Password Protection aktif;
-- secret/service-role tidak ada di client;
-- admin account/role diverifikasi.
->>>>>>> e86c549f60baefea81c1d7fbfb61fcacf17acee3
 
 ## 12. Controlled first live transaction
 

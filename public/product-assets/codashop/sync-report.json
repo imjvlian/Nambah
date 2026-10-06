@@ -1,12 +1,12 @@
 {
-  "startedAt": "2026-09-01T18:42:46.998Z",
-  "finishedAt": "2026-09-01T18:42:55.985Z",
+  "startedAt": "2026-10-06T14:59:08.745Z",
+  "finishedAt": "2026-10-06T14:59:21.237Z",
   "stats": {
-    "discoveredProductPages": 70,
-    "productsWithAssets": 65,
-    "uniqueSourceUrls": 275,
-    "uniqueContentFiles": 241,
-    "totalReferencedBytes": 6757793
+    "discoveredProductPages": 61,
+    "productsWithAssets": 56,
+    "uniqueSourceUrls": 257,
+    "uniqueContentFiles": 222,
+    "totalReferencedBytes": 5436901
   },
   "homepageErrors": [],
   "productFailures": [
