@@ -16,7 +16,7 @@ export default async function Home() {
     <main className="home-v2 home-oura-refine">
       <header className="site-header shell home-v2-header home-market-header">
         <a className="brand" href="#top" aria-label="Nambah">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </a>
 

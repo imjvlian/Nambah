@@ -41,6 +41,13 @@ export const metadata: Metadata = {
     "Top up game dan voucher digital dengan proses simpel dan transparan.",
   applicationName: "Nambah",
   keywords: ["top up game", "voucher digital", "pulsa", "Nambah"],
+  icons: {
+    icon: [
+      { url: "/logo/nambah-logo.svg", type: "image/svg+xml", sizes: "any" },
+    ],
+    shortcut: "/logo/nambah-logo.svg",
+    apple: "/logo/nambah-logo.svg",
+  },
   openGraph: {
     type: "website",
     siteName: "Nambah",
@@ -48,12 +55,19 @@ export const metadata: Metadata = {
     description:
       "Top up game dan voucher digital dengan proses simpel dan transparan.",
     locale: "id_ID",
+    images: [
+      {
+        url: "/logo/nambah-logo.svg",
+        alt: "Logo Nambah",
+      },
+    ],
   },
   twitter: {
     card: "summary",
     title: "Nambah — Top Up Cepat, Main Lagi",
     description:
       "Top up game dan voucher digital dengan proses simpel dan transparan.",
+    images: ["/logo/nambah-logo.svg"],
   },
 };
 

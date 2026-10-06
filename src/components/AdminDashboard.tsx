@@ -1179,7 +1179,7 @@ export default function AdminDashboard() {
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
           <Link className="brand" href="/">
-            <span className="brand-mark">N+</span>
+            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
           </Link>
           <span className="admin-kicker">Admin account</span>
@@ -1205,7 +1205,7 @@ export default function AdminDashboard() {
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
           <Link className="brand" href="/">
-            <span className="brand-mark">N+</span>
+            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
           </Link>
           <span className="admin-kicker">Akses ditolak</span>
@@ -1233,7 +1233,7 @@ export default function AdminDashboard() {
     <main className="acc-page">
       <aside className="acc-sidebar">
         <Link className="acc-brand" href="/">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>
             <b>Nambah</b>
             <small>Control Center</small>

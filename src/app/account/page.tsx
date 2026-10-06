@@ -14,7 +14,7 @@ export default function AccountPage() {
     <main className="account-page">
       <header className="site-header shell account-header">
         <a className="brand" href="/">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi akun">

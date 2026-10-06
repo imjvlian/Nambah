@@ -22,7 +22,7 @@ export default async function LoginPage({
     <main className="auth-page">
       <header className="site-header shell auth-header">
         <a className="brand" href="/">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </a>
         <a className="text-link" href="/">Kembali ke beranda</a>

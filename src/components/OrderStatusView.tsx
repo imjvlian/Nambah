@@ -381,7 +381,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <main>
         <header className="site-header shell order-header">
           <Link className="brand" href="/">
-            <span className="brand-mark">N+</span>
+            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
           </Link>
           <div className="header-actions">
@@ -400,7 +400,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <main>
         <header className="site-header shell order-header">
           <Link className="brand" href="/">
-            <span className="brand-mark">N+</span>
+            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
           </Link>
           <div className="header-actions">
@@ -476,7 +476,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
       <header className="site-header shell order-header">
         <Link className="brand" href="/">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </Link>
         <div className="order-header-center">Status pesanan</div>

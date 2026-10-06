@@ -52,7 +52,7 @@ export default async function ProductPage({
     <main className="product-page">
       <header className="site-header shell product-site-header">
         <a className="brand" href="/" aria-label="Nambah">
-          <span className="brand-mark">N+</span>
+          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi produk">

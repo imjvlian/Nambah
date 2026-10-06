@@ -403,7 +403,7 @@ export default function DigiflazzCatalogBrowserV2() {
   return (
     <main className="supplier-browser-shell clean-catalog">
       <header className="supplier-browser-header">
-        <Link className="brand" href="/"><span className="brand-mark">N+</span><span>Nambah</span></Link>
+        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>Nambah</span></Link>
         <nav>
           <Link href="/admin">Produk Nambah</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>

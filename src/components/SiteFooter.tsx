@@ -4,7 +4,7 @@ export default function SiteFooter() {
       <div className="footer-grid">
         <div className="footer-brand">
           <a className="brand" href="/#top" aria-label="Nambah">
-            <span className="brand-mark">N+</span>
+            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
           </a>
           <p>Top up cepat. Lanjut main.</p>

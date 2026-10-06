@@ -100,16 +100,16 @@ button {
 }
 
 .brand-mark {
-  width: 34px;
   height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--lime);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: -0.05em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-mark img {
+  height: 100%;
+  width: auto;
+  display: block;
 }
 
 .desktop-nav {
