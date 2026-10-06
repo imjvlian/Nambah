@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Game, PaymentMethod } from "@/lib/catalog";
 import {
@@ -170,6 +170,7 @@ export default function TopupExperience({
   const [query, setQuery] = useState("");
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPackage.id);
+  const promoSectionRef = useRef<HTMLDivElement | null>(null);
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
@@ -909,6 +910,13 @@ export default function TopupExperience({
                           onClick={() => {
                             setSelectedPackageId(item.id);
                             resetPricingMessages();
+                            // Setelah memilih item, bawa user langsung ke bagian
+                            // promo & referral supaya kode yang mereka punya
+                            // (mis. dari banner) tidak lupa dipakai.
+                            promoSectionRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
                           }}
                         >
                           <span className="package-card-v3-title">{item.label}</span>
@@ -964,7 +972,11 @@ export default function TopupExperience({
             </div>
           </div>
 
-          <div className="form-block">
+          <div
+            className="form-block"
+            ref={promoSectionRef}
+            style={{ scrollMarginTop: "90px" }}
+          >
             <div className="form-label">
               <span className="step-number">3</span>
               <div><strong>Promo & referral</strong><small>Kode promo dan referral otomatis dihitung dan langsung berlaku saat pembayaran.</small></div>
