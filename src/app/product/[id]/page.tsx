@@ -1,4 +1,5 @@
 import AccountNav from "@/components/AccountNav";
+import SiteFooter from "@/components/SiteFooter";
 import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
 import { getPublicCatalog } from "@/lib/catalog-repository";
@@ -156,14 +157,7 @@ export default async function ProductPage({
         </div>
       </section>
 
-      <footer className="site-footer shell product-footer">
-        <a className="brand" href="/">
-          <span className="brand-mark">N+</span>
-          <span>Nambah</span>
-        </a>
-        <p>Top up cepat. Lanjut main.</p>
-        <span>© 2026 Nambah.</span>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

@@ -2,6 +2,7 @@ import AccountNav from "@/components/AccountNav";
 import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
 import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import PromoPopup from "@/components/PromoPopup";
+import SiteFooter from "@/components/SiteFooter";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
 
@@ -116,19 +117,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer className="site-footer shell home-market-footer">
-        <a className="brand" href="#top">
-          <span className="brand-mark">N+</span>
-          <span>Nambah</span>
-        </a>
-        <p>Top up cepat. Lanjut main.</p>
-        <nav className="site-footer-legal" aria-label="Dokumen legal">
-          <a href="/privacy">Privasi</a>
-          <a href="/terms">Ketentuan</a>
-          <a href="/refund">Refund</a>
-        </nav>
-        <span>© 2026 Nambah.</span>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

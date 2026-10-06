@@ -105,18 +105,3 @@
   color: var(--text);
 }
 
-/* ===== Footer legal links ===== */
-.site-footer-legal {
-  display: flex;
-  gap: 14px;
-}
-
-.site-footer-legal a {
-  font-size: 12px;
-  color: #b9beb5;
-  text-decoration: none;
-}
-
-.site-footer-legal a:hover {
-  color: var(--text);
-}
