@@ -585,7 +585,7 @@
     "free-fire": {
       "name": "Free Fire Top-up",
       "pageUrl": "https://www.codashop.com/id-id/free-fire",
-      "cover": "/product-assets/codashop/_assets/902336ed3c960bb72ec5.jpg",
+      "cover": "/product-assets/unipin/free-fire.jpg",
       "assets": [
         {
           "alt": "Free Fire",
@@ -838,7 +838,7 @@
     "genshin-impact": {
       "name": "Genshin Impact",
       "pageUrl": "https://www.codashop.com/id-id/genshin-impact",
-      "cover": "/product-assets/codashop/_assets/f4f7823bac1b4382c8a3.jpg",
+      "cover": "/product-assets/unipin/genshin-impact.png",
       "assets": [
         {
           "alt": "Genshin Impact",
@@ -1122,7 +1122,7 @@
     "honor-of-kings": {
       "name": "Honor of Kings",
       "pageUrl": "https://www.codashop.com/id-id/honor-of-kings",
-      "cover": "/product-assets/codashop/_assets/d248f5251ed418d22c58.jpg",
+      "cover": "/product-assets/unipin/honor-of-kings.png",
       "assets": [
         {
           "alt": "Honor of Kings",
@@ -1417,7 +1417,7 @@
     "magic-chess-go-go": {
       "name": "Magic Chess: Go Go",
       "pageUrl": "https://www.codashop.com/id-id/magic-chess-go-go",
-      "cover": "/product-assets/codashop/_assets/4f5d90adac527d52f265.png",
+      "cover": "/product-assets/unipin/magic-chess.jpeg",
       "assets": [
         {
           "alt": "Magic Chess: Go Go",
@@ -1598,7 +1598,7 @@
     "mobile-legends": {
       "name": "Mobile Legends: Bang Bang",
       "pageUrl": "https://www.codashop.com/id-id/mobile-legends",
-      "cover": "/product-assets/codashop/_assets/1f9605324323d9244b0f.jpg",
+      "cover": "/product-assets/unipin/mobile-legends.png",
       "assets": [
         {
           "alt": "Mobile Legends",
@@ -1887,7 +1887,7 @@
     "pubg-mobile-uc-redeem-code": {
       "name": "PUBG Mobile UC Redeem Code",
       "pageUrl": "https://www.codashop.com/id-id/pubg-mobile-uc-redeem-code",
-      "cover": "/product-assets/codashop/_assets/bff00955ac9cabd919ff.jpg",
+      "cover": "/product-assets/unipin/pubg-mobile.jpg",
       "assets": [
         {
           "alt": "PUBG Mobile UC Redeem Code",
@@ -1992,7 +1992,7 @@
     "steam-wallet-code-sea": {
       "name": "Steam Wallet Code - Indonesia",
       "pageUrl": "https://www.codashop.com/id-id/steam-wallet-code-sea",
-      "cover": "/product-assets/codashop/_assets/542eb71b0f3c7b54e422.jpg",
+      "cover": "/product-assets/unipin/steam-wallet.png",
       "assets": [
         {
           "alt": "Steam Wallet Code - SEA",
@@ -2273,7 +2273,7 @@
     "valorant": {
       "name": "VALORANT",
       "pageUrl": "https://www.codashop.com/id-id/valorant",
-      "cover": "/product-assets/codashop/_assets/f68b93e37013c4ceb846.jpg",
+      "cover": "/product-assets/unipin/valorant.png",
       "assets": [
         {
           "alt": "VALORANT",
@@ -2821,7 +2821,7 @@
     },
     "roblox": {
       "name": "Roblox",
-      "cover": "/product-assets/brands/roblox.svg",
+      "cover": "/product-assets/unipin/roblox.png",
       "assets": []
     },
     "shopee-pay": {
