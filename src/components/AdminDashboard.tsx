@@ -624,6 +624,29 @@ export default function AdminDashboard() {
     }
   }
 
+  async function deletePromotion(code: string) {
+    const confirmed = window.confirm(
+      `Hapus promo ${code}? Hanya bisa dilakukan bila promo belum pernah dipakai.`,
+    );
+    if (!confirmed) return;
+
+    setBusy("promotion-delete:" + code);
+    try {
+      const response = await fetch(
+        "/api/admin/promotions?code=" + encodeURIComponent(code),
+        { method: "DELETE" },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Promo gagal dihapus.");
+      await Promise.all([loadPromotions(), loadOverview()]);
+      setNotice(`Promo ${code} berhasil dihapus.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Promo gagal dihapus.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function inspectOrder(orderId: string) {
     setBusy("inspect:" + orderId);
     setNotice("");
@@ -2144,6 +2167,7 @@ export default function AdminDashboard() {
                   <span>Quota</span>
                   <span>Usage</span>
                   <span>Status</span>
+                  <span>Aksi</span>
                 </div>
                 {promotionData.promotions.map((promo) => (
                   <div className="acc-receipts-row" key={promo.code}>
@@ -2177,6 +2201,17 @@ export default function AdminDashboard() {
                       <span className="promo-status-dot" aria-hidden="true" />
                       {promo.active ? "Active" : "Inactive"}
                     </button>
+                    <div className="acc-action-panel">
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void deletePromotion(promo.code)}
+                      >
+                        {busy === "promotion-delete:" + promo.code
+                          ? "Menghapus..."
+                          : "Hapus"}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

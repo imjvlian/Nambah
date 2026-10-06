@@ -269,3 +269,68 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  const auth = authorizeAdminRequest(request);
+  if (!auth.ok) return auth.response;
+
+  try {
+    const url = new URL(request.url);
+    const code = normalizeCode(url.searchParams.get("code"));
+    if (!code) {
+      return Response.json({ error: "Kode promo tidak valid." }, { status: 400 });
+    }
+
+    // Kode promo direferensikan redemption ledger dan order. Menghapus promo
+    // bersejarah merusak jejak audit — tolak dan arahkan ke nonaktif.
+    const [redemptionRefs, orderRefs] = await Promise.all([
+      supabaseSelect<{ promotion_code: string }>("promotion_redemptions", {
+        select: "promotion_code",
+        filters: { promotion_code: `eq.${code}` },
+        limit: 1,
+      }),
+      supabaseSelect<{ id: string }>("orders", {
+        select: "id",
+        filters: { promotion_code: `eq.${code}` },
+        limit: 1,
+      }),
+    ]);
+
+    if (redemptionRefs.length > 0 || orderRefs.length > 0) {
+      return Response.json(
+        {
+          error:
+            `Promo ${code} sudah pernah dipakai dan tidak dapat dihapus. ` +
+            "Nonaktifkan saja supaya tidak bisa dipakai lagi.",
+        },
+        { status: 409 },
+      );
+    }
+
+    // Bersihkan targeting produk dulu (child rows), baru promo-nya.
+    await supabaseDelete("promotion_products", {
+      filters: { promotion_code: `eq.${code}` },
+    });
+    const deleted = await supabaseDelete<{ code: string }>("promotions", {
+      filters: { code: `eq.${code}` },
+    });
+
+    if (deleted.length === 0) {
+      return Response.json({ error: "Promo tidak ditemukan." }, { status: 404 });
+    }
+
+    await auditAdminAction(request, {
+      action: "promotion.delete",
+      targetType: "promotion",
+      targetId: code,
+    });
+
+    return Response.json({ deleted: code });
+  } catch (error) {
+    console.error("Admin promotions DELETE failed", error);
+    return Response.json(
+      { error: "Promo gagal dihapus." },
+      { status: 502 },
+    );
+  }
+}
