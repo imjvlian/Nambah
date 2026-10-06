@@ -88,6 +88,36 @@ export function formatIDR(amount: number) {
   }).format(amount);
 }
 
+export function roundUpToHundred(value: number) {
+  return Math.ceil(Math.max(0, value) / 100) * 100;
+}
+
+/**
+ * Harga saran dari modal supplier — rumus yang sama dengan endpoint
+ * /api/admin/catalog/markup: jual = max(Rp100, modal×(1+markup), modal+profit
+ * minimum), coret = jual×(1+markup coret), semuanya dibulatkan ke atas Rp100.
+ */
+export function suggestPriceFromCost({
+  cost,
+  sellingMarkupPercent = 5,
+  referenceMarkupPercent = 10,
+  minimumProfit = MINIMUM_NAMBAH_PROFIT,
+}: {
+  cost: number;
+  sellingMarkupPercent?: number;
+  referenceMarkupPercent?: number;
+  minimumProfit?: number;
+}): { sellingPrice: number; referencePrice: number } {
+  const percentagePrice = roundUpToHundred(cost * (1 + sellingMarkupPercent / 100));
+  const minimumSafePrice = roundUpToHundred(cost + minimumProfit);
+  const sellingPrice = Math.max(100, percentagePrice, minimumSafePrice);
+  const referencePrice = Math.max(
+    sellingPrice,
+    roundUpToHundred(sellingPrice * (1 + referenceMarkupPercent / 100)),
+  );
+  return { sellingPrice, referencePrice };
+}
+
 export function getReferenceDiscountPercent(referencePrice: number, sellingPrice: number) {
   if (referencePrice <= sellingPrice || referencePrice <= 0) return 0;
   return Math.round(((referencePrice - sellingPrice) / referencePrice) * 100);

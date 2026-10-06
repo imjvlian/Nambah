@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatIDR } from "@/lib/pricing";
-import { compareCatalogItems } from "@/lib/nominal-sort";
+import { formatIDR, suggestPriceFromCost } from "@/lib/pricing";
+import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
 
 type AdminSection =
@@ -477,6 +477,9 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [marginFilter, setMarginFilter] = useState("all");
   const [bulkPercent, setBulkPercent] = useState("5");
+  const [suggestPercent, setSuggestPercent] = useState("5");
+  const [suggestRefPercent, setSuggestRefPercent] = useState("10");
+  const [compareOpenId, setCompareOpenId] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -1159,6 +1162,59 @@ export default function AdminDashboard() {
     }).length;
   }, [catalog, drafts]);
 
+  // Kelompok varian nominal: produk dengan jumlah mata uang yang sama di game
+  // yang sama (mis. tiga SKU "86 Diamond" dari channel supplier berbeda).
+  // Dipakai fitur bandingkan agar admin bisa menyelaraskan harga antar varian.
+  const duplicateVariantGroups = useMemo(() => {
+    const groups = new Map<string, CatalogProduct[]>();
+    if (!catalog) return groups;
+    for (const product of catalog.products) {
+      const amount = extractNominalAmount(product.label);
+      if (amount === null) continue;
+      const key = `${product.gameId}::${amount}`;
+      const list = groups.get(key) ?? [];
+      list.push(product);
+      groups.set(key, list);
+    }
+    for (const [key, list] of groups) {
+      if (list.length < 2) groups.delete(key);
+    }
+    return groups;
+  }, [catalog]);
+
+  function variantKeyOf(product: CatalogProduct) {
+    const amount = extractNominalAmount(product.label);
+    return amount === null ? null : `${product.gameId}::${amount}`;
+  }
+
+  function suggestionFor(product: CatalogProduct) {
+    const cost = product.supplier.cost;
+    if (cost === null) return null;
+    const selling = Number(suggestPercent);
+    const reference = Number(suggestRefPercent);
+    return suggestPriceFromCost({
+      cost,
+      sellingMarkupPercent: Number.isFinite(selling) ? selling : 5,
+      referenceMarkupPercent: Number.isFinite(reference) ? reference : 10,
+    });
+  }
+
+  function applySuggestion(product: CatalogProduct) {
+    const suggestion = suggestionFor(product);
+    if (!suggestion) return;
+    updateDraft(product.id, {
+      sellingPrice: String(suggestion.sellingPrice),
+      referencePrice: String(suggestion.referencePrice),
+    });
+  }
+
+  function applyVariantPrice(product: CatalogProduct, variant: CatalogProduct) {
+    updateDraft(product.id, {
+      sellingPrice: String(variant.sellingPrice),
+      referencePrice: String(variant.referencePrice),
+    });
+  }
+
   function applyBulkPercent() {
     const percent = Number(bulkPercent);
     if (!Number.isFinite(percent) || percent === 0 || Math.abs(percent) > 90) {
@@ -1824,6 +1880,29 @@ export default function AdminDashboard() {
                   >
                     Terapkan ke {filteredProducts.length} terfilter
                   </button>
+                </div>
+                <div className="acc-bulk-adjust" title="Parameter harga saran dari modal supplier">
+                  <span>Saran</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="500"
+                    step="0.5"
+                    value={suggestPercent}
+                    onChange={(event) => setSuggestPercent(event.target.value)}
+                    aria-label="Mark-up jual saran persen"
+                  />
+                  <span>%</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="500"
+                    step="0.5"
+                    value={suggestRefPercent}
+                    onChange={(event) => setSuggestRefPercent(event.target.value)}
+                    aria-label="Mark-up coret saran persen"
+                  />
+                  <span>%</span>
                 </div>
                 <span className="acc-filter-count">
                   {filteredProducts.length} dari {catalog.products.length} produk
