@@ -39,7 +39,13 @@ export type PublicOrder = {
     snapToken: string | null;
     redirectUrl: string | null;
     paidAt: string | null;
+    providerTransactionId?: string | null;
   };
+  /** Sesi DOKU (mis. konten QRIS) untuk dirender inline di halaman order. */
+  doku?: {
+    qrContent?: string;
+    expiresAt?: string | null;
+  } | null;
   pricing: {
     sellingPrice: number;
     promotionDiscount: number;

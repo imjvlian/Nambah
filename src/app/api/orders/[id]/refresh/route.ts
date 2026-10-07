@@ -1,5 +1,6 @@
 import { fetchGatewayStatus, normalizeProviderId } from "@/lib/payments";
 import {
+  applyDokuStatus,
   applyMidtransStatus,
   getPublicOrder,
   isOrderOwnedByUser,
@@ -54,17 +55,29 @@ export async function POST(
     // Status diambil dari gateway PEMBUAT order, bukan gateway aktif saat ini —
     // switch di dashboard tidak mengganggu order yang sedang berjalan.
     const provider = normalizeProviderId(existing.payment.provider);
-    const result = await fetchGatewayStatus(provider, orderId);
+    const result = await fetchGatewayStatus(provider, orderId, {
+      referenceNo: existing.payment.providerTransactionId ?? null,
+    });
 
     if (result.provider === "midtrans") {
       const order = await applyMidtransStatus(result.raw, "status_api", false);
       return Response.json({ order }, { headers });
     }
 
-    return Response.json(
-      { error: "Status gateway ini belum didukung." },
-      { status: 501, headers },
+    const order = await applyDokuStatus(
+      {
+        orderId: result.doku.orderId,
+        referenceNo: result.doku.referenceNo,
+        transactionStatus: result.doku.transactionStatus,
+        transactionStatusDesc: result.doku.transactionStatusDesc,
+        paidTime: result.doku.paidTime,
+        amountValue: result.doku.amountValue,
+        raw: result.doku.raw,
+      },
+      "status_api",
+      false,
     );
+    return Response.json({ order }, { headers });
   } catch (error) {
     console.error("Payment status refresh failed", error);
     return Response.json(

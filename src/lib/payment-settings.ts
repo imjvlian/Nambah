@@ -55,8 +55,14 @@ export async function setActivePaymentProvider(provider: PaymentProviderId) {
 }
 
 export function isDokuConfigured() {
+  // SNAP butuh 5 kredensial: client id, secret (HMAC), private key RSA
+  // (token B2B), merchant id, dan terminal id (QRIS).
   return Boolean(
-    process.env.DOKU_CLIENT_ID?.trim() && process.env.DOKU_SECRET_KEY?.trim(),
+    process.env.DOKU_CLIENT_ID?.trim() &&
+      process.env.DOKU_SECRET_KEY?.trim() &&
+      process.env.DOKU_PRIVATE_KEY?.trim() &&
+      process.env.DOKU_MERCHANT_ID?.trim() &&
+      process.env.DOKU_TERMINAL_ID?.trim(),
   );
 }
 
@@ -91,8 +97,8 @@ export function getPaymentProviderStatuses(): PaymentProviderStatus[] {
       configured: isDokuConfigured(),
       environment: isDokuConfigured() ? getDokuEnvironment() : null,
       note: isDokuConfigured()
-        ? "Jokul direct API siap"
-        : "DOKU_CLIENT_ID / DOKU_SECRET_KEY belum diisi",
+        ? "Jokul SNAP direct API siap (QRIS native)"
+        : "DOKU_CLIENT_ID / SECRET_KEY / PRIVATE_KEY / MERCHANT_ID / TERMINAL_ID belum lengkap",
     },
   ];
 }

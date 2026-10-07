@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import AccountNav from "@/components/AccountNav";
+import DokuQrisPanel, { DOKU_QRIS_PANEL_ID } from "@/components/DokuQrisPanel";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -310,6 +311,11 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   }
 
   function focusPayment() {
+    const dokuContainer = document.getElementById(DOKU_QRIS_PANEL_ID);
+    if (dokuContainer) {
+      dokuContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const paymentContainer = document.getElementById(SNAP_EMBED_ID);
     if (paymentContainer) {
       paymentContainer.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -461,10 +467,12 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const paymentType = order?.payment.paymentType ?? null;
   const paymentChannel = paymentTypeLabel(paymentType);
   const redirectUrl = order?.payment.redirectUrl ?? null;
+  const isDoku = order?.payment.provider === "doku";
+  const dokuQrContent = isDoku ? order?.doku?.qrContent ?? null : null;
 
   return (
     <main>
-      {midtransClientKey && order && (
+      {midtransClientKey && order && !isDoku && (
         <Script
           id={"midtrans-snap-" + midtransEnvironment}
           src={midtransSnapUrl}
@@ -597,6 +605,33 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <button type="button" onClick={() => router.push("/#topup")}>
                   Buat pesanan baru
                 </button>
+              </div>
+            ) : liveStatus === "pending_payment" && isDoku ? (
+              <div className="midtrans-native-section">
+                <div className="midtrans-native-head">
+                  <div>
+                    <small>Pembayaran via DOKU</small>
+                    <strong>{payment.name}</strong>
+                    <p>{payment.detail}</p>
+                  </div>
+                  <span>Diverifikasi Nambah</span>
+                </div>
+
+                {dokuQrContent ? (
+                  <DokuQrisPanel
+                    qrContent={dokuQrContent}
+                    amount={order.pricing.finalPrice}
+                    expiresAt={order.doku?.expiresAt ?? order.expiresAt ?? null}
+                  />
+                ) : (
+                  <div className="midtrans-native-warning">
+                    QR pembayaran belum tersedia. Tekan &quot;Cek status&quot; atau muat ulang halaman.
+                  </div>
+                )}
+
+                <div className="midtrans-native-footer">
+                  <span>Pembayaran terverifikasi otomatis — setelah bayar, status berubah tanpa perlu bukti.</span>
+                </div>
               </div>
             ) : liveStatus === "pending_payment" ? (
               <div className="midtrans-native-section">

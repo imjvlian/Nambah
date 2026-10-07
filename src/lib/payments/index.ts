@@ -5,16 +5,25 @@ import {
 } from "@/lib/payment-settings";
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import { createMidtransPaymentSession, fetchMidtransStatus } from "./midtrans";
+import {
+  createDokuQrisPayment,
+  fetchDokuQrisStatus,
+  type DokuStatusResult,
+} from "./doku";
 import type { CreatePaymentInput, PaymentSession } from "./types";
 
 export function normalizeProviderId(value: unknown): PaymentProviderId {
   return isPaymentProviderId(value) ? value : "midtrans";
 }
 
+function isQrisMethod(input: CreatePaymentInput) {
+  const method = input.paymentMethodId.toLowerCase();
+  return method.includes("qris") || input.enabledPayments.some((p) => p.toLowerCase().includes("qris"));
+}
+
 /**
  * Membuat sesi pembayaran untuk ORDER BARU memakai gateway aktif dari
- * app_settings. Integrasi DOKU menyusul (tahap 3) — selama env DOKU belum
- * terisi, switch terkunci di dashboard sehingga cabang ini tidak tercapai.
+ * app_settings. DOKU tahap 3: QRIS native; channel lain menyusul.
  */
 export async function createPaymentSession(
   input: CreatePaymentInput,
@@ -22,11 +31,20 @@ export async function createPaymentSession(
   const provider = await getActivePaymentProvider();
 
   if (provider === "doku") {
-    throw new Error("Gateway DOKU belum tersedia. Alihkan kembali ke Midtrans.");
+    if (!isQrisMethod(input)) {
+      throw new Error(
+        "Gateway DOKU saat ini baru mendukung QRIS. Pilih QRIS, atau alihkan gateway ke Midtrans untuk metode lain.",
+      );
+    }
+    return createDokuQrisPayment(input);
   }
 
   return createMidtransPaymentSession(input);
 }
+
+export type GatewayStatusResult =
+  | { provider: "midtrans"; raw: MidtransStatusPayload }
+  | { provider: "doku"; doku: DokuStatusResult };
 
 /**
  * Mengambil status transaksi dari gateway PEMBUAT order — bukan gateway
@@ -35,9 +53,14 @@ export async function createPaymentSession(
 export async function fetchGatewayStatus(
   provider: PaymentProviderId,
   orderId: string,
-): Promise<{ provider: PaymentProviderId; raw: MidtransStatusPayload }> {
+  options?: { referenceNo?: string | null },
+): Promise<GatewayStatusResult> {
   if (provider === "doku") {
-    throw new Error("Status DOKU belum tersedia (integrasi tahap 3).");
+    const doku = await fetchDokuQrisStatus({
+      orderId,
+      referenceNo: options?.referenceNo ?? null,
+    });
+    return { provider: "doku", doku };
   }
 
   return { provider: "midtrans", raw: await fetchMidtransStatus(orderId) };

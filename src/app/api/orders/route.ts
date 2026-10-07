@@ -421,6 +421,31 @@ export async function POST(request: Request) {
       { filters: { order_id: `eq.${orderId}` } },
     );
 
+    // Sesi DOKU: simpan referenceNo + payload QR agar bisa dirender inline dan
+    // di-query statusnya. payment_payload butuh migrasi 026 — kegagalannya
+    // tidak boleh menggagalkan order (QR tetap dikirim di response create).
+    if (session.provider === "doku") {
+      const raw = session.payload.raw as { referenceNo?: string } | undefined;
+      try {
+        await supabaseUpdate(
+          "payments",
+          {
+            provider_transaction_id: raw?.referenceNo ?? null,
+            payment_type: "qris",
+            payment_payload: {
+              qrContent: session.payload.qrContent ?? null,
+              expiresAt: session.payload.expiresAt ?? null,
+              referenceNo: raw?.referenceNo ?? null,
+            },
+            updated_at: new Date().toISOString(),
+          },
+          { filters: { order_id: `eq.${orderId}` } },
+        );
+      } catch (error) {
+        console.error(`DOKU session payload persist failed for order ${orderId}`, error);
+      }
+    }
+
     const order = await getPublicOrder(orderId);
     if (!order) throw new Error("Order tidak ditemukan setelah dibuat.");
 

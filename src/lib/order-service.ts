@@ -69,6 +69,15 @@ type PaymentRow = {
   snap_token: string | null;
   redirect_url: string | null;
   paid_at: string | null;
+  provider_transaction_id: string | null;
+};
+
+type PaymentPayloadRow = {
+  order_id: string;
+  payment_payload: {
+    qrContent?: string;
+    expiresAt?: string | null;
+  } | null;
 };
 
 type SupplierTransactionPublicRow = {
@@ -107,7 +116,7 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     }),
     supabaseSelect<PaymentRow>("payments", {
       select:
-        "order_id,provider,status,raw_status,payment_type,snap_token,redirect_url,paid_at",
+        "order_id,provider,status,raw_status,payment_type,snap_token,redirect_url,paid_at,provider_transaction_id",
       // Tanpa filter provider: baris terbaru per order adalah sesi gateway
       // yang aktif untuk order itu (Midtrans hari ini, DOKU menyusul).
       filters: { order_id: `eq.${order.id}` },
@@ -130,6 +139,24 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
 
   if (!game || !product || !paymentMethod) {
     throw new Error(`Order ${order.id} memiliki referensi katalog yang tidak lengkap.`);
+  }
+
+  // Sesi DOKU (konten QRIS dll) disimpan di payments.payment_payload — kolom
+  // dari migrasi 026. Diambil terpisah + try/catch supaya order view tidak
+  // rusak saat migrasi belum dijalankan.
+  let dokuSession: PaymentPayloadRow["payment_payload"] = null;
+  if (payment?.provider === "doku") {
+    try {
+      const payloadRows = await supabaseSelect<PaymentPayloadRow>("payments", {
+        select: "order_id,payment_payload",
+        filters: { order_id: `eq.${order.id}`, provider: "eq.doku" },
+        order: "created_at.desc",
+        limit: 1,
+      });
+      dokuSession = payloadRows[0]?.payment_payload ?? null;
+    } catch {
+      dokuSession = null;
+    }
   }
 
   return {
@@ -171,7 +198,11 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       snapToken: payment?.snap_token ?? null,
       redirectUrl: payment?.redirect_url ?? null,
       paidAt: payment?.paid_at ?? null,
+      providerTransactionId: payment?.provider_transaction_id ?? null,
     },
+    ...(payment?.provider === "doku" && dokuSession?.qrContent
+      ? { doku: { qrContent: dokuSession.qrContent, expiresAt: dokuSession.expiresAt ?? null } }
+      : {}),
     pricing: {
       sellingPrice: Number(order.selling_price),
       promotionDiscount: Number(order.promotion_discount),
@@ -327,6 +358,164 @@ export async function applyMidtransStatus(
   // well as fulfillment. This covers orders that were already success before
   // Brevo was enabled and explicit provider failures from an earlier attempt.
   // deliverSuccessReceipt is idempotent after a successful send.
+  if (publicOrder.status === "success") {
+    try {
+      const receipt = await deliverSuccessReceipt(orderId);
+      if (
+        receipt.status !== "sent" &&
+        receipt.status !== "disabled" &&
+        receipt.status !== "sending"
+      ) {
+        console.warn(`Receipt for order ${orderId}: ${receipt.status}`);
+      }
+    } catch (error) {
+      console.error(`Receipt retry failed for order ${orderId}`, error);
+    }
+  }
+
+  return publicOrder;
+}
+
+// ---------------------------------------------------------------------------
+// DOKU
+// ---------------------------------------------------------------------------
+
+export type DokuApplyInput = {
+  orderId: string;
+  referenceNo: string | null;
+  /** Status ternormalisasi gaya Midtrans (dari mapDokuTransactionStatus). */
+  transactionStatus: string;
+  transactionStatusDesc?: string | null;
+  paidTime?: string | null;
+  /** Nominal string DOKU ("10000.00") untuk validasi jumlah. */
+  amountValue?: string | null;
+  /** Payload mentah notifikasi/query terakhir — disimpan di payment_payload. */
+  raw?: unknown;
+};
+
+export async function applyDokuStatus(
+  input: DokuApplyInput,
+  source: MidtransSource,
+  signatureVerified: boolean,
+) {
+  const orderId = input.orderId.trim();
+  if (!orderId) throw new Error("DOKU payload tidak memiliki order id.");
+
+  const [order] = await supabaseSelect<OrderRow>("orders", {
+    select:
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
+    filters: { id: `eq.${orderId}` },
+    limit: 1,
+  });
+  if (!order) throw new Error(`Order ${orderId} tidak ditemukan.`);
+
+  // Validasi jumlah sama ketatnya dengan jalur Midtrans.
+  if (input.amountValue) {
+    const amount = Number(input.amountValue);
+    if (!Number.isFinite(amount) || Math.round(amount) !== Number(order.final_price)) {
+      throw new Error(`Jumlah DOKU tidak cocok untuk order ${orderId}.`);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const paymentStatus = normalizePaymentStatus(input.transactionStatus);
+  const orderStatus = nextOrderStatusFromPayment(order.status, {
+    transactionStatus: input.transactionStatus,
+    fraudStatus: null,
+  });
+  const paid =
+    orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+
+  const paymentUpdatePayload: Record<string, unknown> = {
+    ...(input.referenceNo ? { provider_transaction_id: input.referenceNo } : {}),
+    status: paymentStatus,
+    raw_status: input.transactionStatus,
+    payment_type: "qris",
+    fraud_status: null,
+    ...(signatureVerified ? { signature_verified_at: now } : {}),
+    ...(paid ? { paid_at: input.paidTime ?? now } : {}),
+    updated_at: now,
+  };
+
+  // Simpan payload mentah terakhir untuk audit (digabung dengan sesi QR yang
+  // sudah ada — qrContent tidak boleh tertimpa).
+  if (input.raw !== undefined) {
+    try {
+      const existing = await supabaseSelect<{ payment_payload: Record<string, unknown> | null }>(
+        "payments",
+        {
+          select: "payment_payload",
+          filters: { order_id: `eq.${orderId}`, provider: "eq.doku" },
+          order: "created_at.desc",
+          limit: 1,
+        },
+      );
+      const previous = existing[0]?.payment_payload ?? {};
+      paymentUpdatePayload.payment_payload = {
+        ...previous,
+        lastStatus: input.raw,
+        lastStatusSource: source,
+        lastStatusAt: now,
+      };
+    } catch (error) {
+      // Kolom payment_payload belum ada (migrasi 026 belum jalan) — status
+      // tetap diterapkan, audit mentah menyusul setelah migrasi.
+      console.error(`payment_payload update skipped for order ${orderId}`, error);
+    }
+  }
+
+  const paymentUpdate = await supabaseUpdate<PaymentRow>(
+    "payments",
+    paymentUpdatePayload,
+    { filters: { order_id: `eq.${orderId}`, provider: "eq.doku" } },
+  );
+  if (paymentUpdate.length === 0) {
+    throw new Error(`Payment DOKU untuk order ${orderId} tidak ditemukan.`);
+  }
+
+  if (orderStatus !== order.status) {
+    const orderUpdatePayload: Record<string, unknown> = {
+      status: orderStatus,
+      updated_at: now,
+      status_changed_at: now,
+    };
+    if (orderStatus === "paid") {
+      orderUpdatePayload.paid_at = input.paidTime ?? now;
+    }
+    if (isTerminalStatus(orderStatus)) {
+      orderUpdatePayload.terminal_at = now;
+    }
+    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
+  }
+
+  try {
+    await syncOrderPointsLifecycle(orderId, orderStatus);
+  } catch (error) {
+    console.error(`Nambah Points lifecycle sync failed for order ${orderId}`, error);
+  }
+  try {
+    await syncOrderCommissionLifecycle(orderId, orderStatus);
+  } catch (error) {
+    console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
+  }
+  try {
+    await syncPromotionLifecycle(orderId, orderStatus);
+  } catch (error) {
+    console.error(`Promotion lifecycle sync failed for order ${orderId}`, error);
+  }
+
+  // Fulfillment decoupled — sama seperti jalur Midtrans.
+  if (orderStatus === "paid" || orderStatus === "processing") {
+    try {
+      await fulfillPaidOrder(orderId);
+    } catch (error) {
+      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
+    }
+  }
+
+  const publicOrder = await getPublicOrder(orderId);
+  if (!publicOrder) throw new Error(`Order ${orderId} hilang setelah update.`);
+
   if (publicOrder.status === "success") {
     try {
       const receipt = await deliverSuccessReceipt(orderId);
