@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     paymentMethod,
     promotion,
     referral,
+    promoEndsAt,
     minimumNambahProfit,
   } = result.context;
 
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
       },
       pricing: toPublicPricing(pricing),
       points: pointsSummary,
+      promoEndsAt,
     },
     { headers },
   );

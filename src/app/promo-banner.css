@@ -399,3 +399,100 @@
     animation: none;
   }
 }
+
+/* Flash sale strip (beranda) */
+.flash-sale-strip {
+  margin-top: 14px;
+}
+
+.flash-sale-strip-track {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.flash-sale-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-width: 300px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 255, 63, 0.28);
+  background:
+    radial-gradient(120% 160% at 8% 0%, rgba(201, 255, 63, 0.1), transparent 55%),
+    var(--surface);
+}
+
+.flash-sale-flag {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--lime, #c9ff3f);
+  color: #11130f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flash-sale-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flash-sale-info strong {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flash-sale-info span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.flash-sale-info b {
+  color: var(--lime, #c9ff3f);
+  letter-spacing: 0.04em;
+}
+
+.flash-sale-countdown {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--lime, #c9ff3f);
+}
+
+.flash-sale-use {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 255, 63, 0.45);
+  background: rgba(201, 255, 63, 0.12);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.flash-sale-use:hover {
+  background: rgba(201, 255, 63, 0.22);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flash-sale-chip {
+    transition: transform 160ms ease;
+  }
+  .flash-sale-chip:hover {
+    transform: translateY(-1px);
+  }
+}

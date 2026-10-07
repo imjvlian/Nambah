@@ -1,5 +1,6 @@
 import AccountNav from "@/components/AccountNav";
 import CategorizedTopupExperience from "@/components/CategorizedTopupExperience";
+import FlashSaleStrip from "@/components/FlashSaleStrip";
 import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import PromoPopup from "@/components/PromoPopup";
 import SiteFooter from "@/components/SiteFooter";
@@ -35,6 +36,7 @@ export default async function Home() {
         <PromoBannerCarousel />
       </section>
       <PromoPopup />
+      <FlashSaleStrip />
 
       <section className="shell home-trust-strip" aria-label="Keunggulan layanan">
         <article>

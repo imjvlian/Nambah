@@ -95,6 +95,23 @@ const NOMINAL_SECTIONS: Array<{
   },
 ];
 
+function promoCountdownLabel(endsAt: string, now: number) {
+  const remaining = new Date(endsAt).getTime() - now;
+  if (remaining <= 0) return null;
+  const totalSeconds = Math.floor(remaining / 1000);
+  if (totalSeconds >= 24 * 3600) {
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    return `${days}h ${hours}j`;
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((part) => String(part).padStart(2, "0"))
+    .join(":");
+}
+
 function groupsOf(item: Game["packages"][number]) {
   return ((item as GroupedPackage).groups ?? []) as ProductGroup[];
 }
@@ -179,6 +196,8 @@ export default function TopupExperience({
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
+  const [promoEndsAt, setPromoEndsAt] = useState<string | null>(null);
+  const [promoCountdownNow, setPromoCountdownNow] = useState(() => Date.now());
   const [referralInput, setReferralInput] = useState("");
   const [appliedReferralCode, setAppliedReferralCode] = useState("");
   const [referralMessage, setReferralMessage] = useState("");
@@ -335,17 +354,20 @@ export default function TopupExperience({
           error?: string;
           pricing?: PublicPricingResult;
           points?: PointsSummary | null;
+          promoEndsAt?: string | null;
         };
 
         if (!mounted) return;
         if (!response.ok || !data.pricing) {
           setPricingError(data.error ?? "Harga gagal dihitung.");
+          setPromoEndsAt(null);
           if (appliedPromoCode) setPromoMessage("");
           if (appliedReferralCode) setReferralMessage("");
           return;
         }
 
         setServerPricing(data.pricing);
+        setPromoEndsAt(data.promoEndsAt ?? null);
         if (data.points) setPointsSummary(data.points);
         if (appliedPromoCode && data.pricing.promoCode === appliedPromoCode) {
           setPromoMessage(`${appliedPromoCode} aktif. Harga sudah dihitung ulang.`);
@@ -374,6 +396,13 @@ export default function TopupExperience({
     appliedReferralCode,
     pointsToRedeem,
   ]);
+
+  // Ticker countdown promo — hanya berdetak selama promo berbatas waktu aktif.
+  useEffect(() => {
+    if (!promoEndsAt) return;
+    const timer = setInterval(() => setPromoCountdownNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [promoEndsAt]);
 
   useEffect(() => {
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
@@ -1063,6 +1092,11 @@ export default function TopupExperience({
             </div>
 
             {promoMessage && <p className="inline-message">{promoMessage}</p>}
+            {promoEndsAt && appliedPromoCode && promoCountdownLabel(promoEndsAt, promoCountdownNow) && (
+              <p className="inline-message promo-countdown">
+                ⏳ Promo berakhir dalam <b>{promoCountdownLabel(promoEndsAt, promoCountdownNow)}</b>
+              </p>
+            )}
             {referralMessage && <p className="inline-message referral-message">{referralMessage}</p>}
             {pricingError && <p className="inline-message warning">{pricingError}</p>}
 

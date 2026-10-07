@@ -34,6 +34,8 @@ type PricingContext = {
   paymentMethod: PaymentMethod;
   promotion: Promotion | null;
   referral: ReferralProgram | null;
+  /** Batas waktu promo yang sedang terpasang (untuk countdown di checkout). */
+  promoEndsAt: string | null;
   minimumNambahProfit: number;
   source: "static" | "supabase";
 };
@@ -173,6 +175,7 @@ function getStaticPricingContext(request: PricingRequest): PricingContextResult 
       paymentMethod,
       promotion,
       referral,
+      promoEndsAt: null,
       minimumNambahProfit: 500,
       source: "static",
     },
@@ -431,6 +434,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
         },
         promotion,
         referral,
+        promoEndsAt: promotionRow?.ends_at ?? null,
         minimumNambahProfit: Number(pricingRule.minimum_nambah_profit),
         source: "supabase",
       },

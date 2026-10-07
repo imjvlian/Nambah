@@ -470,6 +470,8 @@ export default function AdminDashboard() {
     maxDiscount: "",
     quota: "",
     quotaPerUser: "1",
+    startsAt: "",
+    endsAt: "",
   });
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
@@ -614,6 +616,12 @@ export default function AdminDashboard() {
           maxDiscount: promoDraft.maxDiscount || null,
           quota: promoDraft.quota || null,
           quotaPerUser: promoDraft.quotaPerUser || null,
+          startsAt: promoDraft.startsAt
+            ? new Date(promoDraft.startsAt).toISOString()
+            : null,
+          endsAt: promoDraft.endsAt
+            ? new Date(promoDraft.endsAt).toISOString()
+            : null,
           active: true,
         }),
       });
@@ -628,6 +636,8 @@ export default function AdminDashboard() {
         maxDiscount: "",
         quota: "",
         quotaPerUser: "1",
+        startsAt: "",
+        endsAt: "",
       });
       await Promise.all([loadPromotions(), loadOverview()]);
       setNotice("Promo berhasil dibuat.");
@@ -2541,6 +2551,28 @@ export default function AdminDashboard() {
                     }))
                   }
                 />
+                <input
+                  type="datetime-local"
+                  title="Mulai berlaku (opsional — kosongkan untuk langsung aktif)"
+                  value={promoDraft.startsAt}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      startsAt: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="datetime-local"
+                  title="Berakhir (opsional — isi untuk flash sale)"
+                  value={promoDraft.endsAt}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      endsAt: event.target.value,
+                    }))
+                  }
+                />
                 <button
                   type="button"
                   disabled={Boolean(busy)}
@@ -2564,6 +2596,17 @@ export default function AdminDashboard() {
                     <div>
                       <strong>{promo.code}</strong>
                       <span>{promo.name}</span>
+                      {(promo.startsAt || promo.endsAt) && (
+                        <span className="acc-promo-schedule">
+                          {promo.startsAt
+                            ? new Date(promo.startsAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })
+                            : "langsung"}
+                          {" → "}
+                          {promo.endsAt
+                            ? new Date(promo.endsAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })
+                            : "tanpa akhir"}
+                        </span>
+                      )}
                     </div>
                     <strong>
                       {promo.type === "flat"

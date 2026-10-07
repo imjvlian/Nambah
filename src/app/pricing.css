@@ -389,3 +389,16 @@
   font-weight: 700;
   text-decoration: underline;
 }
+
+.promo-countdown b {
+  color: var(--lime, #c9ff3f);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+
+.acc-promo-schedule {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
