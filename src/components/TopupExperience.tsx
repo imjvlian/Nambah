@@ -506,6 +506,13 @@ export default function TopupExperience({
       setPromoMessage("Promo dihapus.");
       return;
     }
+    if (viewerState !== "authenticated") {
+      setAppliedPromoCode("");
+      setPromoMessage(
+        "Kode promo hanya untuk pengguna login. Masuk atau daftar gratis dulu, baru pakai kodenya.",
+      );
+      return;
+    }
     setAppliedPromoCode(normalized);
     setPromoInput(normalized);
     setPromoMessage(`${normalized} dipasang. Server sedang memvalidasi kode.`);
@@ -519,6 +526,13 @@ export default function TopupExperience({
     if (!normalized) {
       setAppliedReferralCode("");
       setReferralMessage("Referral dihapus.");
+      return;
+    }
+    if (viewerState !== "authenticated") {
+      setAppliedReferralCode("");
+      setReferralMessage(
+        "Kode referral hanya untuk pengguna login. Masuk atau daftar gratis dulu, baru pakai kodenya.",
+      );
       return;
     }
     setAppliedReferralCode(normalized);
@@ -1025,6 +1039,13 @@ export default function TopupExperience({
             </div>
 
             <div className="discount-stack">
+              {viewerState === "guest" && (
+                <p className="inline-message discount-login-hint">
+                  💡 Kode promo & referral khusus pengguna login —{" "}
+                  <a href="/login?next=%23topup">masuk</a> atau{" "}
+                  <a href="/register?next=%23topup">daftar gratis</a> dulu untuk memakainya.
+                </p>
+              )}
               <label className="discount-field">
                 <span>Kode promo</span>
                 <span className="discount-input-row">

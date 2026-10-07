@@ -140,12 +140,26 @@ function getStaticPricingContext(request: PricingRequest): PricingContextResult 
   }
 
   const promoCode = normalizeCode(request.promoCode);
+  if (promoCode && !request.userId) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Login diperlukan untuk menggunakan kode promo.",
+    };
+  }
   const promotion = promoCode ? findPromotion(promoCode) : null;
   if (promoCode && !promotion) {
     return { ok: false, status: 400, error: "Kode promo tidak ditemukan." };
   }
 
   const referralCode = normalizeCode(request.referralCode);
+  if (referralCode && !request.userId) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Login diperlukan untuk menggunakan kode referral.",
+    };
+  }
   const referral = referralCode ? findReferral(referralCode) : null;
   if (referralCode && !referral) {
     return { ok: false, status: 400, error: "Kode referral tidak ditemukan." };
@@ -181,6 +195,23 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
 
   if (!gameId || !packageId || !paymentId) {
     return { ok: false, status: 400, error: "Produk atau metode pembayaran tidak valid." };
+  }
+
+  // Kode promo & referral mewajibkan login — batas pemakaian per akun tidak
+  // bisa ditegakkan tanpa identitas pengguna.
+  if (promoCode && !request.userId) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Login diperlukan untuk menggunakan kode promo.",
+    };
+  }
+  if (referralCode && !request.userId) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Login diperlukan untuk menggunakan kode referral.",
+    };
   }
 
   try {
