@@ -1,13 +1,13 @@
+import BrandLogo from "@/components/BrandLogo";
+import { BRAND } from "@/lib/brand";
+
 export default function SiteFooter() {
   return (
     <footer className="site-footer shell">
       <div className="footer-grid">
         <div className="footer-brand">
-          <a className="brand" href="/#top" aria-label="Nambah">
-            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-            <span>Nambah</span>
-          </a>
-          <p>Top up cepat. Lanjut main.</p>
+          <BrandLogo href="/#top" size="md" variant="horizontal" />
+          <p>{BRAND.tagline}</p>
           <div className="footer-chips" aria-label="Keunggulan layanan">
             <span>24/7</span>
             <span>QRIS ready</span>

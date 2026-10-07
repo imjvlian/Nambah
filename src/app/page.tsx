@@ -3,6 +3,7 @@ import CategorizedTopupExperience from "@/components/CategorizedTopupExperience"
 import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import PromoPopup from "@/components/PromoPopup";
 import SiteFooter from "@/components/SiteFooter";
+import BrandLogo from "@/components/BrandLogo";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
 
@@ -15,10 +16,7 @@ export default async function Home() {
   return (
     <main className="home-v2 home-oura-refine">
       <header className="site-header shell home-v2-header home-market-header">
-        <a className="brand" href="#top" aria-label="Nambah">
-          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-          <span>Nambah</span>
-        </a>
+        <BrandLogo href="#top" size="md" variant="horizontal" />
 
         <nav className="desktop-nav home-market-nav" aria-label="Navigasi utama">
           <a href="#catalog-start">Top Up</a>

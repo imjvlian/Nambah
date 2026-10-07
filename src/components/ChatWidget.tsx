@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BRAND } from "@/lib/brand";
 
 type WidgetMessage = {
   role: "user" | "assistant";
@@ -19,8 +20,7 @@ const SUPPORT_WHATSAPP =
 
 const GREETING: WidgetMessage = {
   role: "assistant",
-  content:
-    "Halo! Aku Nambah Assistant. Ada yang bisa dibantu — status order, produk, pembayaran, atau hubungi admin?",
+  content: `Halo! Aku Nana, asisten ${BRAND.name}. Ada yang bisa dibantu — status order, produk, pembayaran, atau hubungi admin?`,
 };
 
 export default function ChatWidget() {
@@ -108,10 +108,10 @@ export default function ChatWidget() {
       </button>
 
       {open && (
-        <section className="chat-panel" aria-label="Chat bantuan Nambah">
+        <section className="chat-panel" aria-label={`Chat bantuan ${BRAND.name}`}>
           <header className="chat-header">
             <div>
-              <strong>Nambah Assistant</strong>
+              <strong>Nana · Asisten {BRAND.name}</strong>
               <span>CS digital · online</span>
             </div>
             <button

@@ -7,6 +7,25 @@
   --muted: #92998c;
   --lime: #c9ff3f;
   --lime-dark: #9dcc22;
+  --lime-50: #f6ffe5;
+  --lime-100: #eeffcc;
+  --lime-200: #ddff99;
+  --lime-300: #cbff66;
+  --lime-400: #baff33;
+  --lime-500: #c9ff3f;
+  --lime-600: #b6e636;
+  --lime-700: #9dcc22;
+  --lime-800: #7fa31b;
+  --lime-900: #5f7f16;
+
+  --brand: var(--lime);
+  --brand-ink: #11130f;
+  --brand-glow: radial-gradient(
+    circle at 50% -15%,
+    rgba(201, 255, 63, 0.08),
+    transparent 32rem
+  );
+
   --paper: #f1f4e9;
   --ink: #11130f;
   --radius: 22px;
@@ -37,9 +56,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 50% -15%, rgba(201, 255, 63, 0.08), transparent 32rem),
-    var(--bg);
+  background: var(--brand-glow), var(--bg);
   color: var(--text);
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -48,12 +65,111 @@ body {
 
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+.display {
+  font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
 p {
   text-wrap: pretty;
+}
+
+.brand-logo-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+}
+
+.brand-logo-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 12px);
+}
+
+.brand-logo--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(4px, 1vw, 6px);
+}
+
+.brand-logo--icon-only {
+  gap: 0;
+}
+
+.brand-logo__mark {
+  display: block;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.brand-logo--sm .brand-logo__mark {
+  width: clamp(28px, 2vw, 40px);
+}
+
+.brand-logo--md .brand-logo__mark {
+  width: clamp(40px, 3vw, 56px);
+}
+
+.brand-logo--lg .brand-logo__mark {
+  width: clamp(56px, 4vw, 80px);
+}
+
+.brand-logo__mark--mono {
+  filter: brightness(0) invert(1);
+}
+
+.brand-logo__wordmark {
+  font-family: var(--font-display), var(--font-sans), ui-sans-serif, system-ui;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: var(--text);
+}
+
+.brand-logo--sm .brand-logo__wordmark {
+  font-size: clamp(16px, 2vw, 20px);
+}
+
+.brand-logo--md .brand-logo__wordmark {
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+.brand-logo--lg .brand-logo__wordmark {
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.brand-logo__wordmark--mono {
+  color: inherit;
+}
+
+.brand-logo__tagline {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.01em;
+  line-height: var(--leading-tight);
 }
 
 button,
