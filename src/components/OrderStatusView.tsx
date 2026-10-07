@@ -79,7 +79,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [countdown, setCountdown] = useState(() => calculateCountdown(null));
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const embeddedOrderRef = useRef<string | null>(null);
-  const jokulOpenedOrderRef = useRef<string | null>(null);
   const dokuPopupRef = useRef<Window | null>(null);
   const dokuPopupTimerRef = useRef<number | null>(null);
   const midtransClientKey =
@@ -318,14 +317,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
   // Popup window terpusat (bukan tab penuh): jendela kecil memuat halaman
   // pembayaran DOKU langsung — bebas dari blokir iframe karena tidak memakai
-  // bingkai. Dipicu klik pengguna sehingga lolos popup blocker. Saat jendela
-  // ditutup, status order otomatis diperbarui.
-  function openDokuCheckout() {
-    const url = order?.payment.redirectUrl;
-    if (!url) {
-      setNotice("Sesi pembayaran DOKU belum tersedia.");
-      return;
-    }
+  // bingkai. Saat jendela ditutup, status order otomatis diperbarui.
+  function openDokuPopup(url: string, forOrderId: string) {
     const width = 520;
     const height = 780;
     const left = Math.max(0, Math.round((window.screen.width - width) / 2));
@@ -336,11 +329,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
 
-    if (!popup) {
-      // Popup diblokir browser — tampilkan panel CTA di modal.
-      setCheckoutModalOpen(true);
-      return;
-    }
+    if (!popup) return false;
 
     setCheckoutModalOpen(false);
     dokuPopupRef.current = popup;
@@ -353,9 +342,22 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         dokuPopupTimerRef.current = null;
         dokuPopupRef.current = null;
         setNotice("Jendela pembayaran ditutup — memeriksa status terbaru...");
-        if (order?.id) void refreshStatus(order.id);
+        void refreshStatus(forOrderId);
       }
     }, 1500);
+    return true;
+  }
+
+  function openDokuCheckout() {
+    const url = order?.payment.redirectUrl;
+    if (!url || !order) {
+      setNotice("Sesi pembayaran DOKU belum tersedia.");
+      return;
+    }
+    // Popup diblokir browser → panel CTA tampil sebagai fallback terakhir.
+    if (!openDokuPopup(url, order.id)) {
+      setCheckoutModalOpen(true);
+    }
   }
 
   useEffect(() => {
@@ -365,22 +367,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       }
     };
   }, []);
-
-  // Saat halaman pending dibuka: tampilkan panel CTA (popup window hanya
-  // bisa dibuka lewat klik — auto-open selalu diblokir browser).
-  useEffect(() => {
-    if (
-      order?.status !== "pending_payment" ||
-      order.payment.provider !== "doku" ||
-      order.doku?.qrContent ||
-      !order.payment.redirectUrl ||
-      jokulOpenedOrderRef.current === order.id
-    ) {
-      return;
-    }
-    jokulOpenedOrderRef.current = order.id;
-    setCheckoutModalOpen(true);
-  }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent]);
 
   function focusPayment() {
     // Order DOKU mode checkout: buka modal Jokul, bukan tab baru.
@@ -441,6 +427,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         ? `?access_token=${encodeURIComponent(data.accessToken)}`
         : "";
       router.replace(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
+
+      // Popup langsung dibuka dari gesture klik "Buat pesanan" (masih dalam
+      // jendela transient activation Chrome) — tanpa halaman perantara.
+      if (
+        data.order.payment.provider === "doku" &&
+        data.order.payment.redirectUrl
+      ) {
+        openDokuPopup(data.order.payment.redirectUrl, data.order.id);
+      }
       setNotice("Order dibuat. Pembayaran sedang dimuat.");
     } catch {
       setNotice("Tidak dapat menghubungi server pembayaran.");

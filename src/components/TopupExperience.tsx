@@ -595,10 +595,33 @@ export default function TopupExperience({
             : {}),
         }),
       });
-      const data = (await response.json()) as { error?: string; order?: { id: string }; accessToken?: string };
+      const data = (await response.json()) as {
+        error?: string;
+        order?: {
+          id: string;
+          payment?: { provider?: string; redirectUrl?: string | null };
+        };
+        accessToken?: string;
+      };
       if (!response.ok || !data.order) {
         setNotice(data.error ?? "Gagal membuat pembayaran.");
         return;
+      }
+      // Popup DOKU langsung dibuka dari gesture klik checkout (masih dalam
+      // jendela transient activation) — tanpa halaman perantara.
+      if (
+        data.order.payment?.provider === "doku" &&
+        data.order.payment.redirectUrl
+      ) {
+        const width = 520;
+        const height = 780;
+        const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+        const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+        window.open(
+          data.order.payment.redirectUrl,
+          "doku_payment",
+          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+        );
       }
       const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
       router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
