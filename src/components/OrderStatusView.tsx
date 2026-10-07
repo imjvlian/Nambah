@@ -80,6 +80,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const embeddedOrderRef = useRef<string | null>(null);
   const jokulOpenedOrderRef = useRef<string | null>(null);
+  const dokuPopupRef = useRef<Window | null>(null);
+  const dokuPopupTimerRef = useRef<number | null>(null);
   const midtransClientKey =
     process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
   const configuredMidtransEnvironment =
@@ -314,20 +316,58 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     setNotice("URL pembayaran cadangan belum tersedia.");
   }
 
-  // Modal checkout: halaman pembayaran DOKU dimuat sebagai iframe (mode
-  // `view=iframe`, persis seperti yang dilakukan Jokul JS) di dalam overlay
-  // milik Nambah sendiri — tanpa ketergantungan script eksternal, sehingga
-  // tidak ada lagi jalur yang jatuh ke tab baru.
+  // Popup window terpusat (bukan tab penuh): jendela kecil memuat halaman
+  // pembayaran DOKU langsung — bebas dari blokir iframe karena tidak memakai
+  // bingkai. Dipicu klik pengguna sehingga lolos popup blocker. Saat jendela
+  // ditutup, status order otomatis diperbarui.
   function openDokuCheckout() {
-    if (!order?.payment.redirectUrl) {
+    const url = order?.payment.redirectUrl;
+    if (!url) {
       setNotice("Sesi pembayaran DOKU belum tersedia.");
       return;
     }
-    setCheckoutModalOpen(true);
+    const width = 520;
+    const height = 780;
+    const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+    const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+    const popup = window.open(
+      url,
+      "doku_payment",
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+    );
+
+    if (!popup) {
+      // Popup diblokir browser — tampilkan panel CTA di modal.
+      setCheckoutModalOpen(true);
+      return;
+    }
+
+    setCheckoutModalOpen(false);
+    dokuPopupRef.current = popup;
+    if (dokuPopupTimerRef.current) {
+      window.clearInterval(dokuPopupTimerRef.current);
+    }
+    dokuPopupTimerRef.current = window.setInterval(() => {
+      if (popup.closed) {
+        window.clearInterval(dokuPopupTimerRef.current!);
+        dokuPopupTimerRef.current = null;
+        dokuPopupRef.current = null;
+        setNotice("Jendela pembayaran ditutup — memeriksa status terbaru...");
+        if (order?.id) void refreshStatus(order.id);
+      }
+    }, 1500);
   }
 
-  // Buka modal otomatis sekali per order saat halaman pending siap — pola
-  // yang sama seperti Snap embed yang langsung menampilkan pembayaran.
+  useEffect(() => {
+    return () => {
+      if (dokuPopupTimerRef.current) {
+        window.clearInterval(dokuPopupTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Saat halaman pending dibuka: tampilkan panel CTA (popup window hanya
+  // bisa dibuka lewat klik — auto-open selalu diblokir browser).
   useEffect(() => {
     if (
       order?.status !== "pending_payment" ||
@@ -340,7 +380,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
     jokulOpenedOrderRef.current = order.id;
     setCheckoutModalOpen(true);
-    setNotice("Selesaikan pembayaran di jendela yang tampil.");
   }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent]);
 
   function focusPayment() {
@@ -547,17 +586,20 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               </button>
             </div>
             {/* Halaman checkout DOKU mengirim CSP frame-ancestors / X-Frame-
-                Options yang melarang iframe dari origin mana pun — panel ini
-                menggantikan iframe yang pasti diblokir browser. */}
+                Options yang melarang iframe dari origin mana pun — popup
+                window adalah cara menampilkannya tanpa berpindah tab. */}
             <div className="doku-checkout-modal-fallback">
-              <strong>Halaman pembayaran tidak bisa tampil inline.</strong>
+              <strong>Selesaikan pembayaran di jendela popup.</strong>
               <p>
-                DOKU memblokir halaman checkout-nya dari bingkai situs lain.
-                Lanjutkan pembayaran di tab baru — status order di halaman ini
-                tetap ter-update otomatis setelah kamu membayar.
+                Jendela kecil pembayaran akan terbuka di atas halaman ini.
+                Setelah kamu membayar dan menutupnya, status order di sini
+                langsung diperbarui otomatis.
               </p>
-              <button type="button" className="order-action-button primary" onClick={openFallbackPayment}>
-                Buka pembayaran di tab baru
+              <button type="button" className="order-action-button primary" onClick={openDokuCheckout}>
+                Buka jendela pembayaran
+              </button>
+              <button type="button" className="order-secondary-link" onClick={openFallbackPayment}>
+                atau buka di tab baru
               </button>
             </div>
           </div>
