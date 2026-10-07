@@ -1,5 +1,9 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect, supabaseSelectPage } from "@/lib/supabase/server";
+import {
+  supabaseSelect,
+  supabaseSelectAll,
+  supabaseSelectPage,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -20,14 +24,6 @@ type SupplierCatalogRow = {
   end_cut_off: string | null;
   description: string | null;
   last_seen_at: string;
-};
-
-type FilterOptionRow = {
-  supplier_sku: string;
-  category: string;
-  brand: string;
-  type: string;
-  seller_name: string;
 };
 
 type SupplierProductRow = {
@@ -55,18 +51,18 @@ function cleanExact(value: string | null) {
   return (value ?? "").trim().slice(0, 180);
 }
 
-function quotedInFilter(values: string[]) {
-  return `in.(${values
-    .map((value) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
-    .join(",")})`;
-}
-
 function sortOptions(values: Set<string>) {
   return Array.from(values)
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right, "id", { sensitivity: "base" }));
 }
 
+/**
+ * Filter mapping/visibility diterapkan di JS (bukan SQL) — menyusunnya sebagai
+ * `in.(...)`/`not.in.(...)` dengan ribuan SKU membuat URL melebihi batas
+ * PostgREST dan request selalu gagal. Scan katalog cukup kecil untuk diproses
+ * di memori setelah filter ringan diterapkan di DB.
+ */
 function resolveSkuFilter(
   mapping: string,
   visibility: string,
@@ -74,105 +70,48 @@ function resolveSkuFilter(
   publishedSkus: Set<string>,
 ) {
   if (mapping === "unmapped" && visibility === "published") {
-    return { empty: true, filter: null as string | null };
+    return { empty: true, keep: null as ((sku: string) => boolean) | null };
   }
-
   if (mapping === "mapped" && visibility === "published") {
-    const values = Array.from(publishedSkus);
     return {
-      empty: values.length === 0,
-      filter: values.length ? quotedInFilter(values) : null,
+      empty: publishedSkus.size === 0,
+      keep: (sku: string) => publishedSkus.has(sku.trim().toUpperCase()),
     };
   }
-
   if (mapping === "mapped" && visibility === "hidden") {
-    const values = Array.from(mappedSkus).filter((sku) => !publishedSkus.has(sku));
     return {
-      empty: values.length === 0,
-      filter: values.length ? quotedInFilter(values) : null,
-    };
-  }
-
-  if (mapping === "unmapped") {
-    const values = Array.from(mappedSkus);
-    return {
-      empty: false,
-      filter: values.length ? `not.${quotedInFilter(values)}` : null,
-    };
-  }
-
-  if (mapping === "mapped") {
-    const values = Array.from(mappedSkus);
-    return {
-      empty: values.length === 0,
-      filter: values.length ? quotedInFilter(values) : null,
-    };
-  }
-
-  if (visibility === "published") {
-    const values = Array.from(publishedSkus);
-    return {
-      empty: values.length === 0,
-      filter: values.length ? quotedInFilter(values) : null,
-    };
-  }
-
-  if (visibility === "hidden") {
-    const values = Array.from(publishedSkus);
-    return {
-      empty: false,
-      filter: values.length ? `not.${quotedInFilter(values)}` : null,
-    };
-  }
-
-  return { empty: false, filter: null as string | null };
-}
-
-async function loadFilterOptions(latestScanAt: string) {
-  const categories = new Set<string>();
-  const brands = new Set<string>();
-  const types = new Set<string>();
-  const sellers = new Set<string>();
-  const batchSize = 1000;
-  let offset = 0;
-  let scanTotal = 0;
-
-  while (true) {
-    const batch = await supabaseSelectPage<FilterOptionRow>("supplier_catalog_items", {
-      select: "supplier_sku,category,brand,type,seller_name",
-      filters: {
-        supplier_id: "eq.digiflazz",
-        last_seen_at: `eq.${latestScanAt}`,
+      empty: Array.from(mappedSkus).every((sku) => publishedSkus.has(sku)),
+      keep: (sku: string) => {
+        const key = sku.trim().toUpperCase();
+        return mappedSkus.has(key) && !publishedSkus.has(key);
       },
-      order: "supplier_sku.asc",
-      limit: batchSize,
-      offset,
-    });
-
-    if (batch.count !== null) scanTotal = batch.count;
-
-    for (const item of batch.data) {
-      if (item.category) categories.add(item.category);
-      if (item.brand) brands.add(item.brand);
-      if (item.type) types.add(item.type);
-      if (item.seller_name) sellers.add(item.seller_name);
-    }
-
-    if (batch.data.length === 0) break;
-    offset += batch.data.length;
-    if (batch.count !== null && offset >= batch.count) break;
-    if (batch.count === null && batch.data.length < batchSize) break;
+    };
   }
-
-  return {
-    scanTotal,
-    filterOptions: {
-      categories: sortOptions(categories),
-      brands: sortOptions(brands),
-      types: sortOptions(types),
-      sellers: sortOptions(sellers),
-    },
-  };
+  if (mapping === "unmapped") {
+    return {
+      empty: false,
+      keep: (sku: string) => !mappedSkus.has(sku.trim().toUpperCase()),
+    };
+  }
+  if (mapping === "mapped") {
+    return {
+      empty: mappedSkus.size === 0,
+      keep: (sku: string) => mappedSkus.has(sku.trim().toUpperCase()),
+    };
+  }
+  if (visibility === "published") {
+    return {
+      empty: publishedSkus.size === 0,
+      keep: (sku: string) => publishedSkus.has(sku.trim().toUpperCase()),
+    };
+  }
+  if (visibility === "hidden") {
+    return {
+      empty: false,
+      keep: (sku: string) => !publishedSkus.has(sku.trim().toUpperCase()),
+    };
+  }
+  return { empty: false, keep: null as ((sku: string) => boolean) | null };
 }
 
 export async function GET(request: Request) {
@@ -201,15 +140,15 @@ export async function GET(request: Request) {
         order: "last_seen_at.desc",
         limit: 1,
       }),
-      supabaseSelect<SupplierProductRow>("supplier_products", {
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku",
         filters: { supplier_id: "eq.digiflazz", supplier_sku: "not.is.null" },
       }),
-      supabaseSelect<ProductRow>("products", {
+      supabaseSelectAll<ProductRow>("products", {
         select: "id,game_id,label,active",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
-      supabaseSelect<GameRow>("games", {
+      supabaseSelectAll<GameRow>("games", {
         select: "id,name",
         order: "sort_order.asc,name.asc",
       }),
@@ -228,7 +167,7 @@ export async function GET(request: Request) {
 
     const mappedSkus = new Set(
       supplierProducts
-        .map((row) => row.supplier_sku?.trim() ?? "")
+        .map((row) => row.supplier_sku?.trim().toUpperCase() ?? "")
         .filter(Boolean),
     );
     const publishedSkus = new Set(
@@ -237,7 +176,7 @@ export async function GET(request: Request) {
           if (!row.supplier_sku) return false;
           return Boolean(productsById.get(row.product_id)?.active);
         })
-        .map((row) => row.supplier_sku!.trim()),
+        .map((row) => row.supplier_sku!.trim().toUpperCase()),
     );
 
     if (!latestScanAt) {
@@ -282,7 +221,6 @@ export async function GET(request: Request) {
     if (transactionMode === "single") filters.multi = "eq.false";
 
     const skuFilter = resolveSkuFilter(mapping, visibility, mappedSkus, publishedSkus);
-    if (skuFilter.filter) filters.supplier_sku = skuFilter.filter;
 
     const rawQuery = queryText
       ? {
@@ -290,51 +228,66 @@ export async function GET(request: Request) {
         }
       : undefined;
 
-    const scanMetaPromise = includeOptions
-      ? loadFilterOptions(latestScanAt)
-      : supabaseSelectPage<{ supplier_sku: string }>("supplier_catalog_items", {
-          select: "supplier_sku",
-          filters: {
-            supplier_id: "eq.digiflazz",
-            last_seen_at: `eq.${latestScanAt}`,
-          },
-          limit: 1,
-          offset: 0,
-        }).then((result) => ({
-          scanTotal: result.count ?? result.data.length,
-          filterOptions: undefined,
-        }));
-
-    const resultPromise = skuFilter.empty
-      ? Promise.resolve({ data: [] as SupplierCatalogRow[], count: 0 })
-      : supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
+    // Filter ringan (availability/category/brand/type/seller/mode/search)
+    // tetap di DB; filter SKU mapping/visibility diterapkan di JS sesudahnya.
+    const scanItemsPromise = skuFilter.empty
+      ? Promise.resolve([] as SupplierCatalogRow[])
+      : supabaseSelectAll<SupplierCatalogRow>("supplier_catalog_items", {
           select:
             "supplier_sku,product_name,category,brand,type,seller_name,supplier_cost,buyer_active,seller_active,unlimited_stock,stock,multi,start_cut_off,end_cut_off,description,last_seen_at",
           filters,
           query: rawQuery,
           order: "brand.asc,product_name.asc,supplier_sku.asc",
-          limit,
-          offset: (page - 1) * limit,
         });
 
-    const [scanMeta, result] = await Promise.all([scanMetaPromise, resultPromise]);
+    const scanTotalPromise = supabaseSelectPage<{ supplier_sku: string }>(
+      "supplier_catalog_items",
+      {
+        select: "supplier_sku",
+        filters: {
+          supplier_id: "eq.digiflazz",
+          last_seen_at: `eq.${latestScanAt}`,
+        },
+        limit: 1,
+        offset: 0,
+      },
+    ).then((result) => result.count ?? result.data.length);
+
+    const [scanItems, scanTotal] = await Promise.all([scanItemsPromise, scanTotalPromise]);
+
+    const kept = skuFilter.keep ? scanItems.filter((item) => skuFilter.keep!(item.supplier_sku)) : scanItems;
+    const total = kept.length;
+    const pages = total === 0 ? 0 : Math.ceil(total / limit);
+    const safePage = Math.min(page, Math.max(1, pages || 1));
+    const pageItems = kept.slice((safePage - 1) * limit, safePage * limit);
+
+    // Opsi filter dihitung dari set hasil filter atribut (sebelum filter
+    // mapping), menggantikan loop loadFilterOptions yang lama.
+    const filterOptions = includeOptions
+      ? {
+          categories: sortOptions(new Set(scanItems.map((item) => item.category))),
+          brands: sortOptions(new Set(scanItems.map((item) => item.brand))),
+          types: sortOptions(new Set(scanItems.map((item) => item.type))),
+          sellers: sortOptions(new Set(scanItems.map((item) => item.seller_name))),
+        }
+      : undefined;
+
     const mappedBySku = new Map(
       supplierProducts
         .filter((row) => row.supplier_sku)
         .map((row) => [row.supplier_sku!.toUpperCase(), row.product_id]),
     );
-    const total = result.count ?? result.data.length;
 
     return Response.json({
       latestScanAt,
-      scanTotal: scanMeta.scanTotal,
+      scanTotal,
       publishedCount: publishedSkus.size,
       total,
-      page,
+      page: safePage,
       limit,
-      pages: total === 0 ? 0 : Math.ceil(total / limit),
-      filterOptions: scanMeta.filterOptions,
-      items: result.data.map((item) => {
+      pages,
+      filterOptions,
+      items: pageItems.map((item) => {
         const mappedProductId = mappedBySku.get(item.supplier_sku.toUpperCase()) ?? null;
         const mappedProduct = mappedProductId ? productsById.get(mappedProductId) : null;
         return {

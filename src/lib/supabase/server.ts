@@ -3,6 +3,8 @@ type SupabaseSelectOptions = {
   filters?: Record<string, string>;
   order?: string;
   limit?: number;
+  /** Parameter mentah tambahan, mis. { or: "(...)" } untuk pencarian multi-kolom. */
+  query?: Record<string, string>;
 };
 
 type SupabaseSelectPageOptions = SupabaseSelectOptions & {
@@ -76,6 +78,7 @@ export async function supabaseSelect<T>(
   const query = new URLSearchParams();
   query.set("select", options.select);
   applyFilters(query, options.filters);
+  applyRawQuery(query, options.query);
 
   if (options.order) query.set("order", options.order);
   if (options.limit !== undefined) query.set("limit", String(options.limit));
@@ -197,6 +200,40 @@ export async function supabaseSelectPage<T>(
     data: (await response.json()) as T[],
     count: Number.isFinite(parsedCount) ? parsedCount : null,
   };
+}
+
+/**
+ * Mengambil SEMUA baris yang cocok dengan paginasi otomatis (PostgREST
+ * membatasi 1000 baris per request secara default). Dipakai untuk tabel yang
+ * jumlah barisnya bisa melewati batas itu — supplier_products, products,
+ * scan katalog supplier.
+ */
+export async function supabaseSelectAll<T>(
+  table: string,
+  options: SupabaseSelectOptions,
+  maxRows = 25000,
+): Promise<T[]> {
+  const batchSize = 1000;
+  const rows: T[] = [];
+  let offset = 0;
+
+  while (true) {
+    const batch = await supabaseSelectPage<T>(table, {
+      ...options,
+      limit: batchSize,
+      offset,
+    });
+    rows.push(...batch.data);
+    if (batch.data.length < batchSize) break;
+    offset += batch.data.length;
+    if (rows.length >= maxRows) {
+      throw new Error(
+        `Supabase ${table} melebihi batas ${maxRows} baris — query perlu dipersempit.`,
+      );
+    }
+  }
+
+  return rows;
 }
 
 export async function supabaseInsert<T>(
