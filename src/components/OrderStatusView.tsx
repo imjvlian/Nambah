@@ -77,7 +77,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [countdown, setCountdown] = useState(() => calculateCountdown(null));
-  const [jokulReady, setJokulReady] = useState(false);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const embeddedOrderRef = useRef<string | null>(null);
   const jokulOpenedOrderRef = useRef<string | null>(null);
   const midtransClientKey =
@@ -314,20 +314,16 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     setNotice("URL pembayaran cadangan belum tersedia.");
   }
 
-  // Modal Jokul: halaman pembayaran DOKU tampil sebagai overlay di atas
-  // halaman Nambah — pengguna tidak berpindah URL.
+  // Modal checkout: halaman pembayaran DOKU dimuat sebagai iframe (mode
+  // `view=iframe`, persis seperti yang dilakukan Jokul JS) di dalam overlay
+  // milik Nambah sendiri — tanpa ketergantungan script eksternal, sehingga
+  // tidak ada lagi jalur yang jatuh ke tab baru.
   function openDokuCheckout() {
-    const url = order?.payment.redirectUrl;
-    if (!url) {
+    if (!order?.payment.redirectUrl) {
       setNotice("Sesi pembayaran DOKU belum tersedia.");
       return;
     }
-    if (window.loadJokulCheckout) {
-      window.loadJokulCheckout(url);
-      return;
-    }
-    // Library belum siap / gagal dimuat — tetap bisa bayar lewat tab baru.
-    window.open(url, "_blank", "noopener,noreferrer");
+    setCheckoutModalOpen(true);
   }
 
   // Buka modal otomatis sekali per order saat halaman pending siap — pola
@@ -338,16 +334,14 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       order.payment.provider !== "doku" ||
       order.doku?.qrContent ||
       !order.payment.redirectUrl ||
-      !jokulReady ||
-      !window.loadJokulCheckout ||
       jokulOpenedOrderRef.current === order.id
     ) {
       return;
     }
     jokulOpenedOrderRef.current = order.id;
-    window.loadJokulCheckout(order.payment.redirectUrl);
+    setCheckoutModalOpen(true);
     setNotice("Selesaikan pembayaran di jendela yang tampil.");
-  }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent, jokulReady]);
+  }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent]);
 
   function focusPayment() {
     // Order DOKU mode checkout: buka modal Jokul, bukan tab baru.
@@ -530,13 +524,35 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         />
       )}
 
-      {isDoku && !dokuQrContent && order?.doku?.checkoutJsUrl && (
-        <Script
-          id="jokul-checkout"
-          src={order.doku.checkoutJsUrl}
-          strategy="afterInteractive"
-          onLoad={() => setJokulReady(true)}
-        />
+      {isDoku && !dokuQrContent && checkoutModalOpen && order?.payment.redirectUrl && (
+        <div
+          className="doku-checkout-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pembayaran DOKU"
+          onClick={() => setCheckoutModalOpen(false)}
+        >
+          <div
+            className="doku-checkout-modal-content"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="doku-checkout-modal-head">
+              <strong>Pembayaran</strong>
+              <button
+                type="button"
+                aria-label="Tutup jendela pembayaran"
+                onClick={() => setCheckoutModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <iframe
+              src={`${order.payment.redirectUrl}${order.payment.redirectUrl.includes("?") ? "&" : "?"}view=iframe`}
+              title="Pembayaran DOKU"
+              className="doku-checkout-modal-frame"
+            />
+          </div>
+        </div>
       )}
 
       <header className="site-header shell order-header">

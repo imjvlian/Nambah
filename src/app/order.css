@@ -735,3 +735,70 @@
   color: var(--muted);
   font-size: 11px;
 }
+
+/* DOKU checkout modal (iframe view=iframe, overlay milik Nambah) */
+.doku-checkout-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(4, 6, 4, 0.78);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.doku-checkout-modal-content {
+  width: min(520px, 100%);
+  height: min(780px, calc(100dvh - 32px));
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.6);
+}
+
+.doku-checkout-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.doku-checkout-modal-head strong {
+  font-size: 13px;
+}
+
+.doku-checkout-modal-head button {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.doku-checkout-modal-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+.doku-checkout-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 4px;
+}
+
+.doku-checkout-cta p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
