@@ -3,6 +3,7 @@ import {
   getMidtransEnvironment,
   type MidtransStatusPayload,
 } from "@/lib/midtrans/client";
+import { getDokuCheckoutJsUrl } from "@/lib/payments/doku";
 import type { PublicOrder, PublicOrderStatus } from "@/lib/order-public";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
@@ -75,6 +76,7 @@ type PaymentRow = {
 type PaymentPayloadRow = {
   order_id: string;
   payment_payload: {
+    mode?: string;
     qrContent?: string;
     expiresAt?: string | null;
   } | null;
@@ -200,8 +202,16 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       paidAt: payment?.paid_at ?? null,
       providerTransactionId: payment?.provider_transaction_id ?? null,
     },
-    ...(payment?.provider === "doku" && dokuSession?.qrContent
-      ? { doku: { qrContent: dokuSession.qrContent, expiresAt: dokuSession.expiresAt ?? null } }
+    ...(payment?.provider === "doku"
+      ? {
+          doku: {
+            ...(dokuSession?.qrContent
+              ? { qrContent: dokuSession.qrContent, expiresAt: dokuSession.expiresAt ?? null }
+              : {}),
+            // Mode checkout: modal Jokul dirender di halaman Nambah.
+            ...(payment.redirect_url ? { checkoutJsUrl: getDokuCheckoutJsUrl() } : {}),
+          },
+        }
       : {}),
     pricing: {
       sellingPrice: Number(order.selling_price),

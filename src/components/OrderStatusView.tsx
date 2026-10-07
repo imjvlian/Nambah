@@ -46,6 +46,8 @@ declare global {
       show?: () => void;
       hide?: () => void;
     };
+    /** Jokul Checkout JS — modal pembayaran DOKU di halaman merchant. */
+    loadJokulCheckout?: (paymentUrl: string) => void;
   }
 }
 
@@ -75,7 +77,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [countdown, setCountdown] = useState(() => calculateCountdown(null));
+  const [jokulReady, setJokulReady] = useState(false);
   const embeddedOrderRef = useRef<string | null>(null);
+  const jokulOpenedOrderRef = useRef<string | null>(null);
   const midtransClientKey =
     process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY?.trim() ?? "";
   const configuredMidtransEnvironment =
@@ -310,6 +314,41 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     setNotice("URL pembayaran cadangan belum tersedia.");
   }
 
+  // Modal Jokul: halaman pembayaran DOKU tampil sebagai overlay di atas
+  // halaman Nambah — pengguna tidak berpindah URL.
+  function openDokuCheckout() {
+    const url = order?.payment.redirectUrl;
+    if (!url) {
+      setNotice("Sesi pembayaran DOKU belum tersedia.");
+      return;
+    }
+    if (window.loadJokulCheckout) {
+      window.loadJokulCheckout(url);
+      return;
+    }
+    // Library belum siap / gagal dimuat — tetap bisa bayar lewat tab baru.
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  // Buka modal otomatis sekali per order saat halaman pending siap — pola
+  // yang sama seperti Snap embed yang langsung menampilkan pembayaran.
+  useEffect(() => {
+    if (
+      order?.status !== "pending_payment" ||
+      order.payment.provider !== "doku" ||
+      order.doku?.qrContent ||
+      !order.payment.redirectUrl ||
+      !jokulReady ||
+      !window.loadJokulCheckout ||
+      jokulOpenedOrderRef.current === order.id
+    ) {
+      return;
+    }
+    jokulOpenedOrderRef.current = order.id;
+    window.loadJokulCheckout(order.payment.redirectUrl);
+    setNotice("Selesaikan pembayaran di jendela yang tampil.");
+  }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent, jokulReady]);
+
   function focusPayment() {
     const dokuContainer = document.getElementById(DOKU_QRIS_PANEL_ID);
     if (dokuContainer) {
@@ -482,6 +521,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         />
       )}
 
+      {isDoku && !dokuQrContent && order?.doku?.checkoutJsUrl && (
+        <Script
+          id="jokul-checkout"
+          src={order.doku.checkoutJsUrl}
+          strategy="afterInteractive"
+          onLoad={() => setJokulReady(true)}
+        />
+      )}
+
       <header className="site-header shell order-header">
         <Link className="brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
@@ -626,11 +674,14 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 ) : redirectUrl ? (
                   <div className="doku-checkout-cta">
                     <p>
-                      Sesi pembayaran DOKU siap. Kamu akan diarahkan ke halaman
-                      pembayaran aman untuk menyelesaikan transaksi.
+                      Sesi pembayaran siap — jendela pembayaran aman terbuka di
+                      halaman ini, tanpa berpindah situs.
                     </p>
-                    <button type="button" className="order-action-button primary" onClick={openFallbackPayment}>
-                      Lanjutkan pembayaran
+                    <button type="button" className="order-action-button primary" onClick={openDokuCheckout}>
+                      Bayar sekarang
+                    </button>
+                    <button type="button" className="order-secondary-link" onClick={openFallbackPayment}>
+                      Buka di tab baru
                     </button>
                   </div>
                 ) : (

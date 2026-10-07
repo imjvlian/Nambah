@@ -467,9 +467,15 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error("Midtrans order creation failed", error);
+    console.error("Payment order creation failed", error);
+    const detail = error instanceof Error ? error.message : "";
+    const dokuFailure = /doku/i.test(detail);
     return Response.json(
-      { error: "Gagal membuat pembayaran Midtrans." },
+      {
+        error: dokuFailure
+          ? `Gagal membuat pembayaran DOKU. ${detail}`.slice(0, 200)
+          : "Gagal membuat pembayaran Midtrans.",
+      },
       { status: 502 },
     );
   }

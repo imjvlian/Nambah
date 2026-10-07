@@ -52,12 +52,29 @@ export function getDokuSnapConfig(): DokuSnapConfig | null {
   const clientSecret = env("DOKU_SECRET_KEY");
   // Private key RSA merchant (PEM). Di Vercel biasanya disimpan dengan \n
   // literal — normalkan di sini.
-  const privateKey = env("DOKU_PRIVATE_KEY").replace(/\\n/g, "\n");
+  let privateKey = env("DOKU_PRIVATE_KEY").replace(/\\n/g, "\n");
   const merchantId = env("DOKU_MERCHANT_ID");
   const terminalId = env("DOKU_TERMINAL_ID");
 
   if (!clientId || !clientSecret || !privateKey || !merchantId || !terminalId) {
     return null;
+  }
+
+  // Validasi format: yang dibutuhkan SNAP adalah PRIVATE key RSA merchant.
+  // Kesalahan umum: menempel PUBLIC key (pola MIIBIj...) — ditolak dengan
+  // peringatan jelas supaya order tidak crash saat penandatanganan token.
+  if (
+    privateKey.includes("BEGIN PUBLIC KEY") ||
+    (!privateKey.includes("BEGIN") && privateKey.replace(/\s/g, "").startsWith("MIIBIj"))
+  ) {
+    console.error(
+      "DOKU_PRIVATE_KEY berisi PUBLIC key — mode SNAP dinonaktifkan. Tempel PRIVATE key RSA (-----BEGIN PRIVATE KEY-----).",
+    );
+    return null;
+  }
+  // Tanpa armor sama sekali → bungkus sebagai PKCS#8 (best effort).
+  if (!privateKey.includes("BEGIN")) {
+    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey.replace(/\s/g, "")}\n-----END PRIVATE KEY-----`;
   }
 
   const environment = getDokuEnvironment();
@@ -468,6 +485,17 @@ export function getDokuMode(): DokuMode | null {
   return null;
 }
 
+/** URL Jokul Checkout JS (modal popup di halaman merchant). */
+export function getDokuCheckoutJsUrl() {
+  const environment = getDokuEnvironment();
+  const baseUrl = env("DOKU_BASE_URL");
+  const isSandbox =
+    environment === "sandbox" || baseUrl.toLowerCase().includes("sandbox");
+  return isSandbox
+    ? "https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js"
+    : "https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js";
+}
+
 function sha256Base64(text: string) {
   return createHash("sha256").update(text, "utf8").digest("base64");
 }
@@ -538,17 +566,13 @@ function checkoutMethodTypes(input: CreatePaymentInput): string[] | null {
   return null;
 }
 
-export async function createDokuCheckoutPayment(
+async function checkoutCreateRequest(
+  config: DokuCheckoutConfig,
   input: CreatePaymentInput,
-): Promise<PaymentSession> {
-  const config = getDokuCheckoutConfig();
-  if (!config) {
-    throw new Error("DOKU Checkout belum dikonfigurasi (DOKU_CLIENT_ID / DOKU_SECRET_KEY).");
-  }
-
+  methodTypes: string[] | null,
+) {
   const requestId = randomUUID();
   const timestamp = snapTimestamp();
-  const methodTypes = checkoutMethodTypes(input);
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
   const notificationUrl = env("DOKU_NOTIFICATION_URL");
 
@@ -600,30 +624,61 @@ export async function createDokuCheckoutPayment(
     });
 
     const result = (await response.json()) as CheckoutCreateResponse;
-    const url = result.response?.payment?.url;
-    if (!response.ok || !url) {
-      throw new Error(
-        `DOKU Checkout gagal (${response.status}): ${(result.error_messages ?? result.message ?? ["tanpa pesan"]).join(", ")}`,
-      );
-    }
-
-    return {
-      provider: "doku",
-      payload: {
-        kind: "redirect",
-        redirectUrl: url,
-        expiresAt: parseDokuExpiredDate(result.response?.payment?.expired_date),
-        raw: {
-          mode: "checkout",
-          requestId,
-          sessionId: result.response?.order?.session_id ?? null,
-          tokenId: result.response?.payment?.token_id ?? null,
-        },
-      },
-    };
+    return { status: response.status, result, requestId };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function createDokuCheckoutPayment(
+  input: CreatePaymentInput,
+): Promise<PaymentSession> {
+  const config = getDokuCheckoutConfig();
+  if (!config) {
+    throw new Error("DOKU Checkout belum dikonfigurasi (DOKU_CLIENT_ID / DOKU_SECRET_KEY).");
+  }
+
+  let methodTypes = checkoutMethodTypes(input);
+  let attempt = await checkoutCreateRequest(config, input, methodTypes);
+
+  // Channel hasil mapping bisa belum diaktifkan di akun merchant (umum di
+  // sandbox) — fallback tanpa filter supaya halaman checkout menampilkan
+  // semua channel yang AKTIF daripada order gagal total.
+  let messages = (attempt.result.error_messages ?? attempt.result.message ?? []).join(", ");
+  if (
+    attempt.status === 400 &&
+    methodTypes &&
+    /channel.*inactive|inactive.*channel/i.test(messages)
+  ) {
+    console.warn(
+      `DOKU channel ${methodTypes.join("/")} tidak aktif untuk order ${input.orderId} — retry tanpa payment_method_types.`,
+    );
+    methodTypes = null;
+    attempt = await checkoutCreateRequest(config, input, null);
+    messages = (attempt.result.error_messages ?? attempt.result.message ?? []).join(", ");
+  }
+
+  const url = attempt.result.response?.payment?.url;
+  if (attempt.status !== 200 || !url) {
+    throw new Error(
+      `DOKU Checkout gagal (${attempt.status}): ${messages || "tanpa pesan"}`,
+    );
+  }
+
+  return {
+    provider: "doku",
+    payload: {
+      kind: "redirect",
+      redirectUrl: url,
+      expiresAt: parseDokuExpiredDate(attempt.result.response?.payment?.expired_date),
+      raw: {
+        mode: "checkout",
+        requestId: attempt.requestId,
+        sessionId: attempt.result.response?.order?.session_id ?? null,
+        tokenId: attempt.result.response?.payment?.token_id ?? null,
+      },
+    },
+  };
 }
 
 type CheckoutStatusResponse = {

@@ -45,6 +45,8 @@ export type PublicOrder = {
   doku?: {
     qrContent?: string;
     expiresAt?: string | null;
+    /** Jokul Checkout JS — modal pembayaran di halaman Nambah (mode checkout). */
+    checkoutJsUrl?: string;
   } | null;
   pricing: {
     sellingPrice: number;
