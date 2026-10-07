@@ -350,6 +350,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   }, [order?.id, order?.status, order?.payment.provider, order?.payment.redirectUrl, order?.doku?.qrContent, jokulReady]);
 
   function focusPayment() {
+    // Order DOKU mode checkout: buka modal Jokul, bukan tab baru.
+    if (
+      order?.payment.provider === "doku" &&
+      !order.doku?.qrContent &&
+      order.payment.redirectUrl
+    ) {
+      openDokuCheckout();
+      return;
+    }
     const dokuContainer = document.getElementById(DOKU_QRIS_PANEL_ID);
     if (dokuContainer) {
       dokuContainer.scrollIntoView({ behavior: "smooth", block: "center" });
