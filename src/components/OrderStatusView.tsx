@@ -546,28 +546,20 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 ✕
               </button>
             </div>
-            {/firefox/i.test(typeof navigator !== "undefined" ? navigator.userAgent : "") ? (
-              // DOKU membatasi iframe lewat X-Frame-Options ALLOW-FROM —
-              // Firefox menaatinya (Chrome mengabaikannya). Tampilkan panel
-              // fallback yang rapi, bukan layar "content is blocked".
-              <div className="doku-checkout-modal-fallback">
-                <strong>Browser ini tidak bisa menampilkan pembayaran inline.</strong>
-                <p>
-                  Firefox memblokir halaman pembayaran dalam bingkai. Lanjutkan
-                  lewat tab baru — status order tetap ter-update otomatis di
-                  halaman ini setelah kamu membayar.
-                </p>
-                <button type="button" className="order-action-button primary" onClick={openFallbackPayment}>
-                  Buka pembayaran di tab baru
-                </button>
-              </div>
-            ) : (
-              <iframe
-                src={`${order.payment.redirectUrl}${order.payment.redirectUrl.includes("?") ? "&" : "?"}view=iframe`}
-                title="Pembayaran DOKU"
-                className="doku-checkout-modal-frame"
-              />
-            )}
+            {/* Halaman checkout DOKU mengirim CSP frame-ancestors / X-Frame-
+                Options yang melarang iframe dari origin mana pun — panel ini
+                menggantikan iframe yang pasti diblokir browser. */}
+            <div className="doku-checkout-modal-fallback">
+              <strong>Halaman pembayaran tidak bisa tampil inline.</strong>
+              <p>
+                DOKU memblokir halaman checkout-nya dari bingkai situs lain.
+                Lanjutkan pembayaran di tab baru — status order di halaman ini
+                tetap ter-update otomatis setelah kamu membayar.
+              </p>
+              <button type="button" className="order-action-button primary" onClick={openFallbackPayment}>
+                Buka pembayaran di tab baru
+              </button>
+            </div>
           </div>
         </div>
       )}
