@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatIDR, suggestPriceFromCost } from "@/lib/pricing";
 import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
+import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 
 type AdminSection =
   | "overview"
@@ -1609,6 +1610,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </section>
+
+              <PaymentGatewayPanel />
 
               <section className="acc-panel">
                 <SectionHead

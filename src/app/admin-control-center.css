@@ -384,6 +384,102 @@
 }
 
 .acc-order-list,
+.acc-gateway-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.acc-gateway-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+}
+
+.acc-gateway-card.active {
+  border-color: color-mix(in srgb, var(--lime, #c9ff3f) 55%, var(--line));
+  background: color-mix(in srgb, var(--lime, #c9ff3f) 5%, var(--surface));
+}
+
+.acc-gateway-card.unconfigured {
+  opacity: 0.75;
+}
+
+.acc-gateway-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.acc-gateway-card-head strong {
+  font-size: 15px;
+}
+
+.acc-gateway-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.acc-gateway-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 2.4em;
+}
+
+.acc-gateway-card button {
+  margin-top: 4px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acc-gateway-card button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--lime, #c9ff3f) 50%, var(--line));
+}
+
+.acc-gateway-card button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.acc-chip-active {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--lime, #c9ff3f);
+  color: #11130f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.acc-gateway-active {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acc-gateway-active b {
+  color: var(--lime, #c9ff3f);
+}
+
+.acc-gateway-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .acc-service-list {
   display: grid;
 }
