@@ -469,7 +469,7 @@ export default function AdminDashboard() {
     minimumOrder: "20000",
     maxDiscount: "",
     quota: "",
-    quotaPerUser: "",
+    quotaPerUser: "1",
   });
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
   const [query, setQuery] = useState("");
@@ -627,7 +627,7 @@ export default function AdminDashboard() {
         minimumOrder: "20000",
         maxDiscount: "",
         quota: "",
-        quotaPerUser: "",
+        quotaPerUser: "1",
       });
       await Promise.all([loadPromotions(), loadOverview()]);
       setNotice("Promo berhasil dibuat.");
@@ -2490,6 +2490,54 @@ export default function AdminDashboard() {
                     setPromoDraft((current) => ({
                       ...current,
                       value: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="number"
+                  placeholder="Min. belanja (Rp)"
+                  title="Minimal pembelian agar promo berlaku"
+                  value={promoDraft.minimumOrder}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      minimumOrder: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="number"
+                  placeholder="Maks diskon (Rp, opsional)"
+                  title="Batas maksimal potongan untuk promo persen"
+                  value={promoDraft.maxDiscount}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      maxDiscount: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="number"
+                  placeholder="Kuota total (opsional)"
+                  title="Maksimal pemakaian promo oleh semua pengguna; kosongkan untuk tanpa batas"
+                  value={promoDraft.quota}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      quota: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="number"
+                  placeholder="Kuota per user (default 1)"
+                  title="Berapa kali satu akun boleh memakai promo ini"
+                  value={promoDraft.quotaPerUser}
+                  onChange={(event) =>
+                    setPromoDraft((current) => ({
+                      ...current,
+                      quotaPerUser: event.target.value,
                     }))
                   }
                 />

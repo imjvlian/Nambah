@@ -45,7 +45,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await getPricingContext(body);
+  const result = await getPricingContext({
+    ...body,
+    userId: auth.user?.id ?? null,
+  });
   if (!result.ok) {
     return Response.json(
       { error: result.error },

@@ -24,6 +24,8 @@ type PricingRequest = {
   paymentId?: string;
   promoCode?: string;
   referralCode?: string;
+  /** Untuk penegakan batas pemakaian per akun (promo & referral). */
+  userId?: string | null;
 };
 
 type PricingContext = {
@@ -82,7 +84,26 @@ type PromotionRow = {
   stackable_with_referral: boolean;
   starts_at: string | null;
   ends_at: string | null;
+  quota: number | null;
+  quota_per_user: number | null;
 };
+
+type PromotionRedemptionCountRow = {
+  promotion_code: string;
+};
+
+type AffiliateUsageRow = {
+  id: string;
+};
+
+/** Awal hari ini dalam zona WIB (UTC+7), sebagai ISO UTC. */
+function startOfTodayWibIso() {
+  const now = Date.now();
+  const wibNow = now + 7 * 60 * 60 * 1000;
+  const wibDayStart = new Date(wibNow);
+  wibDayStart.setUTCHours(0, 0, 0, 0);
+  return new Date(wibDayStart.getTime() - 7 * 60 * 60 * 1000).toISOString();
+}
 
 type PromotionProductRow = {
   product_id: string;
@@ -206,7 +227,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
       promoCode
         ? supabaseSelect<PromotionRow>("promotions", {
             select:
-              "code,name,type,value,minimum_order,max_discount,stackable_with_referral,starts_at,ends_at",
+              "code,name,type,value,minimum_order,max_discount,stackable_with_referral,starts_at,ends_at,quota,quota_per_user",
             filters: { code: `eq.${promoCode}`, active: "eq.true" },
             limit: 1,
           })
@@ -272,6 +293,56 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
     const affiliateRow = affiliateRows[0] ?? null;
     if (referralCode && !affiliateRow) {
       return { ok: false, status: 400, error: "Kode referral tidak ditemukan." };
+    }
+
+    // Batas pemakaian per akun — ditegakkan sedini mungkin (preview &
+    // pembuatan order sama-sama lewat sini), dan diperkuat lagi oleh
+    // nambah_promotion_reserve saat order dibuat.
+    if (request.userId) {
+      if (promotionRow && promotionRow.quota_per_user !== null) {
+        const perUserLimit = Number(promotionRow.quota_per_user);
+        if (perUserLimit > 0) {
+          const usages = await supabaseSelect<PromotionRedemptionCountRow>(
+            "promotion_redemptions",
+            {
+              select: "promotion_code",
+              filters: {
+                promotion_code: `eq.${promotionRow.code}`,
+                user_id: `eq.${request.userId}`,
+                status: "in.(reserved,redeemed)",
+              },
+              limit: perUserLimit,
+            },
+          );
+          if (usages.length >= perUserLimit) {
+            return {
+              ok: false,
+              status: 409,
+              error: `Promo ${promotionRow.code} hanya bisa dipakai ${perUserLimit}× per akun.`,
+            };
+          }
+        }
+      }
+
+      // Referral: 1× per hari per akun (kalender WIB), tanpa kuota total.
+      if (affiliateRow) {
+        const todayUsages = await supabaseSelect<AffiliateUsageRow>("orders", {
+          select: "id",
+          filters: {
+            affiliate_code: `eq.${affiliateRow.code}`,
+            customer_user_id: `eq.${request.userId}`,
+            created_at: `gte.${startOfTodayWibIso()}`,
+          },
+          limit: 1,
+        });
+        if (todayUsages.length > 0) {
+          return {
+            ok: false,
+            status: 409,
+            error: "Kode referral hanya bisa dipakai 1× per hari per akun.",
+          };
+        }
+      }
     }
 
     const promotion: Promotion | null = promotionRow

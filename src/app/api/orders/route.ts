@@ -151,6 +151,7 @@ export async function POST(request: Request) {
     paymentId: body.paymentId,
     promoCode: body.promoCode,
     referralCode: body.referralCode,
+    userId: auth.user?.id ?? null,
   });
 
   if (!pricingContext.ok) {

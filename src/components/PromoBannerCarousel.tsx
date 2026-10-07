@@ -13,17 +13,8 @@ type Banner = {
   showTextOverlay?: boolean;
 };
 
-type PublicPromotion = {
-  code: string;
-  name: string;
-  type: "flat" | "percentage";
-  value: number;
-  endsAt: string | null;
-};
-
 type Slide =
   | { kind: "banner"; banner: Banner }
-  | { kind: "promo"; promo: PublicPromotion }
   | { kind: "usp"; title: string; copy: string };
 
 const USP_SLIDES: Slide[] = [
@@ -39,12 +30,6 @@ const USP_SLIDES: Slide[] = [
   },
 ];
 
-function promoValueLabel(promo: PublicPromotion) {
-  return promo.type === "percentage"
-    ? `Hemat ${promo.value}%`
-    : `Potongan Rp${promo.value.toLocaleString("id-ID")}`;
-}
-
 export default function PromoBannerCarousel() {
   const [slides, setSlides] = useState<Slide[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -55,23 +40,15 @@ export default function PromoBannerCarousel() {
     let mounted = true;
     fetch("/api/banners", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { banners?: Banner[]; promotions?: PublicPromotion[] } | null) => {
+      .then((data: { banners?: Banner[] } | null) => {
         if (!mounted) return;
+        // Carousel hanya menampilkan banner — kartu promo generic tidak lagi
+        // dicampur ke sini. Tanpa banner → fallback slide USP.
         const bannerSlides: Slide[] = (data?.banners ?? []).map((banner) => ({
           kind: "banner",
           banner,
         }));
-        const promoSlides: Slide[] = (data?.promotions ?? []).map((promo) => ({
-          kind: "promo",
-          promo,
-        }));
-        setSlides(
-          bannerSlides.length > 0
-            ? [...bannerSlides, ...promoSlides]
-            : promoSlides.length > 0
-              ? promoSlides
-              : USP_SLIDES,
-        );
+        setSlides(bannerSlides.length > 0 ? bannerSlides : USP_SLIDES);
       })
       .catch(() => {
         if (mounted) setSlides(USP_SLIDES);
@@ -106,12 +83,6 @@ export default function PromoBannerCarousel() {
         await copyCode(banner.promoCode);
         return;
       }
-      scrollToCatalog();
-      return;
-    }
-    if (slide.kind === "promo") {
-      await copyCode(slide.promo.code);
-      return;
     }
     scrollToCatalog();
   }
@@ -176,20 +147,6 @@ export default function PromoBannerCarousel() {
                 </div>
               </article>
             )
-          ) : slide.kind === "promo" ? (
-            <article className="promo-slide promo-slide-generic">
-              <div className="promo-slide-copy">
-                <span className="promo-slide-eyebrow">Kode promo aktif</span>
-                <strong>{slide.promo.name}</strong>
-                <p>
-                  <span className="promo-value-pill">{promoValueLabel(slide.promo)}</span>
-                  kode <b>{slide.promo.code}</b>
-                </p>
-              </div>
-              <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
-                {copied === slide.promo.code ? "Kode disalin ✓" : "Pakai kode"}
-              </button>
-            </article>
           ) : (
             <article className="promo-slide promo-slide-generic">
               <div className="promo-slide-copy">
