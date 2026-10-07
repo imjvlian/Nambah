@@ -55,8 +55,14 @@ export async function setActivePaymentProvider(provider: PaymentProviderId) {
 }
 
 export function isDokuConfigured() {
-  // SNAP butuh 5 kredensial: client id, secret (HMAC), private key RSA
-  // (token B2B), merchant id, dan terminal id (QRIS).
+  // Minimum untuk mode Checkout (non-SNAP): Client-Id + Secret Key.
+  // QRIS inline native (SNAP) aktif otomatis saat RSA keys dilengkapi.
+  return Boolean(
+    process.env.DOKU_CLIENT_ID?.trim() && process.env.DOKU_SECRET_KEY?.trim(),
+  );
+}
+
+export function isDokuSnapConfigured() {
   return Boolean(
     process.env.DOKU_CLIENT_ID?.trim() &&
       process.env.DOKU_SECRET_KEY?.trim() &&
@@ -96,9 +102,11 @@ export function getPaymentProviderStatuses(): PaymentProviderStatus[] {
       name: "DOKU",
       configured: isDokuConfigured(),
       environment: isDokuConfigured() ? getDokuEnvironment() : null,
-      note: isDokuConfigured()
-        ? "Jokul SNAP direct API siap (QRIS native)"
-        : "DOKU_CLIENT_ID / SECRET_KEY / PRIVATE_KEY / MERCHANT_ID / TERMINAL_ID belum lengkap",
+      note: isDokuSnapConfigured()
+        ? "SNAP siap — QRIS inline native"
+        : isDokuConfigured()
+          ? "Checkout hosted siap — lengkapi PRIVATE_KEY/MERCHANT_ID/TERMINAL_ID untuk QRIS inline"
+          : "DOKU_CLIENT_ID / DOKU_SECRET_KEY belum diisi",
     },
   ];
 }

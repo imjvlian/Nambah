@@ -5,7 +5,7 @@ import type { PaymentProviderId } from "@/lib/payment-settings";
  * asli provider untuk disimpan di orders.payment_payload (audit & rekonsiliasi).
  */
 export type PaymentSessionPayload = {
-  kind: "snap" | "qris" | "va" | "ewallet" | "card" | "retail";
+  kind: "snap" | "qris" | "va" | "ewallet" | "card" | "retail" | "redirect";
   snapToken?: string;
   /** Snap redirect / deeplink e-wallet / halaman 3DS kartu. */
   redirectUrl?: string;

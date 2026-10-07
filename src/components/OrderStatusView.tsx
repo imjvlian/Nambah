@@ -623,9 +623,19 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     amount={order.pricing.finalPrice}
                     expiresAt={order.doku?.expiresAt ?? order.expiresAt ?? null}
                   />
+                ) : redirectUrl ? (
+                  <div className="doku-checkout-cta">
+                    <p>
+                      Sesi pembayaran DOKU siap. Kamu akan diarahkan ke halaman
+                      pembayaran aman untuk menyelesaikan transaksi.
+                    </p>
+                    <button type="button" className="order-action-button primary" onClick={openFallbackPayment}>
+                      Lanjutkan pembayaran
+                    </button>
+                  </div>
                 ) : (
                   <div className="midtrans-native-warning">
-                    QR pembayaran belum tersedia. Tekan &quot;Cek status&quot; atau muat ulang halaman.
+                    Sesi pembayaran belum tersedia. Tekan &quot;Cek status&quot; atau muat ulang halaman.
                   </div>
                 )}
 

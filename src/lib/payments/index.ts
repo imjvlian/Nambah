@@ -6,8 +6,12 @@ import {
 import type { MidtransStatusPayload } from "@/lib/midtrans/client";
 import { createMidtransPaymentSession, fetchMidtransStatus } from "./midtrans";
 import {
+  createDokuCheckoutPayment,
   createDokuQrisPayment,
+  fetchDokuCheckoutStatus,
   fetchDokuQrisStatus,
+  getDokuMode,
+  isDokuSnapConfigured,
   type DokuStatusResult,
 } from "./doku";
 import type { CreatePaymentInput, PaymentSession } from "./types";
@@ -23,7 +27,9 @@ function isQrisMethod(input: CreatePaymentInput) {
 
 /**
  * Membuat sesi pembayaran untuk ORDER BARU memakai gateway aktif dari
- * app_settings. DOKU tahap 3: QRIS native; channel lain menyusul.
+ * app_settings. DOKU dual-mode: SNAP (QRIS inline native, butuh RSA keys)
+ * diprioritaskan; kalau belum ada, jatuh ke Jokul Checkout (hosted page
+ * semua channel) dengan kredensial Client-Id + Secret Key saja.
  */
 export async function createPaymentSession(
   input: CreatePaymentInput,
@@ -31,12 +37,16 @@ export async function createPaymentSession(
   const provider = await getActivePaymentProvider();
 
   if (provider === "doku") {
-    if (!isQrisMethod(input)) {
-      throw new Error(
-        "Gateway DOKU saat ini baru mendukung QRIS. Pilih QRIS, atau alihkan gateway ke Midtrans untuk metode lain.",
-      );
+    const mode = getDokuMode();
+    if (mode === "snap" && isQrisMethod(input)) {
+      return createDokuQrisPayment(input);
     }
-    return createDokuQrisPayment(input);
+    if (mode) {
+      return createDokuCheckoutPayment(input);
+    }
+    throw new Error(
+      "Gateway DOKU belum terkonfigurasi (minimal DOKU_CLIENT_ID + DOKU_SECRET_KEY).",
+    );
   }
 
   return createMidtransPaymentSession(input);
@@ -56,10 +66,17 @@ export async function fetchGatewayStatus(
   options?: { referenceNo?: string | null },
 ): Promise<GatewayStatusResult> {
   if (provider === "doku") {
-    const doku = await fetchDokuQrisStatus({
-      orderId,
-      referenceNo: options?.referenceNo ?? null,
-    });
+    // Order SNAP menyimpan referenceNo dari qr-mpm-generate; order Checkout
+    // tidak. Kalau referenceNo ada DAN SNAP masih terkonfigurasi → query SNAP,
+    // selain itu pakai check status non-SNAP (per invoice).
+    if (options?.referenceNo && isDokuSnapConfigured()) {
+      const doku = await fetchDokuQrisStatus({
+        orderId,
+        referenceNo: options.referenceNo,
+      });
+      return { provider: "doku", doku };
+    }
+    const doku = await fetchDokuCheckoutStatus(orderId);
     return { provider: "doku", doku };
   }
 

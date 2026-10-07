@@ -421,21 +421,25 @@ export async function POST(request: Request) {
       { filters: { order_id: `eq.${orderId}` } },
     );
 
-    // Sesi DOKU: simpan referenceNo + payload QR agar bisa dirender inline dan
-    // di-query statusnya. payment_payload butuh migrasi 026 — kegagalannya
-    // tidak boleh menggagalkan order (QR tetap dikirim di response create).
+    // Sesi DOKU: simpan reference + payload (QR inline untuk SNAP, atau mode
+    // checkout) agar bisa dirender & di-query statusnya. payment_payload butuh
+    // migrasi 026 — kegagalannya tidak boleh menggagalkan order.
     if (session.provider === "doku") {
-      const raw = session.payload.raw as { referenceNo?: string } | undefined;
+      const raw = session.payload.raw as
+        | { referenceNo?: string; requestId?: string; mode?: string }
+        | undefined;
       try {
         await supabaseUpdate(
           "payments",
           {
-            provider_transaction_id: raw?.referenceNo ?? null,
-            payment_type: "qris",
+            provider_transaction_id: raw?.referenceNo ?? raw?.requestId ?? null,
+            payment_type: session.payload.kind === "qris" ? "qris" : "checkout",
             payment_payload: {
+              mode: raw?.mode ?? (session.payload.kind === "qris" ? "snap" : "checkout"),
               qrContent: session.payload.qrContent ?? null,
               expiresAt: session.payload.expiresAt ?? null,
               referenceNo: raw?.referenceNo ?? null,
+              requestId: raw?.requestId ?? null,
             },
             updated_at: new Date().toISOString(),
           },

@@ -389,6 +389,8 @@ export type DokuApplyInput = {
   paidTime?: string | null;
   /** Nominal string DOKU ("10000.00") untuk validasi jumlah. */
   amountValue?: string | null;
+  /** Channel pembayaran (qris / QRIS_DOKU / VIRTUAL_ACCOUNT_BCA / ...). */
+  paymentType?: string | null;
   /** Payload mentah notifikasi/query terakhir — disimpan di payment_payload. */
   raw?: unknown;
 };
@@ -430,7 +432,7 @@ export async function applyDokuStatus(
     ...(input.referenceNo ? { provider_transaction_id: input.referenceNo } : {}),
     status: paymentStatus,
     raw_status: input.transactionStatus,
-    payment_type: "qris",
+    payment_type: input.paymentType ?? "qris",
     fraud_status: null,
     ...(signatureVerified ? { signature_verified_at: now } : {}),
     ...(paid ? { paid_at: input.paidTime ?? now } : {}),
