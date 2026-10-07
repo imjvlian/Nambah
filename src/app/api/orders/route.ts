@@ -18,7 +18,8 @@ import {
   reserveOrderPoints,
   validateRequestedPoints,
 } from "@/lib/loyalty";
-import { createMidtransSnapTransaction, isMidtransConfigured } from "@/lib/midtrans/client";
+import { isMidtransConfigured } from "@/lib/midtrans/client";
+import { createPaymentSession } from "@/lib/payments";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { reservePromotionForOrder } from "@/lib/promotion-service";
 import { cancelOrderWithCleanup } from "@/lib/order-cancellation";
@@ -371,6 +372,10 @@ export async function POST(request: Request) {
       }
     }
 
+    // Sesi pembayaran dibuat lewat router gateway aktif (Midtrans / DOKU).
+    // Provider dicatat di baris payments supaya webhook, status-check, dan
+    // rekonsiliasi selalu mengikuti gateway pembuat order — bukan switch
+    // global yang bisa berubah sewaktu-waktu.
     await supabaseInsert("payments", {
       order_id: orderId,
       provider: "midtrans",
@@ -382,26 +387,24 @@ export async function POST(request: Request) {
       updated_at: now,
     });
 
-    let snap;
+    let session;
     try {
-      snap = await createMidtransSnapTransaction({
+      session = await createPaymentSession({
         orderId,
         grossAmount: pricing.finalPrice,
         itemId: selectedPackage.id,
         itemName: `${game.name} - ${selectedPackage.label}`,
+        paymentMethodId: paymentMethod.id,
         enabledPayments,
         customerEmail: receiptEmail,
         customerPhone: receiptWhatsapp || undefined,
       });
     } catch (error) {
-      // Jalur ini sebelumnya hanya set `status` + `updated_at` tanpa
-      // `terminal_at`/`status_changed_at`, jadi order terminal tapi tidak
-      // ditandai terminal. Sekarang lewat helper yang sama seperti jalur lain.
       await cancelOrderWithCleanup(orderId, "snap_create_failed");
       await supabaseUpdate(
         "payments",
         { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
-        { filters: { order_id: `eq.${orderId}`, provider: "eq.midtrans" } },
+        { filters: { order_id: `eq.${orderId}` } },
       );
       throw error;
     }
@@ -409,12 +412,13 @@ export async function POST(request: Request) {
     await supabaseUpdate(
       "payments",
       {
-        snap_token: snap.token,
-        redirect_url: snap.redirectUrl,
+        provider: session.provider,
+        snap_token: session.payload.snapToken ?? null,
+        redirect_url: session.payload.redirectUrl ?? null,
         raw_status: "pending",
         updated_at: new Date().toISOString(),
       },
-      { filters: { order_id: `eq.${orderId}`, provider: "eq.midtrans" } },
+      { filters: { order_id: `eq.${orderId}` } },
     );
 
     const order = await getPublicOrder(orderId);

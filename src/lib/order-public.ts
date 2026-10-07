@@ -33,7 +33,7 @@ export type PublicOrder = {
     id: string;
     name: string;
     detail: string;
-    provider: "midtrans";
+    provider: "midtrans" | "doku";
     providerStatus: string;
     paymentType: string | null;
     snapToken: string | null;

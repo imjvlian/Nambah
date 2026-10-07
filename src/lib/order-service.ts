@@ -108,7 +108,9 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
     supabaseSelect<PaymentRow>("payments", {
       select:
         "order_id,provider,status,raw_status,payment_type,snap_token,redirect_url,paid_at",
-      filters: { order_id: `eq.${order.id}`, provider: "eq.midtrans" },
+      // Tanpa filter provider: baris terbaru per order adalah sesi gateway
+      // yang aktif untuk order itu (Midtrans hari ini, DOKU menyusul).
+      filters: { order_id: `eq.${order.id}` },
       order: "created_at.desc",
       limit: 1,
     }),
@@ -163,7 +165,7 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       id: paymentMethod.id,
       name: paymentMethod.name,
       detail: paymentMethod.detail,
-      provider: "midtrans",
+      provider: payment?.provider === "doku" ? "doku" : "midtrans",
       providerStatus: payment?.raw_status ?? payment?.status ?? "pending",
       paymentType: payment?.payment_type ?? null,
       snapToken: payment?.snap_token ?? null,

@@ -1,4 +1,4 @@
-import { getMidtransTransactionStatus } from "@/lib/midtrans/client";
+import { fetchGatewayStatus, normalizeProviderId } from "@/lib/payments";
 import {
   applyMidtransStatus,
   getPublicOrder,
@@ -51,13 +51,24 @@ export async function POST(
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });
     }
 
-    const payload = await getMidtransTransactionStatus(orderId);
-    const order = await applyMidtransStatus(payload, "status_api", false);
-    return Response.json({ order }, { headers });
-  } catch (error) {
-    console.error("Midtrans status refresh failed", error);
+    // Status diambil dari gateway PEMBUAT order, bukan gateway aktif saat ini —
+    // switch di dashboard tidak mengganggu order yang sedang berjalan.
+    const provider = normalizeProviderId(existing.payment.provider);
+    const result = await fetchGatewayStatus(provider, orderId);
+
+    if (result.provider === "midtrans") {
+      const order = await applyMidtransStatus(result.raw, "status_api", false);
+      return Response.json({ order }, { headers });
+    }
+
     return Response.json(
-      { error: "Status Midtrans belum dapat diperbarui." },
+      { error: "Status gateway ini belum didukung." },
+      { status: 501, headers },
+    );
+  } catch (error) {
+    console.error("Payment status refresh failed", error);
+    return Response.json(
+      { error: "Status pembayaran belum dapat diperbarui." },
       { status: 502 },
     );
   }
