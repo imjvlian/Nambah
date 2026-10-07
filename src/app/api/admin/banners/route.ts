@@ -26,6 +26,7 @@ type BannerRow = {
   promo_code: string | null;
   sort_order: number;
   display_mode: string;
+  show_text_overlay: boolean;
   active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -33,7 +34,7 @@ type BannerRow = {
 };
 
 const SELECT =
-  "id,title,subtitle,image_url,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,active,starts_at,ends_at,created_at";
+  "id,title,subtitle,image_url,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,active,starts_at,ends_at,created_at";
 
 const DISPLAY_MODES = new Set(["carousel", "popup", "both"]);
 
@@ -48,6 +49,7 @@ function mapBanner(row: BannerRow) {
     promoCode: row.promo_code,
     sortOrder: row.sort_order,
     displayMode: row.display_mode ?? "carousel",
+    showTextOverlay: row.show_text_overlay ?? true,
     active: row.active,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
       display_mode: DISPLAY_MODES.has(cleanText(form.get("displayMode"), 10))
         ? cleanText(form.get("displayMode"), 10)
         : "carousel",
+      show_text_overlay: cleanText(form.get("showTextOverlay"), 10) !== "false",
       sort_order: Math.max(0, Math.round(Number(cleanText(form.get("sortOrder"), 6)) || 100)),
       active: cleanText(form.get("active"), 10) !== "false",
       starts_at: cleanIso(cleanText(form.get("startsAt"), 40)),
@@ -207,6 +210,9 @@ export async function PATCH(request: Request) {
       updates.display_mode = displayMode;
     }
     if (body.active !== undefined) updates.active = Boolean(body.active);
+    if (body.showTextOverlay !== undefined) {
+      updates.show_text_overlay = Boolean(body.showTextOverlay);
+    }
     if (body.startsAt !== undefined) {
       updates.starts_at = cleanIso(typeof body.startsAt === "string" ? body.startsAt : "");
     }

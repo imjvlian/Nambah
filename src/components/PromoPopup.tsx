@@ -11,6 +11,7 @@ type Banner = {
   ctaHref: string | null;
   promoCode: string | null;
   displayMode: string;
+  showTextOverlay?: boolean;
 };
 
 const SNOOZE_MS = 24 * 60 * 60 * 1000;
@@ -116,23 +117,37 @@ export default function PromoPopup() {
           ✕
         </button>
 
-        <div
-          className="promo-popup-media"
-          style={{ backgroundImage: `url(${banner.imageUrl})` }}
-          role="img"
-          aria-label={banner.title}
-        />
+        {banner.showTextOverlay === false ? (
+          // Mode bersih: gambar memenuhi popup, klik gambar menjalankan aksi
+          // (link / salin kode / katalog), tanpa blok judul & tombol.
+          <button
+            type="button"
+            className="promo-popup-media promo-popup-media-clean"
+            style={{ backgroundImage: `url(${banner.imageUrl})` }}
+            aria-label={banner.title}
+            onClick={() => void handleCta()}
+          />
+        ) : (
+          <>
+            <div
+              className="promo-popup-media"
+              style={{ backgroundImage: `url(${banner.imageUrl})` }}
+              role="img"
+              aria-label={banner.title}
+            />
 
-        <div className="promo-popup-body">
-          <strong>{banner.title}</strong>
-          {banner.subtitle && <p>{banner.subtitle}</p>}
-          <button type="button" className="promo-popup-cta" onClick={() => void handleCta()}>
-            {copied
-              ? "Kode disalin ✓"
-              : banner.ctaLabel ??
-                (banner.promoCode ? `Pakai kode ${banner.promoCode}` : "Lihat promo")}
-          </button>
-        </div>
+            <div className="promo-popup-body">
+              <strong>{banner.title}</strong>
+              {banner.subtitle && <p>{banner.subtitle}</p>}
+              <button type="button" className="promo-popup-cta" onClick={() => void handleCta()}>
+                {copied
+                  ? "Kode disalin ✓"
+                  : banner.ctaLabel ??
+                    (banner.promoCode ? `Pakai kode ${banner.promoCode}` : "Lihat promo")}
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );

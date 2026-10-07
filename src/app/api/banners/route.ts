@@ -13,6 +13,7 @@ type BannerRow = {
   promo_code: string | null;
   sort_order: number;
   display_mode: string;
+  show_text_overlay: boolean;
   starts_at: string | null;
   ends_at: string | null;
 };
@@ -41,7 +42,7 @@ export async function GET() {
     const [banners, promotions, redemptions] = await Promise.all([
       supabaseSelect<BannerRow>("promo_banners", {
         select:
-          "id,title,subtitle,image_url,cta_label,cta_href,promo_code,sort_order,display_mode,starts_at,ends_at",
+          "id,title,subtitle,image_url,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,starts_at,ends_at",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
         limit: 10,
@@ -86,6 +87,7 @@ export async function GET() {
           ctaHref: banner.cta_href,
           promoCode: banner.promo_code,
           displayMode: banner.display_mode ?? "carousel",
+          showTextOverlay: banner.show_text_overlay ?? true,
         })),
         promotions: promotions
           .filter((promo) => !promo.ends_at || promo.ends_at > now)

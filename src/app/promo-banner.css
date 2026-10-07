@@ -44,6 +44,20 @@
   padding: 0;
 }
 
+/* Mode bersih: gambar full-bleed, seluruh slide satu tombol besar. */
+.promo-slide-banner-clean {
+  display: block;
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  border-radius: inherit;
+}
+
+.promo-slide-banner-clean:focus-visible {
+  outline: 2px solid var(--lime, #c9ff3f);
+  outline-offset: -2px;
+}
+
 .promo-slide-overlay {
   flex: 1;
   align-self: stretch;
@@ -263,6 +277,24 @@
   background-position: center;
 }
 
+/* Mode bersih: gambar memenuhi popup dan menjadi satu tombol besar. */
+.promo-popup-media-clean {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  height: auto;
+  min-height: 180px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background-color: transparent;
+}
+
+.promo-popup-media-clean:focus-visible {
+  outline: 2px solid var(--lime, #c9ff3f);
+  outline-offset: -2px;
+}
+
 .promo-popup-body {
   display: grid;
   gap: 8px;
@@ -296,6 +328,37 @@
 
 .promo-popup-cta:hover {
   background: rgba(201, 255, 63, 0.22);
+}
+
+/* Admin: badge mode bersih + toggle inline di form upload */
+.acc-chip-clean {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 255, 63, 0.4);
+  background: rgba(201, 255, 63, 0.1);
+  color: var(--lime, #c9ff3f);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.acc-toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.acc-toggle-inline input {
+  accent-color: var(--lime, #c9ff3f);
+  width: 16px;
+  height: 16px;
 }
 
 .promo-popup-close {

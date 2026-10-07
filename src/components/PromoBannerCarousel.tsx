@@ -10,6 +10,7 @@ type Banner = {
   ctaLabel: string | null;
   ctaHref: string | null;
   promoCode: string | null;
+  showTextOverlay?: boolean;
 };
 
 type PublicPromotion = {
@@ -148,21 +149,33 @@ export default function PromoBannerCarousel() {
       <div className="promo-carousel-frame">
         <div className="promo-slide-track" key={current}>
           {slide.kind === "banner" ? (
-            <article
-              className="promo-slide promo-slide-banner"
-              style={{ backgroundImage: `url(${slide.banner.imageUrl})` }}
-            >
-              <div className="promo-slide-overlay">
-                <div className="promo-slide-copy">
-                  <strong>{slide.banner.title}</strong>
-                  {slide.banner.subtitle && <p>{slide.banner.subtitle}</p>}
+            slide.banner.showTextOverlay === false ? (
+              // Mode bersih: gambar full-bleed tanpa teks/CTA; seluruh slide
+              // tetap bisa diklik mengikuti ctaHref / promoCode / katalog.
+              <button
+                type="button"
+                className="promo-slide promo-slide-banner promo-slide-banner-clean"
+                style={{ backgroundImage: `url(${slide.banner.imageUrl})` }}
+                aria-label={slide.banner.title}
+                onClick={() => void handleCta()}
+              />
+            ) : (
+              <article
+                className="promo-slide promo-slide-banner"
+                style={{ backgroundImage: `url(${slide.banner.imageUrl})` }}
+              >
+                <div className="promo-slide-overlay">
+                  <div className="promo-slide-copy">
+                    <strong>{slide.banner.title}</strong>
+                    {slide.banner.subtitle && <p>{slide.banner.subtitle}</p>}
+                  </div>
+                  <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
+                    {slide.banner.ctaLabel ??
+                      (slide.banner.promoCode ? `Pakai kode ${slide.banner.promoCode}` : "Top up sekarang")}
+                  </button>
                 </div>
-                <button type="button" className="promo-slide-cta" onClick={() => void handleCta()}>
-                  {slide.banner.ctaLabel ??
-                    (slide.banner.promoCode ? `Pakai kode ${slide.banner.promoCode}` : "Top up sekarang")}
-                </button>
-              </div>
-            </article>
+              </article>
+            )
           ) : slide.kind === "promo" ? (
             <article className="promo-slide promo-slide-generic">
               <div className="promo-slide-copy">

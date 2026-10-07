@@ -13,6 +13,7 @@ type Banner = {
   promoCode: string | null;
   sortOrder: number;
   displayMode: "carousel" | "popup" | "both";
+  showTextOverlay: boolean;
   active: boolean;
   startsAt: string | null;
   endsAt: string | null;
@@ -42,6 +43,7 @@ export default function BannerAdminPanel() {
     promoCode: "",
     sortOrder: "100",
     displayMode: "carousel",
+    showTextOverlay: true,
   });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
@@ -93,6 +95,7 @@ export default function BannerAdminPanel() {
       form.set("promoCode", draft.promoCode);
       form.set("sortOrder", draft.sortOrder);
       form.set("displayMode", draft.displayMode);
+      form.set("showTextOverlay", String(draft.showTextOverlay));
 
       const response = await fetch("/api/admin/banners", {
         method: "POST",
@@ -110,6 +113,7 @@ export default function BannerAdminPanel() {
         promoCode: "",
         sortOrder: "100",
         displayMode: "carousel",
+        showTextOverlay: true,
       });
       setFile(null);
       await load();
@@ -160,6 +164,35 @@ export default function BannerAdminPanel() {
       setNotice(`Banner ${banner.title} kini tampil di: ${DISPLAY_MODE_LABEL[displayMode] ?? displayMode}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Display mode gagal diubah.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function toggleTextOverlay(banner: Banner) {
+    setBusy("overlay:" + banner.id);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/banners", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: banner.id,
+          showTextOverlay: !banner.showTextOverlay,
+        }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Mode tampilan gagal diubah.");
+      }
+      await load();
+      setNotice(
+        banner.showTextOverlay
+          ? `Banner ${banner.title} kini tampil bersih (tanpa teks).`
+          : `Banner ${banner.title} kini menampilkan teks overlay.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Mode tampilan gagal diubah.");
     } finally {
       setBusy("");
     }
@@ -324,6 +357,27 @@ export default function BannerAdminPanel() {
                 <small>Pop-up muncul sebagai modal sekali per 24 jam per pengunjung.</small>
               </label>
 
+              <label className="acc-field acc-field-checkbox">
+                <span>Teks di atas gambar</span>
+                <label className="acc-toggle-inline">
+                  <input
+                    type="checkbox"
+                    checked={draft.showTextOverlay}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        showTextOverlay: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>{draft.showTextOverlay ? "Tampilkan judul & tombol" : "Banner bersih (gambar saja)"}</span>
+                </label>
+                <small>
+                  Matikan kalau desain sudah memuat teks/CTA di dalam gambar — banner
+                  tampil full-bleed dan seluruh gambar bisa diklik.
+                </small>
+              </label>
+
               <label className="acc-field">
                 <span>Urutan</span>
                 <input
@@ -362,7 +416,12 @@ export default function BannerAdminPanel() {
               <div className="acc-receipts-row" key={banner.id}>
                 <div>
                   <strong>{banner.title}</strong>
-                  <span>{banner.subtitle ?? banner.imageUrl.slice(0, 64) + "…"}</span>
+                  <span>
+                    {banner.showTextOverlay === false && (
+                      <em className="acc-chip-clean">Bersih</em>
+                    )}
+                    {banner.subtitle ?? banner.imageUrl.slice(0, 64) + "…"}
+                  </span>
                 </div>
                 <span>{banner.promoCode ?? banner.ctaLabel ?? "-"}</span>
                 <select
@@ -380,6 +439,18 @@ export default function BannerAdminPanel() {
                   {banner.active ? "active" : "inactive"}
                 </span>
                 <div className="acc-action-panel">
+                  <button
+                    type="button"
+                    disabled={!canManage || Boolean(busy)}
+                    onClick={() => void toggleTextOverlay(banner)}
+                    title="Alihkan antara tampil dengan teks overlay dan banner bersih (gambar saja)"
+                  >
+                    {busy === "overlay:" + banner.id
+                      ? "..."
+                      : banner.showTextOverlay
+                        ? "Jadikan bersih"
+                        : "Pakai teks"}
+                  </button>
                   <button
                     type="button"
                     disabled={!canManage || Boolean(busy)}
