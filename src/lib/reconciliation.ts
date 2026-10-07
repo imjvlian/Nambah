@@ -10,6 +10,9 @@ import {
   fulfillPaidOrder,
   getFulfillmentMode,
 } from "@/lib/fulfillment";
+import { applyDokuStatus } from "@/lib/order-service";
+import { fetchGatewayStatus } from "@/lib/payments";
+import { getDokuMode } from "@/lib/payments/doku";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import { sweepExpiredPendingOrders } from "@/lib/order-expiry";
 import { resolvePersistedTestScenario } from "@/lib/test-lab-policy";
@@ -64,6 +67,13 @@ export type ReconciliationResult = {
     cancelled: number;
     alreadySettled: number;
     paymentDetected: number;
+    failed: number;
+  };
+  doku: {
+    checked: number;
+    applied: number;
+    stillPending: number;
+    skipped: number;
     failed: number;
   };
   supplier: {
@@ -163,6 +173,13 @@ export async function runNambahReconciliation(input?: {
       paymentDetected: 0,
       failed: 0,
     },
+    doku: {
+      checked: 0,
+      applied: 0,
+      stillPending: 0,
+      skipped: 0,
+      failed: 0,
+    },
     supplier: {
       checked: 0,
       applied: 0,
@@ -201,6 +218,77 @@ export async function runNambahReconciliation(input?: {
     }
   } catch (error) {
     issue(result, "order", "expired_order_sweep", error);
+  }
+
+  // Polling status gateway DOKU untuk order yang masih `pending_payment`.
+  // Webhook adalah jalur utama finalisasi; bagian ini penyelamat kalau
+  // notifikasi telat/gagal (URL belum terdaftar, signature salah, dsb).
+  // Kandidat dibatasi order pending_payment (bukan cancelled) supaya status
+  // "pending" dari gateway tidak pernah menghidupkan order yang sudah mati.
+  if (getDokuMode()) {
+    try {
+      const dokuPendingOrders = await supabaseSelect<{ id: string }>("orders", {
+        select: "id",
+        filters: {
+          status: "eq.pending_payment",
+          created_at: `lt.${before(2 * 60_000)}`,
+        },
+        order: "created_at.asc",
+        limit: 10,
+      });
+
+      if (dokuPendingOrders.length > 0) {
+        const ids = dokuPendingOrders.map((row) => row.id);
+        const dokuPayments = await supabaseSelect<{
+          order_id: string;
+          provider_transaction_id: string | null;
+        }>("payments", {
+          select: "order_id,provider_transaction_id",
+          filters: {
+            order_id: `in.(${ids.join(",")})`,
+            provider: "eq.doku",
+            status: "eq.pending",
+          },
+          limit: ids.length,
+        });
+
+        for (const payment of dokuPayments) {
+          result.doku.checked += 1;
+          try {
+            const status = await fetchGatewayStatus("doku", payment.order_id, {
+              referenceNo: payment.provider_transaction_id,
+            });
+            if (status.provider !== "doku") {
+              result.doku.skipped += 1;
+              continue;
+            }
+            await applyDokuStatus(
+              {
+                orderId: status.doku.orderId,
+                referenceNo: status.doku.referenceNo,
+                transactionStatus: status.doku.transactionStatus,
+                transactionStatusDesc: status.doku.transactionStatusDesc,
+                paidTime: status.doku.paidTime,
+                amountValue: status.doku.amountValue,
+                raw: status.doku.raw,
+              },
+              "status_api",
+              false,
+            );
+            if (status.doku.transactionStatus === "pending") {
+              result.doku.stillPending += 1;
+            } else {
+              result.doku.applied += 1;
+            }
+          } catch (error) {
+            result.doku.failed += 1;
+            issue(result, "order", payment.order_id, error);
+          }
+        }
+      }
+    } catch (error) {
+      issue(result, "order", "doku_status_poll", error);
+    }
   }
 
   const recoverableOrders = await supabaseSelect<RecoverableOrderRow>("orders", {
