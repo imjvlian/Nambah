@@ -1,0 +1,31 @@
+import { ImageResponse } from "next/og";
+import { BRAND } from "@/lib/brand";
+export const runtime = "edge";
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const title = searchParams.get("title") ?? BRAND.name;
+  const subtitle = searchParams.get("subtitle") ?? BRAND.tagline;
+  const fontData = await fetch(`https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap`).then((r) => r.text());
+  const m = fontData.match(/src:\s*url\(([^)]+)\)/);
+  const fontUrl = m?.[1];
+  let fontBuf: ArrayBuffer | null = null;
+  if (fontUrl) fontBuf = await fetch(fontUrl).then((r) => r.arrayBuffer());
+  const svgMark = (
+    <svg width="96" height="71" viewBox="0 0 4435.74 3278.6" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: "28px" }}>
+      <g><path fill="#c9ff3f" d="M3809.98,873.33v-153.66c0-47.28-38.33-85.61-85.61-85.61h-153.66c-47.28,0-85.61-38.33-85.61-85.61v-113.05c0-16.8,4.86-32.46,13.22-45.68-179.2,31.82-321.16,170.14-377.93,383.01l-340.41,1323.8L1475.1,621.44c-264.76-302.58-718.64-208.03-813.19,151.29L0,3250.14h378.23c283.67,56.73,510.61-94.56,586.26-378.23l321.5-1229.25,1285.98,1456.18c264.76,302.58,737.55,208.03,832.11-170.2l515.15-1969.71h-23.63c-47.28,0-85.61-38.33-85.61-85.61Z"/><path fill="#c9ff3f" d="M3645.54,302.58h143.11c44.04,0,79.74-35.7,79.74-79.74V79.74c0-44.04,35.7-79.74,79.74-79.74h105.29c44.04,0,79.74,35.7,79.74,79.74v143.11c0,44.04,35.7,79.74,79.74,79.74h143.11c44.04,0,79.74,35.7,79.74,79.74v105.29c0,44.04-35.7,79.74-79.74,79.74h-143.11c-44.04,0-79.74,35.7-79.74,79.74v143.11c0,44.04-35.7,79.74-79.74,79.74h-105.29c-44.04,0-79.74-35.7-79.74-79.74v-143.11c0-44.04-35.7-79.74-79.74-79.74h-143.11c-44.04,0-79.74-35.7-79.74-79.74v-105.29c0-44.04,35.7-79.74,79.74-79.74Z"/></g>
+    </svg>
+  );
+  return new ImageResponse(
+    (
+      <div style={{ height: "100%", width: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: BRAND.backgroundColor, padding: "80px", position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% -15%, rgba(201,255,63,0.10), transparent 520px)" }} />
+        <div style={{ display: "flex", alignItems: "center", zIndex: 1 }}>{svgMark}<div style={{ fontSize: "64px", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 0.95, color: BRAND.colors.lime[500], fontFamily: "Plus Jakarta Sans" }}>{BRAND.name}</div></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px", zIndex: 1, maxWidth: "980px" }}>
+          <div style={{ fontSize: title.length > 40 ? "56px" : "72px", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.08, color: "#f4f6ef", fontFamily: "Plus Jakarta Sans" }}>{title}</div>
+          <div style={{ fontSize: "36px", color: "#92998c", letterSpacing: "-0.01em", lineHeight: 1.2, fontFamily: "Plus Jakarta Sans" }}>{subtitle}</div>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630, fonts: fontBuf ? [{ name: "Plus Jakarta Sans", data: fontBuf, style: "normal", weight: 800 }] : undefined },
+  );
+}
