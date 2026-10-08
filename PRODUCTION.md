@@ -269,6 +269,10 @@ Respons `expiry.checked > 0` berarti sweeper menemukan order kedaluwarsa;
 `expiry.cancelled` adalah jumlah order yang benar-benar dibatalkan dan
 reservasinya dilepas.
 
+Unit memakai `Restart=no` — kegagalan tidak di-retry otomatis, karena endpoint
+yang membalas 400/401 tidak akan pernah berhasil dengan dicoba ulang. Setelah
+diperbaiki, jalankan ulang dengan `systemctl reset-failed` lalu `systemctl start`.
+
 ## 11. Supabase Auth
 
 Sebelum normal production traffic:

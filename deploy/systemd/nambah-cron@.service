@@ -15,6 +15,18 @@ Documentation=file:///opt/nambah/deploy/systemd/README.md
 After=network-online.target
 Wants=network-online.target
 
+# Cron job TIDAK di-restart otomatis.
+#
+# `Restart=on-failure` pernah dipakai di sini dan itu salah: sebuah endpoint
+# yang membalas 400 (secret salah, env rusak) tidak akan pernah berhasil dengan
+# dicoba ulang. Unit itu mencoba lagi setiap 30 detik tanpa henti, memenuhi
+# journal, dan membuat unit aslinya tidak terlihat di `systemctl list-units
+# --failed` karena restart terus mengeset ulang statusnya.
+#
+# Sekarang kegagalan sekali tercatat, lalu job menunggu jadwal berikutnya.
+# Kalau memang perlu dicoba ulang setelah masalah beres, `systemctl start`
+# manual atau timer pada jadwal berikutnya sudah cukup.
+
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/nambah/cron.env
@@ -23,11 +35,7 @@ ExecStart=/opt/nambah/deploy/systemd/nambah-cron-run.sh %i
 # `reconcile` menjalankan retry supplier dan receipt, `telegram-dispatch`
 # menunggu jeda 1,1 detik per pesan, jadi run-nya bisa beberapa puluh detik.
 TimeoutStartSec=420
-
-# Retry sekali untuk kegagalan yang kelihatan sementara (network, Supabase).
-Restart=on-failure
-RestartSec=30
-TimeoutStopSec=30
+Restart=no
 
 # Hardening
 NoNewPrivileges=true

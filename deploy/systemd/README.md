@@ -115,6 +115,55 @@ journalctl -u nambah-cron@reconcile -n 50 --no-pager
 journalctl -u 'nambah-cron@*' --since today --no-pager
 ```
 
+## Kegagalan tidak di-retry otomatis
+
+Unit memakai `Restart=no`. Ini disengaja: endpoint yang membalas 400 atau 401
+tidak akan pernah berhasil dengan dicoba ulang, dan `Restart=on-failure`
+hanya menghasilkan percobaan berulang setiap 30 detik yang memenuhi journal
+sambil menyembunyikan unit-nya dari `systemctl list-units --failed`.
+
+Setelah masalahnya diperbaiki, jalankan ulang secara manual:
+
+```bash
+sudo systemctl reset-failed nambah-cron@reconcile.service
+sudo systemctl start nambah-cron@reconcile.service
+```
+
+Exit code dari script memakai kelas sysexits(3):
+
+| Code | Arti |
+| --- | --- |
+| 0 | 2xx |
+| 69 | 4xx/5xx — layanan menolak, perbaiki konfigurasi |
+| 75 | 429, timeout, atau tidak ada respons — layak dicoba lagi nanti |
+| 78 | `cron.env` rusak (mis. `CRON_SECRET` kosong) |
+
+## Kalau semua job membalas `400` dengan body kosong
+
+Gejalanya khas: journal hanya menampilkan `[job] http=400` tanpa respons,
+sementara `curl` manual ke endpoint yang sama membalas 401 dengan JSON.
+
+Penyebabnya carriage return di nilai `CRON_SECRET`. Node menolak request itu
+sebelum sampai ke aplikasi, jadi tidak ada header Next.js dan tidak ada body —
+gejalanya sama sekali tidak mengarah ke `cron.env`.
+
+```bash
+sudo cat -A /etc/nambah/cron.env
+```
+
+Baris yang diakhiri `^M$` berarti file itu ber-CRLF. Perbaiki sumbernya, bukan
+hanya turunannya:
+
+```bash
+sed -i 's/\r$//' /home/ubuntu/Nambah/.env.local
+sudo bash -c 'grep "^CRON_SECRET=" /home/ubuntu/Nambah/.env.local > /etc/nambah/cron.env'
+echo 'CRON_BASE_URL=http://127.0.0.1:3000' | sudo tee -a /etc/nambah/cron.env >/dev/null
+```
+
+Script sudah menormalkan `\r` setelah membaca env, jadi nilai yang kena CR lagi
+tidak akan menyebabkan `400` — tapi file-nya tetap perlu dibersihkan supaya
+tidak membingungkan saat dibaca orang.
+
 ## Jika timer tidak muncul di `list-timers`
 
 `systemctl list-timers 'nambah-cron@*'` hanya menampilkan timer yang **aktif**.
