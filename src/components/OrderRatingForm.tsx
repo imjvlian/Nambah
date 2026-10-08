@@ -41,9 +41,16 @@ export default function OrderRatingForm({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+  // `isSuccess` ikut jadi dependensi. Status order berubah dari `processing`
+  // ke `success` lewat polling di OrderStatusView tanpa ganti halaman, jadi
+  // kelayakan yang di-fetch saat mount sudah basi — tanpa dependensi ini form
+  // tetap terkunci sampai user refresh manual.
   useEffect(() => {
     if (!orderId || !accessToken) return;
     let active = true;
+
+    // Status order bisa saja baru saja berubah; jangan tampilkan verdict lama.
+    setState(null);
 
     void (async () => {
       try {
@@ -67,10 +74,12 @@ export default function OrderRatingForm({
     return () => {
       active = false;
     };
-  }, [orderId, accessToken]);
+  }, [orderId, accessToken, isSuccess]);
 
   if (!isSuccess) return null;
 
+  // `state === null` berarti server belum sempat menjawab; form tetap
+  // diklikable supaya tidak terasa rusak.
   if (state && !state.eligible && !state.review) {
     return (
       <div className="form-block order-rating order-rating-locked">
@@ -86,7 +95,10 @@ export default function OrderRatingForm({
   }
 
   async function submit() {
-    if (!accessToken || rating < 1 || busy) return;
+    // `accessToken` tidak dicek di sini: cookie order tetap berlaku kalau
+    // pengguna membuka halaman tanpa `?access_token=`. Server yang memastikan
+    // pemilik order, jadi lebih baik request dicoba daripada digagalkan client.
+    if (rating < 1 || busy) return;
     setBusy(true);
     setNotice("");
     setError("");
@@ -96,7 +108,13 @@ export default function OrderRatingForm({
         `/api/orders/${encodeURIComponent(orderId)}/review`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            // Cookie order di-scope ke path `/api/orders/{id}` sehingga ikut
+            // terkirim ke endpoint review. Header ini hanya cadangan untuk kasus
+            // cookie belum terpasang (mis. pengguna membuka link dari email).
+            ...(accessToken ? { "x-order-access-token": accessToken } : {}),
+          },
           credentials: "same-origin",
           body: JSON.stringify({ rating, comment }),
         },
