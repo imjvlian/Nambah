@@ -1,0 +1,628 @@
+{
+  "version": 1,
+  "source": "public/nambah-assets",
+  "generatedBy": "scripts/build-nambah-asset-manifest.mjs",
+  "products": {
+    "aniimo": {
+      "name": "aniimo",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "980 Lumin Crystals",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Aniimo_Currency.webp",
+          "denomination": 980
+        }
+      ]
+    },
+    "arena-of-valor": {
+      "name": "arena-of-valor",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "700 Vouchers",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Arena_Of_Valor_Currency_1.png",
+          "denomination": 700
+        }
+      ]
+    },
+    "call-of-duty-mobile": {
+      "name": "call-of-duty-mobile",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "26 CP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Currency_1.png",
+          "denomination": 26
+        },
+        {
+          "alt": "278 CP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Currency_2.png",
+          "denomination": 278
+        },
+        {
+          "alt": "1268 CP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Currency_3.png",
+          "denomination": 1268
+        },
+        {
+          "alt": "7656 CP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Currency_4.png",
+          "denomination": 7656
+        },
+        {
+          "alt": "76560 CP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Currency_5.png",
+          "denomination": 76560
+        },
+        {
+          "alt": "Battle Pass",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Call_Of_Duty_Mobile_Battle_Pass.png"
+        }
+      ]
+    },
+    "delta-force": {
+      "name": "delta-force",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "18 Delta Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Delta_Force_Currency_1.png",
+          "denomination": 18
+        },
+        {
+          "alt": "420 Delta Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Delta_Force_Currency_2.png",
+          "denomination": 420
+        },
+        {
+          "alt": "1280 Delta Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Delta_Force_Currency_3.png",
+          "denomination": 1280
+        },
+        {
+          "alt": "6480 Delta Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Delta_Force_Currency_4.png",
+          "denomination": 6480
+        },
+        {
+          "alt": "19440 Delta Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Delta_Force_Currency_5.png",
+          "denomination": 19440
+        }
+      ]
+    },
+    "dragon-nest-m-classic": {
+      "name": "dragon-nest-m-classic",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "626 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_1.png",
+          "denomination": 626
+        },
+        {
+          "alt": "6366 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_.png",
+          "denomination": 6366
+        },
+        {
+          "alt": "19500 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_3.png",
+          "denomination": 19500
+        },
+        {
+          "alt": "66000 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_4.png",
+          "denomination": 66000
+        },
+        {
+          "alt": "198000 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_5.png",
+          "denomination": 198000
+        },
+        {
+          "alt": "330000 Cash Pack",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Dragon_Nest_M_Classic_Currency_6.png",
+          "denomination": 330000
+        }
+      ]
+    },
+    "fc-mobile": {
+      "name": "fc-mobile",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "1070",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Fc_Mobile_Currency.png",
+          "denomination": 1070
+        }
+      ]
+    },
+    "google-play-indonesia": {
+      "name": "google-play-indonesia",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets/Google_Play_Voucher.png",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets/Google_Play_Voucher.png"
+        }
+      ]
+    },
+    "heroes-evolved": {
+      "name": "heroes-evolved",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "100 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_1.webp",
+          "denomination": 100
+        },
+        {
+          "alt": "200 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_2.webp",
+          "denomination": 200
+        },
+        {
+          "alt": "240 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_3.webp",
+          "denomination": 240
+        },
+        {
+          "alt": "1200 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_4.webp",
+          "denomination": 1200
+        },
+        {
+          "alt": "2500 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_5.webp",
+          "denomination": 2500
+        },
+        {
+          "alt": "6500 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_6.webp",
+          "denomination": 6500
+        },
+        {
+          "alt": "14000 Tokens",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Heroes_Evolved_Currency_7.webp",
+          "denomination": 14000
+        }
+      ]
+    },
+    "league-of-legends-pc": {
+      "name": "league-of-legends-pc",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets/League_of_Legends_Icon.png",
+      "assets": [
+        {
+          "alt": "575 RP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/League_Of_Legends_Pc_Currency_1.webp",
+          "denomination": 575
+        },
+        {
+          "alt": "4500 RP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/League_Of_Legends_Pc_Currency_2.webp",
+          "denomination": 4500
+        },
+        {
+          "alt": "13500 RP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/League_Of_Legends_Pc_Currency_3.webp",
+          "denomination": 13500
+        },
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets/League_of_Legends_Icon.png"
+        }
+      ]
+    },
+    "legends-of-runeterra": {
+      "name": "legends-of-runeterra",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "475 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_1.webp",
+          "denomination": 475
+        },
+        {
+          "alt": "1000 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_2.webp",
+          "denomination": 1000
+        },
+        {
+          "alt": "2050 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_3.webp",
+          "denomination": 2050
+        },
+        {
+          "alt": "3650 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_4.webp",
+          "denomination": 3650
+        },
+        {
+          "alt": "5350 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_5.webp",
+          "denomination": 5350
+        },
+        {
+          "alt": "11000 Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Legends_Of_Runeterra_Currency_6.webp",
+          "denomination": 11000
+        }
+      ]
+    },
+    "marvel-rivals": {
+      "name": "marvel-rivals",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets/Marvel_Rivals_Product_Icon.png",
+      "assets": [
+        {
+          "alt": "100 Lattices",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Marvel_Rivals_Currency_1.png",
+          "denomination": 100
+        },
+        {
+          "alt": "2180 Lattices",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Marvel_Rivals_Currency_2.png",
+          "denomination": 2180
+        },
+        {
+          "alt": "11680 Lattices",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Marvel_Rivals_Currency_3.png",
+          "denomination": 11680
+        },
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets/Marvel_Rivals_Product_Icon.png"
+        }
+      ]
+    },
+    "mobile-legends-adventure": {
+      "name": "mobile-legends-adventure",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "13 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_1.png",
+          "denomination": 13
+        },
+        {
+          "alt": "239 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_2.png",
+          "denomination": 239
+        },
+        {
+          "alt": "954 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_3.png",
+          "denomination": 954
+        },
+        {
+          "alt": "1999 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_4.png",
+          "denomination": 1999
+        },
+        {
+          "alt": "3000 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_5.png",
+          "denomination": 3000
+        },
+        {
+          "alt": "4999 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_6.png",
+          "denomination": 4999
+        },
+        {
+          "alt": "10000 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_7.png",
+          "denomination": 10000
+        },
+        {
+          "alt": "65999 M-Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Mobile_Legends_Adventure_Currency_8.png",
+          "denomination": 65999
+        }
+      ]
+    },
+    "nba-infinite": {
+      "name": "nba-infinite",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "100 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_1.png",
+          "denomination": 100
+        },
+        {
+          "alt": "200 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_2.png",
+          "denomination": 200
+        },
+        {
+          "alt": "1000 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_3.png",
+          "denomination": 1000
+        },
+        {
+          "alt": "2000 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_4.png",
+          "denomination": 2000
+        },
+        {
+          "alt": "5000 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_5.png",
+          "denomination": 5000
+        },
+        {
+          "alt": "10000 IC",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Nba_Infinite_Currency_6.png",
+          "denomination": 10000
+        }
+      ]
+    },
+    "point-blank": {
+      "name": "point-blank",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets/Point_Blank_Icon.jpg",
+      "assets": [
+        {
+          "alt": "24000 PB Cash",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Point_Blank_Currency.webp",
+          "denomination": 24000
+        },
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets/Point_Blank_Icon.jpg"
+        }
+      ]
+    },
+    "ragnarok-m-eternal-love": {
+      "name": "ragnarok-m-eternal-love",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "72 Big Cat Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Ragnarok_M_Eternal_Love_Currency.webp",
+          "denomination": 72
+        }
+      ]
+    },
+    "state-of-survival": {
+      "name": "state-of-survival",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "100 Diamonds",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/State_Of_Survival_Currency_1.png",
+          "denomination": 100
+        },
+        {
+          "alt": "10000 Diamonds",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/State_Of_Survival_Currency_2.png",
+          "denomination": 10000
+        },
+        {
+          "alt": "500000 Diamonds",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/State_Of_Survival_Currency_3.png",
+          "denomination": 500000
+        }
+      ]
+    },
+    "teamfight-tactics-mobile": {
+      "name": "teamfight-tactics-mobile",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets/Teamfight_Tactics_Mobile_Icon.webp",
+      "assets": [
+        {
+          "alt": "575 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_1.webp",
+          "denomination": 575
+        },
+        {
+          "alt": "1380 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_2.webp",
+          "denomination": 1380
+        },
+        {
+          "alt": "2800 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_3.webp",
+          "denomination": 2800
+        },
+        {
+          "alt": "4500 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_4.webp",
+          "denomination": 4500
+        },
+        {
+          "alt": "6500 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_5.webp",
+          "denomination": 6500
+        },
+        {
+          "alt": "13500 TFT Coins",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Currency_6.webp",
+          "denomination": 13500
+        },
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Icon.webp"
+        }
+      ]
+    },
+    "valorant": {
+      "name": "valorant",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "5700 VP",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Valorant_Currency.webp",
+          "denomination": 5700
+        }
+      ]
+    },
+    "where-winds-meet": {
+      "name": "where-winds-meet",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "60 Echo Beads",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Where_Winds_Meet_Currency_1.webp",
+          "denomination": 60
+        },
+        {
+          "alt": "300 Echo Beads",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Where_Winds_Meet_Currency_2.webp",
+          "denomination": 300
+        },
+        {
+          "alt": "900 Echo Beads",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Where_Winds_Meet_Currency_3.webp",
+          "denomination": 900
+        },
+        {
+          "alt": "3000 Echo Beads",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Where_Winds_Meet_Currency_4.webp",
+          "denomination": 3000
+        },
+        {
+          "alt": "12000 Echo Beads",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Where_Winds_Meet_Currency_5.webp",
+          "denomination": 12000
+        }
+      ]
+    },
+    "wuthering-waves": {
+      "name": "wuthering-waves",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "60 Lunites",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Wuthering_Waves_Currency_1.webp",
+          "denomination": 60
+        },
+        {
+          "alt": "980 Lunites",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Wuthering_Waves_Currency_2.webp",
+          "denomination": 980
+        },
+        {
+          "alt": "1980 Lunites",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Wuthering_Waves_Currency_3.webp",
+          "denomination": 1980
+        },
+        {
+          "alt": "6480 Lunites",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Wuthering_Waves_Currency_4.webp",
+          "denomination": 6480
+        }
+      ]
+    },
+    "zenless-zone-zero": {
+      "name": "zenless-zone-zero",
+      "source": "nambah-assets",
+      "cover": null,
+      "assets": [
+        {
+          "alt": "980 Monochrome",
+          "kind": "nominal",
+          "localPath": "/nambah-assets/Zenles_Zone_Zero_Currency.webp",
+          "denomination": 980
+        }
+      ]
+    }
+  }
+}

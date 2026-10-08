@@ -1,10 +1,13 @@
-import manifestJson from "../../public/product-assets/codashop/manifest.json";
+import codashopManifestJson from "../../public/product-assets/codashop/manifest.json" with { type: "json" };
+import nambahManifestJson from "../../public/nambah-assets/manifest.json" with { type: "json" };
 import type { Game, GamePackage } from "@/lib/catalog";
 
 type ProductAsset = {
   alt: string | null;
   kind: "cover" | "nominal" | string | null;
   localPath: string;
+  /** Denomination asal aset, dipakai untuk range matching. */
+  denomination?: number;
 };
 
 type ProductAssetEntry = {
@@ -59,7 +62,8 @@ export type ResolvedProductAsset = {
   kind: "nominal" | "cover";
 };
 
-const manifest = manifestJson as unknown as ProductAssetManifest;
+const codashopManifest = codashopManifestJson as unknown as ProductAssetManifest;
+const nambahManifest = nambahManifestJson as unknown as ProductAssetManifest;
 
 const STOP_WORDS = new Set([
   "top",
@@ -104,6 +108,10 @@ const PRODUCT_SLUG_ALIASES: Record<string, string[]> = {
   "steam-wallet": ["steam-wallet", "steam-wallet-code-indonesia"],
   "magic-chess": ["magic-chess-go-go"],
   "magic-chess-go-go": ["magic-chess-go-go"],
+  // Codashop menamai game ini "EA SPORTS FCT Mobile", sedangkan id Nambah
+  // `fc-mobile`. Tanpa alias ini, cover FC Mobile tidak ketemu dan kartu game
+  // di beranda jatuh ke avatar inisial padahal gambarnya tersedia.
+  "fc-mobile": ["ea-sports-fc-mobile"],
 };
 
 function normalize(value: string) {
@@ -233,11 +241,108 @@ function productCandidates(game: Game): string[] {
     .filter(Boolean);
 }
 
-function exactProductBySlug(game: Game) {
+/**
+ * Aset milik Nambah (`public/nambah-assets/`) selalu menang atas Codashop.
+ *
+ * Alasannya nama file aset Nambah memakai indeks urut yang sudah dipetakan ke
+ * denomination di `scripts/build-nambah-asset-manifest.mjs`, sedangkan aset
+ * Codashop diambil dari halaman publik yang penamaannya bisa berbeda. Untuk
+ * game yang ada di keduanya, memakai yang Codashop bisa mengembalikan gambar
+ * untuk nominal yang berbeda dari yangريضcustomer lihat.
+ */
+/** Apakah entry punya aset nominal yang bisa dipakai untuk sebuah item. */
+function hasNominalArtwork(product: ProductAssetEntry | null | undefined) {
+  return Boolean(product?.assets.some((asset) => asset.kind === "nominal"));
+}
+
+/** Apakah entry punya gambar yang bisa dipakai sebagai ikon produk. */
+function hasCover(product: ProductAssetEntry | null | undefined) {
+  return Boolean(
+    product?.cover || product?.assets.some((asset) => asset.kind === "cover"),
+  );
+}
+
+/**
+ * Game yang SENGAJA memakai aset Codashop, bukan `public/nambah-assets/`.
+ *
+ * Untuk game-game ini gambar Codashop yang dipakai, meski folder aset punya
+ * file dengan nama yang cocok. Permintaan eksplisit dari pemilik produk.
+ */
+const CODASHOP_ONLY = new Set<string>([
+  // Wild Rift dan Honkai Star Rail tidak ada di sini. Keduanya memakai aset
+  // Codashop untuk currency, tapi lewat `NOMINAL_IMAGE_OVERRIDE` di bawah —
+  // bukan lewat daftar ini, karena cover dan currency-nya beda kebutuhan.
+  //
+  // Valorant, Call of Duty Mobile, dan Mobile Legends Adventure juga TIDAK di
+  // sini: nominal-nya dari `public/nambah-assets`, cover-nya tetap Codashop.
+]);
+
+/**
+ * Gambar currency yang dipatok ke satu aset untuk seluruh denomination.
+ *
+ * Codashop menyediakan gambar berbeda per nominal, tapi untuk game ini semua
+ * denominationnya deemsosama memakai satu gambar. `match` membatasi override
+ * hanya ke produk yang benar-benar currency — jadi "Express Supply Pass" (HSR)
+ * dan "Stellacorn's Gift" (Wild Rift) tetap memakai gambarnya sendiri.
+ */
+const NOMINAL_IMAGE_OVERRIDE: Record<
+  string,
+  { src: string; match: RegExp }
+> = {
+  // Wild Cores — semua denomination.
+  "league-of-legends-wild-rift": {
+    src: "/product-assets/codashop/_assets/d87d5c9e3407bd041bba.png",
+    match: /wild cores/i,
+  },
+  // Oneiric Shard — semua denomination.
+  "honkai-star-rail": {
+    src: "/product-assets/codashop/_assets/53915baaad54ddae4768.png",
+    match: /oneiric/i,
+  },
+};
+
+/**
+ * Aset milik Nambah (`public/nambah-assets/`) diutamakan atas Codashop, TAPI
+ * hanya kalau aset itu benar-benar bisa melayani permintaan.
+ *
+ * Alasannya nama file aset Nambah memakai indeks urut yang sudah dipetakan ke
+ * denomination di `scripts/build-nambah-asset-manifest.mjs`, sedangkan aset
+ * Codashop diambil dari halaman publik yang penamaannya bisa berbeda.
+ *
+ * Syarat "bisa melayani" itu penting, dan berlaku dua arah:
+ *
+ * - Butuh nominal? Aset Nambah harus punya aset `nominal`. Tanpa syarat ini
+ *   ke-21 produk Google Play kehilangan gambar, karena entry Nambah-nya hanya
+ *   berisi `cover`.
+ * - Butuh cover? Aset Nambah harus punya cover. Tanpa syarat ini Valorant dan
+ *   ZZZ mengembalikan `null`, karena entry Nambah-nya hanya berisi `nominal`
+ *   dan tidak ada file `_Icon` di folder aset.
+ */
+function exactProductBySlug(
+  game: Game,
+  need: "cover" | "nominal",
+): ProductAssetEntry | null {
   const candidates = [game.id, ...(PRODUCT_SLUG_ALIASES[game.id] ?? [])];
+  const useOwn = !CODASHOP_ONLY.has(game.id);
+
+  if (useOwn) {
+    for (const candidate of candidates) {
+      const own = nambahManifest.products[candidate];
+      if (!own) continue;
+      if (need === "nominal" ? hasNominalArtwork(own) : hasCover(own)) return own;
+    }
+  }
+
   for (const candidate of candidates) {
-    const product = manifest.products[candidate];
-    if (product) return product;
+    const fallback = codashopManifest.products[candidate];
+    if (fallback) return fallback;
+  }
+
+  // Terakhir: aset Nambah yang tidak bisa melayani permintaan di atas.
+  // Untuk game di `CODASHOP_ONLY` ini dilewati.
+  for (const candidate of candidates) {
+    const own = nambahManifest.products[candidate];
+    if (own) return own;
   }
   return null;
 }
@@ -277,17 +382,45 @@ function scoreProduct(game: Game, slug: string, product: ProductAssetEntry) {
   return score;
 }
 
-function findProduct(game: Game) {
-  const exact = exactProductBySlug(game);
+function findProduct(game: Game, need: "cover" | "nominal") {
+  const exact = exactProductBySlug(game, need);
   if (exact) return exact;
 
+  const canServe = (product: ProductAssetEntry) =>
+    need === "nominal" ? hasNominalArtwork(product) : hasCover(product);
+
+  // Game di `CODASHOP_ONLY` tidak boleh dialihkan lewat aset Nambah, termasuk
+  // lewat pencocokan fuzzy di bawah.
+  const sources = CODASHOP_ONLY.has(game.id)
+    ? [codashopManifest]
+    : [nambahManifest, codashopManifest];
+
   let best: { product: ProductAssetEntry; score: number } | null = null;
-  for (const [slug, product] of Object.entries(manifest.products)) {
-    const score = scoreProduct(game, slug, product);
-    if (!best || score > best.score) best = { product, score };
+  for (const source of sources) {
+    for (const [slug, product] of Object.entries(source.products)) {
+      const score = scoreProduct(game, slug, product);
+      if (!best || score > best.score) best = { product, score };
+    }
+  }
+  if (!best || best.score < 125) return null;
+
+  // Kandidat terbaik tidak bisa melayani permintaan — cari kandidat lain yang
+  // bisa, jangan mengembalikan entry yang akan menghasilkan `null`.
+  if (!canServe(best.product)) {
+    let usable: { product: ProductAssetEntry; score: number } | null = null;
+    for (const source of sources) {
+      for (const [slug, product] of Object.entries(source.products)) {
+        if (!canServe(product)) continue;
+        const score = scoreProduct(game, slug, product);
+        if (score >= 125 && (!usable || score > usable.score)) {
+          usable = { product, score };
+        }
+      }
+    }
+    if (usable) return usable.product;
   }
 
-  return best && best.score >= 125 ? best.product : null;
+  return best.product;
 }
 
 function resolveSpecialOverride(game: Game, item: GamePackage): ResolvedProductAsset | null {
@@ -348,6 +481,21 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
     return 700 + overlap * 10;
   }
 
+  // Aset dari `public/nambah-assets` menyimpan denomination eksplisit, dan angka
+  // di dalam `alt` sudah berupa nilai yang benar (lihat
+  // `scripts/build-nambah-asset-manifest.mjs`). Jadi yang dibandingkan cukup
+  // angka pertama label produk dengan `denomination` — satuan tidak perlu ada
+  // di whitelist `UnitFamily`.
+  if (typeof asset.denomination === "number") {
+    const target = primaryNumber(item.label);
+    if (target === null || target !== asset.denomination) return null;
+
+    const itemTokens = new Set(tokens(label));
+    const altTokens = new Set(tokens(alt));
+    const overlap = [...itemTokens].filter((token) => altTokens.has(token)).length;
+    return 900 + overlap * 10;
+  }
+
   // Keep exact denomination matching as the first choice. Range matching is
   // applied only when no exact/same-number artwork exists.
   if (itemNumbers.length === 0 || assetNumbers.length === 0) return null;
@@ -368,9 +516,26 @@ function findRangeNominalAsset(product: ProductAssetEntry, item: GamePackage) {
 
   // Special products continue to use semantic matching only. Range fallback is
   // for ordinary denominations such as Diamonds, UC, Robux, Points and Crystals.
-  if (specialIntent(label) || target === null || itemUnits.size === 0) return null;
+  if (specialIntent(label) || target === null) return null;
 
   const itemTokens = new Set(tokens(label));
+
+  // Aset dari `public/nambah-assets` membawa denomination eksplisit di
+  // `denomination` (lihat `scripts/build-nambah-asset-manifest.mjs`). Kalau
+  // semua aset nominal punya nilai itu, pencocokan cukup lewat angka — nama
+  // satuan tidak perlu dipahami.
+  //
+  // Ini penting karena whitelist `UnitFamily` di atas tidak memuat satuan
+  // seperti "CP", "Vouchers", "Wild Cores", "Echo Beads", "M-Cash", atau
+  // "Cash Pack". Tanpa jalur ini, range fallback ditolak oleh
+  // `itemUnits.size === 0` dan produk seperti "53 CP" tidak dapat gambar sama
+  // sekali meski gambarnya ada.
+  const hasExplicitDenominations = product.assets.some(
+    (asset) => asset.kind === "nominal" && typeof asset.denomination === "number",
+  );
+
+  if (!hasExplicitDenominations && itemUnits.size === 0) return null;
+
   const byValue = new Map<
     number,
     { asset: ProductAsset; value: number; tokenOverlap: number }
@@ -382,10 +547,15 @@ function findRangeNominalAsset(product: ProductAssetEntry, item: GamePackage) {
     const alt = normalize(asset.alt);
     if (!alt || specialIntent(alt)) continue;
 
-    const assetUnits = unitFamilies(alt);
-    if (!compatibleUnits(itemUnits, assetUnits)) continue;
+    if (!hasExplicitDenominations) {
+      const assetUnits = unitFamilies(alt);
+      if (!compatibleUnits(itemUnits, assetUnits)) continue;
+    }
 
-    const value = primaryNumber(asset.alt);
+    const value =
+      typeof asset.denomination === "number"
+        ? asset.denomination
+        : primaryNumber(asset.alt);
     if (value === null) continue;
 
     const assetTokens = new Set(tokens(alt));
@@ -442,14 +612,38 @@ export function resolveProductAsset(
   if (item) {
     const override = resolveSpecialOverride(game, item);
     if (override) return override;
+
+    // Gambar currency yang dipatok manual. Dicek sebelum pencarian produk
+    // supaya tidak perlu manifest maupun tebakan denomination.
+    const pinned = NOMINAL_IMAGE_OVERRIDE[game.id];
+    if (pinned && pinned.match.test(item.label)) {
+      return { src: pinned.src, alt: item.label, kind: "nominal" };
+    }
   }
 
-  const product = findProduct(game);
+  const product = findProduct(game, item ? "nominal" : "cover");
   if (!product) return null;
 
   if (item) {
     const nominal = findNominalAsset(product, item);
-    if (!nominal) return null;
+    // Nominal tidak ketemu untuk produk yang sudah dipetakan (mis. "All Pack
+    // Monochrome" yang tidak punya angka). Cover game-nya tetap lebih baik
+    // daripada tidak ada gambar sama sekali.
+    //
+    // Di sini aset currency BOLEH dipakai sebagai fallback. Aturan "jangan
+    // pakai currency sebagai ikon" berlaku untuk ikon GAME yang dirender di
+    // beranda — bukan untuk kartu produk, di mana currency adalah satu-satunya
+    // gambar yang relevan.
+    //
+    // `alt` tetap harus menyebut label produk yang sebenarnya, bukan nama game,
+    // supaya pembaca layar hear deskripsi yang benar.
+    if (!nominal) {
+      const fallbackImage =
+        product.cover ||
+        product.assets.find((asset) => asset.kind === "cover")?.localPath ||
+        product.assets.find((asset) => asset.kind === "nominal")?.localPath;
+      return fallbackImage ? { src: fallbackImage, alt: item.label, kind: "nominal" } : null;
+    }
 
     return {
       src: nominal.asset.localPath,
