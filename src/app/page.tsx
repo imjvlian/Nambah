@@ -4,6 +4,7 @@ import FlashSaleStrip from "@/components/FlashSaleStrip";
 import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import PromoPopup from "@/components/PromoPopup";
 import SiteFooter from "@/components/SiteFooter";
+import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
@@ -16,7 +17,7 @@ export default async function Home() {
 
   return (
     <main className="home-v2 home-oura-refine">
-      <header className="site-header shell home-v2-header home-market-header">
+      <SiteHeader className="home-v2-header home-market-header">
         <BrandLogo href="#top" size="md" variant="horizontal" />
 
         <nav className="desktop-nav home-market-nav" aria-label="Navigasi utama">
@@ -29,7 +30,7 @@ export default async function Home() {
           <AccountNav showPoints />
           <a className="header-cta" href="#catalog-start">Mulai top up</a>
         </div>
-      </header>
+      </SiteHeader>
 
       <section id="top" aria-label="Sorotan utama">
         <h1 className="sr-only">Top up cepat. Lanjut main.</h1>

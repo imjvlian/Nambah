@@ -834,6 +834,268 @@
   font-weight: 800;
 }
 
+/* ===== Dialog konfirmasi admin ===== */
+@keyframes admin-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.admin-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 6, 5, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.admin-confirm {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: min(86vh, 720px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #191d15 0%, #12150f 52%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: admin-confirm-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.admin-confirm-head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 20px 22px 16px;
+}
+
+.admin-confirm-head-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(201, 255, 63, 0.1);
+  color: var(--lime);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.admin-confirm-danger .admin-confirm-head-icon {
+  background: rgba(255, 122, 100, 0.12);
+  color: #ff9b8a;
+}
+
+.admin-confirm-head-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-confirm-head h3 {
+  color: #f2f5ee;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.admin-confirm-head p {
+  color: #858c80;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.admin-confirm-list {
+  display: grid;
+  gap: 2px;
+  margin: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.admin-confirm-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 14px;
+}
+
+.admin-confirm-row + .admin-confirm-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.admin-confirm-row span {
+  color: #7d8478;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-confirm-row strong {
+  min-width: 0;
+  color: #eef1ea;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.admin-confirm-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 9px;
+  padding: 14px;
+}
+
+.admin-confirm-cancel {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #bcc2b4;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.admin-confirm-cancel:hover {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f5ee;
+}
+
+.admin-confirm-accept {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d6ff7a 0%, #b9ed3f 100%);
+  color: #14180d;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: filter 160ms ease;
+}
+
+.admin-confirm-accept:hover {
+  filter: brightness(1.07);
+}
+
+.admin-confirm-accept-danger {
+  background: linear-gradient(180deg, #ff9b8a 0%, #f4694f 100%);
+  color: #1c0b06;
+}
+
+@media (max-width: 560px) {
+  .admin-confirm {
+    border-radius: 16px;
+  }
+
+  .admin-confirm-head {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+    padding: 16px 16px 14px;
+  }
+
+  .admin-confirm-head-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .admin-confirm-list {
+    margin-inline: 10px;
+  }
+
+  .admin-confirm-row {
+    grid-template-columns: 1fr;
+    gap: 1px;
+    padding: 8px 12px;
+  }
+
+  .admin-confirm-row strong {
+    text-align: left;
+  }
+
+  .admin-confirm-actions {
+    grid-template-columns: 1fr;
+    padding: 12px 10px;
+  }
+}
+
+/* Status aksi supplier: tombol + hasil terakhirnya. */
+.acc-supplier-actions {
+  align-items: flex-start;
+}
+
+.acc-action {
+  display: grid;
+  gap: 4px;
+  min-width: 168px;
+  max-width: 240px;
+}
+
+.acc-action-status {
+  display: grid;
+  gap: 1px;
+  min-height: 12px;
+  color: #7f867a;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.acc-action-status b {
+  display: inline;
+}
+
+.acc-action-status em {
+  color: #5f665c;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.acc-action-running .acc-action-status {
+  color: #d9b875;
+}
+
+.acc-action-ok .acc-action-status {
+  color: #b9d978;
+}
+
+.acc-action-error .acc-action-status {
+  color: #ff9b8a;
+}
+
+.acc-action-running button {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.acc-action-ok button {
+  border-color: rgba(201, 255, 63, 0.28);
+}
+
+.acc-action-error button {
+  border-color: rgba(255, 120, 100, 0.34);
+}
+
 .acc-control-main .admin-automation-shell,
 .acc-content .admin-automation-shell {
   width: 100%;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/AdminConfirmDialog";
 
 type ProviderStatus = {
   id: "midtrans" | "doku";
@@ -20,6 +21,7 @@ type SettingsPayload = {
 export default function PaymentGatewayPanel() {
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
   const [notice, setNotice] = useState("");
   const [loadError, setLoadError] = useState("");
 
@@ -48,10 +50,13 @@ export default function PaymentGatewayPanel() {
   async function switchProvider(provider: "midtrans" | "doku") {
     if (!payload || provider === payload.activeProvider || busy) return;
     const target = payload.providers?.find((item) => item.id === provider);
-    const confirmed = window.confirm(
-      `Alihkan gateway pembayaran ke ${target?.name ?? provider}?\n\n` +
-        `Hanya memengaruhi ORDER BARU — order yang sedang berjalan tetap diproses oleh gateway pembuatnya.`,
-    );
+    const confirmed = await confirm({
+      title: `Alihkan gateway ke ${target?.name ?? provider}?`,
+      description:
+        "Hanya memengaruhi order baru — order yang sedang berjalan tetap diproses oleh gateway pembuatnya.",
+      details: [{ label: "Gateway aktif", value: target?.name ?? provider }],
+      confirmLabel: "Alihkan gateway",
+    });
     if (!confirmed) return;
 
     setBusy(true);

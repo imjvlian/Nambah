@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
+import SiteHeader from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Masuk — Nambah",
@@ -20,13 +21,13 @@ export default async function LoginPage({
 
   return (
     <main className="auth-page">
-      <header className="site-header shell auth-header">
+      <SiteHeader className="auth-header">
         <a className="brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
         </a>
         <a className="text-link" href="/">Kembali ke beranda</a>
-      </header>
+      </SiteHeader>
 
       <section className="auth-shell shell">
         <aside className="auth-intro">

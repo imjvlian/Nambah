@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/AdminConfirmDialog";
 
 type Banner = {
   id: number;
@@ -47,6 +48,7 @@ export default function BannerAdminPanel() {
   });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
+  const confirm = useConfirm();
   const [notice, setNotice] = useState("");
 
   const canManage = role === "admin" || role === "superadmin" || role === "legacy";
@@ -199,9 +201,13 @@ export default function BannerAdminPanel() {
   }
 
   async function deleteBanner(banner: Banner) {
-    if (!window.confirm(`Hapus banner "${banner.title}"? Gambar di Cloudinary ikut dihapus.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Hapus banner "${banner.title}"?`,
+      description: "Gambar di Cloudinary ikut dihapus dan tidak bisa dikembalikan.",
+      tone: "danger",
+      confirmLabel: "Hapus banner",
+    });
+    if (!confirmed) return;
     setBusy("delete:" + banner.id);
     setNotice("");
     try {

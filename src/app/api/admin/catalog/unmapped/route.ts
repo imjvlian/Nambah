@@ -1,6 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
-import { supabaseDelete, supabaseSelect } from "@/lib/supabase/server";
+import { supabaseDelete, supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -59,12 +59,15 @@ export async function DELETE(request: Request) {
 
   try {
     const [products, supplierProducts] = await Promise.all([
-      supabaseSelect<ProductRow>("products", {
+      // Wajib paginasi penuh. Tanpa ini produk yang mapping-nya ada di baris 1001+
+      // terlihat "unmapped" dan bisa ikut terhapus saat purge.
+      supabaseSelectAll<ProductRow>("products", {
         select: "id,game_id,label,active",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
-      supabaseSelect<SupplierProductRow>("supplier_products", {
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku",
+        order: "product_id.asc",
       }),
     ]);
 

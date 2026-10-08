@@ -1,5 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { supabaseSelectAll, supabaseUpdate } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -13,6 +13,7 @@ type ProductRow = {
 type SupplierProductRow = {
   product_id: string;
   supplier_sku: string | null;
+  active: boolean;
 };
 
 type GameRow = {
@@ -48,28 +49,44 @@ export async function POST(request: Request) {
   const dryRun = body.dryRun !== false;
 
   try {
+    // products & supplier_products melewati 1000 baris. Kalau dipotong, produk
+    // yang mapping-nya ada di baris 1001+ akan terlihat "orphan" lalu ikut
+    // dinonaktifkan — padahal produk itu valid.
     const [products, supplierProducts, games] = await Promise.all([
-      supabaseSelect<ProductRow>("products", {
+      supabaseSelectAll<ProductRow>("products", {
         select: "id,game_id,label,active",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
-      supabaseSelect<SupplierProductRow>("supplier_products", {
-        select: "product_id,supplier_sku",
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
+        select: "product_id,supplier_sku,active",
+        filters: { supplier_id: "eq.digiflazz" },
       }),
-      supabaseSelect<GameRow>("games", {
+      supabaseSelectAll<GameRow>("games", {
         select: "id,name,active",
         order: "sort_order.asc,name.asc",
       }),
     ]);
 
+    // Produk dianggap "punya" kalau ada mapping Digiflazz dengan SKU terisi.
     const mappedProductIds = new Set(
       supplierProducts
         .filter((row) => Boolean(row.supplier_sku?.trim()))
         .map((row) => row.product_id),
     );
+    // Mapping ada tapi SKU-nya tidak aktif di Digiflazz (habis stok / dihapus).
+    const inactiveMappingProductIds = new Set(
+      supplierProducts
+        .filter((row) => Boolean(row.supplier_sku?.trim()) && row.active === false)
+        .map((row) => row.product_id),
+    );
 
     const orphanProducts = products.filter((product) => !mappedProductIds.has(product.id));
     const activeOrphans = orphanProducts.filter((product) => product.active);
+    // Sudah ter-mapping tapi SKU-nya mati: produknya sah, hanya sementara
+    // tidak bisa dibeli. Tidak dinonaktifkan, tapi dilaporkan supaya terlihat.
+    const unavailableProducts = products.filter((product) =>
+      inactiveMappingProductIds.has(product.id),
+    );
     const activeMappedByGame = new Set(
       products
         .filter((product) => product.active && mappedProductIds.has(product.id))
@@ -114,6 +131,7 @@ export async function POST(request: Request) {
         activeOrphans: activeOrphans.length,
         alreadyHidden: orphanProducts.length - activeOrphans.length,
         gamesToDisable: gamesToDisable.length,
+        unavailableProducts: unavailableProducts.length,
       },
       preview: {
         products: orphanProducts.slice(0, 20).map((product) => ({
@@ -121,6 +139,11 @@ export async function POST(request: Request) {
           gameId: product.game_id,
           label: product.label,
           active: product.active,
+        })),
+        unavailable: unavailableProducts.slice(0, 20).map((product) => ({
+          id: product.id,
+          gameId: product.game_id,
+          label: product.label,
         })),
         games: gamesToDisable.slice(0, 20).map((game) => ({
           id: game.id,

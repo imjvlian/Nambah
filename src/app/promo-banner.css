@@ -236,16 +236,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .promo-slide-cta,
-  .promo-carousel-dots button {
-    transition: none;
-  }
-
-  .promo-slide-track {
-    animation: none;
-  }
-}
+/* (tanpa handling prefers-reduced-motion sesuai permintaan) */
 
 /* ===== Promo popup modal ===== */
 .promo-popup-backdrop {
@@ -393,13 +384,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .promo-popup-backdrop,
-  .promo-popup {
-    animation: none;
-  }
-}
-
 /* Flash sale strip (beranda) */
 .flash-sale-strip {
   margin-top: 14px;
@@ -488,11 +472,10 @@
   background: rgba(201, 255, 63, 0.22);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .flash-sale-chip {
-    transition: transform 160ms ease;
-  }
-  .flash-sale-chip:hover {
-    transform: translateY(-1px);
-  }
+.flash-sale-chip {
+  transition: transform 160ms ease;
+}
+
+.flash-sale-chip:hover {
+  transform: translateY(-1px);
 }

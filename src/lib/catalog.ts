@@ -6,15 +6,35 @@ export type GamePackage = {
   referencePrice: number;
 };
 
+/**
+ * Kategori produk. Nilai "game"/"voucher" adalah nilai legacy yang masih
+ * dipakai database; storefront memetakan keduanya lewat pola teks sebelum
+ * memakai nilai taksonomi yang lebih spesifik.
+ */
+export type CatalogCategory =
+  | "game"
+  | "pulsa-data"
+  | "e-wallet"
+  | "pln"
+  | "langganan"
+  | "voucher"
+  | "digital";
+
 export type Game = {
   id: string;
   name: string;
   shortName: string;
-  category: "game" | "voucher";
+  category: CatalogCategory;
   accent: string;
   initials: string;
   requiresServer?: boolean;
   packages: GamePackage[];
+  /**
+   * Id produk dengan margin tertinggi, urut dari yang tertinggi. Dipakai
+   * untuk seksi "Best Deals" di halaman produk. Hanya berisi id, jadi
+   * margin supplier tidak pernah terekspos ke pelanggan.
+   */
+  popularPackageIds?: string[];
 };
 
 export type PaymentMethod = {

@@ -1,7 +1,9 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { syncCatalogWithSupplier } from "@/lib/digiflazz/catalog-sync";
 import {
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectAll,
   supabaseSelectPage,
   supabaseUpdate,
 } from "@/lib/supabase/server";
@@ -124,14 +126,17 @@ export async function POST(request: Request) {
 
   try {
     const [supplierRows, productRows, pricingRows, latestScanRows] = await Promise.all([
-      supabaseSelect<SupplierProductRow>("supplier_products", {
+      // Keduanya melewati 1000 baris. Kalau terpotong, mapping di baris 1001+
+      // tidak pernah disinkronkan sehingga flag active-nya basi — SKU yang
+      // sudah dihapus Digiflazz tetap terlihat "aktif".
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
         filters: {
           supplier_id: "eq.digiflazz",
           supplier_sku: "not.is.null",
         },
       }),
-      supabaseSelect<ProductRow>("products", {
+      supabaseSelectAll<ProductRow>("products", {
         select: "id,game_id,label,note,selling_price,reference_price,active",
       }),
       supabaseSelect<PricingRuleRow>("pricing_rules", {
@@ -265,6 +270,15 @@ export async function POST(request: Request) {
     const foundResults = results.filter((item) => item.status === "found");
     const missingResults = results.filter((item) => item.status === "missing");
 
+    // Rekonsiliasi katalog selalu dilakukan lewat satu implementasi yang sama
+    // supaya "Sync harga supplier" tidak bisa menghasilkan keadaan yang
+    // berbeda dari tombol sinkron katalog (mis. produk tanpa mapping).
+    const mirror = await syncCatalogWithSupplier({
+      dryRun,
+      // Cache sudah dibaca di atas; jangan panggil price-list Digiflazz lagi.
+      preferLive: false,
+    });
+
     if (!dryRun) {
       await Promise.all([
         ...foundResults.map((result) =>
@@ -390,6 +404,9 @@ export async function POST(request: Request) {
         orphanedMappings: results.filter((item) => item.productMissing).length,
         thinBaseMargin: foundResults.filter((item) => item.minimumProfitBuffer < 0).length,
       },
+      // Rekonsiliasi katalog memakai implementasi yang sama dengan tombol
+      // sinkron katalog, jadi hasil kedua tool ini tidak akan berbeda.
+      mirror,
       products: results,
     });
   } catch (error) {

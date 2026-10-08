@@ -307,25 +307,6 @@
   white-space: nowrap;
 }
 
-.package-select-indicator {
-  width: 19px;
-  height: 19px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #41473f;
-  border-radius: 50%;
-  background: #0a0b0a;
-  color: transparent;
-  font-size: 8px !important;
-  font-weight: 900 !important;
-}
-
-.package-card-v2.active .package-select-indicator {
-  border-color: var(--lime);
-  background: var(--lime);
-  color: var(--ink);
-}
-
 @media (max-width: 620px) {
   .username-checker {
     grid-template-columns: 1fr;
@@ -355,11 +336,6 @@
 
   .package-card-copy .package-current-price {
     font-size: 10px !important;
-  }
-
-  .package-select-indicator {
-    width: 17px;
-    height: 17px;
   }
 }
 

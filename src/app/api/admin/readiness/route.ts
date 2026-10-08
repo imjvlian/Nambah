@@ -2,7 +2,7 @@ import { authorizeAdminRequest } from "@/lib/admin-api";
 import { getFulfillmentMode } from "@/lib/fulfillment";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { getMidtransEnvironment } from "@/lib/midtrans/client";
-import { supabaseSelect } from "@/lib/supabase/server";
+import { supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -97,21 +97,23 @@ export async function GET(request: Request) {
     tableExists("affiliate_withdrawal_allocations"),
   ]);
 
+  // PostgREST memotong di ~1000 baris apa pun nilai limit-nya, jadi pakai
+  // paginasi penuh agar readiness tidak lolos dari produk/mapping yang terpotong.
   const [activeProducts, activeGames, activeMappings] = await Promise.all([
-    supabaseSelect<ProductTargetRow>("products", {
+    supabaseSelectAll<ProductTargetRow>("products", {
       select: "id,game_id,fulfillment_target_template",
       filters: { active: "eq.true" },
-      limit: 5000,
+      order: "id.asc",
     }),
-    supabaseSelect<GameTargetRow>("games", {
+    supabaseSelectAll<GameTargetRow>("games", {
       select: "id,fulfillment_target_template",
       filters: { active: "eq.true" },
-      limit: 1000,
+      order: "id.asc",
     }),
-    supabaseSelect<SupplierMappingRow>("supplier_products", {
+    supabaseSelectAll<SupplierMappingRow>("supplier_products", {
       select: "product_id",
       filters: { active: "eq.true" },
-      limit: 5000,
+      order: "product_id.asc",
     }),
   ]);
 

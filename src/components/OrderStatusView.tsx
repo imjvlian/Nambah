@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import AccountNav from "@/components/AccountNav";
+import SiteHeader from "@/components/SiteHeader";
 import DokuQrisPanel, { DOKU_QRIS_PANEL_ID } from "@/components/DokuQrisPanel";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -461,7 +462,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   if (preview === undefined || order === undefined) {
     return (
       <main>
-        <header className="site-header shell order-header">
+        <SiteHeader className="order-header">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
@@ -469,7 +470,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           <div className="header-actions">
             <AccountNav />
           </div>
-        </header>
+        </SiteHeader>
         <section className="order-status-shell shell">
           <div className="order-empty-card">Memuat status pesanan...</div>
         </section>
@@ -480,7 +481,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   if (!preview && !order) {
     return (
       <main>
-        <header className="site-header shell order-header">
+        <SiteHeader className="order-header">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
             <span>Nambah</span>
@@ -489,7 +490,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             <AccountNav />
             <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
           </div>
-        </header>
+        </SiteHeader>
         <section className="order-status-shell shell">
           <div className="order-empty-card">
             <span className="eyebrow">{accessDenied ? "AKSES PESANAN DITOLAK" : "PESANAN TIDAK DITEMUKAN"}</span>
@@ -601,7 +602,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      <header className="site-header shell order-header">
+      <SiteHeader className="order-header">
         <Link className="brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
@@ -611,7 +612,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           <AccountNav />
           <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
         </div>
-      </header>
+      </SiteHeader>
 
       <section className="order-status-shell shell">
         <div className="order-status-title">

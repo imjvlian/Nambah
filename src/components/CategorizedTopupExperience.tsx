@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Game } from "@/lib/catalog";
+import type { CatalogCategory as GameCategory, Game } from "@/lib/catalog";
 
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
@@ -86,16 +86,46 @@ const CATEGORY_MARK: Record<CatalogCategoryId, string> = {
 };
 
 const GAME_PATTERN =
-  /(mobile legends|free fire|pubg|valorant|honor of kings|genshin|honkai|zenless|wuthering|roblox|league of legends|wild rift|call of duty|codm|efootball|fc mobile|clash of clans|clash royale|point blank|arena of valor|aov|garena|diamonds?\b|\buc\b|robux|genesis crystals?|valorant points?)/i;
+  /(mobile legends|free fire|pubg|valorant|honor of kings|genshin|honkai|zenless|wuthering|roblox|league of legends|wild rift|call of duty|codm|efootball|fc mobile|clash of clans|clash royale|point blank|arena of valor|\baov\b|diamonds?\b|\buc\b|robux|genesis crystals?|valorant points?|lunite|lattice|biocaps?)/i;
 const TELCO_PATTERN =
   /(pulsa|paket\s*data|kuota|internet|masa\s*aktif|paket\s*(sms|telpon|telepon)|aktivasi\s*(perdana|voucher)|axis|telkomsel|simpati|by\.?u|indosat|im3|xl\b|tri\b|three\b|smartfren|live[ .-]?on)/i;
 const EWALLET_PATTERN =
   /(e[ -]?wallet|e[ -]?money|dana\b|ovo\b|gopay|go-pay|shopeepay|linkaja|isaku|sakuku|brizzi|tapcash|flazz)/i;
-const PLN_PATTERN = /(pln|token\s*listrik|listrik\s*prabayar)/i;
+const PLN_PATTERN = /(pln|token\s*listrik|listrik\s*(prabayar|token))/i;
 const SUBSCRIPTION_PATTERN =
-  /(netflix|spotify|youtube\s*premium|vidio|viu\b|wetv|disney|prime\s*video|canva|capcut|office\s*365|microsoft\s*365|adobe|subscription|langganan|streaming)/i;
+  /(netflix|spotify|youtube\s*premium|vidio|viu\b|wetv|disney|prime\s*video|canva|capcut|office\s*365|microsoft\s*365|adobe|subscription|langganan|streaming|k-?vision|dan\s*gol|indovision|transvision|ola\s*tv)/i;
 const VOUCHER_PATTERN =
-  /(voucher|gift\s*card|steam\s*wallet|google\s*play|app\s*store|itunes|playstation|psn\b|xbox|nintendo|wallet\s*code)/i;
+  /(voucher|gift\s*card|steam\s*wallet|google\s*play|app\s*store|itunes|playstation|psn\b|xbox|nintendo|wallet\s*code|garena|shells?)/i;
+// Tagihan/utilitas yang tidak masuk kategori pulsa-data/e-wallet/PLN.
+const BILLER_PATTERN =
+  /(pertamina|pddik|pajak\s*(kendaraan|pmb|opr)|bpjs|asuransi|multifinance|pinjol|ewbtb|tol\b|e-?toll|pendidikan|tagihan\s*(air|internet|listrik)|pdam|gas\s*(elpiji|pertamina)|bpjt|pajak\s*mobil)/i;
+
+/**
+ * Nilai `games.category` yang spesifik sudah sengaja diisi di database, jadi
+ * dipercaya langsung. Nilai legacy "voucher" masih dipakai banyak baris dan
+ * terlalu kasar, jadi baris itu diklasifikasikan ulang lewat pola teks.
+ */
+const DB_CATEGORY_MAP: Record<GameCategory, CatalogCategoryId> = {
+  game: "games",
+  "pulsa-data": "pulsa-data",
+  "e-wallet": "e-wallet",
+  pln: "pln",
+  langganan: "langganan",
+  voucher: "voucher",
+  digital: "digital",
+};
+
+function isTrustedDbCategory(
+  value: GameCategory | string | null | undefined,
+): value is Exclude<GameCategory, "game" | "voucher"> {
+  return (
+    typeof value === "string" &&
+    value !== "" &&
+    value !== "game" &&
+    value !== "voucher" &&
+    value in DB_CATEGORY_MAP
+  );
+}
 
 function groupsOf(item: Game["packages"][number]) {
   return ((item as GroupedPackage).groups ?? []) as ProductGroup[];
@@ -113,15 +143,20 @@ function searchableGameText(game: Game) {
 }
 
 function getCatalogCategoryId(game: Game): CatalogCategoryId {
+  const dbCategory = game.category;
+  if (isTrustedDbCategory(dbCategory)) return DB_CATEGORY_MAP[dbCategory];
+
   const text = searchableGameText(game);
 
-  if (game.category === "game" || GAME_PATTERN.test(text)) return "games";
+  if (dbCategory === "game") return "games";
   if (TELCO_PATTERN.test(text)) return "pulsa-data";
   if (EWALLET_PATTERN.test(text)) return "e-wallet";
   if (PLN_PATTERN.test(text)) return "pln";
   if (SUBSCRIPTION_PATTERN.test(text)) return "langganan";
   if (VOUCHER_PATTERN.test(text)) return "voucher";
-  if (game.category === "voucher") return "voucher";
+  if (GAME_PATTERN.test(text)) return "games";
+  if (BILLER_PATTERN.test(text)) return "digital";
+  if (dbCategory === "voucher") return "voucher";
   return "digital";
 }
 

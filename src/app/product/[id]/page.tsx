@@ -2,6 +2,7 @@ import AccountNav from "@/components/AccountNav";
 import SiteFooter from "@/components/SiteFooter";
 import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
+import SiteHeader from "@/components/SiteHeader";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import type { Game } from "@/lib/catalog";
 import {
@@ -50,7 +51,7 @@ export default async function ProductPage({
 
   return (
     <main className="product-page">
-      <header className="site-header shell product-site-header">
+      <SiteHeader className="product-site-header">
         <a className="brand" href="/" aria-label="Nambah">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>Nambah</span>
@@ -64,7 +65,7 @@ export default async function ProductPage({
           <AccountNav />
           <a className="header-cta" href="#transaction">Top up sekarang</a>
         </div>
-      </header>
+      </SiteHeader>
 
       <section className="shell product-hero">
         <div

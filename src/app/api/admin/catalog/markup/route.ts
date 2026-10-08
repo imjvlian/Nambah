@@ -1,5 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -79,13 +79,16 @@ export async function POST(request: Request) {
 
   try {
     const [products, supplierProducts, pricingRules] = await Promise.all([
-      supabaseSelect<ProductRow>("products", {
+      // Paginasi penuh: tanpa ini ~170 produk yang sudah ter-map ikut terhitung
+      // tidak punya modal, sehingga auto mark-up melewatikannya.
+      supabaseSelectAll<ProductRow>("products", {
         select: "id,game_id,label,selling_price,reference_price,active",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
-      supabaseSelect<SupplierProductRow>("supplier_products", {
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku,supplier_cost,active",
         filters: { supplier_id: "eq.digiflazz", supplier_sku: "not.is.null" },
+        order: "product_id.asc",
       }),
       supabaseSelect<PricingRuleRow>("pricing_rules", {
         select: "minimum_nambah_profit",

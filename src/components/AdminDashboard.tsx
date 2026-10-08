@@ -6,6 +6,7 @@ import { formatIDR, suggestPriceFromCost } from "@/lib/pricing";
 import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
 import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
+import { useConfirm } from "@/components/AdminConfirmDialog";
 
 type AdminSection =
   | "overview"
@@ -344,6 +345,39 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+type CatalogSyncSummaryResult = {
+  catalogItems: number;
+  catalogSource: "live" | "cache";
+  catalogScanAt: string;
+  staleWarning: string | null;
+  productsCreated: number;
+  mappingsCreated: number;
+  costsRefreshed: number;
+  pricesRaised: number;
+  deactivatedMissingSku: number;
+  productsRemoved: number;
+  productsHidden: number;
+  gamesActivated: number;
+  failures: string[];
+};
+
+type ActionStatus = "idle" | "running" | "ok" | "error";
+
+type ActionState = {
+  status: ActionStatus;
+  /** Pesan singkat hasil terakhir, ditampilkan di bawah tombol. */
+  message: string;
+  /** Waktu hasil terakhir, supaya admin tahu ini data lama atau baru. */
+  at: string | null;
+};
+
+const ACTION_STATE: Record<ActionStatus, string> = {
+  idle: "",
+  running: "⏳ ",
+  ok: "✓ ",
+  error: "! ",
+};
+
 function formatTime(value: string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
@@ -352,6 +386,52 @@ function formatTime(value: string | null | undefined) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+/**
+ * Tombol aksi supplier dengan status sendiri: spinner saat berjalan, lalu hasil
+ * terakhir (sukses/gagal) beserta waktunya. Tanpa ini admin tidak bisa tahu
+ * tombol mana yang sedang diproses atau hasil terakhirnya apa.
+ */
+function SupplierActionButton({
+  action,
+  label,
+  busyLabel,
+  busy,
+  state,
+  onClick,
+}: {
+  action: string;
+  label: string;
+  busyLabel: string;
+  busy: string;
+  state?: ActionState;
+  onClick: () => void;
+}) {
+  const status = state?.status ?? "idle";
+  const running = status === "running";
+
+  return (
+    <div className={`acc-action acc-action-${status}`} data-action={action}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={Boolean(busy)}
+        aria-busy={running || undefined}
+      >
+        {running ? busyLabel : label}
+      </button>
+      <span className="acc-action-status" role="status">
+        {state?.message ? (
+          <>
+            <b aria-hidden="true">{ACTION_STATE[status]}</b>
+            {state.message}
+            {state.at ? <em>{formatTime(state.at)}</em> : null}
+          </>
+        ) : null}
+      </span>
+    </div>
+  );
 }
 
 function numberOrDash(value: number | null | undefined) {
@@ -486,6 +566,8 @@ export default function AdminDashboard() {
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
+  const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
+  const confirm = useConfirm();
 
   function hydrateDrafts(payload: CatalogPayload) {
     setDrafts(
@@ -668,9 +750,13 @@ export default function AdminDashboard() {
   }
 
   async function deletePromotion(code: string) {
-    const confirmed = window.confirm(
-      `Hapus promo ${code}? Hanya bisa dilakukan bila promo belum pernah dipakai.`,
-    );
+    const confirmed = await confirm({
+      title: `Hapus promo ${code}?`,
+      description:
+        "Promo hanya bisa dihapus bila belum pernah dipakai. Tindakan ini tidak bisa dibatalkan.",
+      tone: "danger",
+      confirmLabel: "Hapus promo",
+    });
     if (!confirmed) return;
 
     setBusy("promotion-delete:" + code);
@@ -1032,9 +1118,108 @@ export default function AdminDashboard() {
     }
   }
 
+  function setActionState(action: string, state: Partial<ActionState>) {
+    setActionStates((current) => ({
+      ...current,
+      [action]: {
+        status: state.status ?? current[action]?.status ?? "idle",
+        message: state.message ?? current[action]?.message ?? "",
+        at: state.at !== undefined ? state.at : (current[action]?.at ?? null),
+      },
+    }));
+  }
+
+  /**
+   * Tombol utama: sinkron penuh dengan katalog Digiflazz. Mapping selalu
+   * mengikuti supplier_sku — tidak ada lagi pencocokan tebakan, sehingga tidak
+   * mungkin tertukar varian SKU antar game.
+   */
+  async function syncCatalogWithDigiflazz() {
+    const confirmed = await confirm({
+      title: "Sinkronkan katalog dengan Digiflazz?",
+      description:
+        "SKU baru akan dibuatkan produk, harga modal disegarkan, dan produk tanpa SKU di Digiflazz akan disembunyikan dari etalase.",
+      details: [
+        { label: "Sumber", value: "Digiflazz price-list" },
+        { label: "Mapping", value: "Persis ke supplier_sku" },
+      ],
+      confirmLabel: "Sinkronkan sekarang",
+    });
+    if (!confirmed) return;
+
+    setBusy("sync-catalog");
+    setNotice("");
+    setActionState("automap", { status: "running", message: "Membaca katalog Digiflazz..." });
+
+    try {
+      const response = await fetch("/api/admin/digiflazz/sync-catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: false }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        summary?: CatalogSyncSummaryResult;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Sinkron katalog gagal.");
+      }
+
+      await Promise.all([loadCatalog(), loadOverview()]);
+
+      const s = result.summary;
+      const parts = [
+        `${s?.productsCreated ?? 0} produk baru`,
+        `${s?.mappingsCreated ?? 0} mapping`,
+        `${s?.costsRefreshed ?? 0} harga modal diperbarui`,
+      ];
+      if ((s?.productsRemoved ?? 0) > 0) {
+        parts.push(`${s?.productsRemoved} produk dihapus (SKU tak ada di Digiflazz)`);
+      }
+      if ((s?.productsHidden ?? 0) > 0) {
+        parts.push(`${s?.productsHidden} disembunyikan (punya riwayat order)`);
+      }
+      if ((s?.failures?.length ?? 0) > 0) {
+        parts.push(`${s?.failures.length} batch gagal`);
+      }
+      const message = parts.join(", ");
+      setNotice(
+        `Sinkron selesai (${s?.catalogSource === "cache" ? "cache" : "live"}): ${message}.` +
+          (s?.staleWarning ? ` ${s.staleWarning}` : ""),
+      );
+      setActionState("automap", {
+        status: (s?.failures?.length ?? 0) > 0 ? "error" : "ok",
+        message,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Sinkron katalog gagal.";
+      setNotice(message);
+      setActionState("automap", { status: "error", message, at: new Date().toISOString() });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function runBootstrap(apply: boolean) {
+    const action = apply ? "automap" : "scan";
+
+    // Scan hanya membaca, jadi tidak perlu konfirmasi. Auto-map menulis mapping
+    // produk sehingga perlu konfirmasi eksplisit.
+    if (apply) {
+      const confirmed = await confirm({
+        title: "Jalankan auto-map aman?",
+        description:
+          "Produk yang kecocokannya aman akan langsung dipetakan ke SKU supplier, dan mapping itu dipakai saat checkout.",
+        confirmLabel: "Jalankan auto-map",
+      });
+      if (!confirmed) return;
+    }
+
     setBusy(apply ? "bootstrap-apply" : "bootstrap-scan");
     setNotice("");
+    setActionState(action, { status: "running", message: "Sedang berjalan..." });
     try {
       const response = await fetch("/api/admin/digiflazz/bootstrap", {
         method: "POST",
@@ -1043,29 +1228,47 @@ export default function AdminDashboard() {
       });
       const result = (await response.json()) as BootstrapResult & {
         error?: string;
+        mirror?: CatalogSyncSummaryResult;
       };
       if (!response.ok) {
         throw new Error(result.error ?? "Bootstrap Digiflazz gagal.");
       }
 
       if (apply) await Promise.all([loadCatalog(), loadOverview()]);
+      // Pencocokan skor sudah dihapus; angka yang tampil sekarang berasal dari
+      // rekonsiliasi katalog yang sama dipakai semua tool sinkron.
+      const mirror = result.mirror;
+      const message = mirror
+        ? `${mirror.catalogItems} SKU, ${mirror.productsCreated} produk baru, ${mirror.productsRemoved} dihapus, ${mirror.productsHidden} disembunyikan`
+        : `${result.summary?.unmapped ?? 0} belum mapped.`;
       setNotice(
         apply
-          ? `Auto-map selesai. ${result.summary?.autoMapped ?? 0} produk dipetakan, ${result.summary?.unmapped ?? 0} belum mapped.`
-          : `Scan selesai. ${result.summary?.suggested ?? 0} kandidat aman, ${result.summary?.unmapped ?? 0} belum cocok.`,
+          ? `Auto-map selesai. ${message}.`
+          : `Scan selesai. ${message}. Jalankan "Sinkron ke Digiflazz" untuk menerapkan.`,
       );
+      setActionState(action, { status: "ok", message, at: new Date().toISOString() });
     } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Bootstrap Digiflazz gagal.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Bootstrap Digiflazz gagal.";
+      setNotice(message);
+      setActionState(action, { status: "error", message, at: new Date().toISOString() });
     } finally {
       setBusy("");
     }
   }
 
   async function syncPrices() {
+    const confirmed = await confirm({
+      title: "Sinkronkan harga supplier?",
+      description:
+        "Harga modal dari Digiflazz akan diperbarui, harga jual dinaikkan bila di bawah modal + profit, dan katalog direkonsiliasi supaya produk tetap persis mengikuti SKU Digiflazz.",
+      confirmLabel: "Sinkronkan harga",
+    });
+    if (!confirmed) return;
+
     setBusy("sync");
     setNotice("");
+    setActionState("sync", { status: "running", message: "Sedang mengambil harga..." });
     try {
       const response = await fetch("/api/admin/digiflazz/sync-prices", {
         method: "POST",
@@ -1079,19 +1282,25 @@ export default function AdminDashboard() {
           costChanged?: number;
           missing?: number;
         };
+        mirror?: CatalogSyncSummaryResult;
       };
       if (!response.ok) {
         throw new Error(result.error ?? "Sinkronisasi harga gagal.");
       }
 
       await Promise.all([loadCatalog(), loadOverview()]);
-      setNotice(
-        `Sync selesai. ${result.summary?.found ?? 0} SKU ditemukan, ${result.summary?.costChanged ?? 0} harga berubah, ${result.summary?.missing ?? 0} missing.`,
-      );
+      const message =
+        `${result.summary?.found ?? 0} SKU, ${result.summary?.costChanged ?? 0} harga berubah` +
+        (result.mirror
+          ? `; katalog: ${result.mirror.productsCreated} produk baru, ${result.mirror.productsRemoved} dihapus, ${result.mirror.productsHidden} disembunyikan`
+          : "");
+      setNotice(`Sync harga selesai. ${message}. Mapping produk ikut direkonsiliasi.`);
+      setActionState("sync", { status: "ok", message, at: new Date().toISOString() });
     } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Sinkronisasi harga gagal.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Sinkronisasi harga gagal.";
+      setNotice(message);
+      setActionState("sync", { status: "error", message, at: new Date().toISOString() });
     } finally {
       setBusy("");
     }
@@ -1100,6 +1309,7 @@ export default function AdminDashboard() {
   async function checkBalance() {
     setBusy("balance");
     setNotice("");
+    setActionState("balance", { status: "running", message: "Menghubungi supplier..." });
     try {
       const response = await fetch("/api/admin/digiflazz/balance", {
         method: "POST",
@@ -1113,11 +1323,13 @@ export default function AdminDashboard() {
       if (!response.ok) throw new Error(result.error ?? "Cek saldo gagal.");
 
       await Promise.all([loadCatalog(), loadOverview()]);
-      setNotice(
-        `Saldo diperbarui: ${formatIDR(result.availableBalance ?? 0)} tersedia.`,
-      );
+      const message = `${formatIDR(result.availableBalance ?? 0)} tersedia.`;
+      setNotice(`Saldo diperbarui: ${message}`);
+      setActionState("balance", { status: "ok", message, at: new Date().toISOString() });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Cek saldo gagal.");
+      const message = error instanceof Error ? error.message : "Cek saldo gagal.";
+      setNotice(message);
+      setActionState("balance", { status: "error", message, at: new Date().toISOString() });
     } finally {
       setBusy("");
     }
@@ -1226,7 +1438,7 @@ export default function AdminDashboard() {
     });
   }
 
-  function applyBulkPercent() {
+  async function applyBulkPercent() {
     const percent = Number(bulkPercent);
     if (!Number.isFinite(percent) || percent === 0 || Math.abs(percent) > 90) {
       setNotice("Persen penyesuaian harus di antara -90% dan 90% (bukan 0).");
@@ -1236,9 +1448,16 @@ export default function AdminDashboard() {
       setNotice("Tidak ada produk terfilter untuk disesuaikan.");
       return;
     }
-    const confirmed = window.confirm(
-      `Sesuaikan harga jual & harga coret sebesar ${percent > 0 ? "+" : ""}${percent}% untuk ${filteredProducts.length} produk terfilter (dibulatkan ke Rp100 terdekat)? Perubahan masuk ke draft — tinjau lalu klik "Simpan semua".`,
-    );
+    const confirmed = await confirm({
+      title: `Sesuaikan harga ${percent > 0 ? "+" : ""}${percent}%?`,
+      description:
+        'Harga jual dan harga coret untuk produk terfilter akan diubah, lalu dibulatkan ke Rp100 terdekat. Perubahan masuk ke draft — tinjau dulu sebelum klik "Simpan semua".',
+      details: [
+        { label: "Produk terdampak", value: String(filteredProducts.length) },
+        { label: "Perubahan", value: `${percent > 0 ? "+" : ""}${percent}%` },
+      ],
+      confirmLabel: "Terapkan ke draft",
+    });
     if (!confirmed) return;
 
     setDrafts((current) => {
@@ -1338,9 +1557,16 @@ export default function AdminDashboard() {
     });
     if (dirtyProducts.length === 0) return;
 
-    const confirmed = window.confirm(
-      `Simpan ${dirtyProducts.length} perubahan produk? Harga yang sudah tersimpan langsung berlaku di etalase.`,
-    );
+    const confirmed = await confirm({
+      title: `Simpan ${dirtyProducts.length} perubahan produk?`,
+      description:
+        "Harga yang sudah tersimpan langsung berlaku di etalase dan bisa dilihat pelanggan.",
+      details: [
+        { label: "Produk diubah", value: String(dirtyProducts.length) },
+        { label: "Tujuan", value: "Katalog etalase" },
+      ],
+      confirmLabel: "Simpan semua",
+    });
     if (!confirmed) return;
 
     setBusy("save-all");
@@ -2159,35 +2385,39 @@ export default function AdminDashboard() {
                 </article>
               </div>
 
-              <div className="acc-action-panel">
-                <button
-                  type="button"
+              <div className="acc-action-panel acc-supplier-actions">
+                <SupplierActionButton
+                  action="balance"
+                  label="Cek saldo"
+                  busyLabel="Memeriksa saldo..."
+                  busy={busy}
+                  state={actionStates.balance}
                   onClick={() => void checkBalance()}
-                  disabled={Boolean(busy)}
-                >
-                  Cek saldo
-                </button>
-                <button
-                  type="button"
+                />
+                <SupplierActionButton
+                  action="sync"
+                  label="Sync harga supplier"
+                  busyLabel="Sinkron harga..."
+                  busy={busy}
+                  state={actionStates.sync}
                   onClick={() => void syncPrices()}
-                  disabled={Boolean(busy)}
-                >
-                  Sync harga supplier
-                </button>
-                <button
-                  type="button"
+                />
+                <SupplierActionButton
+                  action="scan"
+                  label="Scan mapping"
+                  busyLabel="Memindai..."
+                  busy={busy}
+                  state={actionStates.scan}
                   onClick={() => void runBootstrap(false)}
-                  disabled={Boolean(busy)}
-                >
-                  Scan mapping
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void runBootstrap(true)}
-                  disabled={Boolean(busy)}
-                >
-                  Auto-map aman
-                </button>
+                />
+                <SupplierActionButton
+                  action="automap"
+                  label="Sinkron ke Digiflazz"
+                  busyLabel="Sinkron..."
+                  busy={busy}
+                  state={actionStates.automap}
+                  onClick={() => void syncCatalogWithDigiflazz()}
+                />
               </div>
 
               <AdminCatalogTools />

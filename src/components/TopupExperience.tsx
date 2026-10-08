@@ -49,6 +49,12 @@ type PointsSummary = {
   };
 };
 
+type PendingCheckout = {
+  targetUserId: string;
+  targetServerId: string;
+  guestContact: { email: string; whatsapp: string } | null;
+};
+
 type TopupExperienceProps = {
   games: Game[];
   paymentMethods: PublicPaymentMethod[];
@@ -116,8 +122,17 @@ function groupsOf(item: Game["packages"][number]) {
   return ((item as GroupedPackage).groups ?? []) as ProductGroup[];
 }
 
+/**
+ * Catatan yang isinya sudah tercermin sebagai badge grup (hemat, langganan,
+ * membership, dst) tidak dirender dua kali.
+ */
 function isOnlyGroupNote(note?: string) {
-  return Boolean(note && /^(hemat|populer|popular|langganan|promo)$/i.test(note.trim()));
+  return Boolean(
+    note &&
+      /^(hemat|populer|popular|langganan|promo|membership|member|weekly|monthly|pass|subscription|subscribe)$/i.test(
+        note.trim(),
+      ),
+  );
 }
 
 function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
@@ -189,6 +204,7 @@ export default function TopupExperience({
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPackage.id);
   const promoSectionRef = useRef<HTMLDivElement | null>(null);
+  
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
@@ -215,6 +231,10 @@ export default function TopupExperience({
   const [pricingError, setPricingError] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+const [confirmOpen, setConfirmOpen] = useState(false);
+const [viewerEmail, setViewerEmail] = useState("");
+const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
   const filteredGames = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -227,6 +247,111 @@ export default function TopupExperience({
   const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
   const accountSchema = getGameAccountSchema(selectedGame);
   const canCheckUsername = Boolean(accountSchema.checker);
+
+  const bestDealItems = useMemo(() => {
+    const ids = selectedGame.popularPackageIds ?? [];
+    if (ids.length === 0) return [];
+    const order = new Map(ids.map((id, index) => [id, index]));
+    return selectedGame.packages
+      .filter((item) => order.has(item.id))
+      .sort((left, right) => order.get(left.id)! - order.get(right.id)!);
+  }, [selectedGame]);
+
+  /**
+   * Alur pilih nominal dipakai semua kartu, termasuk seksi Best Deals, supaya
+   * perilaku auto scroll-nya sama: data akun dulu, baru promo. Belum valid ->
+   * scroll ke step 1 + tampilkan errornya; sudah valid -> lanjut ke promo.
+   */
+  function selectPackage(item: Game["packages"][number]) {
+    setSelectedPackageId(item.id);
+    resetPricingMessages();
+
+    const account = validateGameAccountTarget(selectedGame, userId, serverId);
+    if (!account.ok) {
+      setAccountError(account.error);
+      document
+        .getElementById("account-data")
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+
+    promoSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /**
+   * Satu kartu compact untuk semua nominal — dipakai seksi Best Deals maupun
+   * tiap seksi nominal, supaya tampilannya identik di mana pun. Badge peringkat
+   * sengaja tidak ada: penanda sudah lewat dari posisi di seksi Best Deals.
+   */
+  function renderPackageCard(
+    item: Game["packages"][number],
+    options: { keyPrefix: string; onSelect: () => void },
+  ) {
+    const { keyPrefix, onSelect } = options;
+    const referenceDiscount = getReferenceDiscountPercent(
+      item.referencePrice,
+      item.sellingPrice,
+    );
+    const groups = groupsOf(item);
+    const visualKind = getPackageVisualKind(selectedGame, item);
+    const artwork = artworkByPackageId[item.id];
+    const active = selectedPackageId === item.id;
+    const showReference = item.referencePrice > item.sellingPrice;
+
+    return (
+      <button
+        className={`package-option package-priced package-card-v4 ${active ? "active" : ""}`}
+        key={`${keyPrefix}-${item.id}`}
+        type="button"
+        aria-pressed={active}
+        onClick={onSelect}
+      >
+        <span
+          className={`package-item-visual ${visualKind} package-card-v4-visual`}
+          aria-hidden={artwork ? undefined : true}
+          style={artwork ? { overflow: "hidden", padding: 2 } : undefined}
+        >
+          {artwork ? (
+            <img
+              src={artwork.src}
+              alt={artwork.alt}
+              loading="lazy"
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            packageVisualLabel(visualKind)
+          )}
+        </span>
+
+        <span className="package-card-v4-body">
+          <span className="package-card-v4-title">{item.label}</span>
+        </span>
+
+        <span className="package-card-v4-price">
+          <strong className="package-current-price">{formatIDR(item.sellingPrice)}</strong>
+          {(showReference || referenceDiscount > 0) && (
+            <span className="package-reference-row">
+              {showReference && <del>{formatIDR(item.referencePrice)}</del>}
+              {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
+            </span>
+          )}
+        </span>
+
+        {(groups.length > 0 || (item.note && !isOnlyGroupNote(item.note))) && (
+          <span className="package-card-v4-meta">
+            {groups.slice(0, 2).map((group) => (
+              <b className={`package-badge ${group}`} key={group}>
+                {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
+              </b>
+            ))}
+            {item.note && !isOnlyGroupNote(item.note) && (
+              <b className="package-badge package-badge-note">{item.note}</b>
+            )}
+          </span>
+        )}
+      </button>
+    );
+  }
 
   const nominalSections = useMemo(
     () =>
@@ -287,6 +412,12 @@ export default function TopupExperience({
         setViewerState(response.ok ? "authenticated" : "guest");
         if (response.ok) {
           setContactError("");
+          // Email akun dipakai sebagai tujuan receipt pada ringkasan konfirmasi.
+          const meData = (await response.json().catch(() => null)) as {
+            user?: { email?: string } | null;
+          } | null;
+          if (!mounted) return;
+          setViewerEmail(meData?.user?.email ?? "");
           setPointsLoading(true);
           try {
             const pointsResponse = await fetch("/api/account/points", {
@@ -314,6 +445,7 @@ export default function TopupExperience({
         } else {
           setPointsSummary(null);
           setPointsToRedeem(0);
+          setViewerEmail("");
         }
       } catch {
         if (mounted) setViewerState("guest");
@@ -325,6 +457,22 @@ export default function TopupExperience({
       mounted = false;
     };
   }, []);
+
+  // Escape menutup ringkasan konfirmasi; fokus dikembalikan ke tombol
+  // "Kembali" supaya keyboard user tidak tersesat di dalam dialog.
+  useEffect(() => {
+    if (!confirmOpen) return;
+
+    confirmCloseRef.current?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || isSubmitting) return;
+      setConfirmOpen(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmOpen, isSubmitting]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -616,6 +764,19 @@ export default function TopupExperience({
       return;
     }
 
+    // Semua input sudah valid: simpan payload dan tampilkan ringkasan dulu.
+    // Order baru dibuat setelah pengguna menekan tombol konfirmasi.
+    setPendingCheckout({
+      targetUserId: account.userId,
+      targetServerId: account.serverId ?? "",
+      guestContact,
+    });
+    setConfirmOpen(true);
+  }
+
+  async function confirmCheckout() {
+    if (!pendingCheckout) return;
+
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/orders", {
@@ -625,15 +786,15 @@ export default function TopupExperience({
           gameId: selectedGame.id,
           packageId: selectedPackage.id,
           paymentId: paymentMethod.id,
-          targetUserId: account.userId,
-          targetServerId: account.serverId,
+          targetUserId: pendingCheckout.targetUserId,
+          targetServerId: pendingCheckout.targetServerId,
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
           pointsToRedeem,
-          ...(guestContact
+          ...(pendingCheckout.guestContact
             ? {
-                receiptEmail: guestContact.email,
-                receiptWhatsapp: guestContact.whatsapp,
+                receiptEmail: pendingCheckout.guestContact.email,
+                receiptWhatsapp: pendingCheckout.guestContact.whatsapp,
               }
             : {}),
         }),
@@ -647,6 +808,8 @@ export default function TopupExperience({
         accessToken?: string;
       };
       if (!response.ok || !data.order) {
+        // Tutup dialog supaya pesan error di form terlihat.
+        setConfirmOpen(false);
         setNotice(data.error ?? "Gagal membuat pembayaran.");
         return;
       }
@@ -669,6 +832,7 @@ export default function TopupExperience({
       const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
       router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
+      setConfirmOpen(false);
       setNotice("Tidak bisa menyiapkan pembayaran. Coba lagi.");
     } finally {
       setIsSubmitting(false);
@@ -952,6 +1116,33 @@ export default function TopupExperience({
               <div><strong>Pilih nominal</strong><small>Semua nominal ditampilkan sekaligus dan dikelompokkan berdasarkan jenis produk.</small></div>
             </div>
 
+            {bestDealItems.length > 0 && (
+              <section
+                className="nominal-section nominal-section-best-deals"
+                aria-labelledby="best-deals-heading"
+              >
+                <div className="nominal-section-heading">
+                  <div>
+                    <strong id="best-deals-heading">
+                      Best Deals
+                      <span className="nominal-section-spark" aria-hidden="true">✦</span>
+                    </strong>
+                    <small>Lima nominal dengan margin rupiah tertinggi untuk {selectedGame.name}.</small>
+                  </div>
+                  <span>{bestDealItems.length} pilihan</span>
+                </div>
+
+                <div className="package-grid package-grid-v3">
+                  {bestDealItems.map((item) =>
+                    renderPackageCard(item, {
+                      keyPrefix: "best-deal",
+                      onSelect: () => selectPackage(item),
+                    }),
+                  )}
+                </div>
+              </section>
+            )}
+
             <div className="nominal-section-stack">
               {nominalSections.map((section) => (
                 <section className={`nominal-section nominal-section-${section.id}`} key={section.id}>
@@ -967,90 +1158,12 @@ export default function TopupExperience({
                   </div>
 
                   <div className="package-grid package-grid-v3">
-                    {section.items.map((item) => {
-                      const referenceDiscount = getReferenceDiscountPercent(item.referencePrice, item.sellingPrice);
-                      const groups = groupsOf(item);
-                      const visualKind = getPackageVisualKind(selectedGame, item);
-                      const artwork = artworkByPackageId[item.id];
-                      const active = selectedPackageId === item.id;
-
-                      return (
-                        <button
-                          className={`package-option package-priced package-card-v3 ${active ? "active" : ""}`}
-                          key={item.id}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => {
-                            setSelectedPackageId(item.id);
-                            resetPricingMessages();
-                            // Urutan diarahkan: data akun dulu, baru promo.
-                            // Belum valid -> scroll ke step 1 + tampilkan errornya;
-                            // sudah valid -> lanjut ke promo & referral.
-                            const account = validateGameAccountTarget(
-                              selectedGame,
-                              userId,
-                              serverId,
-                            );
-                            if (!account.ok) {
-                              setAccountError(account.error);
-                              document
-                                .getElementById("account-data")
-                                ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                              return;
-                            }
-                            promoSectionRef.current?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "nearest",
-                            });
-                          }}
-                        >
-                          <span className="package-card-v3-title">{item.label}</span>
-
-                          <span className="package-card-v3-main">
-                            <span
-                              className={`package-item-visual ${visualKind}`}
-                              aria-hidden={artwork ? undefined : true}
-                              style={artwork ? { overflow: "hidden", padding: 4 } : undefined}
-                            >
-                              {artwork ? (
-                                <img
-                                  src={artwork.src}
-                                  alt={artwork.alt}
-                                  loading="lazy"
-                                  style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-                                />
-                              ) : (
-                                packageVisualLabel(visualKind)
-                              )}
-                            </span>
-                            <span className="package-card-v3-price">
-                              <strong className="package-current-price">{formatIDR(item.sellingPrice)}</strong>
-                              {(item.referencePrice > item.sellingPrice || referenceDiscount > 0) && (
-                                <span className="package-reference-row">
-                                  {item.referencePrice > item.sellingPrice && <del>{formatIDR(item.referencePrice)}</del>}
-                                  {referenceDiscount > 0 && <b>-{referenceDiscount}%</b>}
-                                </span>
-                              )}
-                              {item.note && !isOnlyGroupNote(item.note) && (
-                                <small className="package-note">{item.note}</small>
-                              )}
-                            </span>
-                          </span>
-
-                          <span className="package-card-v3-footer">
-                            <span className="package-badges">
-                              {groups.slice(0, 2).map((group) => (
-                                <b className={`package-badge ${group}`} key={group}>
-                                  {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
-                                </b>
-                              ))}
-                            </span>
-                            <span className="package-card-v3-brand">N+</span>
-                            <span className="package-select-indicator" aria-hidden="true">{active ? "✓" : ""}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
+                    {section.items.map((item) =>
+                      renderPackageCard(item, {
+                        keyPrefix: section.id,
+                        onSelect: () => selectPackage(item),
+                      }),
+                    )}
                   </div>
                 </section>
               ))}
@@ -1068,13 +1181,6 @@ export default function TopupExperience({
             </div>
 
             <div className="discount-stack">
-              {viewerState === "guest" && (
-                <p className="inline-message discount-login-hint">
-                  💡 Kode promo & referral khusus pengguna login —{" "}
-                  <a href="/login?next=%23topup">masuk</a> atau{" "}
-                  <a href="/register?next=%23topup">daftar gratis</a> dulu untuk memakainya.
-                </p>
-              )}
               <label className="discount-field">
                 <span>Kode promo</span>
                 <span className="discount-input-row">
@@ -1089,6 +1195,15 @@ export default function TopupExperience({
                   <button type="button" onClick={applyReferral}>Pakai</button>
                 </span>
               </label>
+              {/* Hint login diletakkan di bawah kedua input supaya tidak menutupi
+                  label field saat pertama kali dibuka. */}
+              {viewerState === "guest" && (
+                <p className="inline-message discount-login-hint">
+                  💡 Kode promo & referral khusus pengguna login —{" "}
+                  <a href="/login?next=%23topup">masuk</a> atau{" "}
+                  <a href="/register?next=%23topup">daftar gratis</a> dulu untuk memakainya.
+                </p>
+              )}
             </div>
 
             {promoMessage && <p className="inline-message">{promoMessage}</p>}
@@ -1254,10 +1369,130 @@ export default function TopupExperience({
           </div>
 
           <button className="primary-button full" disabled={isSubmitting || pricingLoading || Boolean(pricingError)} type="submit">
-            {isSubmitting ? "Membuat pembayaran..." : pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
+            {pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
           </button>
           </div>
           {notice && <p className="form-notice" role="status">{notice}</p>}
+
+          {confirmOpen && pendingCheckout && (
+            <div
+              className="checkout-confirm-backdrop"
+              role="presentation"
+              onClick={() => {
+                if (!isSubmitting) setConfirmOpen(false);
+              }}
+            >
+              <section
+                className="checkout-confirm"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="checkout-confirm-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <header className="checkout-confirm-head">
+                  <span className="checkout-confirm-head-icon" aria-hidden="true">
+                    ✓
+                  </span>
+                  <div className="checkout-confirm-head-copy">
+                    <h3 id="checkout-confirm-title">Periksa transaksi kamu</h3>
+                    <p>Pastikan data tujuan sudah benar sebelum melanjutkan ke pembayaran.</p>
+                  </div>
+                </header>
+
+                <div className="checkout-confirm-list">
+                  <div className="checkout-confirm-row">
+                    <span>Produk</span>
+                    <strong>{selectedGame.name} · {selectedPackage.label}</strong>
+                  </div>
+                  <div className="checkout-confirm-row checkout-confirm-row-accent">
+                    <span>User ID</span>
+                    <strong>{pendingCheckout.targetUserId}</strong>
+                  </div>
+                  {pendingCheckout.targetServerId && (
+                    <div className="checkout-confirm-row">
+                      <span>Server / Zone</span>
+                      <strong>{pendingCheckout.targetServerId}</strong>
+                    </div>
+                  )}
+                  <div className="checkout-confirm-row">
+                    <span>Metode pembayaran</span>
+                    <strong>{paymentMethod.name}</strong>
+                  </div>
+                  <div className="checkout-confirm-row">
+                    <span>Tujuan receipt</span>
+                    <strong>
+                      {pendingCheckout.guestContact?.email ?? viewerEmail ?? "Email akun"}
+                    </strong>
+                  </div>
+                  {pendingCheckout.guestContact?.whatsapp && (
+                    <div className="checkout-confirm-row">
+                      <span>WhatsApp</span>
+                      <strong>{pendingCheckout.guestContact.whatsapp}</strong>
+                    </div>
+                  )}
+                  {appliedPromoCode && (
+                    <div className="checkout-confirm-row">
+                      <span>Kode promo</span>
+                      <strong>{appliedPromoCode}</strong>
+                    </div>
+                  )}
+                  {appliedReferralCode && (
+                    <div className="checkout-confirm-row">
+                      <span>Kode referral</span>
+                      <strong>{appliedReferralCode}</strong>
+                    </div>
+                  )}
+                  {pointsToRedeem > 0 && (
+                    <div className="checkout-confirm-row">
+                      <span>Nambah Points</span>
+                      <strong>{pointsToRedeem.toLocaleString("id-ID")} pts</strong>
+                    </div>
+                  )}
+                </div>
+
+                <div className="checkout-confirm-totals">
+                  <div className="summary-line">
+                    <span>Harga Nambah</span>
+                    <strong>{formatIDR(pricing.sellingPrice)}</strong>
+                  </div>
+                  {pricing.promotionDiscount > 0 && (
+                    <div className="summary-line discount"><span>Promo {pricing.promoCode}</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
+                  )}
+                  {pricing.referralDiscount > 0 && (
+                    <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
+                  )}
+                  {pricing.pointsDiscount > 0 && (
+                    <div className="summary-line points-benefit"><span>Nambah Points</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+                  )}
+                  <div className="summary-line">
+                    <span>Biaya pembayaran</span>
+                    <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
+                  </div>
+                  <div className="summary-total"><span>Total dibayar</span><strong>{formatIDR(pricing.finalPrice)}</strong></div>
+                </div>
+
+                <footer className="checkout-confirm-actions">
+                  <button
+                    ref={confirmCloseRef}
+                    type="button"
+                    className="checkout-confirm-cancel"
+                    disabled={isSubmitting}
+                    onClick={() => setConfirmOpen(false)}
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={isSubmitting}
+                    onClick={() => void confirmCheckout()}
+                  >
+                    {isSubmitting ? "Membuat pembayaran..." : "Konfirmasi & bayar"} <span aria-hidden="true">→</span>
+                  </button>
+                </footer>
+              </section>
+            </div>
+          )}
         </form>
       </section>
     </>

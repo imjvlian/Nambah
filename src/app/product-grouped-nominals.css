@@ -61,7 +61,470 @@
 
 .package-grid.package-grid-v3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* 1fr membuat semua baris setinggi konten terpanjang, jadi kartu seragam
+     tanpa perlu memotong nama item. */
+  grid-auto-rows: 1fr;
+  gap: 7px;
+}
+
+/* Seksi "Best Deals" (5 item dengan margin rupiah tertinggi per produk). */
+.nominal-section-best-deals {
+  margin-bottom: 28px;
+  padding: 14px;
+  border: 1px solid rgba(201, 255, 63, 0.16);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0 0, rgba(201, 255, 63, 0.07), transparent 55%),
+    rgba(201, 255, 63, 0.02);
+}
+
+.nominal-section-best-deals .nominal-section-heading strong {
+  color: var(--lime);
+}
+
+/* Kartu nominal v4 — dipakai seragam di seksi Best Deals maupun semua seksi
+   nominal. Layout horizontal ringkas: ikon | teks | harga. */
+.package-option.package-card-v4 {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 4px 9px;
+  min-height: 56px;
+  padding: 8px 9px;
+  overflow: hidden;
+  text-align: left;
+  border-radius: 11px;
+  background: #121411;
+}
+
+/* Kilau diagonal yang melintas kartu. */
+@keyframes package-card-v4-glare {
+  from {
+    transform: translateX(-135%);
+  }
+
+  to {
+    transform: translateX(135%);
+  }
+}
+
+.package-option.package-card-v4::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+  background: linear-gradient(
+    112deg,
+    transparent 26%,
+    rgba(255, 255, 255, 0.08) 42%,
+    rgba(201, 255, 63, 0.26) 50%,
+    rgba(255, 255, 255, 0.08) 58%,
+    transparent 74%
+  );
+  transition: opacity 260ms ease;
+}
+
+.package-option.package-card-v4:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #171a15;
+}
+
+.package-option.package-card-v4.active {
+  border-color: rgba(201, 255, 63, 0.55);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(201, 255, 63, 0.14), transparent 62%),
+    linear-gradient(90deg, rgba(201, 255, 63, 0.08), transparent 55%),
+    #14180f;
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 255, 63, 0.08),
+    0 0 0 1px rgba(201, 255, 63, 0.22),
+    0 6px 20px rgba(0, 0, 0, 0.34),
+    0 0 22px rgba(201, 255, 63, 0.14);
+}
+
+/* Hover tidak boleh menimpa gaya kartu terpilih. */
+.package-option.package-card-v4.active:hover {
+  border-color: rgba(201, 255, 63, 0.55);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(201, 255, 63, 0.14), transparent 62%),
+    linear-gradient(90deg, rgba(201, 255, 63, 0.08), transparent 55%),
+    #14180f;
+}
+
+/* Kilau berjalan saat kursor di atas kartu maupun saat kartu terpilih. */
+.package-option.package-card-v4:hover::after,
+.package-option.package-card-v4.active::after {
+  opacity: 1;
+  animation: package-card-v4-glare 2.6s ease-in-out infinite;
+}
+
+/* Isi kartu harus di atas lapisan kilau. */
+.package-card-v4-visual,
+.package-card-v4-body,
+.package-card-v4-price,
+.package-card-v4-meta {
+  position: relative;
+  z-index: 2;
+}
+
+.package-card-v4-visual {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  font-size: 18px !important;
+}
+
+.package-card-v4 .package-item-visual.diamond {
+  font-size: 17px !important;
+}
+
+.package-card-v4 .package-item-visual.pass {
+  font-size: 8px !important;
+}
+
+.package-card-v4-body {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+
+/* Nama item tidak dipotong: teks membungkus penuh, tanpa clamp/ellipsis. */
+.package-card-v4-title {
+  min-width: 0;
+  color: #e0e4dc;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Tag produk ada di baris bawah kartu, sejajar dengan kolom teks. */
+.package-card-v4-meta {
+  grid-column: 2 / span 3;
+  grid-row: 2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.package-card-v4-meta .package-badge {
+  min-height: 16px;
+  padding: 0 7px;
+  font-size: 7px;
+  line-height: 1.5;
+  letter-spacing: 0.035em;
+}
+
+/* Catatan produk (mis. "Umum", "Jawa Barat") memakai kelas .package-badge yang
+   sama persis dengan badge grup supaya ukuran keduanya tidak pernah berbeda. */
+.package-card-v4-meta .package-badge-note {
+  border-color: rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.035);
+  color: #8f968b;
+}
+
+.package-card-v4-price {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  justify-items: end;
+  text-align: right;
+}
+
+.package-card-v4-price .package-current-price {
+  color: #e6e9e2;
+  font-size: 10px;
+  font-weight: 880;
+  white-space: nowrap;
+}
+
+.package-card-v4-price .package-reference-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 6.5px;
+}
+
+/* ===== Popup konfirmasi sebelum bayar ===== */
+@keyframes checkout-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.checkout-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(201, 255, 63, 0.06), transparent 60%),
+    rgba(5, 6, 5, 0.78);
+  backdrop-filter: blur(10px) saturate(120%);
+}
+
+.checkout-confirm {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: min(88vh, 760px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #191d15 0%, #12150f 46%);
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(201, 255, 63, 0.05) inset;
+  animation: checkout-confirm-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Cahaya lime tipis di tepi atas, penanda dialog ini milik Nambah. */
+.checkout-confirm::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 12%;
+  left: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 255, 63, 0.75), transparent);
+}
+
+.checkout-confirm-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 20px 22px 18px;
+}
+
+.checkout-confirm-head-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(201, 255, 63, 0.1);
+  color: var(--lime);
+  font-size: 17px;
+}
+
+.checkout-confirm-head-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.checkout-confirm-head h3 {
+  color: #f2f5ee;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.checkout-confirm-head p {
+  color: #858c80;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Kartu data tujuan: label kiri, nilai kanan, dipisah hairline. */
+.checkout-confirm-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  margin: 0 14px;
+  padding: 4px 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.checkout-confirm-row {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 14px;
+}
+
+.checkout-confirm-row + .checkout-confirm-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.checkout-confirm-row > span {
+  color: #7d8478;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.checkout-confirm-row > strong {
+  min-width: 0;
+  color: #eef1ea;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.checkout-confirm-row-accent > strong {
+  color: var(--lime);
+}
+
+.checkout-confirm-totals {
+  display: grid;
+  gap: 6px;
+  margin: 12px 14px 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.checkout-confirm-totals .summary-total {
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px dashed rgba(201, 255, 63, 0.24);
+}
+
+/* Baris harga di sidebar punya padding sendiri; rapikan agar pas di kartu. */
+.checkout-confirm-totals .summary-line {
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 11.5px;
+}
+
+.checkout-confirm-totals .summary-line strong {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.checkout-confirm-totals .summary-total {
+  padding: 9px 0 0;
+}
+
+.checkout-confirm-totals .summary-total span {
+  font-size: 12px;
+}
+
+.checkout-confirm-totals .summary-total strong {
+  font-size: 21px;
+}
+
+.checkout-confirm-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 9px;
+  padding: 14px;
+}
+
+.checkout-confirm-cancel {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #bcc2b4;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.checkout-confirm-cancel:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f5ee;
+}
+
+.checkout-confirm-cancel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.checkout-confirm-actions .primary-button {
+  min-height: 44px;
+  border-radius: 13px;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .checkout-confirm {
+    border-radius: 18px;
+  }
+
+  .checkout-confirm-head {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+    padding: 16px 16px 14px;
+  }
+
+  .checkout-confirm-head-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .checkout-confirm-list,
+  .checkout-confirm-totals {
+    margin-inline: 10px;
+  }
+
+  .checkout-confirm-row {
+    grid-template-columns: 1fr;
+    gap: 1px;
+    padding: 8px 12px;
+  }
+
+  .checkout-confirm-row > strong {
+    text-align: left;
+  }
+
+  .checkout-confirm-actions {
+    grid-template-columns: 1fr;
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .nominal-section-best-deals {
+    padding: 12px 10px;
+  }
+
+  .nominal-section-best-deals .package-grid.package-grid-v3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .package-option.package-card-v3 {
@@ -216,13 +679,6 @@
   font-size: 6px !important;
   font-weight: 950 !important;
   letter-spacing: -0.04em;
-}
-
-.package-card-v3 .package-select-indicator {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 auto;
-  font-size: 7px !important;
 }
 
 @media (max-width: 1080px) {

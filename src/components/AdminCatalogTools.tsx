@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { useConfirm } from "@/components/AdminConfirmDialog";
 
 type CatalogSnapshot = {
   stats: {
@@ -101,6 +102,7 @@ export default function AdminCatalogTools() {
   const [gameId, setGameId] = useState("all");
   const [scope, setScope] = useState("ready");
   const [busy, setBusy] = useState("");
+  const confirm = useConfirm();
   const [notice, setNotice] = useState("");
   const [markupResult, setMarkupResult] = useState<MarkupResult | null>(null);
   const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null);
@@ -167,9 +169,19 @@ export default function AdminCatalogTools() {
 
     if (!dryRun) {
       const targetCount = markupResult?.summary.changed ?? markupResult?.summary.eligible ?? 0;
-      const confirmed = window.confirm(
-        `Terapkan auto mark-up ke ${targetCount || "produk yang sesuai"} pada ${selectedGameName}? Harga manual produk target akan diganti oleh rumus otomatis.`,
-      );
+      const confirmed = await confirm({
+        title: "Terapkan auto mark-up?",
+        description:
+          "Harga manual produk target akan diganti oleh rumus otomatis, jadi cek dulu hasil dry-run.",
+        details: [
+          {
+            label: "Produk terdampak",
+            value: targetCount ? String(targetCount) : "produk yang sesuai",
+          },
+          { label: "Cakupan", value: selectedGameName },
+        ],
+        confirmLabel: "Terapkan mark-up",
+      });
       if (!confirmed) return;
     }
 
@@ -210,9 +222,12 @@ export default function AdminCatalogTools() {
   async function runCleanup(dryRun: boolean) {
     if (!dryRun) {
       const activeCount = cleanupResult?.summary.activeOrphans ?? catalog?.stats.unmapped ?? 0;
-      const confirmed = window.confirm(
-        `Clean ${activeCount} produk tanpa mapping? Produk tidak dihapus; produk orphan akan disembunyikan dan game kosong akan dinonaktifkan.`,
-      );
+      const confirmed = await confirm({
+        title: `Bersihkan ${activeCount} produk tanpa mapping?`,
+        description:
+          "Produk tidak dihapus: produk orphan akan disembunyikan dan game kosong dinonaktifkan.",
+        confirmLabel: "Bersihkan katalog",
+      });
       if (!confirmed) return;
     }
 
@@ -250,13 +265,22 @@ export default function AdminCatalogTools() {
     if (!dryRun) {
       const deletableCount = purgeResult?.summary.deletable ?? 0;
       const skippedCount = purgeResult?.summary.skipped ?? 0;
-      const confirmed = window.confirm(
-        `Hapus permanen ${deletableCount} produk tanpa mapping yang bersih? ` +
-          (skippedCount > 0
-            ? `${skippedCount} produk punya riwayat order dan TETAP disimpan (nonaktifkan saja). `
-            : "") +
-          "Aksi ini tidak bisa dibatalkan.",
-      );
+      const confirmed = await confirm({
+        title: `Hapus permanen ${deletableCount} produk?`,
+        description: "Aksi ini tidak bisa dibatalkan.",
+        tone: "danger",
+        details: [
+          { label: "Akan dihapus", value: String(deletableCount) },
+          {
+            label: "Dipertahankan",
+            value:
+              skippedCount > 0
+                ? `${skippedCount} (punya riwayat order)`
+                : "—",
+          },
+        ],
+        confirmLabel: "Hapus permanen",
+      });
       if (!confirmed) return;
     }
 

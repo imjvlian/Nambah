@@ -1,5 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect } from "@/lib/supabase/server";
+import { supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -41,19 +41,23 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    // products & supplier_products melewati 1000 baris. Kalau terpotong, mapping
+    // untuk produk di baris 1001+ tidak terbaca sehingga produk yang sudah
+    // ter-map ikut terhitung "unmapped" di panel katalog.
     const [games, products, supplierProducts, balanceRows] = await Promise.all([
-      supabaseSelect<GameRow>("games", {
+      supabaseSelectAll<GameRow>("games", {
         select: "id,name,short_name,active,sort_order",
         order: "sort_order.asc,name.asc",
       }),
-      supabaseSelect<ProductRow>("products", {
+      supabaseSelectAll<ProductRow>("products", {
         select:
           "id,game_id,label,note,selling_price,reference_price,active,sort_order",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
-      supabaseSelect<SupplierProductRow>("supplier_products", {
+      supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
         filters: { supplier_id: "eq.digiflazz" },
+        order: "product_id.asc",
       }),
       supabaseSelect<SupplierBalanceRow>("supplier_balances", {
         select: "balance,reserved_balance,checked_at",

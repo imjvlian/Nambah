@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { useConfirm } from "@/components/AdminConfirmDialog";
 
 type AffiliatePayload = {
   stats: {
@@ -89,6 +90,7 @@ export default function AffiliateAdminPanel() {
   });
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
+  const confirm = useConfirm();
   const [notice, setNotice] = useState("");
 
   // Aksi payout (approve/paid withdrawal) tetap level tertinggi karena
@@ -310,9 +312,13 @@ export default function AffiliateAdminPanel() {
   }
 
   async function deleteAffiliate(code: string) {
-    const confirmed = window.confirm(
-      `Hapus affiliate ${code}? Aksi ini hanya bisa dilakukan bila kode belum memiliki riwayat komisi/withdrawal.`,
-    );
+    const confirmed = await confirm({
+      title: `Hapus affiliate ${code}?`,
+      description:
+        "Hanya bisa dilakukan bila kode belum punya riwayat komisi atau withdrawal.",
+      tone: "danger",
+      confirmLabel: "Hapus affiliate",
+    });
     if (!confirmed) return;
 
     setBusy("delete:" + code);

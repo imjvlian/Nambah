@@ -330,10 +330,9 @@
    the customer browses long nominal lists. Smaller screens keep the original
    stacked form so the checkout controls never squeeze the product cards. */
 @media (min-width: 1280px) {
-  .product-page .product-transaction.shell {
-    width: min(1480px, calc(100% - 40px));
-  }
-
+  /* Tidak ada override lebar di blok ini: header, tab bar, dan semua seksi
+     halaman produk memakai .shell global yang sama, jadi navbar selalu rata
+     dengan isi halaman. */
   .product-page .topup-section {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
     gap: 24px;
