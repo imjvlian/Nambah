@@ -74,6 +74,19 @@
   color: #d8b2b2;
 }
 
+/* Provider tidak tersedia untuk game ini. Sengaja netral dan redup: ini bukan
+   kegagalan — form sudah valid dan checkout tetap bisa dilanjutkan. Warnanya
+   berdiri sendiri dari error dan success supaya tidak salah dibaca. */
+.account-check-banner.unavailable {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+  color: #868d82;
+}
+
+.account-check-banner.unavailable .account-check-icon {
+  opacity: 0.55;
+}
+
 .account-check-icon {
   width: 23px;
   height: 23px;

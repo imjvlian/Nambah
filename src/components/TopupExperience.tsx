@@ -27,7 +27,16 @@ type ProductArtwork = {
   alt: string;
   kind: "nominal" | "cover";
 };
-type UsernameCheckStatus = "idle" | "loading" | "success" | "pending" | "error";
+type UsernameCheckStatus =
+  | "idle"
+  | "loading"
+  | "success"
+  | "pending"
+  | "error"
+  // Provider tidak tersedia untuk game ini (route belum dikonfigurasi, atau
+  // game memang tidak memakai checker eksternal). Bukan kegagalan — form tetap
+  // valid dan checkout tetap bisa dilanjutkan.
+  | "unavailable";
 type UsernameCheckState = {
   status: UsernameCheckStatus;
   nickname?: string;
@@ -564,7 +573,13 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
-    if (!canCheckUsername || !account.ok || !account.serverId) {
+    // `account.ok` saja sudah cukup: `validateGameAccountTarget` mengembalikan
+    // `ok: false` kalau skema punya kolom server tapi nilainya kosong. Klausa
+    // `!account.serverId` yang pernah ada di sini mematikan auto-check untuk 14
+    // game yang memang tidak menanyakan server — Valorant, Arena of Valor, LoL
+    // Wild Rift, FC Mobile, dan lainnya — padahal route Volsever-nya sehat dan
+    // API sudah menerima request tanpa server.
+    if (!canCheckUsername || !account.ok) {
       setUsernameCheck({ status: "idle" });
       return;
     }
@@ -603,8 +618,13 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         if (!mounted) return;
 
         if (data.localOnly) {
+          // Status `unavailable`, bukan `pending`. API memakai `localOnly` untuk
+          // dua hal: game memang tidak butuh provider, dan route Volsever-nya
+          // belum dikonfigurasi. Keduanya berarti tidak ada yang sedang
+          // diproses — memakai `pending` membuat banner menulis "Masih
+          // diproses" padahal tidak ada proses sama sekali.
           setUsernameCheck({
-            status: "pending",
+            status: "unavailable",
             server: normalizedServerId,
             message:
               data.message ??
@@ -1031,7 +1051,14 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       <span className="account-check-icon" aria-hidden="true">↻</span>
                       <span className="account-check-copy">
                         <strong>Memeriksa akun...</strong>
-                        <small>Sebentar, kami cek ID dan Zone kamu.</small>
+                        {/* "Zone" hanya relevan untuk game yang menanyakan
+                            server. Valorant, FC Mobile, dan 12 game lain tidak
+                            punya kolom itu sama sekali. */}
+                        <small>
+                          {accountSchema.server
+                            ? "Sebentar, kami cek ID dan Zone kamu."
+                            : "Sebentar, kami cek ID akun kamu."}
+                        </small>
                       </span>
                     </>
                   ) : usernameCheck.status === "success" ? (
@@ -1040,9 +1067,26 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       <span className="account-check-copy">
                         <span>Akun kamu <strong>{usernameCheck.nickname ?? "terverifikasi"}</strong>.</span>
                         <small>
-                          {usernameCheck.region ? `${usernameCheck.region} · ` : ""}
-                          Zone {usernameCheck.server ?? serverId}
+                          {[
+                            usernameCheck.region,
+                            // Tanpa Kolom server, `serverId` selalu kosong —
+                            // menampilkan "Zone " dengan nilai kosong hanya
+                            // menambah kebisingan.
+                            accountSchema.server
+                              ? `Zone ${usernameCheck.server ?? serverId}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </small>
+                      </span>
+                    </>
+                  ) : usernameCheck.status === "unavailable" ? (
+                    <>
+                      <span className="account-check-icon" aria-hidden="true">i</span>
+                      <span className="account-check-copy">
+                        <strong>Pengecekan otomatis tidak tersedia</strong>
+                        <small>{usernameCheck.message}</small>
                       </span>
                     </>
                   ) : usernameCheck.status === "pending" ? (
