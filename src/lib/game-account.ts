@@ -5,6 +5,26 @@ export type AccountGameDescriptor = {
   requiresServer?: boolean;
 };
 
+/**
+ * Satu pilihan di `<select>` server.
+ *
+ * Bentuk `{ value, label }` dipakai ketika nilai yang harus dikirim ke supplier
+ * TIDAK sama dengan yang ditampilkan ke pelanggan. Contoh: Honkai Star Rail
+ * mengirim `os_asia`, tapi pelanggan harus melihat "Asia" — bukan kode internal
+ * yang tidak dia kenal.
+ */
+export type AccountFieldOption = string | { value: string; label: string };
+
+/** Nilai yang benar-benar dikirim ke supplier untuk sebuah opsi. */
+export function accountFieldOptionValue(option: AccountFieldOption): string {
+  return typeof option === "string" ? option : option.value;
+}
+
+/** Label yang ditampilkan di `<select>`. */
+export function accountFieldOptionLabel(option: AccountFieldOption): string {
+  return typeof option === "string" ? option : option.label;
+}
+
 export type AccountField = {
   label: string;
   placeholder: string;
@@ -14,8 +34,10 @@ export type AccountField = {
   pattern: RegExp;
   invalidMessage: string;
   // Bila terisi, field dirender sebagai <select> berisi nilai-nilai ini
-  // (bukan input teks bebas) dan validasi menolak nilai di luar daftar.
-  options?: string[];
+  // (bukan input teks bebas). Penolakan nilai di luar daftar dilakukan oleh
+  // `pattern` di atas, bukan oleh `options` — `options` hanya mengatur apa yang
+  // bisa dipilih.
+  options?: AccountFieldOption[];
 };
 
 export type GameAccountSchema = {
@@ -125,19 +147,53 @@ const VALORANT_USER: AccountField = {
   invalidMessage: "Riot ID harus berformat Nama#Tag (contoh: Joko#1234).",
 };
 
-// Server Genshin hanya punya 4 nilai sah dari publisher. Dibuat dropdown
-// supaya typo seperti `asia`/`ASIA` tidak terkirim ke supplier.
-const GENSHIN_SERVER_OPTIONS = ["Asia", "America", "Europe", "TW/HK/MO"];
+// HoYoverse (Genshin, HSR, ZZZ). Deskripsi Seller di panel Digiflazz untuk
+// Zenless Zone Zero (`MA***`):
+//
+//   "Format order : UID|Server uid,server uid|server uid(server)
+//    uid (default asia) List Server :
+//    Asia,os_asia,prod_official,asia,001
+//    America,os_usa,002
+//    Europe,os_euro,003
+//    TW, HK, MO,os_cht,004"
+//
+// Tiga hal yang terkonfirmasi dari sini:
+//
+// 1. `|` adalah KARAKTER LITERAL, bukan notasi. Seller menulis tiga separator
+//    yang berbeda (`uid,server`, `uid|server`, `uid(server)`) dalam satu
+//    kalimat — kalau `|` cuma notasi, seller tidak akan menyebutnya eksplisit
+//    di antara dua bentuk lain.
+//
+// 2. Nilai yang dikirim boleh berupa kode `os_*` (`os_asia`, `os_usa`,
+//    `os_euro`, `os_cht`) ATAU nama (`Asia`, `asia`, `America`, `TW, HK, MO`)
+//    ATAU angka (`001`-`004`).
+//
+// 3. UID saja sah — `uid (default asia)`. Ini menjelaskan kenapa template
+//    lama `{user_id}` "tampak" benar: tanpa server, order tetap jalan dengan
+//    default Asia. Tapi pilihan pelanggan jadi tidak berguna, dan akun
+//    Asia/Amerika/Eropa/TW akan salah hasil.
+//
+// Yang dikirim tetap `os_*`: satu kode tanpa spasi, tanpa tanda baca, dan
+// tanpa bergantung pada kapitalisasi. Bandingkan "TW, HK, MO" yang mengandung
+// koma — koma adalah separator, jadi bentuk itu tidak bisa dipakai di dalam
+// `customer_no` yang dipisah `|`.
+const HOYOVENSE_SERVER_OPTIONS: AccountFieldOption[] = [
+  { value: "os_asia", label: "Asia (os_asia)" },
+  { value: "os_usa", label: "America (os_usa)" },
+  { value: "os_euro", label: "Europe (os_euro)" },
+  { value: "os_cht", label: "TW / HK / MO (os_cht)" },
+];
 
-const GENSHIN_SERVER: AccountField = {
+const HOYOVENSE_SERVER: AccountField = {
   label: "Server / Region",
   placeholder: "Pilih server",
   inputMode: "text",
   maxLength: 8,
   sanitize: "identifier",
-  pattern: /^(Asia|America|Europe|TW\/HK\/MO)$/,
-  invalidMessage: "Pilih salah satu server: Asia, America, Europe, atau TW/HK/MO.",
-  options: GENSHIN_SERVER_OPTIONS,
+  pattern: /^(os_asia|os_usa|os_euro|os_cht)$/,
+  invalidMessage:
+    "Pilih salah satu server: Asia, America, Europe, atau TW/HK/MO.",
+  options: HOYOVENSE_SERVER_OPTIONS,
 };
 
 // Server Wuthering Waves: 5 region resmi Kuro Games. Dropdown supaya tidak
@@ -221,20 +277,34 @@ const DRAGON_NEST_SERVER: AccountField = {
   invalidMessage: "Server Dragon Nest M berupa angka, contoh: 030003.",
 };
 
-// NBA Infinite: filter server di halaman top-up resmi memuat "Asia, Europe,
-// NA, LATAM, Oceania". Ini wilayah geografis, bukan shard per akun, jadi
-// daftarnya stabil dan aman dijadikan dropdown.
-const NBA_INFINITE_SERVER_OPTIONS = ["Asia", "Europe", "NA", "LATAM", "Oceania"];
+// NBA Infinite. Wilayahnya memang lima (filter server di halaman top-up
+// kaleoz.com: "Oceania, LATAM, NA, Asia, Europe"), TAPI nilai yang dikirim ke
+// supplier adalah kode angka, bukan nama wilayah.
+//
+// Sumber: tabel format order reseller Digiflazz (kuotapulsa.com, post "Server
+// NBA Infinite"):
+//
+//   Format tujuan : User ID,Server      <- pemisah KOMA, bukan pipe
+//   Contoh : 12345,1001
+//   1001 = Oceania   5001 = SouthAmerica   6001 = NA   7001 = Asia   8001 = Europe
+//
+// Perhatikan "LATAM" di sumber resmi ditulis "SouthAmerica" di tabel reseller.
+const NBA_INFINITE_SERVER_OPTIONS: AccountFieldOption[] = [
+  { value: "1001", label: "Oceania (1001)" },
+  { value: "5001", label: "South America / LATAM (5001)" },
+  { value: "6001", label: "North America (6001)" },
+  { value: "7001", label: "Asia (7001)" },
+  { value: "8001", label: "Europe (8001)" },
+];
 
 const NBA_INFINITE_SERVER: AccountField = {
   label: "Server",
   placeholder: "Pilih server",
-  inputMode: "text",
-  maxLength: 16,
-  sanitize: "identifier",
-  pattern: /^(Asia|Europe|NA|LATAM|Oceania)$/,
-  invalidMessage:
-    "Pilih salah satu server: Asia, Europe, NA, LATAM, atau Oceania.",
+  inputMode: "numeric",
+  maxLength: 4,
+  sanitize: "digits",
+  pattern: /^(1001|5001|6001|7001|8001)$/,
+  invalidMessage: "Pilih salah satu server yang terdaftar di dalam game.",
   options: NBA_INFINITE_SERVER_OPTIONS,
 };
 
@@ -261,29 +331,21 @@ const COD_MOBILE_USER: AccountField = {
   placeholder: "Masukkan Player ID Call of Duty Mobile",
 };
 
-// Zenless Zone Zero: deskripsi Digiflazz `[UID][|Server]` dengan daftar
-// server Asia / America / Europe / TW,HK,MO — sama seperti Genshin, jadi
-// dropdown dipakai supaya `asia` atau `ASIA` tidak terkirim ke supplier.
-const ZZZ_SERVER_OPTIONS = ["Asia", "America", "Europe", "TW/HK/MO"];
-
-const ZZZ_SERVER: AccountField = {
-  label: "Server / Region",
-  placeholder: "Pilih server",
-  inputMode: "text",
-  maxLength: 8,
-  sanitize: "identifier",
-  pattern: /^(Asia|America|Europe|TW\/HK\/MO)$/,
-  invalidMessage:
-    "Pilih salah satu server: Asia, America, Europe, atau TW/HK/MO.",
-  options: ZZZ_SERVER_OPTIONS,
-};
+// Zenless Zone Zero memakai `HOYOVENSE_SERVER` — sumber formatnya persis
+// Deskripsi Seller ZZZ di panel Digiflazz, jadi tidak perlu menebak.
+// Lihat komentar `HOYOVENSE_SERVER`.
 
 // Ragnarok M: Eternal Love — lima server resmi. Server berupa nama dengan
 // spasi, jadi TIDAK boleh jadi kolom numerik.
+//
+// Ejaan "Memory of Faith" mengikuti situs resmi Ragnarok M ("our three servers
+// (Eternal Love, Midnight Party, and Memory of Faith)"). Huruf kecil pada "of"
+// bukan soal tampilan: nilai inilah yang dikirim ke supplier, dan perbedaan
+// kapitalisasi bisa membuat seller menolaknya.
 const RAGNAROK_SERVER_OPTIONS = [
   "Eternal Love",
   "Midnight Party",
-  "Memory Of Faith",
+  "Memory of Faith",
   "Valhalla Glory",
   "Port City",
 ];
@@ -294,15 +356,26 @@ const RAGNAROK_SERVER: AccountField = {
   inputMode: "text",
   maxLength: 32,
   sanitize: "identifier",
-  pattern: /^(Eternal Love|Midnight Party|Memory Of Faith|Valhalla Glory|Port City)$/,
+  pattern: /^(Eternal Love|Midnight Party|Memory of Faith|Valhalla Glory|Port City)$/,
   invalidMessage:
-    "Pilih salah satu server: Eternal Love, Midnight Party, Memory Of Faith, Valhalla Glory, atau Port City.",
+    "Pilih salah satu server: Eternal Love, Midnight Party, Memory of Faith, Valhalla Glory, atau Port City.",
   options: RAGNAROK_SERVER_OPTIONS,
 };
 
-// Heroes Evolved: deskripsi Digiflazz `[UID][|Server]` dan dokumentasi resminya
-// "Enter your Player ID and select the game server". Daftar server tidak
-// disebut, jadi server dibiarkan teks bebas.
+// Heroes Evolved. Deskripsi Digiflazz hanya menulis "Format no tujuan
+// [UID]|[Server]" tanpa daftar server, jadi daftar ini diambil dari tabel
+// format order reseller Digiflazz (kuotapulsa.com, post "Server Heroes
+// Evolved"):
+//
+//   Format tujuan : User ID,Server      <- pemisah KOMA, bukan pipe
+//   Contoh : 12345,100
+//
+// Region resminya memang empat (NetDragon: "NA region... SA region... EU
+// region... AS region"), dan TIDAK ada region bernama SEA. Yang paling mendekati
+// SEA adalah `134`/`135`, server berbahasa Thailand.
+//
+// Nilai yang dikirim adalah ANGKA, bukan "NA"/"Asia". Karena itu label dan
+// value dipisah: pelanggan melihat nama server, supplier menerima kodenya.
 const HEROES_EVOLVED_USER: AccountField = {
   label: "Player ID",
   placeholder: "Masukkan Player ID Heroes Evolved",
@@ -313,17 +386,28 @@ const HEROES_EVOLVED_USER: AccountField = {
   invalidMessage: "Player ID harus 4-20 digit.",
 };
 
-// Server Heroes Evolved = wilayah regional, bukan shard per akun.
-const HEROES_EVOLVED_SERVER_OPTIONS = ["Asia", "SEA", "NA", "SA", "EU"];
+const HEROES_EVOLVED_SERVER_OPTIONS: AccountFieldOption[] = [
+  { value: "100", label: "North America - LOST TEMPLE (100)" },
+  { value: "101", label: "North America - NEW ORDER (101)" },
+  { value: "111", label: "Europe - ASGARD (111)" },
+  { value: "112", label: "Europe - OLYMPUS (112)" },
+  { value: "121", label: "South America - AMAZON (121)" },
+  { value: "122", label: "South America - EL DORADO (122)" },
+  { value: "131", label: "Asia - ANGKOR (131)" },
+  { value: "132", label: "Asia - SHANGRI-LA (132)" },
+  { value: "133", label: "Asia - EL NIDO (133)" },
+  { value: "134", label: "Asia - Thailand (134)" },
+  { value: "135", label: "Asia - Thailand 2 (135)" },
+];
 
 const HEROES_EVOLVED_SERVER: AccountField = {
   label: "Server",
   placeholder: "Pilih server",
-  inputMode: "text",
-  maxLength: 8,
-  sanitize: "identifier",
-  pattern: /^(Asia|SEA|NA|SA|EU)$/,
-  invalidMessage: "Pilih salah satu server: Asia, SEA, NA, SA, atau EU.",
+  inputMode: "numeric",
+  maxLength: 3,
+  sanitize: "digits",
+  pattern: /^(100|101|111|112|121|122|131|132|133|134|135)$/,
+  invalidMessage: "Pilih salah satu server yang terdaftar di dalam game.",
   options: HEROES_EVOLVED_SERVER_OPTIONS,
 };
 
@@ -403,7 +487,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
         pattern: /^\d{9,10}$/,
         invalidMessage: "UID Genshin harus 9–10 digit.",
       },
-      ...(requiresServer ? { server: GENSHIN_SERVER } : {}),
+      ...(requiresServer ? { server: HOYOVENSE_SERVER } : {}),
       checker: "universal",
       helper: requiresServer
         ? "Masukkan UID dan pilih server/region akun Genshin."
@@ -426,7 +510,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
         pattern: /^\d{9,10}$/,
         invalidMessage: "UID Zenless Zone Zero harus 9-10 digit.",
       },
-      ...(requiresServer ? { server: ZZZ_SERVER } : {}),
+      ...(requiresServer ? { server: HOYOVENSE_SERVER } : {}),
       checker: "universal",
       helper: requiresServer
         ? "Masukkan UID dan pilih server/region akun Zenless Zone Zero."
@@ -434,10 +518,9 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
-  // Honkai: Star Rail — publisher HoYoverse, sama seperti Genshin, dan daftar
-// region-nya identik (Asia, America, Europe, TW/HK/MO). Field server-nya
-// dipinjam dari `GENSHIN_SERVER` supaya tidak ada daftar region yang berbeda
-// untuk game yang regionnya sama.
+  // Honkai: Star Rail — publisher HoYoverse, region dan format server identik
+  // dengan Genshin dan ZZZ. Ketiganya memakai `HOYOVENSE_SERVER`, yang
+  // sumbernya Deskripsi Seller di panel Digiflazz.
   if (/honkai|star rail|hsr/.test(identity)) {
     return {
       kind: "honkai-star-rail",
@@ -450,7 +533,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
         pattern: /^\d{9,10}$/,
         invalidMessage: "UID Honkai: Star Rail harus 9-10 digit.",
       },
-      ...(requiresServer ? { server: GENSHIN_SERVER } : {}),
+      ...(requiresServer ? { server: HOYOVENSE_SERVER } : {}),
       checker: "universal",
       helper: requiresServer
         ? "Masukkan UID dan pilih server/region akun Honkai: Star Rail."

@@ -66,19 +66,27 @@ test("valorant: satu kolom Riot ID dengan # wajib", () => {
   assert.equal(tanpaTag.ok, false);
 });
 
-test("genshin: dua kolom, server hanya boleh 4 region resmi", () => {
+test("genshin: dua kolom, server memakai kode internal 4 region resmi", () => {
   const game = { id: "genshin-impact", name: "Genshin Impact", requiresServer: true };
   const schema = getGameAccountSchema(game);
   assert.equal(schema.kind, "genshin");
-  assert.deepEqual(schema.server?.options, ["Asia", "America", "Europe", "TW/HK/MO"]);
+  // Deskripsi Seller di panel Digiflazz: "Asia,os_asia,...; America,os_usa,002;
+  // Europe,os_euro,003; TW, HK, MO,os_cht,004". Yang dikirim ke supplier adalah
+  // kode `os_*`, bukan nama region.
+  assert.deepEqual(schema.server?.options, [
+    { value: "os_asia", label: "Asia (os_asia)" },
+    { value: "os_usa", label: "America (os_usa)" },
+    { value: "os_euro", label: "Europe (os_euro)" },
+    { value: "os_cht", label: "TW / HK / MO (os_cht)" },
+  ]);
 
-  assert.deepEqual(validateGameAccountTarget(game, "812345678", "Asia"), {
+  assert.deepEqual(validateGameAccountTarget(game, "812345678", "os_asia"), {
     ok: true,
     userId: "812345678",
-    serverId: "Asia",
+    serverId: "os_asia",
   });
 
-  for (const invalid of ["asia", "ASIA", "asia tenggara", ""]) {
+  for (const invalid of ["Asia", "asia", "ASIA", "os_Asia", "asia tenggara", ""]) {
     const result = validateGameAccountTarget(game, "812345678", invalid);
     assert.equal(result.ok, false, `server '${invalid}' harus ditolak`);
   }

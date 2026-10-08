@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  accountFieldOptionLabel,
+  accountFieldOptionValue,
   getGameAccountSchema,
   validateGameAccountTarget,
 } from "../src/lib/game-account.ts";
@@ -95,10 +97,12 @@ test("ragnarok m: Character ID + dropdown lima server", () => {
   const schema = getGameAccountSchema(game);
 
   assert.equal(schema.user.label, "Character ID");
+  // Ejaan mengikuti situs resmi: "Memory of Faith" dengan huruf kecil pada
+  // "of". Nilai inilah yang dikirim ke supplier.
   assert.deepEqual(schema.server?.options, [
     "Eternal Love",
     "Midnight Party",
-    "Memory Of Faith",
+    "Memory of Faith",
     "Valhalla Glory",
     "Port City",
   ]);
@@ -121,25 +125,54 @@ test("ragnarok m: Character ID + dropdown lima server", () => {
   assert.equal(validateGameAccountTarget(game, "123378499", "").ok, false);
 });
 
-test("honkai star rail memakai daftar region yang sama dengan Genshin", () => {
-  const genshin = getGameAccountSchema({
-    id: "genshin-impact",
-    name: "Genshin Impact",
-    requiresServer: true,
-  });
-  const hsr = getGameAccountSchema({
-    id: "honkai-star-rail",
-    name: "Honkai: Star Rail",
-    requiresServer: true,
-  });
+test("tiga game HoYoverse kirim kode internal, bukan nama region", () => {
+  // Deskripsi Seller di panel Digiflazz (produk ZZZ, seller MA***):
+  //   "Format order : UID|Server uid,server uid|server uid(server)
+  //    uid (default asia) List Server :
+  //    Asia,os_asia,prod_official,asia,001
+  //    America,os_usa,002
+  //    Europe,os_euro,003
+  //    TW, HK, MO,os_cht,004"
+  //
+  // Ketiganya publisher HoYoverse dan memakai daftar server yang sama.
+  const expected = ["os_asia", "os_usa", "os_euro", "os_cht"];
+  for (const [id, name] of [
+    ["genshin-impact", "Genshin Impact"],
+    ["honkai-star-rail", "Honkai: Star Rail"],
+    ["zenless-zone-zero", "Zenless Zone Zero"],
+  ] as const) {
+    const schema = getGameAccountSchema({ id, name, requiresServer: true });
+    assert.deepEqual(
+      schema.server?.options.map(accountFieldOptionValue),
+      expected,
+      `${id} salah daftar server`,
+    );
+    // Label harus menyebut nama region agar pelanggan tidak melihat kode telanjang.
+    assert.deepEqual(schema.server?.options.map(accountFieldOptionLabel), [
+      "Asia (os_asia)",
+      "America (os_usa)",
+      "Europe (os_euro)",
+      "TW / HK / MO (os_cht)",
+    ]);
 
-  assert.equal(hsr.user.label, "UID");
-  assert.deepEqual(hsr.server?.options, genshin.server?.options);
+    assert.ok(validateGameAccountTarget({ id, name, requiresServer: true }, "123456789", "os_asia").ok);
+    // Nama region tidak lagi diterima — kode adalah yang dikirim ke supplier.
+    assert.equal(
+      validateGameAccountTarget({ id, name, requiresServer: true }, "123456789", "Asia").ok,
+      false,
+      `nama region lolos untuk ${id}`,
+    );
+  }
 
-  const game = { id: "honkai-star-rail", name: "Honkai: Star Rail", requiresServer: true };
-  assert.ok(validateGameAccountTarget(game, "123456789", "Asia").ok);
-  assert.equal(validateGameAccountTarget(game, "123456789", "asia").ok, false);
-  assert.equal(validateGameAccountTarget(game, "12345", "Asia").ok, false);
+  // Hasil render harus persis "UID|Server" dari Deskripsi Seller.
+  assert.equal(
+    renderFulfillmentTarget("{user_id}|{server_id}", {
+      userId: "12345",
+      serverId: "os_asia",
+      requiresServer: true,
+    }).customerNo,
+    "12345|os_asia",
+  );
 });
 
 test("heroes evolved: Player ID + server, checker aktif", () => {
@@ -154,24 +187,29 @@ test("heroes evolved: Player ID + server, checker aktif", () => {
   assert.ok(schema.server, "server tidak muncul padahal requires_server true");
   assert.equal(schema.checker, "universal");
 
-  assert.ok(validateGameAccountTarget(game, "123456", "SEA").ok);
-  assert.equal(validateGameAccountTarget(game, "abc", "SEA").ok, false);
+  // Server adalah kode angka dari daftar server NetDragon, bukan nama region.
+  assert.ok(validateGameAccountTarget(game, "123456", "131").ok);
+  assert.equal(validateGameAccountTarget(game, "abc", "131").ok, false);
   assert.equal(validateGameAccountTarget(game, "123456", "").ok, false);
-  // Server sekarang dropdown wilayah, jadi teks angka tidak lagi berlaku.
   assert.equal(
     validateGameAccountTarget(game, "123456", "1").ok,
     false,
-    "server angka lolos untuk dropdown wilayah",
+    "kode server di luar daftar lolos",
+  );
+  assert.equal(
+    validateGameAccountTarget(game, "123456", "SEA").ok,
+    false,
+    "nama region lolos",
   );
 });
 
 test("lima game baru punya target kurasi yang sesuai kebutuhannya", () => {
   const expected = [
-    // Ketiganya description-nya "Format no tujuan [UID]|[Server]", jadi pemisah
-    // `|` — bukan `{user_id}{server_id}` yang menghilangkan pemisah.
+    // Ragnarok M & HSR: pemisah `|` (HSR terbukti dari "Contoh : 12345|os_asia").
     { id: "ragnarok-m-eternal-love", template: "{user_id}|{server_id}", server: true },
     { id: "honkai-star-rail", template: "{user_id}|{server_id}", server: true },
-    { id: "heroes-evolved", template: "{user_id}|{server_id}", server: true },
+    // Heroes Evolved: pemisah KOMA ("Contoh : 12345,100").
+    { id: "heroes-evolved", template: "{user_id},{server_id}", server: true },
     // Dua ini cuma minta ID.
     { id: "league-of-legends-pc", template: "{user_id}", server: false },
     { id: "teamfight-tactics-mobile", template: "{user_id}", server: false },
@@ -199,6 +237,7 @@ test("setiap game di peta kurasi punya template yang valid", () => {
     "{user_id}",
     "{user_id}{server_id}",
     "{user_id}|{server_id}",
+    "{user_id},{server_id}",
   ]);
   for (const [id, target] of Object.entries(CURATED_GAME_TARGETS)) {
     assert.ok(
@@ -217,26 +256,40 @@ test("setiap game di peta kurasi punya template yang valid", () => {
   }
 });
 
-test("game ber-server memakai pemisah yang cocok dengan description supplier", () => {
-  // Kolom `description` di supplier_catalog_items:
-  //   "Format no tujuan [UID]|[Server]"  -> pemisah `|`
-  //   "Masukkan ID dan Server"             -> pemisah `|`
-  //   "no tujuan = gabungan user_id dan zone_id" -> tanpa pemisah
+test("game ber-server memakai pemisah yang sesuai format supplier", () => {
+  // Pemisah ditentukan per game dari sumber yang berbeda-beda, bukan dari
+  // deskripsi `[UID]|[Server]` yang tanda `|`-nya notasi.
+  //
+  //   `|`  -> Dragon Nest M (Deskripsi Seller di panel: "Contoh : 400628|030003")
+  //           dan Honkai Star Rail (tabel reseller: "12345|os_asia")
+  //   `,`  -> Heroes Evolved ("Contoh : 12345,100") dan NBA Infinite
+  //           ("Contoh : 12345,1001")
+  //   (none) -> "no tujuan = gabungan antara user_id dan zone_id"
+  //
+  // Genshin, ZZZ, WuWa, dan Ragnarok M masih `|` sebagai asumsi — belum ada
+  // sumber yang mengonfirmasinya.
   const pipe = [
     "genshin-impact",
     "wuthering-waves",
     "zenless-zone-zero",
     "honkai-star-rail",
-    "heroes-evolved",
     "dragon-nest-m-classic",
     "ragnarok-m-eternal-love",
-    "nba-infinite",
   ];
   for (const id of pipe) {
     assert.equal(
       getCuratedGameTarget(id)?.template,
       "{user_id}|{server_id}",
       `${id} harus memakai pemisah |`,
+    );
+  }
+
+  const comma = ["heroes-evolved", "nba-infinite"];
+  for (const id of comma) {
+    assert.equal(
+      getCuratedGameTarget(id)?.template,
+      "{user_id},{server_id}",
+      `${id} harus memakai pemisah koma`,
     );
   }
 
@@ -255,13 +308,31 @@ test("tidak ada game yang gagal total saat fulfillment", () => {
   // template `{user_id}`. `renderFulfillmentTarget` menolak kombinasi itu, jadi
   // setiap order kedua game itu gagal. Test ini menjalankan renderer sungguhan
   // terhadap kombinasi template di peta kurasi.
+  // Server diuji dengan nilai yang BENAR-BENAR bisa dipilih untuk game itu, bukan
+  // satu angka generik: Heroes Evolved pakai kode 3 digit (100), NBA Infinite
+  // kode 4 digit (1001), HSR kode `os_*`. Memakai `030003` untuk semuanya akan
+  // menutupi bug di nilai yang sebenarnya dipakai.
+  const sampleByGame: Record<string, string> = {
+    "heroes-evolved": "131",
+    "nba-infinite": "1001",
+    "honkai-star-rail": "os_asia",
+    "ragnarok-m-eternal-love": "Eternal Love",
+    "dragon-nest-m-classic": "030003",
+    "mobile-legends": "1234",
+    "mobile-legends-adventure": "1234",
+    "magic-chess": "1234",
+    "genshin-impact": "os_cht",
+    "zenless-zone-zero": "os_cht",
+    "honkai-star-rail": "os_cht",
+    "wuthering-waves": "HMT",
+  };
   for (const [id, target] of Object.entries(CURATED_GAME_TARGETS)) {
     if (!target.template || !target.requiresServer) continue;
     assert.doesNotThrow(
       () =>
         renderFulfillmentTarget(target.template as string, {
           userId: "123456789",
-          serverId: "030003",
+          serverId: sampleByGame[id],
           requiresServer: true,
         }),
       `${id} tidak bisa dirender`,
@@ -328,38 +399,86 @@ test("dragon nest m: server berupa angka dan nol di depan harus utuh", () => {
   );
 });
 
-test("nba infinite: dropdown lima wilayah, heroes evolved: dropdown lima wilayah", () => {
+test("nba infinite & heroes evolved mengirim kode angka, bukan nama region", () => {
+  // Tabel format reseller Digiflazz:
+  //   NBA Infinite:   1001=Oceania 5001=SouthAmerica 6001=NA 7001=Asia 8001=Europe
+  //   Heroes Evolved: 100/101=NA 111/112=EU 121/122=SA 131/132/133/134/135=AS
+  //
+  // Pemisah KOMA, bukan pipe: "Format tujuan : User ID,Server".
   const nba = getGameAccountSchema({
     id: "nba-infinite",
     name: "NBA Infinite",
     requiresServer: true,
   });
-  assert.deepEqual(nba.server?.options, ["Asia", "Europe", "NA", "LATAM", "Oceania"]);
+  assert.deepEqual(nba.server?.options.map(accountFieldOptionValue), [
+    "1001",
+    "5001",
+    "6001",
+    "7001",
+    "8001",
+  ]);
+  // Label harus informatif — pelanggan tidak boleh melihat `7001` tanpa nama.
+  assert.deepEqual(
+    nba.server?.options.map(accountFieldOptionLabel),
+    ["Oceania (1001)", "South America / LATAM (5001)", "North America (6001)", "Asia (7001)", "Europe (8001)"],
+  );
 
   const heroes = getGameAccountSchema({
     id: "heroes-evolved",
     name: "Heroes Evolved",
     requiresServer: true,
   });
-  assert.deepEqual(heroes.server?.options, ["Asia", "SEA", "NA", "SA", "EU"]);
+  assert.deepEqual(heroes.server?.options.map(accountFieldOptionValue), [
+    "100",
+    "101",
+    "111",
+    "112",
+    "121",
+    "122",
+    "131",
+    "132",
+    "133",
+    "134",
+    "135",
+  ]);
 
-  // Keduanya harus punya dropdown lima wilayah.
-  assert.ok(nba.server?.options && heroes.server?.options);
+  // Nama region yang lama harus DITOLAK, bukan lolos validasi lalu gagal di
+  // supplier. Ini yang membuat daftar lama berbahaya: "Asia" adalah format yang
+  // masuk akal tapi salah.
+  for (const [game, server] of [
+    [{ id: "nba-infinite", name: "NBA Infinite", requiresServer: true }, "Asia"],
+    [{ id: "heroes-evolved", name: "Heroes Evolved", requiresServer: true }, "SEA"],
+  ] as const) {
+    assert.equal(
+      validateGameAccountTarget(game, "123456", server).ok,
+      false,
+      `nama region "${server}" lolos`,
+    );
+  }
+
   assert.ok(
     validateGameAccountTarget(
       { id: "nba-infinite", name: "NBA Infinite", requiresServer: true },
       "123456",
-      "Oceania",
+      "1001",
     ).ok,
   );
-  assert.equal(
+  assert.ok(
     validateGameAccountTarget(
       { id: "heroes-evolved", name: "Heroes Evolved", requiresServer: true },
       "123456",
-      "Europe",
+      "131",
     ).ok,
-    false,
-    "server di luar daftar dropdown lolos",
+  );
+
+  // Render harus persis "Contoh : 12345,1001" dari tabel reseller.
+  assert.equal(
+    renderFulfillmentTarget("{user_id},{server_id}", {
+      userId: "12345",
+      serverId: "1001",
+      requiresServer: true,
+    }).customerNo,
+    "12345,1001",
   );
 });
 

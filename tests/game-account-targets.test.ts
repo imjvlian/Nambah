@@ -49,6 +49,8 @@ const CASES: GameCase[] = [
   {
     // Deskripsi Digiflazz: `Masukkan ID dan Server`. Server berupa wilayah:
     // Asia, Europe, NA, LATAM, Oceania.
+    // Server berupa kode angka + pemisah koma, dari tabel format reseller
+    // Digiflazz ("Contoh : 12345,1001").
     id: "nba-infinite",
     name: "NBA Infinite",
     requiresServer: true,
@@ -56,7 +58,7 @@ const CASES: GameCase[] = [
     userLabel: "ID",
     validUser: "12345678",
     invalidUser: "123",
-    validServer: "Asia",
+    validServer: "1001",
     // Route Volsever-nya ada tapi health check-nya `fail`.
     checker: null,
   },
@@ -206,23 +208,24 @@ test("zenless zone zero: UID + dropdown server seperti Genshin", () => {
   assert.equal(schema.kind, "zenless-zone-zero");
   assert.equal(schema.user.label, "UID");
   assert.equal(schema.checker, "universal");
+  // Deskripsi Seller produk ini persis ada di panel Digiflazz — kode `os_*`.
   assert.deepEqual(schema.server?.options, [
-    "Asia",
-    "America",
-    "Europe",
-    "TW/HK/MO",
+    { value: "os_asia", label: "Asia (os_asia)" },
+    { value: "os_usa", label: "America (os_usa)" },
+    { value: "os_euro", label: "Europe (os_euro)" },
+    { value: "os_cht", label: "TW / HK / MO (os_cht)" },
   ]);
 
   assert.ok(
-    validateGameAccountTarget(game, "1234567890", "Asia").ok,
+    validateGameAccountTarget(game, "1234567890", "os_asia").ok,
     "UID + server valid ditolak",
   );
 
   // Case-sensitivity harus diteolak: `asia` tidak akan dikenali supplier.
   assert.equal(
-    validateGameAccountTarget(game, "1234567890", "asia").ok,
+    validateGameAccountTarget(game, "1234567890", "os_Asia").ok,
     false,
-    "server lowercase lolos",
+    "kode server dengan kapitalisasi salah lolos",
   );
   assert.equal(
     validateGameAccountTarget(game, "1234567890", "Indonesia").ok,
@@ -230,7 +233,7 @@ test("zenless zone zero: UID + dropdown server seperti Genshin", () => {
     "server di luar daftar lolos",
   );
   assert.equal(
-    validateGameAccountTarget(game, "12345", "Asia").ok,
+    validateGameAccountTarget(game, "12345", "os_asia").ok,
     false,
     "UID terpendek lolos",
   );

@@ -60,16 +60,21 @@ export function renderFulfillmentTarget(
   }
 
   // Karakter yang diizinkan di `customer_no`:
-  //   `#`  Riot ID Valorant/LoL (Nama#Tag)
-  //   `|`  pemisah "Format no tujuan [UID]|[Server]"
-  //   `@`  email (Xbox, voucher)
-  //   `/`  region "TW/HK/MO" — Genshin, Honkai Star Rail, Zenless Zone Zero
-  //   ` `  nama server Ragnarok M: "Eternal Love", "Memory Of Faith", dll
+  //   `#`   Riot ID Valorant/LoL (Nama#Tag)
+  //   `|`   pemisah "Format no tujuan [UID]|[Server]" — Dragon Nest M, HSR
+  //   `,`   pemisah "Format tujuan : User ID,Server" — Heroes Evolved, NBA Infinite
+  //   `@`   email (Xbox, voucher)
+  //   `/`   region "TW/HK/MO" — Genshin, Zenless Zone Zero
+  //   ` `   nama server Ragnarok M: "Eternal Love", "Memory of Faith", dll
   //
-  // `/` dan spasi ditambahkan karena keduanya nama region/ server yang sah,
-  // bukan karakter nakal. Tanpa keduanya, memilih "TW/HK/MO" di Genshin atau
-  // server mana pun di Ragnarok M akan menggagalkan order di menit terakhir.
-  if (!/^[A-Za-z0-9@._+|:#\-\/ ]+$/.test(target)) {
+  // Semua ini ditambahkan karena nama region/server yang sah, bukan karakter
+  // nakal. Tanpa `,` setiap order Heroes Evolved dan NBA Infinite gagal di
+  // menit terakhir; tanpa `/` dan spasi, memilih "TW/HK/MO" di Genshin atau
+  // server mana pun di Ragnarok M tidak bisa dikirim.
+  //
+  // Yang tetap DITOLAK: kutip, backslash, titik koma, kurung siku, dan
+  // karakter kontrol. Ada testnya di `tests/fulfillment-target.test.ts`.
+  if (!/^[A-Za-z0-9@._+|,#:\-\/ ]+$/.test(target)) {
     throw new Error(
       "customer_no hasil format mengandung karakter yang tidak diizinkan.",
     );

@@ -27,8 +27,44 @@ test("allows # for Riot ID customer_no (Valorant)", () => {
   );
 });
 
+test("allows koma as separator for Heroes Evolved and NBA Infinite", () => {
+  // Tabel format reseller Digiflazz:
+  //   Heroes Evolved : "Format tujuan : User ID,Server  Contoh : 12345,100"
+  //   NBA Infinite   : "Format tujuan : User ID,Server  Contoh : 12345,1001"
+  assert.equal(
+    renderFulfillmentTarget("{user_id},{server_id}", {
+      userId: "12345",
+      serverId: "100",
+      requiresServer: true,
+    }).customerNo,
+    "12345,100",
+  );
+  assert.equal(
+    renderFulfillmentTarget("{user_id},{server_id}", {
+      userId: "12345",
+      serverId: "1001",
+      requiresServer: true,
+    }).customerNo,
+    "12345,1001",
+  );
+});
+
 test("allows / for region names and spaces for server names", () => {
-  // Region "TW/HK/MO" dipakai Genshin, Honkai Star Rail, dan Zenless Zone Zero.
+  // Region TW/HK/MO dipakai Genshin, Honkai Star Rail, dan Zenless Zone Zero.
+  // Deskripsi Seller menulisnya `TW, HK, MO` — dengan koma. Karena koma adalah
+  // separator di template, nilai yang dikirim memakai kode `os_cht` yang tidak
+  // mengandung tanda baca sama sekali.
+  assert.equal(
+    renderFulfillmentTarget("{user_id}|{server_id}", {
+      userId: "123456789",
+      serverId: "os_cht",
+      requiresServer: true,
+    }).customerNo,
+    "123456789|os_cht",
+  );
+
+  // `/` tetap diizinkan: Wuthering Waves masih memakai nama region, dan
+  // "TW/HK/MO" adalah bentuk yang biasa customer ketik.
   assert.equal(
     renderFulfillmentTarget("{user_id}|{server_id}", {
       userId: "123456789",

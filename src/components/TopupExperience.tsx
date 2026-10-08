@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Game, PaymentMethod } from "@/lib/catalog";
 import {
+  accountFieldOptionLabel,
+  accountFieldOptionValue,
   getGameAccountSchema,
   sanitizeAccountField,
   validateGameAccountTarget,
@@ -996,8 +998,11 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     >
                       <option value="">{accountSchema.server.placeholder}</option>
                       {accountSchema.server.options.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
+                        <option
+                          key={accountFieldOptionValue(option)}
+                          value={accountFieldOptionValue(option)}
+                        >
+                          {accountFieldOptionLabel(option)}
                         </option>
                       ))}
                     </select>

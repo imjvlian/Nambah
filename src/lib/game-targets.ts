@@ -36,13 +36,17 @@ export type GameFulfillmentTarget = {
    *
    *   "no tujuan = gabungan user id dan zone id"  -> tanpa pemisah (Mobile
    *       Legends, Mobile Legends Adventure)
-   *   "Format no tujuan [UID]|[Server]"            -> pemisah `|` (Genshin,
-   *       Wuthering Waves, Zenless Zone Zero, Honkai Star Rail, Heroes Evolved,
-   *       Dragon Nest M Classic)
-   *   "Masukkan ID dan Server"                     -> pemisah `|` (Ragnarok M,
-   *       NBA Infinite). Ragnarok M punya contoh supplier `123378499|Eternal
-   *       Love` yang memakai `|`; NBA Infinite memakai asumsi yang sama karena
-   *       deskripsinya identik dan belum pernah dites live.
+   *   Dragon Nest M / Genshin / HSR / ZZZ / WuWa / Ragnarok M -> pemisah `|`
+   *       (lihat catatan Deskripsi Seller di bawah)
+   *   "Masukkan ID dan Server"                     -> pemisah KOMA (Heroes
+   *       Evolved, NBA Infinite). Tabel format reseller menyebut
+   *       `Contoh : 12345,100` dan `Contoh : 12345,1001`.
+   *   Genshin / HSR / ZZZ -> `|` dari Deskripsi Seller ZZZ di panel:
+   *       "Format order : UID|Server uid,server uid|server uid(server)".
+   *       Seller menyebut `|` eksplisit di antara dua bentuk lain, jadi tanda
+   *       itu karakter literal, bukan notasi.
+   *   Wuthering Waves / Ragnarok M -> `|` sebagai ASUMSI. Belum ada Deskripsi
+   *       Seller yang dilihat untuk keduanya.
    *
    * null berarti game ini belum diverifikasi dan belum boleh dikirim ke
    * supplier. Sengaja dibiarkan kosong supaya readiness menandainya blocker,
@@ -56,24 +60,44 @@ export const CURATED_GAME_TARGETS: Readonly<Record<string, GameFulfillmentTarget
   // Format no tujuan [UID]|[Server]. Contoh supplier Dragon Nest M:
   // "Note : User ID|Server  Contoh : 400628|030003".
   //
+  // Honkai Star Rail punya konfirmasi terkuat kedua setelah Dragon Nest M: seller
+  // menerima empat format, dan salah satunya `User ID|Server` dengan contoh
+  // `12345|os_asia`.
+  //
   // Genshin Impact dan Wuthering Waves sebelumnya `{user_id}` padahal
   // `requires_server` true. Itu bukan sekadar membuang pilihan pelanggan —
   // `renderFulfillmentTarget` melempar error "Produk membutuhkan server tetapi
   // template tidak memiliki {server_id}", jadi SETIAP order kedua game itu
   // gagal saat fulfillment.
+  //
+  // Genshin, HSR, dan ZZZ memakai `os_*` karena Deskripsi Seller di panel
+  // Digiflazz menuliskannya eksplisit:
+  //   "Format order : UID|Server ... List Server : Asia,os_asia,...;
+  //    America,os_usa,002; Europe,os_euro,003; TW, HK, MO,os_cht,004"
+  //
+  // Wuthering Waves masih nama region ("America, Asia, Europe, SEA, HMT") karena
+  // publisher-nya Kuro Games, bukan HoYoverse, dan Deskripsi Seller-nya belum
+  // pernah dilihat.
   "genshin-impact": { requiresServer: true, template: "{user_id}|{server_id}" },
   "wuthering-waves": { requiresServer: true, template: "{user_id}|{server_id}" },
   "zenless-zone-zero": { requiresServer: true, template: "{user_id}|{server_id}" },
   "honkai-star-rail": { requiresServer: true, template: "{user_id}|{server_id}" },
-  "heroes-evolved": { requiresServer: true, template: "{user_id}|{server_id}" },
   "dragon-nest-m-classic": { requiresServer: true, template: "{user_id}|{server_id}" },
 
-  // Ragnarok M dan NBA Infinite: "Masukkan ID dan Server". Ragnarok M punya
-  // contoh supplier `123378499|Eternal Love` yang memakai `|`. NBA Infinite
-  // memakai pemisah yang sama karena deskripsinya sama persis — ASUMSI, belum
-  // ada order live yang membuktikan.
+  // Ragnarok M: "Masukkan ID dan Server". Pemisah `|` belum terverifikasi —
+  // tidak ada reseller maupun panel yang menyebut formatnya, dan deskripsi
+  // Digiflazz tidak memberi contoh. Dibiarkan `|` karena itu bentuk yang dipakai
+  // seller Dragon Nest M, tapi ini ASUMSI.
   "ragnarok-m-eternal-love": { requiresServer: true, template: "{user_id}|{server_id}" },
-  "nba-infinite": { requiresServer: true, template: "{user_id}|{server_id}" },
+
+  // ── ID + server, pemisah koma ───────────────────────────────────────────
+  // Keduanya "Masukkan ID dan Server", dan tabel format order reseller Digiflazz
+  // menyebut `Format tujuan : User ID,Server` — pemisah KOMA, bukan pipe.
+  // Server juga berupa kode angka, bukan nama region:
+  //   Heroes Evolved: 100, 101, 111, 112, 121, 122, 131, 132, 133, 134, 135
+  //   NBA Infinite:   1001, 5001, 6001, 7001, 8001
+  "heroes-evolved": { requiresServer: true, template: "{user_id},{server_id}" },
+  "nba-infinite": { requiresServer: true, template: "{user_id},{server_id}" },
 
   // ── ID + Zone ID, digabung tanpa pemisah ────────────────────────────────
   // Deskripsinya eksplisit: "no tujuan = gabungan antara user_id dan zone_id".

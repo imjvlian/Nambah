@@ -18,7 +18,7 @@
 --    "Produk membutuhkan server tetapi template tidak memiliki {server_id}".
 --    Bukan order yang terkirim dengan target salah — order yang gagal.
 --
--- 2) Delapan game lain memakai pemisah yang salah.
+-- 2) Enam game lain memakai pemisah yang salah.
 --
 --    Kolom description mereka berbunyi `Format no tujuan [UID]|[Server]`.
 --    Tanda `|` di sana bukan "`|` opsional" melainkan PEMBATAS field, dan
@@ -39,11 +39,11 @@
 --   dengan Mobile Legends. Description-nya hanya "Masukkan ID dan Server Anda"
 --   dan tidak ada contoh supplier — ini asumsi, belum terbukti.
 --
--- CATATAN untuk `nba-infinite`: pemisah `|` di sini ASUMSI, diambil dari
--- deskripsi "Masukkan ID dan Server" yang persis sama dengan Ragnarok M, dan
--- Ragnarok M punya contoh supplier `123378499|Eternal Love` yang memakai `|`.
--- Belum ada order live yang membuktikan NBA Infinite. Kalau order pertama
--- game itu ditolak supplier, culprit-nya hampir pasti pemisah ini.
+-- CATATAN untuk `ragnarok-m-eternal-love`: pemisah `|` di blok 3 adalah ASUMSI.
+-- Deskripsi Digiflazz-nya hanya "Masukkan ID dan Server" tanpa contoh, dan tidak
+-- ada reseller yang mempublikasikan formatnya (unlike Heroes Evolved dan NBA
+-- Infinite yang punya tabel di kuotapulsa.com). Kalau order pertama ditolak
+-- supplier, periksa pemisah ini duluan.
 
 -- 1) Dua perbaikan order yang sama sekali tidak bisa jalan.
 --    Genshin Impact & Wuthering Waves butuh placeholder `{server_id}`.
@@ -55,21 +55,42 @@ where id in (
 );
 
 -- 2) Pemisah `|` untuk keluarga "Format no tujuan [UID]|[Server]".
+--
+--    Untuk Genshin / HSR / ZZZ, `|` bukan lagi asumsi. Deskripsi Seller di panel
+--    Digiflazz (produk ZZZ) menulis:
+--      "Format order : UID|Server uid,server uid|server uid(server)"
+--    Seller menyebut `|` eksplisit di antara dua separator lain, jadi tanda itu
+--    karakter literal — bukan notasi seperti di kolom `description`.
 update public.games
 set fulfillment_target_template = '{user_id}|{server_id}', updated_at = now()
 where id in (
   'zenless-zone-zero',
   'honkai-star-rail',
-  'heroes-evolved',
   'dragon-nest-m-classic'
 );
 
--- 3) "Masukkan ID dan Server" — Ragnarok M punya contoh supplier dengan `|`,
---    NBA Infinite mengikuti karena deskripsinya identik.
+-- 3) Ragnarok M. Pemisah `|` di sini ASUMSI — tidak ada sumber yang menyebut
+--    formatnya, dan deskripsi Digiflazz ("Masukkan ID dan Server") tidak
+--    memberi contoh.
 update public.games
 set fulfillment_target_template = '{user_id}|{server_id}', updated_at = now()
+where id = 'ragnarok-m-eternal-love';
+
+-- 4) Heroes Evolved & NBA Infinite: pemisah KOMA.
+--
+--    Tabel format order reseller Digiflazz (kuotapulsa.com) untuk keduanya:
+--      Heroes Evolved : "Format tujuan : User ID,Server  Contoh : 12345,100"
+--      NBA Infinite   : "Format tujuan : User ID,Server  Contoh : 12345,1001"
+--
+--    Perhatikan deskripsi Digiflazz untuk keduanya menulis "Format no tujuan
+--    [UID]|[Server]" (Heroes Evolved) atau "Masukkan ID dan Server" (NBA
+--    Infinite) — tanda `|` di `[UID]|[Server]` itu NOTASI, bukan karakter
+--    harfiah. Dragon Nest M satu-satunya game dengan bukti literal `|`, dari
+--    Deskripsi Seller di panel: "Note : User ID|Server  Contoh : 400628|030003".
+update public.games
+set fulfillment_target_template = '{user_id},{server_id}', updated_at = now()
 where id in (
-  'ragnarok-m-eternal-love',
+  'heroes-evolved',
   'nba-infinite'
 );
 
