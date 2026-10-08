@@ -1,3 +1,14 @@
+# Template unit untuk satu job cron Nambah.
+#
+# JANGAN langsung meng-install file ini. Jalankan `install-timers.sh`, yang
+# akan me-render ulang file ini dengan `ExecStart` dan `Documentation` yang
+# mengikuti lokasi repo (`APP_DIR`). Nilai di bawah adalah default untuk repo
+# yang berada di /opt/nambah.
+#
+# `ProtectHome=read-only`, bukan `true`: repo Nambah pada sebagian mesin ada di
+# direktori home user, dan `true` membuat systemd menutup akses ke /home
+# sepenuhnya sehingga ExecStart tidak bisa dibaca.
+
 [Unit]
 Description=Nambah cron job (%i)
 Documentation=file:///opt/nambah/deploy/systemd/README.md
@@ -8,17 +19,18 @@ Wants=network-online.target
 Type=oneshot
 EnvironmentFile=/etc/nambah/cron.env
 ExecStart=/opt/nambah/deploy/systemd/nambah-cron-run.sh %i
-# Cron sometimes butuh waktu lama: reconcile menjalankan retry supplier dan
-# receipt, telegram-dispatch menunggu jeda 1,1 detik per pesan.
+
+# `reconcile` menjalankan retry supplier dan receipt, `telegram-dispatch`
+# menunggu jeda 1,1 detik per pesan, jadi run-nya bisa beberapa puluh detik.
 TimeoutStartSec=420
-# Retry sekali kalau failure-nya kelihatan sementara (network, restart Supabase).
+
+# Retry sekali untuk kegagalan yang kelihatan sementara (network, Supabase).
 Restart=on-failure
 RestartSec=30
-# Cegah dua job yang sama berjalan bersamaan kalau satu run melar.
 TimeoutStopSec=30
 
-# hardening
+# Hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+ProtectHome=read-only

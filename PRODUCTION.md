@@ -120,11 +120,16 @@ Authorization: Bearer <CRON_SECRET>
 Pemasangan dan tes manual ada di `deploy/systemd/README.md`. Ringkasnya:
 
 ~~~bash
+export APP_DIR=/home/ubuntu/Nambah    # lokasi repo; default /opt/nambah
 sudo mkdir -p /etc/nambah
-sudoedit /etc/nambah/cron.env      # CRON_SECRET + CRON_BASE_URL
-sudo /opt/nambah/deploy/systemd/install-timers.sh
+sudoedit /etc/nambah/cron.env          # CRON_SECRET + CRON_BASE_URL
+sudo APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/systemd/install-timers.sh"
 systemctl list-timers 'nambah-cron@*'
 ~~~
+
+`CRON_SECRET` di `cron.env` harus sama dengan `CRON_SECRET` di environment
+aplikasi, kalau tidak semua job membalas 401. Bandingkan dengan
+`grep CRON_SECRET <file> | md5sum` di kedua file tanpa mencetak nilainya.
 
 `Persistent=true` pada timer membuat job yang terlewat saat server mati tetap
 jalan saat boot.
@@ -252,8 +257,13 @@ journalctl -u nambah-cron@reconcile -n 20 --no-pager
 atau panggil satu job secara langsung:
 
 ~~~bash
-sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh reconcile
+APP_DIR=/home/ubuntu/Nambah
+"$APP_DIR/deploy/systemd/nambah-cron-run.sh" reconcile
 ~~~
+
+`APP_DIR` harus menunjuk ke lokasi repo. Unit systemd memakai absolute path untuk
+`ExecStart`, jadi kalau repo tidak di `/opt/nambah`, `install-timers.sh` harus
+dipanggil dengan `APP_DIR` yang benar — kalau tidak, setiap job gagal `203/EXEC`.
 
 Respons `expiry.checked > 0` berarti sweeper menemukan order kedaluwarsa;
 `expiry.cancelled` adalah jumlah order yang benar-benar dibatalkan dan

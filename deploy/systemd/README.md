@@ -21,10 +21,16 @@ endpoint di `/api/cron/*` hanya berjalan saat dipanggil manual.
 
 ## Instalasi
 
+`APP_DIR` adalah lokasi repo. Repo di `/opt/nambah` bisa memakai nilai default;
+repo di mana saja harus diberi eksplisit, karena unit systemd memakai absolute
+path untuk `ExecStart`.
+
 ```bash
-# 1. Asumsikan repo ada di /opt/nambah dan aplikasi berjalan sebagai user `nambah`.
+export APP_DIR=/home/ubuntu/Nambah   # sesuaikan
+
+# 1. Buat file env cron.
 sudo mkdir -p /etc/nambah
-sudo install -m 0600 -o nambah -g nambah /dev/null /etc/nambah/cron.env
+sudo install -m 0600 /dev/null /etc/nambah/cron.env
 sudoedit /etc/nambah/cron.env
 ```
 
@@ -38,13 +44,32 @@ CRON_BASE_URL=http://127.0.0.1:3000
 `CRON_BASE_URL` memakai `127.0.0.1` supaya request tidak keluar ke internet dan
 tidak melewati TLS. Kalau aplikasinya sudah punya nama host lokal, pakai itu.
 
+`CRON_SECRET` di sini **harus sama** dengan `CRON_SECRET` di environment
+aplikasi. Kalau beda, semua job membalas 401 dan tidak ada yang memberi tahu
+selain kode HTTP di journal. Bandingkan tanpa mencetak rahasianya:
+
+```bash
+sudo grep CRON_SECRET /etc/nambah/cron.env | md5sum
+grep CRON_SECRET "$APP_DIR/.env.local" | md5sum
+```
+
+Kedua hash harus sama.
+
 ```bash
 # 2. Pasang timer
-sudo /opt/nambah/deploy/systemd/install-timers.sh
+sudo APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/systemd/install-timers.sh"
 
 # 3. Cek
 systemctl list-timers 'nambah-cron@*'
 ```
+
+Kalau `APP_DIR` tidak diteruskan, unit akan terpasang dengan `ExecStart` ke
+`/opt/nambah/...` dan setiap job gagal `203/EXEC`. Script memverifikasi ini
+sendiri dan berhenti dengan pesan error kalau `ExecStart`-nya tidak sesuai.
+
+> **Catatan `ProtectHome`.** Unit memakai `ProtectHome=read-only`, bukan
+> `true`, supaya repo yang berada di direktori home masih bisa dibaca. Repo di
+> `/opt` tidak terpengaruh.
 
 ## Jadwal yang dipasang
 
@@ -65,12 +90,13 @@ tidak menumpuk dengan cron lain.
 ## Tes manual
 
 ```bash
-sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh reconcile
-sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh operations-health
-sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh telegram-dispatch
+"$APP_DIR/deploy/systemd/nambah-cron-run.sh" reconcile
+"$APP_DIR/deploy/systemd/nambah-cron-run.sh" operations-health
+"$APP_DIR/deploy/systemd/nambah-cron-run.sh" telegram-dispatch
 
-# Digest untuk tanggal tertentu, tanpa mengirim ke chat:
-sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh daily-digest date=2026-10-07
+# Digest untuk tanggal tertentu. Tanpa `force`, tanggal yang sudah pernah
+# terkirim akan dilewati.
+"$APP_DIR/deploy/systemd/nambah-cron-run.sh" daily-digest date=2026-10-07
 ```
 
 Exit code 0 kalau HTTP 2xx. Non-zero kalau gagal — itulah yang dibaca systemd
@@ -88,6 +114,21 @@ Untuk melihat log:
 journalctl -u nambah-cron@reconcile -n 50 --no-pager
 journalctl -u 'nambah-cron@*' --since today --no-pager
 ```
+
+## Jika timer tidak muncul di `list-timers`
+
+`systemctl list-timers 'nambah-cron@*'` hanya menampilkan timer yang **aktif**.
+Kalau kosong, tambahkan `--all` untuk melihat yang termuat tapi tidak aktif:
+
+```bash
+systemctl list-timers 'nambah-cron@*' --all --no-pager
+systemctl is-enabled nambah-cron@reconcile.timer
+systemctl cat nambah-cron@reconcile.service | grep ExecStart
+```
+
+Kalau `ExecStart` menunjuk ke `/opt/nambah` padahal repo Anda di direktori
+lain, ulangi `./install-timers.sh` dengan `APP_DIR` yang benar — unit akan
+di-render ulang.
 
 ## Telegram
 

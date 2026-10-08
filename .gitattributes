@@ -1,0 +1,12 @@
+# Script shell dan unit systemd WAJIB LF.
+#
+# Kalau file ini ter-checkout dengan CRLF, bash gagal dengan error
+# `$'\r': command not found` dan systemd menolak unit dengan "bad unit file
+# setting". Gejalanya muncul di server, bukan di laptop — sulit ditelusuri
+# karena di mesin yang sama skripnya terlihat benar.
+*.sh text eol=lf
+deploy/systemd/*.service text eol=lf
+deploy/systemd/*.timer text eol=lf
+
+# SQL: LF.
+*.sql text eol=lf

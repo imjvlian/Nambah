@@ -5,8 +5,12 @@
 # /etc/systemd/system/nambah-cron@<job>.timer.d/override.conf. Template timer
 # hanya memberi perilaku umum (Persistent, random delay, unit yang dipanggil).
 #
-#   sudo deploy/systemd/install-timers.sh
-#   sudo deploy/systemd/install-timers.sh --dry-run
+#   sudo APP_DIR=/home/ubuntu/Nambah bash deploy/systemd/install-timers.sh
+#   sudo APP_DIR=/home/ubuntu/Nambah bash deploy/systemd/install-timers.sh --dry-run
+#
+# `APP_DIR` default ke /opt/nambah. Kalau repo ada di lokasi lain, WAJIB
+# meneruskan APP_DIR: unit systemd memakai absolute path untuk ExecStart, jadi
+# path yang salah membuat setiap job gagal 203/EXEC.
 #
 # Jalankan ulang setiap kali daftar job atau jadwal berubah.
 
@@ -124,6 +128,14 @@ fi
 
 echo ""
 echo "Aktif: $ENABLED, gagal: $FAILED"
+
+if [[ "$FAILED" -gt 0 ]]; then
+  echo ""
+  echo "GAGAL: $FAILED timer tidak bisa diaktifkan." >&2
+  echo "Cek: systemctl status nambah-cron@<job>.timer" >&2
+  exit 1
+fi
+
 echo "Lanjutkan: tes satu job sebelum menunggu timer:"
 echo "  $RUN_SCRIPT reconcile"
 echo "  journalctl -u nambah-cron@reconcile -n 20 --no-pager"
