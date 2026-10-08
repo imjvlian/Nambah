@@ -27,6 +27,47 @@ test("allows # for Riot ID customer_no (Valorant)", () => {
   );
 });
 
+test("allows / for region names and spaces for server names", () => {
+  // Region "TW/HK/MO" dipakai Genshin, Honkai Star Rail, dan Zenless Zone Zero.
+  assert.equal(
+    renderFulfillmentTarget("{user_id}|{server_id}", {
+      userId: "123456789",
+      serverId: "TW/HK/MO",
+      requiresServer: true,
+    }).customerNo,
+    "123456789|TW/HK/MO",
+  );
+
+  // Lima server Ragnarok M semuanya mengandung spasi.
+  for (const server of [
+    "Eternal Love",
+    "Midnight Party",
+    "Memory Of Faith",
+    "Valhalla Glory",
+    "Port City",
+  ]) {
+    assert.equal(
+      renderFulfillmentTarget("{user_id}|{server_id}", {
+        userId: "123378499",
+        serverId: server,
+        requiresServer: true,
+      }).customerNo,
+      `123378499|${server}`,
+      `server ${server} ditolak`,
+    );
+  }
+});
+
+test("tetap menolak karakter yang tidak aman", () => {
+  // Guard ini tetap harus menahan kutip,backslash, dan karakter kontrol.
+  for (const userId of ['a"b', "a\\b", "a;b", "a\nb", "a<script>", "a$b"]) {
+    assert.throws(
+      () => renderFulfillmentTarget("{user_id}", { userId }),
+      `karakter berbahaya lolos: ${JSON.stringify(userId)}`,
+    );
+  }
+});
+
 test("rejects unsafe or incomplete templates", () => {
   assert.throws(() => renderFulfillmentTarget("", { userId: "123" }));
   assert.throws(() =>

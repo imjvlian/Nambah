@@ -6,6 +6,10 @@ import {
 import { getGameAccountSchema, validateGameAccountTarget } from "@/lib/game-account";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 import { checkVolseverGame } from "@/lib/volsever/client";
+import {
+  parseVolseverRoutesEnv,
+  resolveVolseverRoute,
+} from "@/lib/volsever/games";
 import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -54,23 +58,10 @@ const RATE_LIMIT_MAX = 20;
 const CHECK_TIMEOUT_MS = 12_000;
 
 function configuredVolseverRoute(gameId: string) {
-  const raw = process.env.VOLSEVER_GAME_ROUTES_JSON?.trim();
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const value = parsed[gameId];
-    if (
-      typeof value === "string" &&
-      /^[a-z0-9-]+$/i.test(value.trim())
-    ) {
-      return value.trim();
-    }
-  } catch {
-    // Invalid mapping must never break checkout; System health will surface it.
-  }
-
-  return null;
+  return resolveVolseverRoute(
+    gameId,
+    parseVolseverRoutesEnv(process.env.VOLSEVER_GAME_ROUTES_JSON),
+  );
 }
 
 const accountCache = new Map<string, CachedAccount>();
@@ -318,18 +309,11 @@ export async function POST(request: Request) {
     ? "mobile-legends-wr"
     : configuredVolseverRoute(game.id);
 
-  if (!routeSlug) {
-    return Response.json({
-      verified: false,
-      localOnly: true,
-      server: serverId ?? null,
-      message:
-        "Format akun valid. Auto-check provider belum dikonfigurasi untuk produk ini.",
-      source: "local",
-    });
-  }
-
-  // Dua lapis cache sebelum menyentuh provider eksternal:
+  // Dua lapis cache SEBELUM provider eksternal, dan sebelum gate route di
+  // bawah. Urutannya penting: gate route pernah berada di sini, sehingga
+  // nickname yang sudah tersimpan di `account_check_cache` dibuang begitu
+  // config Volsever berubah atau env-nya kosong — padahal tidak ada satu pun
+  // request yang perlu dikirim untuk mengambilnya.
   // L1 = memory instance ini, L2 = table `account_check_cache` (durable,
   // bertahan lintas cold start dan dibagi antar instance).
   const cacheKey = `${game.id}:${userId}:${serverId ?? ""}`;
@@ -361,6 +345,17 @@ export async function POST(request: Request) {
       server: stored.server ?? serverId ?? null,
       region: stored.region,
       verified: true,
+    });
+  }
+
+  if (!routeSlug) {
+    return Response.json({
+      verified: false,
+      localOnly: true,
+      server: serverId ?? null,
+      message:
+        "Format akun valid. Auto-check provider belum dikonfigurasi untuk produk ini.",
+      source: "local",
     });
   }
 

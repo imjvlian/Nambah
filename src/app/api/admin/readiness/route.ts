@@ -1,8 +1,14 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { getFulfillmentMode } from "@/lib/fulfillment";
 import { isFlowTestMode } from "@/lib/flow-test";
+import { getGameAccountSchema } from "@/lib/game-account";
 import { getMidtransEnvironment } from "@/lib/midtrans/client";
 import { supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
+import {
+  parseVolseverRoutesEnv,
+  resolveVolseverRoute,
+  UNKNOWN_VOLSEVER_ROUTES,
+} from "@/lib/volsever/games";
 
 export const runtime = "nodejs";
 
@@ -14,6 +20,9 @@ type ProductTargetRow = {
 
 type GameTargetRow = {
   id: string;
+  name: string;
+  short_name: string | null;
+  requires_server: boolean;
   fulfillment_target_template: string | null;
 };
 
@@ -31,6 +40,32 @@ type Check = {
 
 function configured(name: string) {
   return Boolean(process.env[name]?.trim());
+}
+
+/**
+ * Kalimat untuk status auto-check.
+ *
+ * Angka nol harus disebut eksplisit. Dulu pemeriksaan ini hanya melihat API
+ * key, jadi panel menampilkan `pass` padahal `VOLSEVER_GAME_ROUTES_JSON` kosong
+ * dan tidak ada game yang bisa dicek — gejalanya baru terlihat di halaman
+ * checkout.
+ */
+function checkerGapDescription(
+  gap: number,
+  routed: number,
+  checked: number,
+) {
+  if (checked === 0) {
+    return "Tidak ada game aktif yang memakai auto-check nickname.";
+  }
+  if (gap === 0) {
+    return `${routed}/${checked} game aktif punya route Volsever; sisanya memakai validasi format lokal saja.`;
+  }
+
+  const names = UNKNOWN_VOLSEVER_ROUTES.length
+    ? ` Route yang ada tapi sedang gagal: ${UNKNOWN_VOLSEVER_ROUTES.join(", ")}.`
+    : "";
+  return `${gap}/${checked} game aktif memakai checker tanpa route Volsever — nickname tidak akan dicek otomatis, hanya format lokal yang divalidasi.${names}`;
 }
 
 function enabled(name: string) {
@@ -106,7 +141,9 @@ export async function GET(request: Request) {
       order: "id.asc",
     }),
     supabaseSelectAll<GameTargetRow>("games", {
-      select: "id,fulfillment_target_template",
+      // `name`, `short_name`, dan `requires_server` dibutuhkan oleh
+      // `getGameAccountSchema` untuk menghitung game mana yang punya checker.
+      select: "id,name,short_name,requires_server,fulfillment_target_template",
       filters: { active: "eq.true" },
       order: "id.asc",
     }),
@@ -139,6 +176,30 @@ export async function GET(request: Request) {
   const digiflazzCallback =
     process.env.DIGIFLAZZ_CALLBACK_URL?.trim() ?? "";
   const brevoEnabled = enabled("BREVO_RECEIPT_ENABLED");
+
+  // Cakupan auto-check nickname.
+  //
+  // Yang dihitung hanya game aktif yang skemanya memang memakai checker.
+  // Game voucher/pulsa/e-wallet tidak punya konsep nickname, jadi tidak boleh
+  // dihitung sebagai gap —和刘gua route-nya memang kosong itu normal.
+  const checkerEnvRoutes = parseVolseverRoutesEnv(
+    process.env.VOLSEVER_GAME_ROUTES_JSON,
+  );
+  let checkerChecked = 0;
+  let checkerRouted = 0;
+  for (const game of activeGames) {
+    const schema = getGameAccountSchema(game);
+    if (!schema.checker) continue;
+    checkerChecked += 1;
+
+    // MLBB punya slug yang di-hardcode di route check, jadi selalu routed.
+    const route =
+      schema.checker === "mobile-legends"
+        ? "mobile-legends-wr"
+        : resolveVolseverRoute(game.id, checkerEnvRoutes);
+    if (route) checkerRouted += 1;
+  }
+  const checkerGap = checkerChecked - checkerRouted;
 
   const checks: Check[] = [
     {
@@ -331,9 +392,16 @@ export async function GET(request: Request) {
       id: "universal-checker",
       label: "Universal account checker routing",
       scope: "production",
-      status: configured("VOLSEVER_API_KEY") ? "pass" : "warning",
-      detail:
-        "Produk tanpa provider mapping tetap memakai validasi format lokal.",
+      // API key saja tidak cukup. Kalau `VOLSEVER_GAME_ROUTES_JSON` kosong dan
+      // peta bawaan tidak mencakup game aktif mana pun, tidak ada satu pun
+      // nickname yang bisa dicek — tapi pemeriksaan lama tetap melaporkannya
+      // `pass` hanya karena key-nya terisi.
+      status: !configured("VOLSEVER_API_KEY")
+        ? "warning"
+        : checkerGap > 0
+          ? "warning"
+          : "pass",
+      detail: checkerGapDescription(checkerGap, checkerRouted, checkerChecked),
     },
   ];
 

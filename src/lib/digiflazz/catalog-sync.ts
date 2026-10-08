@@ -201,7 +201,8 @@ export async function planCatalogSync(input?: {
       filters: { supplier_id: "eq.digiflazz" },
     }),
     supabaseSelectAll<GameRow>("games", {
-      select: "id,name,short_name,category,accent,initials,requires_server,active",
+      select:
+        "id,name,short_name,category,accent,initials,requires_server,fulfillment_target_template,active",
     }),
     supabaseSelectAll<{ minimum_nambah_profit: number | string }>("pricing_rules", {
       select: "minimum_nambah_profit",
@@ -280,6 +281,10 @@ export async function planCatalogSync(input?: {
         accent: game.accent,
         initials: game.initials,
         requires_server: game.requires_server,
+        // Dari peta kurasi. Kalau null, game ini belum diverifikasi dan
+        // readiness akan menandainya blocker — lebih baik daripada template
+        // tebakan yang menghasilkan target salah ke supplier.
+        fulfillment_target_template: game.fulfillment_target_template,
         active: true,
         sort_order: 1000,
         created_at: now,

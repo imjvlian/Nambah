@@ -59,8 +59,17 @@ export function renderFulfillmentTarget(
     throw new Error("customer_no hasil format berada di luar batas aman.");
   }
 
-  // `#` diizinkan karena Riot ID Valorant (format Nama#Tag) masuk customer_no.
-  if (!/^[A-Za-z0-9@._+|:#\-]+$/.test(target)) {
+  // Karakter yang diizinkan di `customer_no`:
+  //   `#`  Riot ID Valorant/LoL (Nama#Tag)
+  //   `|`  pemisah "Format no tujuan [UID]|[Server]"
+  //   `@`  email (Xbox, voucher)
+  //   `/`  region "TW/HK/MO" — Genshin, Honkai Star Rail, Zenless Zone Zero
+  //   ` `  nama server Ragnarok M: "Eternal Love", "Memory Of Faith", dll
+  //
+  // `/` dan spasi ditambahkan karena keduanya nama region/ server yang sah,
+  // bukan karakter nakal. Tanpa keduanya, memilih "TW/HK/MO" di Genshin atau
+  // server mana pun di Ragnarok M akan menggagalkan order di menit terakhir.
+  if (!/^[A-Za-z0-9@._+|:#\-\/ ]+$/.test(target)) {
     throw new Error(
       "customer_no hasil format mengandung karakter yang tidak diizinkan.",
     );

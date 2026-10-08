@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getCuratedGameTarget } from "@/lib/game-targets";
 
 /**
  * Identitas produk katalog supplier.
@@ -27,6 +28,7 @@ export type GameRow = {
   accent: string;
   initials: string;
   requires_server: boolean;
+  fulfillment_target_template: string | null;
   active: boolean;
 };
 
@@ -95,14 +97,25 @@ export function makeProductId(supplierSku: string) {
 export function makeGameDefaults(item: SupplierCatalogItem) {
   const brandName = titleCase(item.brand || item.category || "Produk Digital");
   const initials = makeInitials(brandName);
+  const id = slugify(item.brand || item.category || "digiflazz") || "digiflazz";
+
+  // Peta kurasi menang atas tebakan. `inferRequiresServer` dulu hanya mengenali
+  // dua nama brand, jadi Honkai Star Rail / Heroes Evolved / Ragnarok M lahir
+  // dengan `requires_server` salah dan template kosong.
+  const curated = getCuratedGameTarget(id);
+
   return {
-    id: slugify(item.brand || item.category || "digiflazz") || "digiflazz",
+    id,
     name: brandName,
     shortName: brandName.length <= 18 ? brandName : initials,
     category: inferCategory(item.category),
     accent: stableAccent(item.brand || item.category || item.supplier_sku),
     initials,
-    requiresServer: inferRequiresServer(item.brand),
+    requiresServer: curated?.requiresServer ?? inferRequiresServer(item.brand),
+    // Sengaja `null` kalau belum diverifikasi, bukan fallback ke `{user_id}`.
+    // Template yang salah berarti target salah terkirim ke supplier; template
+    // kosong hanya berarti readiness menandainya blocker.
+    fulfillmentTargetTemplate: curated?.template ?? null,
   };
 }
 
@@ -135,6 +148,7 @@ export function resolveGame(
       accent: defaults.accent,
       initials: defaults.initials,
       requires_server: defaults.requiresServer,
+      fulfillment_target_template: defaults.fulfillmentTargetTemplate,
       active: true,
     },
     create: true,
