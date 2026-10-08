@@ -3,6 +3,7 @@ import SiteFooter from "@/components/SiteFooter";
 import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
 import SiteHeader from "@/components/SiteHeader";
+import ProductRatingRail from "@/components/ProductRatingRail";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import type { Game } from "@/lib/catalog";
 import {
@@ -117,6 +118,7 @@ export default async function ProductPage({
           catalogSource={catalog.source}
           artworkByGameId={artworkByGameId}
           artworkByPackageId={artworkByPackageId}
+          railPanel={<ProductRatingRail gameId={game.id} />}
         />
       </section>
 

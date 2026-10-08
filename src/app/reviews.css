@@ -1,0 +1,304 @@
+/* ===== Rating & ulasan ===== */
+.order-rating {
+  display: grid;
+  gap: 12px;
+}
+
+.order-rating .form-label {
+  margin-bottom: 0;
+}
+
+.order-rating-locked {
+  opacity: 0.75;
+}
+
+.order-rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.order-rating-star {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #4c524a;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.order-rating-star:hover,
+.order-rating-star:focus-visible,
+.order-rating-star.active {
+  border-color: rgba(201, 255, 63, 0.4);
+  background: rgba(201, 255, 63, 0.08);
+  color: var(--lime);
+}
+
+.order-rating-label {
+  margin-left: 6px;
+  color: #8f968b;
+  font-size: 10px;
+}
+
+.order-rating-comment {
+  display: grid;
+  gap: 5px;
+}
+
+.order-rating-comment > span {
+  color: #8f968b;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-rating-comment textarea {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #0f110d;
+  color: #e6e9e2;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.order-rating-comment textarea:focus-visible {
+  border-color: rgba(201, 255, 63, 0.45);
+  outline: none;
+}
+
+.order-rating-comment small {
+  justify-self: end;
+  color: #666d63;
+  font-size: 9px;
+}
+
+/* --- Kartu rating di kolom kiri halaman produk --- */
+.topup-intro-rail {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.rating-rail {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+/* Selector sengaja menyamai `.product-page .topup-intro h2` dari
+   product-v2.css: kartu intro desktop memakai heading besar, sementara
+   rating di rail 230px butuh ukuran normal. */
+.topup-intro-rail .rating-rail-head h2 {
+  margin-top: 4px;
+  color: #e9ece5;
+  font-size: 22px;
+  font-weight: 820;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Teks intro pada halaman produk sengaja disembunyikan karena tidak relevan;
+   pesan rating harus tetap terlihat. */
+.topup-intro-rail > p.rating-empty {
+  display: block;
+  margin: 0;
+}
+
+.rating-rail-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rating-rail-score > strong {
+  color: var(--lime);
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.rating-rail-score > div {
+  display: grid;
+  gap: 3px;
+}
+
+.rating-head-stars b {
+  color: #3f443d;
+  font-size: 10px;
+}
+
+.rating-head-stars b.on {
+  color: var(--lime);
+}
+
+.rating-rail-score small {
+  color: #7f867a;
+  font-size: 9px;
+}
+
+.rating-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.rating-bar {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 7px;
+  color: #7f867a;
+  font-size: 9px;
+}
+
+.rating-bar-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.rating-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b9ed3f, #d6ff7a);
+}
+
+.rating-bar small {
+  justify-self: end;
+  color: #666d63;
+  font-size: 9px;
+}
+
+.rating-highlights {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rating-highlights li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rating-highlight-stars b {
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.rating-highlight-stars > span {
+  color: #3f443d;
+  font-size: 9px;
+}
+
+.rating-highlights p {
+  color: #d3d8cf;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.rating-highlights small {
+  color: #6d7469;
+  font-size: 9px;
+}
+
+.rating-empty {
+  color: #7f867a;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.rating-top {
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rating-top h3 {
+  margin-bottom: 9px;
+  color: #9aa194;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rating-top ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rating-top li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #d3d8cf;
+  font-size: 10px;
+}
+
+.rating-top li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rating-top li > b {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--lime);
+  font-size: 10px;
+}
+
+.rating-top li > b small {
+  color: #6d7469;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.rating-rail-skeleton {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: #666d63;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .topup-intro-rail {
+    padding: 18px;
+  }
+
+  .rating-rail-score > strong {
+    font-size: 32px;
+  }
+}

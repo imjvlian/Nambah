@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Game, PaymentMethod } from "@/lib/catalog";
 import {
@@ -61,6 +62,12 @@ type TopupExperienceProps = {
   catalogSource: "static" | "supabase";
   artworkByGameId?: Record<string, ProductArtwork | null>;
   artworkByPackageId?: Record<string, ProductArtwork | null>;
+  /**
+   * Konten untuk kolom kiri. Kalau diisi, blok intro "Checkout" digantikan.
+   * Halaman produk memakainya untuk kartu rating; beranda membiarkan intro
+   * tetap tampil karena di sana checkout memang jadi pesan utama.
+   */
+  railPanel?: ReactNode;
 };
 
 const GROUP_OPTIONS: Array<{ id: ProductGroup; label: string }> = [
@@ -194,6 +201,7 @@ export default function TopupExperience({
   catalogSource,
   artworkByGameId = {},
   artworkByPackageId = {},
+  railPanel,
 }: TopupExperienceProps) {
   const router = useRouter();
   const defaultGame = games[0]!;
@@ -895,19 +903,23 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       </section>
 
       <section className="topup-section" id="topup">
-        <div className="topup-intro">
-          <span className="eyebrow">Checkout</span>
-          <h2>Top up tanpa muter-muter.</h2>
-          <p>
-            Harga, promo, dan benefit referral dihitung otomatis, lalu
-            disesuaikan dengan kode yang kamu pakai sebelum pembayaran dibuat.
-          </p>
-          <div className="trust-list">
-            <span><b>01</b> Harga jelas</span>
-            <span><b>02</b> Promo terukur</span>
-            <span><b>03</b> Referral menguntungkan</span>
+        {railPanel ? (
+          <div className="topup-intro topup-intro-rail">{railPanel}</div>
+        ) : (
+          <div className="topup-intro">
+            <span className="eyebrow">Checkout</span>
+            <h2>Top up tanpa muter-muter.</h2>
+            <p>
+              Harga, promo, dan benefit referral dihitung otomatis, lalu
+              disesuaikan dengan kode yang kamu pakai sebelum pembayaran dibuat.
+            </p>
+            <div className="trust-list">
+              <span><b>01</b> Harga jelas</span>
+              <span><b>02</b> Promo terukur</span>
+              <span><b>03</b> Referral menguntungkan</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <form className="order-card" onSubmit={submitOrder}>
           <div className="order-head">

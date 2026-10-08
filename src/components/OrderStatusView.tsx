@@ -14,6 +14,7 @@ import {
 } from "@/lib/order-preview";
 import { paymentTypeLabel } from "@/lib/payment-label";
 import { formatIDR } from "@/lib/pricing";
+import OrderRatingForm from "@/components/OrderRatingForm";
 import {
   STATUS_CTA,
   STATUS_DESCRIPTION,
@@ -864,6 +865,16 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               <span>Total pembayaran</span>
               <strong>{formatIDR(pricing.finalPrice)}</strong>
             </div>
+
+            {/* Rating hanya setelah transaksi benar-benar selesai, dan form ini
+                memakai access token order jadi hanya pemiliknya yang bisa kirim. */}
+            {!isPreview && (
+              <OrderRatingForm
+                orderId={order!.id}
+                accessToken={accessToken}
+                isSuccess={liveStatus === "success"}
+              />
+            )}
 
             {!isPreview && statusActions.length > 0 && (
               <div className="order-summary-actions">

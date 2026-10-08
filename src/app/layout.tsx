@@ -25,6 +25,7 @@ import "./auth.css";
 import "./points.css";
 import "./promo-banner.css";
 import "./legal.css";
+import "./reviews.css";
 
 const inter = Inter({
   subsets: ["latin"],
