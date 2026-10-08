@@ -1,0 +1,20 @@
+[Unit]
+Description=Nambah cron timer (%i)
+Documentation=file:///opt/nambah/deploy/systemd/README.md
+
+[Timer]
+# Jadwal di sini hanya default. Jadwal sebenarnya per job ditulis sebagai
+# drop-in di nambah-cron@<job>.timer.d/override.conf — lihat install-timers.sh.
+#
+# `OnCalendar` memakai timezone sistem. Kalau VPS Anda tidak di UTC, tambahkan
+# sufiks timezone eksplisit, misal `OnCalendar=*-*-* 01:00:00 UTC`.
+OnCalendar=*:0/5
+Persistent=true
+# DeadlineDetectSec longgar supaya timer yang telat tetap memicu.
+AccuracySec=30s
+# Sebar trigger supaya beberapa job tidak menumpuk di detik yang sama.
+RandomizedDelaySec=30s
+Unit=nambah-cron@%i.service
+
+[Install]
+WantedBy=timers.target

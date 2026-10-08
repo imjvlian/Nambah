@@ -11,6 +11,10 @@ import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
+import {
+  notifyFulfillmentFailed,
+  notifyFulfillmentSucceeded,
+} from "@/lib/telegram-alerts";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
   supabaseSelect,
@@ -381,6 +385,25 @@ async function finalizeOrder(
 
   if (status === "success") {
     await tryDeliverReceipt(orderId);
+  }
+
+  // Alert admin masuk antrean Telegram, tidak dikirim di sini. `finalizeOrder`
+  // hanya mengubah status sekali (filter `status in.(paid,processing)` di
+  // atas), jadi satu order tidak akan memicu dua pesan meski webhook supplier
+  // dikirim berulang.
+  try {
+    if (status === "failed") {
+      await notifyFulfillmentFailed(orderId);
+    } else {
+      const [serial] = await supabaseSelect<{ serial_number: string | null }>(
+        "supplier_transactions",
+        { select: "serial_number", filters: { order_id: `eq.${orderId}` }, order: "created_at.desc", limit: 1 },
+      );
+      await notifyFulfillmentSucceeded(orderId, serial?.serial_number ?? null);
+    }
+  } catch (error) {
+    // Notifikasi tidak boleh menggagalkan finalisasi order.
+    console.error(`Fulfillment Telegram alert failed for order ${orderId}`, error);
   }
 }
 

@@ -8,6 +8,7 @@ import {
   supabaseUpdate,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { notifyReceiptDeliveryFailed } from "@/lib/telegram-alerts";
 
 type ReceiptOrderRow = {
   id: string;
@@ -370,6 +371,14 @@ export async function deliverSuccessReceipt(
     );
 
     console.error(`Receipt email failed for order ${orderId}`, error);
+
+    try {
+      await notifyReceiptDeliveryFailed(orderId, "email", message);
+    } catch (alertError) {
+      // Alert tidak boleh menutupi status kegagalan yang baru disimpan.
+      console.error(`Receipt Telegram alert failed for order ${orderId}`, alertError);
+    }
+
     return { orderId, status: "failed" };
   }
 }

@@ -83,19 +83,27 @@ readyForStagingE2E = true
 stagingBlockers = 0
 ~~~
 
-## 4. Vercel Cron
+## 4. Cron (systemd timer di VPS)
 
-Repo menyediakan `vercel.json`:
+Production berjalan di VPS, bukan Vercel. `vercel.json` sudah dihapus karena
+file itu mendaftarkan cron yang tidak akan pernah dieksekusi di sini — dan
+jadwal yang tertulis di sana (`0 3 * * *` demi batas plan Hobby Vercel) bukan
+jadwal yang dipakai.
+
+Penjadwalan ada di `deploy/systemd/`:
 
 ~~~text
-reconcile             every 5 minutes
-operations-health     every 10 minutes
-digiflazz-balance     every 15 minutes
-financial-reconcile   hourly
-points-expiry         daily
+reconcile             setiap 5 menit
+operations-health     setiap 10 menit
+digiflazz-balance     setiap 15 menit
+financial-reconcile   setiap jam (menit 7)
+points-expiry         00:30 UTC setiap hari
+telegram-dispatch     setiap menit
+daily-digest          01:00 UTC = 08:00 WIB
 ~~~
 
-Vercel cron schedule memakai UTC.
+Semua jadwal ditulis eksplisit dalam UTC, jadi tidak berubah kalau timezone
+server diganti.
 
 Set:
 
@@ -109,7 +117,21 @@ Route Nambah memverifikasi:
 Authorization: Bearer <CRON_SECRET>
 ~~~
 
-Jika deploy di platform selain Vercel, jadwalkan endpoint yang sama dengan scheduler platform tersebut.
+Pemasangan dan tes manual ada di `deploy/systemd/README.md`. Ringkasnya:
+
+~~~bash
+sudo mkdir -p /etc/nambah
+sudoedit /etc/nambah/cron.env      # CRON_SECRET + CRON_BASE_URL
+sudo /opt/nambah/deploy/systemd/install-timers.sh
+systemctl list-timers 'nambah-cron@*'
+~~~
+
+`Persistent=true` pada timer membuat job yang terlewat saat server mati tetap
+jalan saat boot.
+
+> **Penting — cron hanya jalan kalau timernya terpasang.** Jika timer belum
+> di-install, `/api/cron/*` hanya merespons ketika dipanggil manual. Sebelum
+> menganggap sweep dan rekonsiliasi berjalan, cek `systemctl list-timers` dulu.
 
 ## 5. Provider callback
 
@@ -203,39 +225,39 @@ Monitoring:
 
 Production launch tidak boleh diteruskan bila ada unexplained critical finance mismatch/operations incident.
 
-Cron endpoints membutuhkan `Authorization: Bearer <CRON_SECRET>`. Vercel mengirim
-header itu otomatis selama env `CRON_SECRET` terisi di project.
+Cron endpoints membutuhkan `Authorization: Bearer <CRON_SECRET>`. Di VPS header
+itu dikirim oleh `deploy/systemd/nambah-cron-run.sh`, bukan otomatis.
 
 ### Jadwal cron
 
-Jadwal ada di `vercel.json`. Saat ini seluruh cron distandarkan harian pada
-`0 3 * * *` agar aman untuk batas plan Hobby:
+Jadwal ada di `deploy/systemd/install-timers.sh` (lihat §4):
 
 | Path | Jadwal | Tugas |
 | --- | --- | --- |
-| `/api/cron/reconcile` | `0 3 * * *` | Sweep order kedaluwarsa, retry supplier & receipt, purge cache cek akun |
-| `/api/cron/financial-reconcile` | `0 3 * * *` | Rekonsiliasi keuangan (liabilitas points, promo, komisi) |
-| `/api/cron/digiflazz-balance` | `0 3 * * *` | Pemantauan saldo Digiflazz |
+| `/api/cron/reconcile` | `*/5 * * * *` | Sweep order kedaluwarsa, retry supplier & receipt, purge cache cek akun |
+| `/api/cron/operations-health` | `*/10 * * * *` | Deteksi incident + alert order nyangkut |
+| `/api/cron/digiflazz-balance` | `*/15 * * * *` | Pemantauan saldo Digiflazz |
+| `/api/cron/financial-reconcile` | `7 * * * *` | Rekonsiliasi keuangan (liabilitas points, promo, komisi) |
+| `/api/cron/points-expiry` | `30 0 * * *` | Expiry poin |
+| `/api/cron/telegram-dispatch` | `* * * * *` | Drain antrean notifikasi Telegram |
+| `/api/cron/daily-digest` | `1 0 * * *` | Digest harian 08:00 WIB |
 
-> **Penting — batas plan Vercel.** Plan **Hobby hanya mengizinkan cron satu
-> kali per hari**, dan deployment akan **ditolak** (`cron duration must be at
-> least daily`) kalau ada jadwal < 1 hari. Karena itu seluruh jadwal di
-> `vercel.json` saat ini memakai `0 3 * * *`.
->
-> Kalau nanti plan naik atau deployment mengizinkan jadwal lebih rapat,
-> konsolidasi/naikkan frekuensi cron harus dilakukan dengan sengaja dan
-> diuji ulang.
->
-> Dampak jadwal harian: reservasi points/promo dari order yang terlantar masih
-> dilepas oleh sweeper, tapi bisa terlambat sampai ~24 jam (`expires_at` +
-> grace 5 menit). Ini jauh lebih baik daripada membocorkannya permanen, tapi
-> tidak secepat jadwal yang lebih rapat.
+Untuk memastikan cron benar-benar berjalan (bukan hanya terdaftar):
 
-Untuk memastikan cron benar-benar berjalan (bukan hanya terdaftar), cek
-`GET /api/cron/reconcile` secara manual dengan `CRON_SECRET` lalu lihat field
-`expiry` pada respons. `expiry.checked > 0` berarti sweeper menemukan order
-kedaluwarsa; `expiry.cancelled` adalah jumlah order yang benar-benar dibatalkan
-dan reservasinya dilepas.
+~~~bash
+systemctl list-timers 'nambah-cron@*'
+journalctl -u nambah-cron@reconcile -n 20 --no-pager
+~~~
+
+atau panggil satu job secara langsung:
+
+~~~bash
+sudo -u nambah /opt/nambah/deploy/systemd/nambah-cron-run.sh reconcile
+~~~
+
+Respons `expiry.checked > 0` berarti sweeper menemukan order kedaluwarsa;
+`expiry.cancelled` adalah jumlah order yang benar-benar dibatalkan dan
+reservasinya dilepas.
 
 ## 11. Supabase Auth
 
@@ -307,3 +329,55 @@ Code dapat mencapai 1.0.0 walau item operasional berikut belum diisi:
 - explicit live-money owner approval.
 
 Item tersebut bukan aman untuk ditebak atau diaktifkan otomatis oleh source code.
+
+## 15. Telegram
+
+Env (server-only):
+
+~~~env
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_ADMIN_CHAT_ID=
+TELEGRAM_WEBHOOK_SECRET=   # hanya untuk bot dua arah
+~~~
+
+URL publik aplikasi diambil dari `NEXT_PUBLIC_SITE_URL` yang sudah ada, atau
+diberi langsung dengan `--url`.
+
+### Pesan keluar (selalu aktif)
+
+，Semua ini berjalan tanpa webhook:
+
+- saldo Digiflazz saat status berubah;
+- incident operasional kritis (dari `/api/cron/operations-health`);
+- order nyangkut di `paid`/`processing` lebih dari 5 menit;
+- fulfilment gagal dan receipt gagal terkirim;
+- digest harian 08:00 WIB.
+
+Semua pengiriman dicatat di `telegram_delivery_log`. Alert yang bisa beruntun
+(fulfillment, receipt) masuk antrean dulu dan dikirim oleh
+`/api/cron/telegram-dispatch` satu per satu dengan jeda 1,1 detik — itu batas
+Telegram per chat. Kalau antrean menumpuk, tekan "Kirim antrean Telegram" di
+System & production readiness.
+
+### Bot dua arah
+
+~~~bash
+node scripts/telegram-set-webhook.mjs --info
+node scripts/telegram-set-webhook.mjs
+node scripts/telegram-set-webhook.mjs --delete
+~~~
+
+Endpoint `/api/telegram/webhook` menolak request yang secret token-nya salah,
+chat-nya bukan `TELEGRAM_ADMIN_CHAT_ID`, atau `update_id`-nya sudah pernah
+diproses. Perintah yang tersedia: `/status`, `/saldo`, `/order NBH-...`,
+`/incident`, `/retry-receipt NBH-...`, `/help`.
+
+`/retry-receipt` adalah satu-satunya perintah yang menulis; ia memakai
+`deliverSuccessReceipt` yang sama dengan scheduler, jadi tidak ada jalur kedua
+yang bisa mengirim receipt ganda.
+
+### Migration
+
+`supabase/migrations/20261008_029_telegram_delivery_log.sql` wajib dijalankan
+sebelum bot digunakan. Tanpa tabelnya, pesan keluar tetap terkirim (kegagalan
+logging hanya masuk ke log server), tapi webhook dan dedupe tidak bekerja.

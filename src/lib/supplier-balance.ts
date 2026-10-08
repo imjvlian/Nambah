@@ -171,6 +171,12 @@ export async function checkDigiflazzSupplierBalance(input?: {
           targetBalance,
           recommendedDeposit,
         }),
+        {
+          kind: "balance",
+          // Transisi status yang sama dalam satu jam cukup satu pesan; tanpa
+          // ini saldo yang naik-turun di sekitar ambang bisa spam tiap cek.
+          dedupeKey: `balance:${previousStatus ?? "none"}->${status}:${checkedAt.slice(0, 13)}`,
+        },
       );
       notification = result.sent
         ? { attempted: true, sent: true }

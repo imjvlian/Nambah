@@ -1,4 +1,5 @@
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
+import { notifyOrderStuck } from "@/lib/telegram-alerts";
 import { supabaseSelect, supabaseUpsert, supabaseUpdate } from "@/lib/supabase/server";
 
 type Source = "admin" | "cron";
@@ -10,6 +11,7 @@ type IncidentRow = {
   first_seen_at: string; last_seen_at: string; last_notified_at: string | null; resolved_at: string | null;
 };
 type IdRow = { id: string };
+type StuckOrderRow = { id: string; updated_at: string };
 type SupplierTransactionRow = { id: number };
 type ReceiptRow = { id: number };
 type FinanceRow = { order_id: string };
@@ -21,6 +23,8 @@ type BalanceRow = {
 const STUCK_MS = 5 * 60_000;
 const STALE_RECEIPT_MS = 15 * 60_000;
 const NOTIFY_COOLDOWN_MS = 60 * 60_000;
+/** Batas pesan per order nyangkut dalam satu run, biar tidak membanjiri chat. */
+const STUCK_ALERT_LIMIT = 5;
 
 function isoBefore(ms: number) {
   return new Date(Date.now() - ms).toISOString();
@@ -36,8 +40,8 @@ export async function getOperationsHealth(input?: { source?: Source }) {
   const source = input?.source ?? "admin";
   const [stuckOrders, pendingSupplier, failedReceipts, staleReceipts, financeErrors, balances, existing] =
     await Promise.all([
-      supabaseSelect<IdRow>("orders", {
-        select: "id",
+      supabaseSelect<StuckOrderRow>("orders", {
+        select: "id,updated_at",
         filters: { status: "in.(paid,processing)", updated_at: `lt.${isoBefore(STUCK_MS)}` },
         limit: 100,
       }),
@@ -135,12 +139,41 @@ export async function getOperationsHealth(input?: { source?: Source }) {
     if (source === "cron" && item.severity === "critical" && isTelegramConfigured() &&
         notificationDue(previous?.last_notified_at ?? null)) {
       try {
-        await sendTelegramMessage(["Nambah Operations", item.title, item.detail].join("\n"));
+        await sendTelegramMessage(
+          ["Nambah Operations", item.title, item.detail].join("\n"),
+          {
+            kind: "ops",
+            // Sejalan dengan cooldown 1 jam di `notificationDue`: satu incident
+            // per fingerprint per jam, sama dengan yang sudah dijanjikan.
+            dedupeKey: `ops:${item.fingerprint}:${now.slice(0, 13)}`,
+          },
+        );
         await supabaseUpdate("operational_incidents", {
           last_notified_at: now, updated_at: now,
         }, { filters: { fingerprint: `eq.${item.fingerprint}` } });
       } catch (error) {
         console.error("Operations Telegram alert failed", error);
+      }
+    }
+  }
+
+  // Notifikasi per order untuk yang nyangkut.
+  //
+  // Incident `orders:stuck` sengaja tetap satu baris agregat supaya dashboard
+  // tidak berdesakan, tapi severity-nya baru `critical` kalau sudah 5 order.
+  // Artinya 1-4 order nyangkut tidak pernah sampai ke Telegram. Supaya
+  // kasusnya tidak hilang, tiap order dikasih pesan sendiri — dibatasi 5 per
+  // run dan dedupe per jam, jadi polling 10 menit tidak jadi spam.
+  if (source === "cron" && stuckOrders.length > 0 && isTelegramConfigured()) {
+    for (const stuck of stuckOrders.slice(0, STUCK_ALERT_LIMIT)) {
+      const minutes = Math.max(
+        0,
+        Math.round((Date.now() - Date.parse(stuck.updated_at)) / 60_000),
+      );
+      try {
+        await notifyOrderStuck(stuck.id, minutes);
+      } catch (error) {
+        console.error(`Stuck order alert failed for ${stuck.id}`, error);
       }
     }
   }

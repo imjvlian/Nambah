@@ -16,11 +16,27 @@ export async function POST(request: Request) {
 
   try {
     const result = await sendTelegramMessage(
-      "✅ Nambah — Telegram monitoring aktif.\n\nNotifikasi saldo Digiflazz akan dikirim saat status berubah.",
+      [
+        "<b>Nambah — Telegram aktif.</b>",
+        "",
+        "Notifikasi yang dikirim dari sini:",
+        "  • saldo Digiflazz saat status berubah",
+        "  • incident operasional kritis",
+        "  • order nyangkut",
+        "  • fulfilment gagal, receipt gagal",
+        "  • digest harian 08:00 WIB",
+      ].join("\n"),
+      {
+        kind: "ops",
+        // Dedupe per menit: menekan tombol beberapa kali tidak boleh
+        // membanjiri chat, tapi tetap bisa dites berulang.
+        dedupeKey: `test:${new Date().toISOString().slice(0, 16)}`,
+        parseMode: "HTML",
+      },
     );
     return Response.json(result);
   } catch (error) {
     console.error("Telegram test failed", error);
-    return Response.json({ error: "Test Telegram gagal dikirim." }, { status: 502 });
+    return Response.json({ error: "Tes Telegram gagal dikirim." }, { status: 502 });
   }
 }

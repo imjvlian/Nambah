@@ -1335,6 +1335,71 @@ export default function AdminDashboard() {
     }
   }
 
+  async function testTelegram() {
+    setBusy("telegram");
+    setNotice("");
+    setActionState("telegram", { status: "running", message: "Mengirim pesan tes..." });
+    try {
+      const response = await fetch("/api/admin/telegram/test", { method: "POST" });
+      const result = (await response.json()) as { error?: string; sent?: boolean };
+      if (!response.ok) throw new Error(result.error ?? "Tes Telegram gagal.");
+
+      setNotice("Pesan tes terkirim ke chat admin Telegram.");
+      setActionState("telegram", {
+        status: "ok",
+        message: "Terkirim",
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Tes Telegram gagal.";
+      setNotice(message);
+      setActionState("telegram", {
+        status: "error",
+        message,
+        at: new Date().toISOString(),
+      });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function dispatchTelegramQueue() {
+    setBusy("telegram_queue");
+    setNotice("");
+    setActionState("telegram_queue", {
+      status: "running",
+      message: "Mengirim antrean...",
+    });
+    try {
+      const response = await fetch("/api/admin/telegram/dispatch", { method: "POST" });
+      const result = (await response.json()) as {
+        error?: string;
+        attempted?: number;
+        sent?: number;
+        failed?: number;
+      };
+      if (!response.ok) throw new Error(result.error ?? "Antrean gagal diproses.");
+
+      const message = `Antrean: ${result.attempted ?? 0} dicoba, ${result.sent ?? 0} terkirim, ${result.failed ?? 0} gagal.`;
+      setNotice(message);
+      setActionState("telegram_queue", {
+        status: (result.failed ?? 0) > 0 ? "error" : "ok",
+        message,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Antrean gagal diproses.";
+      setNotice(message);
+      setActionState("telegram_queue", {
+        status: "error",
+        message,
+        at: new Date().toISOString(),
+      });
+    } finally {
+      setBusy("");
+    }
+  }
+
   const filteredProducts = useMemo(() => {
     if (!catalog) return [];
     const keyword = query.trim().toLowerCase();
@@ -3039,6 +3104,26 @@ export default function AdminDashboard() {
                   {busy === "reconciliation"
                     ? "Reconciling..."
                     : "Run reconciliation"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void testTelegram()}
+                  disabled={Boolean(busy)}
+                >
+                  {busy === "telegram" ? "Mengirim..." : "Tes Telegram"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void dispatchTelegramQueue()}
+                  disabled={Boolean(busy)}
+                  title={
+                    actionStates.telegram_queue?.message ||
+                    "Kirim notifikasi yang tertunda di antrean."
+                  }
+                >
+                  {busy === "telegram_queue"
+                    ? "Mengirim antrean..."
+                    : "Kirim antrean Telegram"}
                 </button>
                 <span className="acc-status processing">
                   {numberOrDash(overview.stats.supplierPending)} supplier pending
