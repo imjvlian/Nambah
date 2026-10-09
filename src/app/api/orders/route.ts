@@ -2,6 +2,7 @@ import {
   appendResolvedNambahAuthCookies,
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
+import { readLinkReferralCode } from "@/lib/affiliate-link-cookie";
 import { randomUUID } from "node:crypto";
 import {
   isValidReceiptEmail,
@@ -171,6 +172,7 @@ export async function POST(request: Request) {
     paymentMethod,
     promotion,
     referral,
+    linkAffiliate,
     minimumNambahProfit,
   } = pricingContext.context;
 
@@ -217,6 +219,7 @@ export async function POST(request: Request) {
     paymentMethod,
     promotion,
     referral,
+    linkAffiliate,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
   });
@@ -319,7 +322,7 @@ export async function POST(request: Request) {
       target_user_id: account.userId,
       target_server_id: account.serverId ?? null,
       promotion_code: pricing.promoCode,
-      affiliate_code: pricing.referralCode,
+      affiliate_code: pricing.affiliateCode,
       supplier_id: "digiflazz",
       status: "pending_payment",
       reference_price: pricing.referencePrice,

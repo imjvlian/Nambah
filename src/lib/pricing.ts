@@ -49,6 +49,16 @@ export type PricingResult = {
   promoName: string | null;
   promotionDiscount: number;
   referralCode: string | null;
+  /**
+   * Kode affiliate yang dipakai untuk order ini, baik dari kode manual
+   * (`referralCode`) maupun dari link.
+   *
+   * Dipakai untuk `orders.affiliate_code` — kolom yang dibaca
+   * `commission-service.ts` untuk menghitung komisi. Kalau order hanya datang
+   * dari link, `referralCode` tetap null (pembeli tidak dapat diskon) tapi
+   * affiliate tetap harus tercatat di sini, kalau tidak komisinya nol.
+   */
+  affiliateCode: string | null;
   referralName: string | null;
   referralRequestedDiscount: number;
   referralDiscount: number;
@@ -306,6 +316,7 @@ export function calculatePricing({
   paymentMethod,
   promotion,
   referral,
+  linkAffiliate = null,
   pointsDiscount = 0,
   loyaltyEligible = false,
   minimumNambahProfit = MINIMUM_NAMBAH_PROFIT,
@@ -314,6 +325,14 @@ export function calculatePricing({
   paymentMethod: PaymentMethod;
   promotion: Promotion | null;
   referral: ReferralProgram | null;
+  /**
+   * Affiliate dari kode link. Memberi KOMISI saja — pembeli tidak dapat
+   * diskon dan tidak perlu login. Berlaku untuk tamu.
+   *
+   * Kalau `referral` tidak null, kode manual menang dan `linkAffiliate`
+   * diabaikan, jadi kedua-duanya tidak pernah dipakai bersamaan.
+   */
+  linkAffiliate?: { code: string; commissionRate: number } | null;
   pointsDiscount?: number;
   loyaltyEligible?: boolean;
   minimumNambahProfit?: number;
@@ -328,7 +347,14 @@ export function calculatePricing({
     referral,
     promotion,
   );
-  const affiliateRate = referral?.commissionRate ?? 0;
+  // Rate komisi: kode manual menang kalau ada. Kalau tidak, kode link tetap
+  // memberi komisi — inilah yang membuat link tetap bernilai untuk affiliate
+  // even ketika pembeli tidak Benefit apa pun.
+  //
+  // Tidak ada safety untuk minimum order di jalur link: benefit-nya nol, jadi
+  // `minimum_order` milik affiliate tidak relevan di jalur link.
+  const affiliateRate =
+    referral?.commissionRate ?? linkAffiliate?.commissionRate ?? 0;
 
   const evaluate = (referralDiscount: number) =>
     evaluatePrice({
@@ -400,6 +426,7 @@ export function calculatePricing({
     promoName: promotion?.name ?? null,
     promotionDiscount: promo.amount,
     referralCode: referral?.code ?? null,
+    affiliateCode: referral?.code ?? linkAffiliate?.code ?? null,
     referralName: referral?.name ?? null,
     referralRequestedDiscount: referralBenefit.amount,
     referralDiscount,

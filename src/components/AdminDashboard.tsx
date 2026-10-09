@@ -7,6 +7,7 @@ import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
 import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 import { useConfirm } from "@/components/AdminConfirmDialog";
+import AffiliatePerformancePanel from "@/components/AffiliatePerformancePanel";
 import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
 
 type AdminSection =
@@ -2983,6 +2984,7 @@ export default function AdminDashboard() {
                   </div>
                 }
               />
+              <AffiliatePerformancePanel />
               <div className="acc-metrics">
                 <article>
                   <small>Active affiliates</small>

@@ -8,6 +8,7 @@ import {
   appendResolvedNambahAuthCookies,
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
+import { readLinkReferralCode } from "@/lib/affiliate-link-cookie";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
 import { toPublicPricing } from "@/lib/public-pricing";
@@ -47,6 +48,9 @@ export async function POST(request: Request) {
 
   const result = await getPricingContext({
     ...body,
+    // Kode dari cookie, bukan dari body — client tidak boleh menentukan
+    // affiliate-nya sendiri.
+    linkCode: readLinkReferralCode(request),
     userId: auth.user?.id ?? null,
   });
   if (!result.ok) {
@@ -62,6 +66,7 @@ export async function POST(request: Request) {
     paymentMethod,
     promotion,
     referral,
+    linkAffiliate,
     promoEndsAt,
     minimumNambahProfit,
   } = result.context;
@@ -71,6 +76,8 @@ export async function POST(request: Request) {
     paymentMethod,
     promotion,
     referral,
+
+    linkAffiliate,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
   });

@@ -17,6 +17,7 @@ import {
   type SupplierPricedPackage,
 } from "@/lib/supplier-pricing";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
+import { evaluateCooldown } from "@/lib/affiliate-attribution";
 
 type PricingRequest = {
   gameId?: string;
@@ -24,6 +25,19 @@ type PricingRequest = {
   paymentId?: string;
   promoCode?: string;
   referralCode?: string;
+  /**
+   * Kode affiliate dari link `/r/[code]`.
+   *
+   * BERBEDA dari `referralCode` dengan sengaja:
+   *   - `referralCode` → kode yang DIKETIK manual, hanya untuk user login.
+   *     Pembeli dapat diskon.
+   *   - `linkCode`    → kode dari link yang diklik. Berlaku untuk TAMU juga,
+   *     dan pembeli TIDAK dapat apa-apa. Hanya affiliate yang dapat komisi.
+   *
+   * Kalau keduanya ada, `referralCode` yang menang — kode yang diketik manual
+   * lebih spesifik daripada kode yang datang dari link.
+   */
+  linkCode?: string;
   /** Untuk penegakan batas pemakaian per akun (promo & referral). */
   userId?: string | null;
 };
@@ -34,6 +48,14 @@ type PricingContext = {
   paymentMethod: PaymentMethod;
   promotion: Promotion | null;
   referral: ReferralProgram | null;
+  /**
+   * Affiliate dari kode link. Berbeda dari `referral`: tidak memberi diskon ke
+   * pembeli, hanya komisi. Berlaku untuk tamu juga.
+   *
+   * Tidak akan pernah ada bersamaan dengan `referral` yang tidak-null — kode
+   * manual menang kalau keduanya ada.
+   */
+  linkAffiliate: LinkAffiliate | null;
   /** Batas waktu promo yang sedang terpasang (untuk countdown di checkout). */
   promoEndsAt: string | null;
   minimumNambahProfit: number;
@@ -127,7 +149,7 @@ function normalizeCode(value?: string) {
   return value?.trim().toUpperCase() ?? "";
 }
 
-function getStaticPricingContext(request: PricingRequest): PricingContextResult {
+async function getStaticPricingContext(request: PricingRequest): Promise<PricingContextResult> {
   const game = games.find((item) => item.id === request.gameId);
   const selectedPackage = game?.packages.find((item) => item.id === request.packageId);
   const paymentMethod = paymentMethods.find((item) => item.id === request.paymentId);
@@ -167,6 +189,17 @@ function getStaticPricingContext(request: PricingRequest): PricingContextResult 
     return { ok: false, status: 400, error: "Kode referral tidak ditemukan." };
   }
 
+  // Kode dari link: hanya untuk komisi affiliate, tidak pernah memberi diskon
+  // ke pembeli — termasuk untuk tamu yang belum login.
+  //
+  // Kalau `referralCode` juga ada, kode itu yang menang. Kode yang diketik
+  // manual lebih spesifik daripada kode yang datang dari link, dan pembeli
+  // yang mengetik memang mengharapkan kode itu yang dipakai.
+  const linkCode = referral ? "" : normalizeCode(request.linkCode);
+  const linkAffiliate = linkCode
+    ? await resolveActiveAffiliate(linkCode)
+    : null;
+
   return {
     ok: true,
     context: {
@@ -175,6 +208,7 @@ function getStaticPricingContext(request: PricingRequest): PricingContextResult 
       paymentMethod,
       promotion,
       referral,
+      linkAffiliate,
       promoEndsAt: null,
       minimumNambahProfit: 500,
       source: "static",
@@ -187,6 +221,75 @@ function isPromotionCurrentlyActive(promotion: PromotionRow) {
   if (promotion.starts_at && new Date(promotion.starts_at).getTime() > now) return false;
   if (promotion.ends_at && new Date(promotion.ends_at).getTime() <= now) return false;
   return true;
+}
+
+/** Bentuk affiliate yang dipakai untuk hitung komisi dari kode link. */
+export type LinkAffiliate = {
+  code: string;
+  commissionRate: number;
+};
+
+/**
+ * Kapan user ini terakhir mendapat komisi dari kode affiliate ini.
+ *
+ * Hanya order `success` yang dihitung:
+ *   - `pending_payment` bisa menggantung lalu dibatalkan
+ *   - `failed` / `cancelled` / `refunded` tidak menghasilkan komisi
+ *
+ * Kalau order yang dibatalkan ikut dihitung, affiliate bisa memicu cooldown-nya
+ * dengan order yang tak pernah dibayar — lalu order berikutnya yang sah jadi
+ * ikut terblokir.
+ */
+async function findLastCommissionedOrderAt(
+  userId: string,
+  affiliateCode: string,
+): Promise<string | null> {
+  const [row] = await supabaseSelect<{ created_at: string }>("orders", {
+    select: "created_at",
+    filters: {
+      customer_user_id: `eq.${userId}`,
+      affiliate_code: `eq.${affiliateCode}`,
+      status: "eq.success",
+    },
+    order: "created_at.desc",
+    limit: 1,
+  });
+  return row?.created_at ?? null;
+}
+
+/**
+ * Ambil affiliate yang aktif untuk kode link.
+ *
+ * Mengembalikan `null` kalau kode tidak ada, tidak aktif, atau tidak punya
+ * pemilik (`user_id`). Kode tanpa pemilik ditolak supaya program bawaan
+ * seperti `CREATOR` — yang punya rate tapi tidak ada yang mencairkan — tidak
+ * bisa dipakai lewat link.
+ *
+ * `null` BUKAN error: link yang tidak valid harus tetap mengarahkan pembeli ke
+ * beranda. Menolak order-nya akan terasa seperti layanan rusak.
+ */
+export async function resolveActiveAffiliate(
+  code: string,
+): Promise<LinkAffiliate | null> {
+  const normalized = normalizeCode(code);
+  if (!normalized) return null;
+
+  const [row] = await supabaseSelect<{
+    code: string;
+    commission_rate: number | string;
+    user_id: string | null;
+  }>("affiliates", {
+    select: "code,commission_rate,user_id",
+    filters: { code: `eq.${normalized}`, status: "eq.active" },
+    limit: 1,
+  });
+
+  if (!row?.user_id) return null;
+
+  return {
+    code: row.code,
+    commissionRate: Math.max(0, Math.min(1, Number(row.commission_rate) || 0)),
+  };
 }
 
 async function getSupabasePricingContext(request: PricingRequest): Promise<PricingContextResult> {
@@ -329,6 +432,43 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
       return { ok: false, status: 400, error: "Kode referral tidak ditemukan." };
     }
 
+    // ── Kode link: komisi saja, tanpa diskon, tanpa blokir order ──────────
+    //
+    // Berbeda dari kode referral di bawah. Untuk kode link:
+    //
+    //   - tidak ada batas 1×/hari yang memblokir order. Orang yang datang dari
+    //     link affiliate dan sudah Beli 5 menit lalu harus tetap bisa Beli lagi
+    //     — menolak order-nya akan terasa seperti layanan rusak, dan affiliate
+    //     yang mengarahkan orang justru menanggung akibatnya.
+    //   - cooldown 24 jam hanya mematikan KOMISI. Order tetap jalan.
+    //
+    // Bedanya bukan hal kecil: kode referral memblokir order, kode
+    // link tidak. Itu disengaja — kode referral dipilih sendiri oleh user yang
+    // login, sedangkan kode link orang lain yang mengarahkan traffic.
+    const linkCode = affiliateRow ? "" : normalizeCode(request.linkCode);
+    let linkAffiliate: LinkAffiliate | null = linkCode
+      ? await resolveActiveAffiliate(linkCode)
+      : null;
+
+    if (linkAffiliate && request.userId) {
+      const lastCommissionedAt = await findLastCommissionedOrderAt(
+        request.userId,
+        linkAffiliate.code,
+      );
+      const decision = evaluateCooldown({
+        affiliateCode: linkAffiliate.code,
+        // Orde baru ini akan berstatus `pending_payment` saat dibuat, tapi
+        // pemeriksaannya menyaring order `success` yang SUDAH lewat — makanya
+        // status di sini hanya untuk early-out, bukan untuk menggeser hitungan.
+        orderStatus: "success",
+        lastCommissionedAt,
+      });
+      if (decision.blocked) {
+        // Komisi dimatikan, order tetap jalan.
+        linkAffiliate = null;
+      }
+    }
+
     // Batas pemakaian per akun — ditegakkan sedini mungkin (preview &
     // pembuatan order sama-sama lewat sini), dan diperkuat lagi oleh
     // nambah_promotion_reserve saat order dibuat.
@@ -434,6 +574,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
         },
         promotion,
         referral,
+        linkAffiliate,
         promoEndsAt: promotionRow?.ends_at ?? null,
         minimumNambahProfit: Number(pricingRule.minimum_nambah_profit),
         source: "supabase",

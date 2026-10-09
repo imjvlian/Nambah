@@ -11,6 +11,7 @@ import {
   statusTone,
 } from "@/lib/order-status-display";
 import AffiliateAccountPanel from "@/components/AffiliateAccountPanel";
+import AffiliateJoinPanel from "@/components/AffiliateJoinPanel";
 
 type AccountUser = {
   id: string;
@@ -78,11 +79,12 @@ type PointLedger = {
  * Tab memakai `useState`, bukan routing: URL tetap `/account`, tidak ada
  * request tambahan, dan tombol back browser tetap bekerja seperti sekarang.
  */
-type AccountTab = "orders" | "points" | "profile";
+type AccountTab = "orders" | "points" | "profile" | "affiliate";
 
 const TABS: ReadonlyArray<{ id: AccountTab; label: string; hint: string }> = [
   { id: "orders", label: "Transaksi", hint: "Riwayat pesanan kamu" },
   { id: "points", label: "Nambah Points", hint: "Saldo dan aktivitas points" },
+  { id: "affiliate", label: "Afiliasi", hint: "Komisi dan pendaftaran" },
   { id: "profile", label: "Profil", hint: "Data untuk checkout" },
 ];
 
@@ -608,7 +610,12 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
       </section>
       )}
 
-      <AffiliateAccountPanel />
+      {tab === "affiliate" && (
+        <>
+          <AffiliateAccountPanel />
+          <AffiliateJoinPanel />
+        </>
+      )}
 
       {tab === "orders" && (
       <section className="account-orders-card">

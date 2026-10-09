@@ -477,6 +477,28 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     };
   }, []);
 
+  // Kode affiliate dari link `/r/[code]`.
+  //
+  // Link menyimpan kodenya di cookie, dan baris ini memindahkannya ke kolom
+  // referral. Tanpa ini, orang yang klik link affiliate harus mengetik kodenya
+  // sendiri — dan klik yang tercatat tidak akan pernah jadi transaksi, jadi
+  // monitor selalu menunjukkan konversi nol.
+  //
+  // Berlaku untuk tamu juga. Kode dari link tidak memberi diskon ke pembeli;
+  // diskon hanya untuk pengguna login yang mengetik kodenya manual (lihat
+  // `applyReferral`). Yang_IDENTIFIKASI_code-nya tetap dikunci server saat order
+  // dibuat, jadi cookie ini cuma prefill — bukan pengganti validasi.
+  useEffect(() => {
+    const match = document.cookie.match(/(?:^|;\s*)nambah_ref_code=([^;]+)/);
+    if (!match) return;
+    const code = decodeURIComponent(match[1] ?? "").trim().toUpperCase();
+    if (!code) return;
+
+    // Kode yang sudah diketik manual menang. Kalau tidak, mengetik kode lain
+    // akan ditimpa diam-diam setiap kali halaman dimuat.
+    setReferralInput((current) => (current.trim() ? current : code));
+  }, []);
+
   // Escape menutup ringkasan konfirmasi; fokus dikembalikan ke tombol
   // "Kembali" supaya keyboard user tidak tersesat di dalam dialog.
   useEffect(() => {
@@ -735,6 +757,17 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       setReferralMessage("Referral dihapus.");
       return;
     }
+
+    // Kode yang diketik manual menang atas kode dari cookie link, dan cookie
+    // ikut diperbarui supaya tidak menimpa kolom ini lagi di render berikutnya.
+    // Tanpa ini, reload halaman akan mengembalikan kode link yang lama.
+    document.cookie = [
+      `nambah_ref_code=${encodeURIComponent(normalized)}`,
+      "Path=/",
+      `Max-Age=${30 * 24 * 60 * 60}`,
+      "SameSite=Lax",
+    ].join("; ");
+
     if (viewerState !== "authenticated") {
       setAppliedReferralCode("");
       setReferralMessage(

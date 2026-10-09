@@ -476,7 +476,7 @@
 
 .account-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
 }
@@ -625,6 +625,192 @@
 
 @media (max-width: 900px) {
   .account-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Pendaftaran affiliate ─────────────────────────────────────────────── */
+
+.affiliate-join-card {
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.affiliate-join-body {
+  display: grid;
+  gap: 12px;
+  padding: 26px;
+}
+
+.affiliate-join-body > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.affiliate-join-hint,
+.affiliate-join-meta {
+  font-size: 10px;
+}
+
+.affiliate-join-hint code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+}
+
+.affiliate-join-reason {
+  padding: 12px 14px;
+  border-left: 2px solid rgba(231, 106, 106, 0.5);
+  color: #dea5a5 !important;
+  background: rgba(231, 106, 106, 0.05);
+}
+
+.affiliate-join-status {
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.affiliate-join-status.tone-done {
+  border-color: rgba(201, 255, 63, 0.24);
+  color: var(--lime);
+}
+
+.affiliate-join-status.tone-bad {
+  border-color: rgba(231, 106, 106, 0.24);
+  color: #dea5a5;
+}
+
+.affiliate-join-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.affiliate-join-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.affiliate-join-form label > span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.affiliate-join-form input,
+.affiliate-join-form textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.affiliate-join-form input:focus,
+.affiliate-join-form textarea:focus {
+  outline: none;
+  border-color: rgba(201, 255, 63, 0.34);
+}
+
+.affiliate-join-form button {
+  justify-self: start;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lime);
+  color: #10140c;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.affiliate-join-form button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.affiliate-join-notice,
+.affiliate-join-error,
+.affiliate-join-loading {
+  margin: 0;
+  padding: 18px 26px;
+  font-size: 11px;
+}
+
+.affiliate-join-notice {
+  color: var(--lime);
+}
+
+.affiliate-join-error {
+  color: #dea5a5;
+}
+
+.affiliate-join-loading {
+  color: var(--muted);
+}
+
+/* Field link channel.
+ *
+ * Dua kolom supaya empat field tidak membuat form terlalu panjang. Di layar
+ * sempit `datalist`-nya tetap jalan — browser menampilkannya sendiri, tidak
+ * ada layout yang perlu menyesuaikan.
+ */
+.affiliate-join-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+
+.affiliate-join-links legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.affiliate-join-links legend em {
+  margin-left: 6px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.affiliate-join-links label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.affiliate-join-links label > span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .affiliate-join-links {
     grid-template-columns: 1fr;
   }
 }
