@@ -14,7 +14,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isSupabaseConfigured()) {
-    return Response.json({ error: "Database {BRAND.shortName} belum dikonfigurasi." }, { status: 503 });
+    return Response.json({ error: `Database ${BRAND.shortName} belum dikonfigurasi.` }, { status: 503 });
   }
 
   const { id } = await context.params;

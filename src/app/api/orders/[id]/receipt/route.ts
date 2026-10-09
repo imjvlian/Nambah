@@ -52,7 +52,7 @@ export async function GET(
 ) {
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database {BRAND.shortName} belum dikonfigurasi." },
+      { error: `Database ${BRAND.shortName} belum dikonfigurasi.` },
       { status: 503 },
     );
   }
@@ -109,7 +109,7 @@ export async function POST(
 ) {
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database {BRAND.shortName} belum dikonfigurasi." },
+      { error: `Database ${BRAND.shortName} belum dikonfigurasi.` },
       { status: 503 },
     );
   }

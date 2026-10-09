@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database {BRAND.shortName} belum dikonfigurasi untuk membuat order." },
+      { error: `Database ${BRAND.shortName} belum dikonfigurasi untuk membuat order.` },
       { status: 503 },
     );
   }
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     receiptEmail = normalizeReceiptEmail(auth.user.email);
     if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
       return Response.json(
-        { error: "Email akun {BRAND.shortName} tidak tersedia untuk receipt." },
+        { error: `Email akun ${BRAND.shortName} tidak tersedia untuk receipt.` },
         { status: 409 },
       );
     }

@@ -8,6 +8,7 @@ import AdminCatalogTools from "@/components/AdminCatalogTools";
 import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 import { useConfirm } from "@/components/AdminConfirmDialog";
 import AffiliatePerformancePanel from "@/components/AffiliatePerformancePanel";
+import ReceiptPreview from "@/components/ReceiptPreview";
 import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
 import { BRAND } from "@/lib/brand";
 
@@ -2518,6 +2519,9 @@ export default function AdminDashboard() {
                 title="Email bukti transfer"
                 copy="Log Brevo untuk melihat receipt terkirim, retry, dan error provider."
               />
+
+              <ReceiptPreview />
+
               <div className="acc-table-card">
                 <div className="acc-receipts-head">
                   <span>Order</span>

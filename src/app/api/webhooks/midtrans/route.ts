@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
-    return Response.json({ error: "Database {BRAND.shortName} belum dikonfigurasi." }, { status: 503 });
+    return Response.json({ error: `Database ${BRAND.shortName} belum dikonfigurasi.` }, { status: 503 });
   }
 
   let payload: MidtransStatusPayload;

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     const result = await sendTelegramMessage(
       [
-        "<b>{BRAND.name} — Telegram aktif.</b>",
+        `<b>${BRAND.name} — Telegram aktif.</b>`,
         "",
         "Notifikasi yang dikirim dari sini:",
         "  • saldo Digiflazz saat status berubah",

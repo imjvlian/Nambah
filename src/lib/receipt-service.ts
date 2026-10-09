@@ -154,7 +154,15 @@ async function ensureDelivery(orderId: string, recipient: string) {
   return await getDelivery(orderId);
 }
 
-async function loadReceiptContext(orderId: string) {
+/**
+ * Muat semua data yang dibutuhkan untuk merender receipt.
+ *
+ * DI-EXPORT untuk preview admin (`/admin/receipt`). Preview memakai fungsi
+ * yang sama persis dengan pengiriman sungguhan — bukan salinan terpisah —
+ * supaya apa yang dilihat admin di preview itu persis yang akan diterima
+ * pelanggan. Kalau ada dua jalur render, previewnya hanya berbohong.
+ */
+export async function loadReceiptContext(orderId: string) {
   const [order] = await supabaseSelect<ReceiptOrderRow>("orders", {
     select:
       "id,status,game_id,product_id,payment_method_id,target_user_id,target_server_id,receipt_email,final_price,paid_at,fulfilled_at,created_at",
@@ -239,7 +247,9 @@ async function loadReceiptContext(orderId: string) {
  *    atau delay-nya tidak bisa diprediksi, dan receipt bisa dibaca Offline
  *    atau setelah gambar diblokir.
  */
-function renderReceiptHtml(context: Awaited<ReturnType<typeof loadReceiptContext>>) {
+export function renderReceiptHtml(
+  context: Awaited<ReturnType<typeof loadReceiptContext>>,
+) {
   if (!context) throw new Error("Receipt context tidak tersedia.");
 
   const { order, game, product, payment, serialNumber } = context;

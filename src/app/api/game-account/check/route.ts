@@ -237,7 +237,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Konfigurasi database {BRAND.shortName} belum lengkap." },
+      { error: `Konfigurasi database ${BRAND.shortName} belum lengkap.` },
       { status: 503 },
     );
   }
@@ -447,7 +447,7 @@ export async function POST(request: Request) {
       {
         error: volseverUnavailable
           ? "Volsever sedang tidak tersedia dan fallback checker belum dikonfigurasi. Checkout tetap bisa dilanjutkan."
-          : "Volsever belum dikonfigurasi. Tambahkan VOLSEVER_API_KEY di server {BRAND.shortName}.",
+          : `Volsever belum dikonfigurasi. Tambahkan VOLSEVER_API_KEY di server ${BRAND.shortName}.`,
         retryable: volseverUnavailable,
         source: "volsever",
       },

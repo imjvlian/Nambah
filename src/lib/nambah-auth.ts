@@ -71,7 +71,7 @@ function requireAuthConfig() {
   const config = getAuthConfig();
   if (!config.url || !config.publishableKey) {
     throw new NambahAuthError(
-      "Supabase Auth {BRAND.shortName} belum dikonfigurasi.",
+      `Supabase Auth ${BRAND.shortName} belum dikonfigurasi.`,
       503,
       "auth_not_configured",
     );
