@@ -6,6 +6,7 @@ import {
   supabaseUpdate,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -248,7 +249,7 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
     });
 
     if (!product) {
-      throw new PublicationError("Mapping supplier ada tetapi produk Nambah tidak ditemukan.", 409);
+      throw new PublicationError("Mapping supplier ada tetapi produk {BRAND.shortName} tidak ditemukan.", 409);
     }
 
     const nextSellingPrice = Math.max(Number(product.selling_price), minimumSellingPrice);

@@ -12,6 +12,7 @@ import {
 } from "@/lib/order-status-display";
 import AffiliateAccountPanel from "@/components/AffiliateAccountPanel";
 import AffiliateJoinPanel from "@/components/AffiliateJoinPanel";
+import { BRAND } from "@/lib/brand";
 
 type AccountUser = {
   id: string;
@@ -83,7 +84,7 @@ type AccountTab = "orders" | "points" | "profile" | "affiliate";
 
 const TABS: ReadonlyArray<{ id: AccountTab; label: string; hint: string }> = [
   { id: "orders", label: "Transaksi", hint: "Riwayat pesanan kamu" },
-  { id: "points", label: "Nambah Points", hint: "Saldo dan aktivitas points" },
+  { id: "points", label: "Lacte Points", hint: "Saldo dan aktivitas points" },
   { id: "affiliate", label: "Afiliasi", hint: "Komisi dan pendaftaran" },
   { id: "profile", label: "Profil", hint: "Data untuk checkout" },
 ];
@@ -290,7 +291,7 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
           setPointsError("");
         } else {
           setPointsError(
-            pointsData.error ?? "Nambah Points belum dapat dimuat.",
+            pointsData.error ?? "Lacte Points belum dapat dimuat.",
           );
         }
       } catch (loadError) {
@@ -358,7 +359,7 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
   }
 
   if (loading) {
-    return <div className="account-loading-card">Memuat akun Nambah...</div>;
+    return <div className="account-loading-card">Memuat akun {BRAND.shortName}...</div>;
   }
 
   if (error) {
@@ -387,7 +388,7 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
           {user.displayName.slice(0, 1).toUpperCase()}
         </div>
         <div className="account-profile-copy">
-          <span className="eyebrow">Akun Nambah</span>
+          <span className="eyebrow">Akun {BRAND.shortName}</span>
           <h1>{user.displayName}</h1>
           <p>{user.email}</p>
           <div className="account-profile-meta">
@@ -509,7 +510,7 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
       <section className="account-points-card" id="nambah-points">
         <div className="account-points-hero">
           <div>
-            <span className="eyebrow">Nambah Points</span>
+            <span className="eyebrow">Lacte Points</span>
             <h2>
               {points ? points.available.toLocaleString("id-ID") : "—"}{" "}
               <small>pts</small>

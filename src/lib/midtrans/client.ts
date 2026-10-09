@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { BRAND } from "@/lib/brand";
 
 const SNAP_URLS = {
   sandbox: "https://app.sandbox.midtrans.com/snap/v1/transactions",
@@ -120,7 +121,7 @@ export async function createMidtransSnapTransaction(input: {
             quantity: 1,
             name: input.itemName.slice(0, 50),
             category: "Digital Goods",
-            merchant_name: "Nambah",
+            merchant_name: BRAND.name,
           },
         ],
         enabled_payments: input.enabledPayments,

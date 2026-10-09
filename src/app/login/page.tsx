@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 import SiteHeader from "@/components/SiteHeader";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Masuk — Nambah",
-  description: "Masuk ke akun Nambah.",
+  title: `Masuk — ${BRAND.name}`,
+  description: `Masuk ke akun ${BRAND.shortName}.`,
 };
 
 function safeNext(value?: string) {
@@ -24,14 +25,14 @@ export default async function LoginPage({
       <SiteHeader className="auth-header">
         <a className="brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-          <span>Nambah</span>
+          <span>{BRAND.shortName}</span>
         </a>
         <a className="text-link" href="/">Kembali ke beranda</a>
       </SiteHeader>
 
       <section className="auth-shell shell">
         <aside className="auth-intro">
-          <span className="eyebrow">Nambah account</span>
+          <span className="eyebrow">{BRAND.shortName} account</span>
           <h2>Satu akun untuk semua transaksi.</h2>
           <p>
             Riwayat pembayaran dan status pesanan tersimpan di akunmu tanpa mengubah flow top up.

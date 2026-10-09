@@ -207,10 +207,28 @@ Jangan menebak format target. Format harus diverifikasi terhadap requirement SKU
 BREVO_RECEIPT_ENABLED=false
 BREVO_API_KEY=
 BREVO_SENDER_EMAIL=
-BREVO_SENDER_NAME=Nambah
+BREVO_SENDER_NAME=Lacte Game Store
 ~~~
 
 Aktifkan hanya setelah sender/domain sudah verified.
+
+> **Rebrand 2026-10-10.** `BREVO_SENDER_NAME` di server masih bernilai
+> `Nambah` sampai Anda ubah manual di `.env.local` produksi. Nilai ini
+> **tidak** diambil dari `src/lib/brand.ts` — env var selalu menang atas
+> default kode, jadi mengubah `BRAND.name` tidak akan mengubah nama pengirim
+> email yang sudah terkirim.
+>
+> Di server:
+>
+> ~~~bash
+> sed -i 's/^BREVO_SENDER_NAME=.*/BREVO_SENDER_NAME=Lacte Game Store/' .env.local
+> sudo systemctl restart nambah-cron@*.service   # kalau cron memproses receipt
+> ~~~
+>
+> Kalau sender email sudah diverifikasi Brevo untuk domain `nambah.id`,
+> nama pengirim boleh diganti tanpa verifikasi ulang — nama (display name)
+> bukan domain. Kalau Anda sekaligus ganti domain, sender wajib
+> diverifikasi ulang.
 
 Production:
 

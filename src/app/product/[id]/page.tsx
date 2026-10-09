@@ -10,6 +10,7 @@ import {
   resolveProductAsset,
   resolveProductCover,
 } from "@/lib/product-asset-resolver";
+import { BRAND } from "@/lib/brand";
 
 function searchableProductText(game: Game) {
   return [
@@ -53,9 +54,9 @@ export default async function ProductPage({
   return (
     <main className="product-page">
       <SiteHeader className="product-site-header">
-        <a className="brand" href="/" aria-label="Nambah">
+        <a className="brand" href="/" aria-label={BRAND.name}>
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-          <span>Nambah</span>
+          <span>{BRAND.shortName}</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi produk">
           <a href="/">Katalog</a>
@@ -87,7 +88,7 @@ export default async function ProductPage({
           <a className="product-back-link" href="/">← Kembali ke katalog</a>
           <span className="eyebrow">{category}</span>
           <h1>{game.name}</h1>
-          <p>{game.shortName} · Top up melalui Nambah dengan alur transaksi yang singkat dan jelas.</p>
+          <p>{game.shortName} · Top up melalui {BRAND.shortName} dengan alur transaksi yang singkat dan jelas.</p>
           <div className="product-trust-row" aria-label="Keunggulan transaksi">
             <span><b>01</b> Proses cepat</span>
             <span><b>02</b> Tersedia 24/7</span>
@@ -127,7 +128,7 @@ export default async function ProductPage({
           <span className="eyebrow">Keterangan</span>
           <h2>Top up {game.name}</h2>
           <p>
-            Pilih nominal yang tersedia, masukkan data akun atau tujuan dengan benar, lalu lanjutkan ke pembayaran. Harga final tetap divalidasi oleh Nambah sebelum order dibuat.
+            Pilih nominal yang tersedia, masukkan data akun atau tujuan dengan benar, lalu lanjutkan ke pembayaran. Harga final tetap divalidasi oleh ${BRAND.shortName} sebelum order dibuat.
           </p>
         </div>
 
@@ -147,7 +148,7 @@ export default async function ProductPage({
         <div className="product-faq-list">
           <details>
             <summary>Data akun apa yang harus diisi?</summary>
-            <p>Ikuti field yang tampil pada form. Untuk game tertentu Nambah meminta User ID dan Server / Zone ID.</p>
+            <p>Ikuti field yang tampil pada form. Untuk game tertentu ${BRAND.shortName} meminta User ID dan Server / Zone ID.</p>
           </details>
           <details>
             <summary>Kapan harga final ditentukan?</summary>
@@ -155,7 +156,7 @@ export default async function ProductPage({
           </details>
           <details>
             <summary>Bagaimana mengecek status transaksi?</summary>
-            <p>Setelah pembayaran dibuat, Nambah mengarahkan kamu ke halaman order untuk melihat status pembayaran dan proses transaksi.</p>
+            <p>Setelah pembayaran dibuat, ${BRAND.shortName} mengarahkan kamu ke halaman order untuk melihat status pembayaran dan proses transaksi.</p>
           </details>
         </div>
       </section>

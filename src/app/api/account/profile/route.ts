@@ -11,6 +11,7 @@ import {
   supabaseSelect,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
             profile?.display_name?.trim() ||
             auth.user.user_metadata?.display_name ||
             auth.user.email?.split("@")[0] ||
-            "User Nambah",
+            "User {BRAND.name}",
           whatsapp: profile?.whatsapp ?? "",
           preferredReceiptChannel:
             profile?.preferred_receipt_channel ?? "email",

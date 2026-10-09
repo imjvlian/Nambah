@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
 import { useConfirm } from "@/components/AdminConfirmDialog";
+import { BRAND } from "@/lib/brand";
 
 type CatalogSnapshot = {
   stats: {
@@ -329,7 +330,7 @@ export default function AdminCatalogTools() {
           <span className="admin-kicker">Pricing Automation</span>
           <h2>Harga otomatis & cleanup.</h2>
           <p>
-            Hitung harga dari modal Digiflazz lalu rapikan produk Nambah yang sudah tidak punya mapping supplier.
+            Hitung harga dari modal Digiflazz lalu rapikan produk ${BRAND.shortName} yang sudah tidak punya mapping supplier.
           </p>
         </div>
         <span className="admin-automation-count">{catalog.stats.mapped} mapped · {catalog.stats.unmapped} unmapped</span>

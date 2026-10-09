@@ -5,6 +5,7 @@ import {
 } from "@/lib/nambah-auth";
 import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isSupabaseConfigured()) {
-    return Response.json({ error: "Database Nambah belum dikonfigurasi." }, { status: 503 });
+    return Response.json({ error: "Database {BRAND.shortName} belum dikonfigurasi." }, { status: 503 });
   }
 
   const { id } = await context.params;

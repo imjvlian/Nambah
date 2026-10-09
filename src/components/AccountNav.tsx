@@ -171,8 +171,8 @@ export default function AccountNav({
         <a
           className="account-header-points"
           href="/account#nambah-points"
-          aria-label={`Nambah Points: ${points ?? 0} points`}
-          title="Nambah Points"
+          aria-label={`Lacte Points: ${points ?? 0} points`}
+          title="Lacte Points"
         >
           <i aria-hidden="true">N+</i>
           <strong>

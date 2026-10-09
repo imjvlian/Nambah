@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import TestLabPanel from "@/components/TestLabPanel";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Staging Test Lab — Nambah",
+  title: `Staging Test Lab — ${BRAND.name}`,
   description: "Admin-only staging fulfillment scenario controls.",
 };
 

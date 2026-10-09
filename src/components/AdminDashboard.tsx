@@ -9,6 +9,7 @@ import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 import { useConfirm } from "@/components/AdminConfirmDialog";
 import AffiliatePerformancePanel from "@/components/AffiliatePerformancePanel";
 import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
+import { BRAND } from "@/lib/brand";
 
 type AdminSection =
   | "overview"
@@ -332,7 +333,7 @@ const NAV: Array<{
   { id: "supplier", label: "Supplier", short: "SU", group: "Katalog" },
   { id: "promotions", label: "Promo", short: "PR", group: "Katalog" },
   { id: "finance", label: "Keuangan", short: "KE", group: "Keuangan" },
-  { id: "points", label: "Nambah Points", short: "NP", group: "Keuangan" },
+  { id: "points", label: "Lacte Points", short: "NP", group: "Keuangan" },
   { id: "affiliates", label: "Afiliasi", short: "AF", group: "Keuangan" },
   { id: "users", label: "Pengguna", short: "PE", group: "Sistem" },
   { id: "system", label: "Sistem", short: "SY", group: "Sistem" },
@@ -648,7 +649,7 @@ export default function AdminDashboard() {
       error?: string;
     };
     if (!response.ok) {
-      throw new Error(data.error ?? "Nambah Points gagal dimuat.");
+      throw new Error(data.error ?? "Lacte Points gagal dimuat.");
     }
     setPointsData(data);
   }
@@ -666,7 +667,7 @@ export default function AdminDashboard() {
         pointsExpired?: number;
       };
       if (!response.ok) {
-        throw new Error(data.error ?? "Expiry Nambah Points gagal.");
+        throw new Error(data.error ?? "Expiry Lacte Points gagal.");
       }
       await loadPoints();
       setNotice(
@@ -674,7 +675,7 @@ export default function AdminDashboard() {
       );
     } catch (error) {
       setNotice(
-        error instanceof Error ? error.message : "Expiry Nambah Points gagal.",
+        error instanceof Error ? error.message : "Expiry Lacte Points gagal.",
       );
     } finally {
       setBusy("");
@@ -1046,7 +1047,7 @@ export default function AdminDashboard() {
     if (section === "points" && !pointsData) {
       void loadPoints().catch((error) =>
         setNotice(
-          error instanceof Error ? error.message : "Nambah Points gagal dimuat.",
+          error instanceof Error ? error.message : "Lacte Points gagal dimuat.",
         ),
       );
     }
@@ -1690,7 +1691,7 @@ export default function AdminDashboard() {
   if (authState === "loading") {
     return (
       <main className="admin-shell">
-        <div className="admin-loading">Memuat Nambah Control Center...</div>
+        <div className="admin-loading">Memuat {BRAND.name} Control Center...</div>
       </main>
     );
   }
@@ -1701,12 +1702,12 @@ export default function AdminDashboard() {
         <section className="admin-login-card">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-            <span>Nambah</span>
+            <span>{BRAND.shortName}</span>
           </Link>
           <span className="admin-kicker">Admin account</span>
           <h1>Masuk dengan akun admin.</h1>
           <p>
-            Control Center memakai akun Nambah dengan role admin atau
+            Control Center memakai akun ${BRAND.shortName} dengan role admin atau
             superadmin.
           </p>
           <Link
@@ -1727,7 +1728,7 @@ export default function AdminDashboard() {
         <section className="admin-login-card">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-            <span>Nambah</span>
+            <span>{BRAND.shortName}</span>
           </Link>
           <span className="admin-kicker">Akses ditolak</span>
           <h1>Akun ini bukan admin.</h1>
@@ -1756,7 +1757,7 @@ export default function AdminDashboard() {
         <Link className="acc-brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
           <span>
-            <b>Nambah</b>
+            <b>{BRAND.shortName}</b>
             <small>Control Center</small>
           </span>
         </Link>
@@ -1916,7 +1917,7 @@ export default function AdminDashboard() {
                   <SectionHead
                     eyebrow="Kesehatan sistem"
                     title="Integrasi"
-                    copy="Status konfigurasi service utama Nambah."
+                    copy={`Status konfigurasi service utama ${BRAND.shortName}.`}
                   />
                   <div className="acc-service-list">
                     {overview.system.services.map((service) => (
@@ -1938,7 +1939,7 @@ export default function AdminDashboard() {
               <section className="acc-panel">
                 <SectionHead
                   eyebrow="Peta jalan"
-                  title="Modul Nambah"
+                  title={`Modul ${BRAND.name}`}
                   copy="Fitur aktif dan pekerjaan yang sudah ada dalam roadmap production-ready."
                 />
                 <div className="acc-roadmap-grid">
@@ -1963,7 +1964,7 @@ export default function AdminDashboard() {
                     copy="Campaign CRUD, quota reservation, per-user limit, scheduling data, dan product targeting aktif."
                   />
                   <RoadmapCard
-                    title="Nambah Points"
+                    title="Lacte Points"
                     status="live"
                     copy="Saldo account, checkout redemption, success earning, customer ledger, dan admin monitoring aktif."
                   />
@@ -2247,7 +2248,7 @@ export default function AdminDashboard() {
               <div className="admin-catalog-card acc-catalog-card">
                 <div className="admin-table-head">
                   <span>Produk</span>
-                  <span>Harga Nambah</span>
+                  <span>Harga ${BRAND.shortName}</span>
                   <span>Digiflazz</span>
                   <span>Status</span>
                   <span />
@@ -2564,7 +2565,7 @@ export default function AdminDashboard() {
             <>
               <SectionHead
                 eyebrow="Loyalitas"
-                title="Nambah Points"
+                title="Lacte Points"
                 copy="Outstanding liability, reservation, FIFO lots, expiry, dan immutable ledger points."
                 action={
                   <button

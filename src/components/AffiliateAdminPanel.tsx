@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
 import { useConfirm } from "@/components/AdminConfirmDialog";
+import { BRAND } from "@/lib/brand";
 
 type AffiliatePayload = {
   stats: {
@@ -409,7 +410,7 @@ export default function AffiliateAdminPanel() {
               <span className="acc-eyebrow">Affiliate payout</span>
               <h1>Review dulu, bayar di luar sistem.</h1>
               <p>
-                Nambah mengunci commission allocation secara atomic. Transfer
+                ${BRAND.shortName} mengunci commission allocation secara atomic. Transfer
                 dana tetap dilakukan operator, lalu superadmin menandai request paid
                 dengan reference pembayaran.
               </p>
@@ -625,7 +626,7 @@ export default function AffiliateAdminPanel() {
             <div className="acc-section-head">
               <div>
                 <span className="acc-eyebrow">Ownership</span>
-                <h2>Hubungkan affiliate ke akun Nambah.</h2>
+                <h2>Hubungkan affiliate ke akun ${BRAND.shortName}.</h2>
                 <p>
                   Pilih user terdaftar. Satu akun hanya dapat
                   memiliki satu affiliate link.

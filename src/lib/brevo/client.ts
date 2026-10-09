@@ -1,3 +1,5 @@
+import { BRAND } from "@/lib/brand";
+
 const BREVO_EMAIL_URL = "https://api.brevo.com/v3/smtp/email";
 const BREVO_TIMEOUT_MS = 15_000;
 
@@ -34,7 +36,7 @@ export function isBrevoConfigured() {
 function requireBrevoConfig() {
   const apiKey = configured("BREVO_API_KEY");
   const senderEmail = configured("BREVO_SENDER_EMAIL");
-  const senderName = configured("BREVO_SENDER_NAME") || "Nambah";
+  const senderName = configured("BREVO_SENDER_NAME") || BRAND.name;
 
   if (!apiKey || !senderEmail) {
     throw new Error(

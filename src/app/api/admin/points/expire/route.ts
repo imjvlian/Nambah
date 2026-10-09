@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Admin Points expiry failed", error);
     return Response.json(
-      { error: "Expiry Nambah Points gagal dijalankan." },
+      { error: "Expiry Lacte Points gagal dijalankan." },
       { status: 502 },
     );
   }

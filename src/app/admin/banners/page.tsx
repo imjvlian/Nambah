@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import BannerAdminPanel from "@/components/BannerAdminPanel";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Promo Banners — Nambah Admin",
+  title: `Promo Banners — ${BRAND.name} Admin`,
   description: "Kelola banner promo carousel beranda.",
 };
 

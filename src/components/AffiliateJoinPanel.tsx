@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Formulir pendaftaran affiliate.
@@ -234,7 +235,7 @@ export default function AffiliateJoinPanel() {
         <div className="account-section-head">
           <div>
             <span className="eyebrow">Afiliasi</span>
-            <h2>Jadi afiliasi Nambah.</h2>
+            <h2>Jadi afiliasi ${BRAND.shortName}.</h2>
           </div>
         </div>
         <div className="affiliate-join-body">
@@ -276,7 +277,7 @@ export default function AffiliateJoinPanel() {
       <div className="account-section-head">
         <div>
           <span className="eyebrow">Afiliasi</span>
-          <h2>Jadi afiliasi Nambah.</h2>
+          <h2>Jadi afiliasi ${BRAND.shortName}.</h2>
         </div>
         {existing && (
           <span className={"affiliate-join-status tone-" + (statusInfo?.tone ?? "wait")}>
@@ -354,7 +355,7 @@ export default function AffiliateJoinPanel() {
           <>
             <p>
               Daftar sebagai afiliasi, dapat komisi dari setiap order yang kamu
-              arahkan ke Nambah. Rate komisinya ditentukan admin setelah
+              arahkan ke ${BRAND.shortName}. Rate komisinya ditentukan admin setelah
               pengajuan kamu ditinjau.
             </p>
             <form onSubmit={submit} className="affiliate-join-form">

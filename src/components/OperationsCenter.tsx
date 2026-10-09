@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { BRAND } from "@/lib/brand";
 
 type Payload = {
   checkedAt: string;
@@ -184,7 +185,7 @@ export default function OperationsCenter() {
                 <h2>Jalankan recovery secara eksplisit.</h2>
                 <p>
                   Gunakan reconciliation untuk memulihkan state yang tertunda.
-                  Semua action tetap mengikuti guard idempotency Nambah.
+                  Semua action tetap mengikuti guard idempotency ${BRAND.shortName}.
                 </p>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { supabaseSelect } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -141,7 +142,7 @@ const FAQ: Array<{ keywords: RegExp; answer: string }> = [
   {
     keywords: /\b(halo|hai|hi|hello|pagi|siang|sore|malam)\b/i,
     answer:
-      "Halo! Aku Nambah Assistant. Bisa bantu cek status order, info produk & harga, cara pembayaran, atau arahkan ke admin. Mau tanya apa?",
+      `Halo! Aku ${BRAND.shortName} Assistant. Bisa bantu cek status order, info produk & harga, cara pembayaran, atau arahkan ke admin. Mau tanya apa?`,
   },
   {
     keywords: /(cara|bagaimana).*(top ?up|isi|beli)|^top ?up/i,
@@ -184,7 +185,7 @@ async function fallbackReply(input: {
 
   if (/(status|cek|lacak).*(order|pesanan)|^nbh-|order saya/i.test(text)) {
     if (!input.userId) {
-      return "Untuk cek status order, login dulu ke akun Nambah kamu — setelah itu aku bisa bantu lihatkan status pesananmu. Atau buka langsung halaman order dari link yang kamu dapat setelah checkout.";
+      return `Untuk cek status order, login dulu ke akun ${BRAND.shortName} kamu — setelah itu aku bisa bantu lihatkan status pesananmu. Atau buka langsung halaman order dari link yang kamu dapat setelah checkout.`;
     }
     const ordersContext = await buildUserOrdersContext(input.userId);
     return ordersContext.startsWith("(")
@@ -218,11 +219,11 @@ function buildSystemPrompt(input: {
   loggedIn: boolean;
 }) {
   return [
-    "Kamu adalah Nambah Assistant, customer service digital untuk Nambah — platform top up game, pulsa, dan e-money di Indonesia.",
+    `Kamu adalah ${BRAND.shortName} Assistant, customer service digital untuk ${BRAND.name} — platform top up game, pulsa, dan e-money di Indonesia.`,
     "",
     "Aturan wajib:",
     "- Jawab dalam Bahasa Indonesia yang ramah dan ringkas (idealnya maksimal 4 kalimat).",
-    "- Hanya bahas layanan Nambah: produk, harga, cara top up, status order, pembayaran, promo.",
+    `- Hanya bahas layanan ${BRAND.shortName}: produk, harga, cara top up, status order, pembayaran, promo.`,
     "- JANGAN pernah menyebut nama supplier, penyedia pembayaran internal, biaya modal, profit, atau detail teknis backend.",
     "- Jangan mengarang nomor order atau status. Gunakan hanya data konteks di bawah. Kalau user menanyakan order yang tidak ada di konteks, minta nomor ordernya dan jelaskan status hanya bisa dicek untuk order miliknya sendiri.",
     "- Kalau user tanya di luar topik layanan, arahkan kembali dengan sopan.",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BRAND } from "@/lib/brand";
 
 type Banner = {
   id: number;
@@ -150,7 +151,7 @@ export default function PromoBannerCarousel() {
           ) : (
             <article className="promo-slide promo-slide-generic">
               <div className="promo-slide-copy">
-                <span className="promo-slide-eyebrow">Nambah</span>
+                <span className="promo-slide-eyebrow">{BRAND.shortName}</span>
                 <strong>{slide.title}</strong>
                 <p>{slide.copy}</p>
               </div>

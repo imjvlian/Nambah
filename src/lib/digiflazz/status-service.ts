@@ -351,7 +351,7 @@ export async function applyDigiflazzTransactionStatus(
     await syncOrderPointsLifecycle(order.id, latestOrder.status);
   } catch (error) {
     console.error(
-      `Nambah Points callback sync failed for order ${order.id}`,
+      `Lacte Points callback sync failed for order ${order.id}`,
       error,
     );
   }

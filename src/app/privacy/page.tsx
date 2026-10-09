@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Kebijakan Privasi — Nambah",
+  title: `Kebijakan Privasi — ${BRAND.name}`,
   description:
-    "Bagaimana Nambah mengumpulkan, menggunakan, dan melindungi data pribadi kamu.",
+    `Bagaimana ${BRAND.name} mengumpulkan, menggunakan, dan melindungi data pribadi kamu.`,
 };
 
 export default function PrivacyPage() {
@@ -16,9 +17,9 @@ export default function PrivacyPage() {
     >
       <section>
         <p>
-          Kebijakan Privasi ini menjelaskan bagaimana Nambah (&ldquo;kami&rdquo;)
+          Kebijakan Privasi ini menjelaskan bagaimana ${BRAND.name} (&ldquo;kami&rdquo;)
           mengumpulkan, menggunakan, menyimpan, dan melindungi data pribadi kamu
-          saat menggunakan layanan top up digital di situs Nambah. Dengan
+          saat menggunakan layanan top up digital di situs ${BRAND.shortName}. Dengan
           menggunakan layanan kami, kamu menyetujui praktik yang dijelaskan di
           dokumen ini.
         </p>

@@ -368,7 +368,7 @@ async function finalizeOrder(
   try {
     await syncOrderPointsLifecycle(orderId, status);
   } catch (error) {
-    console.error(`Nambah Points finalization failed for order ${orderId}`, error);
+    console.error(`Lacte Points finalization failed for order ${orderId}`, error);
   }
 
   try {
@@ -425,7 +425,7 @@ async function syncExistingTerminalTransaction(
       try {
         await syncOrderPointsLifecycle(order.id, "success");
       } catch (error) {
-        console.error(`Nambah Points resync failed for order ${order.id}`, error);
+        console.error(`Lacte Points resync failed for order ${order.id}`, error);
       }
       await tryDeliverReceipt(order.id);
     }

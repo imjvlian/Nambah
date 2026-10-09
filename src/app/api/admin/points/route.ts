@@ -112,9 +112,9 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error) {
-    console.error("Admin Nambah Points failed", error);
+    console.error("Admin Lacte Points failed", error);
     return Response.json(
-      { error: "Data Nambah Points tidak dapat dimuat." },
+      { error: "Data Lacte Points tidak dapat dimuat." },
       { status: 502 },
     );
   }

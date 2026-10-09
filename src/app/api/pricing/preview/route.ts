@@ -92,7 +92,7 @@ export async function POST(request: Request) {
   if (pointsRequest.points > 0) {
     if (!auth.user || !pointsSummary) {
       return Response.json(
-        { error: "Login diperlukan untuk menggunakan Nambah Points." },
+        { error: "Login diperlukan untuk menggunakan Lacte Points." },
         { status: 401, headers },
       );
     }
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       return Response.json(
         {
           error:
-            "Nambah Points tersedia hanya " +
+            "Lacte Points tersedia hanya " +
             pointsSummary.available +
             " points.",
           points: pointsSummary,
@@ -124,8 +124,8 @@ export async function POST(request: Request) {
             maxPoints > 0
               ? "Maksimum penggunaan untuk transaksi ini adalah " +
                 maxPoints +
-                " Nambah Points."
-              : "Nambah Points belum dapat digunakan pada transaksi ini.",
+                " Lacte Points."
+              : "Lacte Points belum dapat digunakan pada transaksi ini.",
           points: pointsSummary,
         },
         { status: 409, headers },

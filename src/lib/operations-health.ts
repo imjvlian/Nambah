@@ -1,6 +1,7 @@
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { notifyOrderStuck } from "@/lib/telegram-alerts";
 import { supabaseSelect, supabaseUpsert, supabaseUpdate } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 type Source = "admin" | "cron";
 type Severity = "info" | "warning" | "critical";
@@ -140,7 +141,7 @@ export async function getOperationsHealth(input?: { source?: Source }) {
         notificationDue(previous?.last_notified_at ?? null)) {
       try {
         await sendTelegramMessage(
-          ["Nambah Operations", item.title, item.detail].join("\n"),
+          ["{BRAND.name} Operations", item.title, item.detail].join("\n"),
           {
             kind: "ops",
             // Sejalan dengan cooldown 1 jam di `notificationDue`: satu incident

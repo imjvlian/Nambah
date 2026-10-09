@@ -56,7 +56,7 @@ const CUSTOMER_REJECTION_COPY: Record<
     `Referral ${code} tidak dapat digabung dengan promo ${otherCode}.`,
 
   points_exceed_subtotal: () =>
-    "Nambah Points yang dipilih melebihi nilai yang dapat dipotong. Kurangi jumlah points.",
+    "Lacte Points yang dipilih melebihi nilai yang dapat dipotong. Kurangi jumlah points.",
 };
 
 export function rejectionCodeCopy(

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { BRAND } from "@/lib/brand";
 
 type SupplierItem = {
   sku: string;
@@ -328,7 +329,7 @@ export default function DigiflazzCatalogBrowser() {
         );
       } else {
         setNotice(
-          `${succeededSkus.size} perubahan tersimpan. ${published} ditampilkan, ${hidden} disembunyikan${created ? `, ${created} produk Nambah dibuat baru` : ""}.`,
+          `${succeededSkus.size} perubahan tersimpan. ${published} ditampilkan, ${hidden} disembunyikan${created ? `, ${created} produk ${BRAND.shortName} dibuat baru` : ""}.`,
         );
       }
     } catch (error) {
@@ -391,9 +392,9 @@ export default function DigiflazzCatalogBrowser() {
   return (
     <main className="supplier-browser-shell">
       <header className="supplier-browser-header">
-        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>Nambah</span></Link>
+        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>{BRAND.shortName}</span></Link>
         <nav>
-          <Link href="/admin">Produk Nambah</Link>
+          <Link href="/admin">Produk {BRAND.shortName}</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>
         </nav>
       </header>
@@ -490,7 +491,7 @@ export default function DigiflazzCatalogBrowser() {
           </label>
 
           <label>
-            <span>Mapping Nambah</span>
+            <span>Mapping ${BRAND.shortName}</span>
             <select value={filters.mapping} onChange={(event) => changeFilter("mapping", event.target.value)}>
               <option value="all">Semua mapping</option>
               <option value="mapped">Sudah mapped</option>
@@ -623,7 +624,7 @@ export default function DigiflazzCatalogBrowser() {
                           ? "Tersimpan · tampil di katalog"
                           : item.mapping
                             ? "Tersimpan · disembunyikan"
-                            : "Belum dibuat di Nambah"}
+                            : `Belum dibuat di ${BRAND.shortName}`}
                     </small>
                   </span>
                 </label>

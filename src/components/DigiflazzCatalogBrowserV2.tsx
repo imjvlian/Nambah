@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import { BRAND } from "@/lib/brand";
 
 type SupplierItem = {
   sku: string;
@@ -357,7 +358,7 @@ export default function DigiflazzCatalogBrowserV2() {
         setNotice(`${succeededSkus.size} perubahan tersimpan, ${failures.length} gagal. ${preview}`);
       } else {
         setNotice(
-          `${succeededSkus.size} perubahan tersimpan. ${publishedCount} ditampilkan, ${hiddenCount} disembunyikan${createdCount ? `, ${createdCount} produk Nambah dibuat baru` : ""}.`,
+          `${succeededSkus.size} perubahan tersimpan. ${publishedCount} ditampilkan, ${hiddenCount} disembunyikan${createdCount ? `, ${createdCount} produk ${BRAND.shortName} dibuat baru` : ""}.`,
         );
       }
     } catch (error) {
@@ -403,9 +404,9 @@ export default function DigiflazzCatalogBrowserV2() {
   return (
     <main className="supplier-browser-shell clean-catalog">
       <header className="supplier-browser-header">
-        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>Nambah</span></Link>
+        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>{BRAND.shortName}</span></Link>
         <nav>
-          <Link href="/admin">Produk Nambah</Link>
+          <Link href="/admin">Produk {BRAND.shortName}</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>
         </nav>
       </header>
@@ -602,7 +603,7 @@ export default function DigiflazzCatalogBrowserV2() {
                           ? "Tersimpan · tampil di katalog"
                           : item.mapping
                             ? "Tersimpan · disembunyikan"
-                            : "Belum dibuat di Nambah"}
+                            : `Belum dibuat di ${BRAND.shortName}`}
                     </small>
                   </span>
                 </label>

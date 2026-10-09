@@ -15,9 +15,9 @@ export async function GET(request: Request) {
       pointsExpired: result?.pointsExpired ?? 0,
     });
   } catch (error) {
-    console.error("Nambah Points expiry cron failed", error);
+    console.error("Lacte Points expiry cron failed", error);
     return Response.json(
-      { error: "Nambah Points expiry cron gagal." },
+      { error: "Lacte Points expiry cron gagal." },
       { status: 502 },
     );
   }

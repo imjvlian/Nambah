@@ -2,6 +2,7 @@ import { getDigiflazzBalance } from "@/lib/digiflazz/client";
 import { formatIDR } from "@/lib/pricing";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
+import { BRAND } from "@/lib/brand";
 
 export type SupplierBalanceStatus = "healthy" | "low" | "critical";
 export type SupplierBalanceCheckSource = "manual" | "periodic" | "transaction";
@@ -56,7 +57,7 @@ function buildAlertMessage(input: {
         : "Saldo Digiflazz rendah";
 
   return [
-    `${icon} Nambah — ${title}`,
+    `${icon} ${BRAND.name} — ${title}`,
     "",
     `Status: ${statusLabel(input.status)}`,
     input.previousStatus ? `Sebelumnya: ${input.previousStatus.toUpperCase()}` : null,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -346,7 +347,7 @@ export async function GET(request: Request) {
   const name = (url.searchParams.get("name") ?? "").trim().slice(0, 100);
 
   if (!name) {
-    return new NextResponse(fallbackSvg("Nambah"), {
+    return new NextResponse(fallbackSvg(BRAND.name), {
       headers: {
         "Content-Type": "image/svg+xml; charset=utf-8",
         "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,

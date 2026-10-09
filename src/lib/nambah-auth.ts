@@ -1,3 +1,5 @@
+import { BRAND } from "@/lib/brand";
+
 const ACCESS_COOKIE = "nambah_auth_access";
 const REFRESH_COOKIE = "nambah_auth_refresh";
 const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -69,7 +71,7 @@ function requireAuthConfig() {
   const config = getAuthConfig();
   if (!config.url || !config.publishableKey) {
     throw new NambahAuthError(
-      "Supabase Auth Nambah belum dikonfigurasi.",
+      "Supabase Auth {BRAND.shortName} belum dikonfigurasi.",
       503,
       "auth_not_configured",
     );
@@ -385,7 +387,7 @@ export function publicNambahUser(user: NambahAuthUser) {
     displayName:
       metadataName ||
       user.email?.split("@")[0] ||
-      "Pengguna Nambah",
+      `Pengguna ${BRAND.shortName}`,
     emailConfirmed: Boolean(user.email_confirmed_at),
     createdAt: user.created_at ?? null,
   };

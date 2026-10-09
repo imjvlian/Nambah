@@ -23,6 +23,8 @@ import {
   calculateCountdown,
 } from "@/lib/order-status";
 
+import { BRAND } from "@/lib/brand";
+
 type SnapCallbacks = {
   onSuccess?: (result: unknown) => void;
   onPending?: (result: unknown) => void;
@@ -155,11 +157,11 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return {
       language: "id",
       onSuccess: () => {
-        setNotice("Pembayaran selesai. Nambah sedang memverifikasi pembayaran...");
+        setNotice(`Pembayaran selesai. ${BRAND.shortName} sedang memverifikasi pembayaran...`);
         void refreshStatus(id);
       },
       onPending: () => {
-        setNotice("Pembayaran masih pending. Nambah sedang memverifikasi status...");
+        setNotice(`Pembayaran masih pending. ${BRAND.shortName} sedang memverifikasi status...`);
         void refreshStatus(id);
       },
       onError: () => {
@@ -451,7 +453,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     const url = `${window.location.origin}/order/${encodeURIComponent(order.id)}?access_token=${encodeURIComponent(accessToken)}`;
 
     if (navigator.share) {
-      void navigator.share({ title: "Order Nambah", text: `Order ${order.id}`, url });
+      void navigator.share({ title: `Order ${BRAND.shortName}`, text: `Order ${order.id}`, url });
       return;
     }
 
@@ -466,7 +468,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         <SiteHeader className="order-header">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-            <span>Nambah</span>
+            <span>{BRAND.shortName}</span>
           </Link>
           <div className="header-actions">
             <AccountNav />
@@ -485,7 +487,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         <SiteHeader className="order-header">
           <Link className="brand" href="/">
             <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-            <span>Nambah</span>
+            <span>{BRAND.shortName}</span>
           </Link>
           <div className="header-actions">
             <AccountNav />
@@ -606,7 +608,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       <SiteHeader className="order-header">
         <Link className="brand" href="/">
           <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-          <span>Nambah</span>
+          <span>{BRAND.shortName}</span>
         </Link>
         <div className="order-header-center">Status pesanan</div>
         <div className="header-actions">
@@ -735,7 +737,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>Diverifikasi Nambah</span>
+                  <span>Diverifikasi ${BRAND.shortName}</span>
                 </div>
 
                 {dokuQrContent ? (
@@ -775,7 +777,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>Diverifikasi Nambah</span>
+                  <span>Diverifikasi ${BRAND.shortName}</span>
                 </div>
 
                 {!midtransClientKey && (
@@ -853,7 +855,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <div className="referral-saving"><span>Referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
               )}
               {pricing.pointsDiscount > 0 && (
-                <div className="points-saving"><span>Nambah Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+                <div className="points-saving"><span>Lacte Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
               )}
               {pricing.pointsEarned > 0 && (
                 <div className="points-earned"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>

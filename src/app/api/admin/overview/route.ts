@@ -8,6 +8,7 @@ import {
   supabaseSelect,
   supabaseSelectPage,
 } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database Nambah belum dikonfigurasi." },
+      { error: "Database {BRAND.shortName} belum dikonfigurasi." },
       { status: 503 },
     );
   }

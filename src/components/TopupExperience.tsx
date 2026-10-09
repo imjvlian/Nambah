@@ -18,6 +18,7 @@ import {
   createPublicPricingFallback,
   type PublicPricingResult,
 } from "@/lib/public-pricing";
+import { BRAND } from "@/lib/brand";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
@@ -453,11 +454,11 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               setPointsError("");
             } else {
               setPointsError(
-                pointsData.error ?? "Nambah Points belum dapat dimuat.",
+                pointsData.error ?? "Lacte Points belum dapat dimuat.",
               );
             }
           } catch {
-            if (mounted) setPointsError("Nambah Points belum dapat dimuat.");
+            if (mounted) setPointsError("Lacte Points belum dapat dimuat.");
           } finally {
             if (mounted) setPointsLoading(false);
           }
@@ -1324,11 +1325,11 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
             <div className="form-label">
               <span className="step-number">N+</span>
               <div>
-                <strong>Nambah Points</strong>
+                <strong>Lacte Points</strong>
                 <small>
                   {viewerState === "authenticated"
                     ? "Gunakan points sebagai potongan. Points baru didapat setelah transaksi berhasil."
-                    : "Login untuk mengumpulkan dan menggunakan Nambah Points."}
+                    : "Login untuk mengumpulkan dan menggunakan Lacte Points."}
                 </small>
               </div>
             </div>
@@ -1379,7 +1380,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                           setPointsError("");
                           setPointsToRedeem(Number(event.target.value));
                         }}
-                        aria-label="Nambah Points yang digunakan"
+                        aria-label="Lacte Points yang digunakan"
                       />
                       <div className="points-redeem-actions">
                         <span>
@@ -1401,14 +1402,14 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 </div>
               ) : (
                 <p className="inline-message warning">
-                  {pointsError || "Nambah Points belum dapat dimuat."}
+                  {pointsError || "Lacte Points belum dapat dimuat."}
                 </p>
               )
             ) : (
               <div className="points-guest-callout">
                 <span>N+</span>
                 <p>
-                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk ke akun Nambah sebelum checkout untuk mulai mengumpulkan points.
+                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk ke akun ${BRAND.shortName} sebelum checkout untuk mulai mengumpulkan points.
                 </p>
               </div>
             )}
@@ -1442,7 +1443,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 {pricing.referenceDiscountPercent > 0 && <span>-{pricing.referenceDiscountPercent}%</span>}
               </div>
             </div>
-            <div className="summary-line"><span>Harga Nambah</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
+            <div className="summary-line"><span>Harga {BRAND.shortName}</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
             {pricing.promotionDiscount > 0 && (
               <div className="summary-line discount"><span>Promo {pricing.promoCode}</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
             )}
@@ -1450,7 +1451,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
             )}
             {pricing.pointsDiscount > 0 && (
-              <div className="summary-line points-benefit"><span>Nambah Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+              <div className="summary-line points-benefit"><span>Lacte Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
             )}
             {viewerState === "authenticated" && pricing.pointsEarned > 0 && (
               <div className="summary-line points-earn"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
@@ -1538,7 +1539,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   )}
                   {pointsToRedeem > 0 && (
                     <div className="checkout-confirm-row">
-                      <span>Nambah Points</span>
+                      <span>Lacte Points</span>
                       <strong>{pointsToRedeem.toLocaleString("id-ID")} pts</strong>
                     </div>
                   )}
@@ -1546,7 +1547,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
                 <div className="checkout-confirm-totals">
                   <div className="summary-line">
-                    <span>Harga Nambah</span>
+                    <span>Harga {BRAND.shortName}</span>
                     <strong>{formatIDR(pricing.sellingPrice)}</strong>
                   </div>
                   {pricing.promotionDiscount > 0 && (
@@ -1556,7 +1557,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
                   )}
                   {pricing.pointsDiscount > 0 && (
-                    <div className="summary-line points-benefit"><span>Nambah Points</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+                    <div className="summary-line points-benefit"><span>Lacte Points</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
                   )}
                   <div className="summary-line">
                     <span>Biaya pembayaran</span>

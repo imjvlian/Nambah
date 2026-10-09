@@ -87,7 +87,7 @@ export function validateRequestedPoints(points: unknown) {
   if (!Number.isInteger(parsed) || parsed < 0) {
     return {
       ok: false as const,
-      error: "Nambah Points yang digunakan tidak valid.",
+      error: "Lacte Points yang digunakan tidak valid.",
     };
   }
 
@@ -96,14 +96,14 @@ export function validateRequestedPoints(points: unknown) {
   if (parsed < POINT_MIN_REDEEM) {
     return {
       ok: false as const,
-      error: `Minimum penggunaan Nambah Points adalah ${POINT_MIN_REDEEM} points.`,
+      error: `Minimum penggunaan Lacte Points adalah ${POINT_MIN_REDEEM} points.`,
     };
   }
 
   if (parsed % POINT_REDEEM_STEP !== 0) {
     return {
       ok: false as const,
-      error: `Nambah Points harus digunakan dalam kelipatan ${POINT_REDEEM_STEP} points.`,
+      error: `Lacte Points harus digunakan dalam kelipatan ${POINT_REDEEM_STEP} points.`,
     };
   }
 

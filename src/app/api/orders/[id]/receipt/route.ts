@@ -19,6 +19,7 @@ import {
   isBrevoReceiptEnabled,
 } from "@/lib/brevo/client";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,7 @@ export async function GET(
 ) {
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database Nambah belum dikonfigurasi." },
+      { error: "Database {BRAND.shortName} belum dikonfigurasi." },
       { status: 503 },
     );
   }
@@ -108,7 +109,7 @@ export async function POST(
 ) {
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database Nambah belum dikonfigurasi." },
+      { error: "Database {BRAND.shortName} belum dikonfigurasi." },
       { status: 503 },
     );
   }

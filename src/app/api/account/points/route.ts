@@ -42,9 +42,9 @@ export async function GET(request: Request) {
       return Response.json({ error: error.message }, { status: error.status });
     }
 
-    console.error("Nambah Points account API failed", error);
+    console.error("Lacte Points account API failed", error);
     return Response.json(
-      { error: "Nambah Points belum dapat dimuat." },
+      { error: "Lacte Points belum dapat dimuat." },
       { status: 503 },
     );
   }

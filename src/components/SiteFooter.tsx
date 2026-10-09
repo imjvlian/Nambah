@@ -38,7 +38,7 @@ export default function SiteFooter() {
       </div>
 
       <div className="footer-bottom">
-        <span>© 2026 Nambah. Seluruh hak cipta dilindungi.</span>
+        <span>© 2026 ${BRAND.name}. Seluruh hak cipta dilindungi.</span>
         <span className="footer-bottom-note">Produk digital diproses otomatis setelah pembayaran terkonfirmasi.</span>
       </div>
     </footer>

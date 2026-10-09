@@ -32,6 +32,7 @@ import {
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
 import { isSupabaseConfigured, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Database Nambah belum dikonfigurasi untuk membuat order." },
+      { error: "Database {BRAND.shortName} belum dikonfigurasi untuk membuat order." },
       { status: 503 },
     );
   }
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
     receiptEmail = normalizeReceiptEmail(auth.user.email);
     if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
       return Response.json(
-        { error: "Email akun Nambah tidak tersedia untuk receipt." },
+        { error: "Email akun {BRAND.shortName} tidak tersedia untuk receipt." },
         { status: 409 },
       );
     }
@@ -235,7 +236,7 @@ export async function POST(request: Request) {
   if (pointsRequest.points > 0) {
     if (!auth.user) {
       return Response.json(
-        { error: "Login diperlukan untuk menggunakan Nambah Points." },
+        { error: "Login diperlukan untuk menggunakan Lacte Points." },
         { status: 401 },
       );
     }
@@ -243,7 +244,7 @@ export async function POST(request: Request) {
     const points = await getPointsSummary(auth.user.id);
     if (points.available < pointsRequest.points) {
       return Response.json(
-        { error: `Nambah Points tersedia hanya ${points.available} points.` },
+        { error: `Lacte Points tersedia hanya ${points.available} points.` },
         { status: 409 },
       );
     }
@@ -260,8 +261,8 @@ export async function POST(request: Request) {
         {
           error:
             maxPoints > 0
-              ? `Maksimum penggunaan untuk transaksi ini adalah ${maxPoints} Nambah Points.`
-              : "Nambah Points belum dapat digunakan pada transaksi ini.",
+              ? `Maksimum penggunaan untuk transaksi ini adalah ${maxPoints} Lacte Points.`
+              : "Lacte Points belum dapat digunakan pada transaksi ini.",
         },
         { status: 409 },
       );
@@ -355,8 +356,8 @@ export async function POST(request: Request) {
         await cancelOrderWithCleanup(orderId, "points_reservation_failed");
         throw new Error(
           error instanceof Error
-            ? `Nambah Points gagal direservasi: ${error.message}`
-            : "Nambah Points gagal direservasi.",
+            ? `Lacte Points gagal direservasi: ${error.message}`
+            : "Lacte Points gagal direservasi.",
         );
       }
     }

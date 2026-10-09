@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Kebijakan Pengembalian Dana — Nambah",
+  title: `Kebijakan Pengembalian Dana — ${BRAND.name}`,
   description:
-    "Ketentuan pengembalian dana (refund) untuk transaksi di Nambah.",
+    `Ketentuan pengembalian dana (refund) untuk transaksi di ${BRAND.shortName}.`,
 };
 
 export default function RefundPage() {
@@ -18,7 +19,7 @@ export default function RefundPage() {
         <p>
           Kebijakan ini menjelaskan kapan dana kamu dapat dikembalikan dan
           bagaimana prosesnya. Dokumen ini merupakan bagian dari{" "}
-          <a href="/terms">Ketentuan Layanan</a> Nambah.
+          <a href="/terms">Ketentuan Layanan</a> {BRAND.shortName}.
         </p>
       </section>
 

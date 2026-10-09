@@ -1,4 +1,5 @@
 import type { PublicOrderStatus } from "./order-public";
+import { BRAND } from "@/lib/brand";
 
 /** Customer-facing status copy and CTA definitions */
 export const STATUS_LABEL: Record<PublicOrderStatus, string> = {
@@ -16,7 +17,7 @@ export const STATUS_DESCRIPTION: Record<PublicOrderStatus, string> = {
     "Silakan selesaikan pembayaran di bawah. Order akan kedaluwarsa dalam 30 menit.",
   paid: "Pembayaran Anda telah diterima dan sedang diverifikasi.",
   processing: "Pesanan Anda sedang diteruskan ke penyedia layanan.",
-  success: "Top up telah berhasil diproses. Terima kasih telah menggunakan Nambah.",
+  success: `Top up telah berhasil diproses. Terima kasih telah menggunakan ${BRAND.shortName}.`,
   failed: "Pembayaran gagal atau ditolak. Anda dapat membuat pesanan baru.",
   refunded: "Pembayaran telah dikembalikan ke sumber dana asli.",
   cancelled: "Pembayaran dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.",

@@ -16,6 +16,7 @@ import {
   supabaseUpsert,
 } from "@/lib/supabase/server";
 import { gameDisplayName } from "@/lib/game-display-name";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Digest harian ke Telegram.
@@ -270,10 +271,10 @@ export async function buildDailyDigest(dateKey: string): Promise<DailyDigest> {
 export function formatDailyDigest(digest: DailyDigest) {
   const label = formatWibDateLabel(digest.dateKey);
   const lines: string[] = [
-    `<b>Digest Harian Nambah</b> — ${escapeTelegramHtml(label)}`,
+    `<b>Digest Harian {BRAND.name}</b> — ${escapeTelegramHtml(label)}`,
     "",
     `Omzet: ${escapeTelegramHtml(rupiah(digest.totals.revenue))}`,
-    `Profit Nambah: ${escapeTelegramHtml(rupiah(digest.totals.profit))}`,
+    `Profit {BRAND.shortName}: ${escapeTelegramHtml(rupiah(digest.totals.profit))}`,
     `Modal supplier: ${escapeTelegramHtml(rupiah(digest.totals.supplierCost))}`,
     `Order sukses: ${digest.totals.successful} dari ${digest.totals.created} dibuat`,
     "",

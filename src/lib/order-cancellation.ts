@@ -39,7 +39,7 @@ export async function releaseOrderReservations(orderId: string) {
 
   results.forEach((result, index) => {
     if (result.status === "rejected") {
-      const subsystem = index === 0 ? "Nambah Points" : "promo";
+      const subsystem = index === 0 ? "Lacte Points" : "promo";
       console.error(
         `${subsystem} release failed for order ${orderId}`,
         result.reason,

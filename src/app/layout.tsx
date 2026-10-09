@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   title: `${BRAND.name} — ${BRAND.tagline}`,
   description: BRAND.description,
   applicationName: BRAND.name,
-  keywords: ["top up game", "voucher digital", "pulsa", "Nambah"],
+  keywords: ["top up game", "voucher digital", "pulsa", BRAND.shortName, BRAND.name],
   themeColor: BRAND.themeColor,
   manifest: "/manifest.json",
   icons: {

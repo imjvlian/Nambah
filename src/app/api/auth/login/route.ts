@@ -5,6 +5,7 @@ import {
   signInNambah,
 } from "@/lib/nambah-auth";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       const message = /invalid login credentials/i.test(error.message)
         ? "Email atau password salah."
         : /email not confirmed/i.test(error.message)
-          ? "Email belum dikonfirmasi. Buka email dari Nambah lalu coba login lagi."
+          ? `Email belum dikonfirmasi. Buka email dari ${BRAND.shortName} lalu coba login lagi.`
           : error.message;
       return Response.json(
         { error: message },

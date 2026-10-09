@@ -4,12 +4,13 @@ import {
 } from "@/lib/midtrans/client";
 import { applyMidtransStatus } from "@/lib/order-service";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
-    return Response.json({ error: "Database Nambah belum dikonfigurasi." }, { status: 503 });
+    return Response.json({ error: "Database {BRAND.shortName} belum dikonfigurasi." }, { status: 503 });
   }
 
   let payload: MidtransStatusPayload;

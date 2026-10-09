@@ -3,6 +3,7 @@ import {
   supabaseSelect,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 
 type FinancialOrderRow = {
   id: string;
@@ -190,7 +191,7 @@ export async function reconcileOrderFinancial(
     issues.push({
       code: "nambah_profit_mismatch",
       severity: "error",
-      message: "Nambah profit frozen tidak cocok.",
+      message: "{BRAND.shortName} profit frozen tidak cocok.",
       expected: expectedNambahProfit,
       actual: n(order.nambah_profit),
     });

@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   try {
     const result = await sendTelegramMessage(
       [
-        "<b>Nambah — Telegram aktif.</b>",
+        "<b>{BRAND.name} — Telegram aktif.</b>",
         "",
         "Notifikasi yang dikirim dari sini:",
         "  • saldo Digiflazz saat status berubah",

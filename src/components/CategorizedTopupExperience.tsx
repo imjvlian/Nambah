@@ -267,7 +267,7 @@ export default function CategorizedTopupExperience({
         <div className="home-search-heading">
           <div>
             <span className="eyebrow">Cari produk</span>
-            <strong>Mau Nambah apa?</strong>
+            <strong>Mau top up apa?</strong>
           </div>
           <span>{games.length} produk tersedia</span>
         </div>

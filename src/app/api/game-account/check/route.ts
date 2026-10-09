@@ -11,6 +11,7 @@ import {
   resolveVolseverRoute,
 } from "@/lib/volsever/games";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
 
@@ -236,7 +237,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: "Konfigurasi database Nambah belum lengkap." },
+      { error: "Konfigurasi database {BRAND.shortName} belum lengkap." },
       { status: 503 },
     );
   }
@@ -446,7 +447,7 @@ export async function POST(request: Request) {
       {
         error: volseverUnavailable
           ? "Volsever sedang tidak tersedia dan fallback checker belum dikonfigurasi. Checkout tetap bisa dilanjutkan."
-          : "Volsever belum dikonfigurasi. Tambahkan VOLSEVER_API_KEY di server Nambah.",
+          : "Volsever belum dikonfigurasi. Tambahkan VOLSEVER_API_KEY di server {BRAND.shortName}.",
         retryable: volseverUnavailable,
         source: "volsever",
       },

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { BRAND } from "@/lib/brand";
 
 type AuthMode = "login" | "register";
 
@@ -72,7 +73,7 @@ export default function AuthForm({
 
       window.location.href = safeNext(nextPath);
     } catch {
-      setError("Tidak dapat terhubung ke server akun Nambah.");
+      setError(`Tidak dapat terhubung ke server akun ${BRAND.shortName}.`);
     } finally {
       setBusy(false);
     }
@@ -82,7 +83,7 @@ export default function AuthForm({
     <form className="auth-card" onSubmit={submit}>
       <div className="auth-card-head">
         <span className="eyebrow">{isRegister ? "Daftar" : "Masuk"}</span>
-        <h1>{isRegister ? "Buat akun Nambah." : "Selamat datang lagi."}</h1>
+        <h1>{isRegister ? `Buat akun ${BRAND.shortName}.` : "Selamat datang lagi."}</h1>
         <p>
           {isRegister
             ? "Simpan riwayat transaksi dan buka status pesanan dari satu akun."

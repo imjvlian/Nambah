@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import LegalShell from "@/components/LegalShell";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Ketentuan Layanan — Nambah",
+  title: `Ketentuan Layanan — ${BRAND.name}`,
   description:
-    "Syarat dan ketentuan penggunaan layanan top up digital Nambah.",
+    `Syarat dan ketentuan penggunaan layanan top up digital ${BRAND.shortName}.`,
 };
 
 export default function TermsPage() {
@@ -16,7 +17,7 @@ export default function TermsPage() {
     >
       <section>
         <p>
-          Ketentuan Layanan ini mengatur penggunaan situs dan layanan Nambah
+          Ketentuan Layanan ini mengatur penggunaan situs dan layanan ${BRAND.shortName}
           (&ldquo;Layanan&rdquo;). Dengan mengakses atau menggunakan Layanan, kamu
           menyatakan telah membaca, memahami, dan menyetujui ketentuan ini.
         </p>
@@ -25,7 +26,7 @@ export default function TermsPage() {
       <section>
         <h2>1. Tentang layanan</h2>
         <p>
-          Nambah adalah platform penjualan produk digital — termasuk top up
+          {BRAND.name} adalah platform penjualan produk digital — termasuk top up
           game, pulsa, paket data, voucher, dan pembayaran tagihan — yang
           diproses secara otomatis setelah pembayaran terkonfirmasi. Produk
           digital dikirimkan oleh penyedia produk pihak ketiga atas pesanan kamu.
@@ -105,7 +106,7 @@ export default function TermsPage() {
           <li>Aktivitas penipuan, pencucian uang, atau pelanggaran hukum.</li>
           <li>Mengganggu, membobol, atau membebani sistem secara tidak wajar.</li>
           <li>Menyalahgunakan celah harga, promo, atau sistem referral.</li>
-          <li>Menjual kembali akses akun Nambah kamu kepada pihak lain.</li>
+          <li>Menjual kembali akses akun ${BRAND.shortName} kamu kepada pihak lain.</li>
         </ul>
       </section>
 

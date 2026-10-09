@@ -320,7 +320,7 @@ export async function applyMidtransStatus(
   } catch (error) {
     // Payment truth must not be rolled back by a loyalty subsystem issue.
     // Repeated status checks and fulfillment finalization will retry idempotently.
-    console.error(`Nambah Points lifecycle sync failed for order ${orderId}`, error);
+    console.error(`Lacte Points lifecycle sync failed for order ${orderId}`, error);
   }
 
   try {
@@ -503,7 +503,7 @@ export async function applyDokuStatus(
   try {
     await syncOrderPointsLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Nambah Points lifecycle sync failed for order ${orderId}`, error);
+    console.error(`Lacte Points lifecycle sync failed for order ${orderId}`, error);
   }
   try {
     await syncOrderCommissionLifecycle(orderId, orderStatus);
