@@ -48,6 +48,31 @@
   gap: 4px;
 }
 
+/* Sebelas seksi dikelompokkan menjadi empat agar urutannya menunjukkan alur
+ * kerja operator: cek yang masuk hari ini, lalu yang bermasalah, lalu sisanya.
+ *
+ * `gap: 4px` di `.acc-nav` tetap berlaku antar-tombol; jarak antar-kelompok
+ * diberi oleh margin di bawah. Tanpa ini, label grup akan menempel pada
+ * tombol terakhir grup sebelumnya dan terbaca sebagai bagian dari tombol itu. */
+.acc-nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.acc-nav-group + .acc-nav-group {
+  margin-top: 16px;
+}
+
+.acc-nav-group-label {
+  padding: 0 10px 4px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 .acc-nav button {
   width: 100%;
   min-height: 42px;

@@ -465,6 +465,171 @@
   color: #dea5a5;
 }
 
+/* ── Dashboard akun: tab, tone status, konteks waktu ─────────────────────
+ *
+ * Kelas `status-*` di atas dipakai dashboard lama dan tidak diubah, supaya
+ * `/order/[id]` yang menata status dengan gaya serupa tidak ikut berganti.
+ * Dashboard `/account` sekarang memakai `tone-*` supaya warna berasal dari
+ * `statusTone()` di `@/lib/order-status-display` — satu sumber untuk dua
+ * dashboard, bukan daftar warna yang ditulis ulang per layar.
+ */
+
+.account-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.account-tabs button {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel, rgba(255, 255, 255, 0.015));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.account-tabs button:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.account-tabs button.active {
+  border-color: rgba(201, 255, 63, 0.34);
+  background: rgba(201, 255, 63, 0.05);
+}
+
+.account-tabs b {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.account-tabs small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.account-tabs button.active small {
+  color: #9fa69b;
+}
+
+.account-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(120, 167, 255, 0.14);
+  color: #aec7f5;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* Order yang sedang berjalan: dikelompokkan di atas riwayat selesai, dengan
+   nada lebih tegas supaya kelihatan tanpa harus menggulir. */
+.account-orders-open {
+  padding: 22px 22px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-orders-open-title {
+  font-size: 13px;
+}
+
+.account-orders-open p {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.account-orders-closed > summary {
+  padding: 18px 26px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.account-orders-closed > summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-orders-closed > summary::before {
+  content: "▸ ";
+}
+
+.account-orders-closed[open] > summary::before {
+  content: "▾ ";
+}
+
+.account-orders-closed > summary:hover {
+  color: #9fa69b;
+}
+
+.account-order-row.tone-busy {
+  background: rgba(120, 167, 255, 0.035);
+}
+
+.account-order-status.tone-done {
+  border-color: rgba(201, 255, 63, 0.2);
+  background: rgba(201, 255, 63, 0.05);
+  color: var(--lime);
+}
+
+.account-order-status.tone-busy {
+  border-color: rgba(120, 167, 255, 0.18);
+  background: rgba(120, 167, 255, 0.05);
+  color: #aec7f5;
+}
+
+.account-order-status.tone-bad {
+  border-color: rgba(231, 106, 106, 0.24);
+  color: #dea5a5;
+}
+
+.account-order-status.tone-wait {
+  border-color: var(--line);
+  color: #acb2a8;
+}
+
+.account-order-status b {
+  display: block;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.account-order-hint {
+  display: block;
+  max-width: 190px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.account-order-elapsed {
+  color: #aec7f5;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .account-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 @media (max-width: 900px) {
   .auth-shell {
     grid-template-columns: 1fr;

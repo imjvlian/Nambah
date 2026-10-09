@@ -7,6 +7,7 @@ import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
 import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 import { useConfirm } from "@/components/AdminConfirmDialog";
+import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
 
 type AdminSection =
   | "overview"
@@ -321,29 +322,42 @@ const NAV: Array<{
   id: AdminSection;
   label: string;
   short: string;
+  group: string;
 }> = [
-  { id: "overview", label: "Overview", short: "OV" },
-  { id: "orders", label: "Orders", short: "OR" },
-  { id: "catalog", label: "Catalog", short: "CA" },
-  { id: "supplier", label: "Supplier", short: "SU" },
-  { id: "receipts", label: "Receipts", short: "RE" },
-  { id: "points", label: "Nambah Points", short: "NP" },
-  { id: "finance", label: "Finance", short: "FI" },
-  { id: "promotions", label: "Promotions", short: "PR" },
-  { id: "affiliates", label: "Affiliates", short: "AF" },
-  { id: "users", label: "Users", short: "US" },
-  { id: "system", label: "System", short: "SY" },
+  { id: "overview", label: "Ringkasan", short: "OV", group: "Harian" },
+  { id: "orders", label: "Pesanan", short: "PE", group: "Harian" },
+  { id: "receipts", label: "Bukti Transfer", short: "BT", group: "Harian" },
+  { id: "catalog", label: "Katalog", short: "KA", group: "Katalog" },
+  { id: "supplier", label: "Supplier", short: "SU", group: "Katalog" },
+  { id: "promotions", label: "Promo", short: "PR", group: "Katalog" },
+  { id: "finance", label: "Keuangan", short: "KE", group: "Keuangan" },
+  { id: "points", label: "Nambah Points", short: "NP", group: "Keuangan" },
+  { id: "affiliates", label: "Afiliasi", short: "AF", group: "Keuangan" },
+  { id: "users", label: "Pengguna", short: "PE", group: "Sistem" },
+  { id: "system", label: "Sistem", short: "SY", group: "Sistem" },
 ];
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_payment: "Pending payment",
-  paid: "Paid",
-  processing: "Processing",
-  success: "Success",
-  failed: "Failed",
-  refunded: "Refunded",
-  cancelled: "Cancelled",
-};
+/**
+ * Groups untuk sidebar.
+ *
+ * Sebelas seksi dalam satu daftar panjang tidak menunjukkan alur kerja.
+ * Urutannya sekarang mengikuti urutan yang dipakai operator sehari-hari:
+ * cek apa yang masuk hari ini, lalu apa yang bermasalah, baru sisanya.
+ *
+ * Backward-compatible: `NAV` tidak berubah isinya, hanya `group` yang
+ * ditambahkan. Semua pemanggilan `setSection(item.id)` tetap bekerja.
+ */
+const NAV_GROUPS = ["Harian", "Katalog", "Keuangan", "Sistem"] as const;
+
+/**
+ * Label status order.
+ *
+ * Sekarang diambil dari `@/lib/order-status-display`, sumber yang sama dengan
+ * `/account`. Sebelumnya kedua dashboard punya nama berbeda untuk hal yang
+ * sama — "Pending payment" di sini, "Menunggu pembayaran" di sana — jadi user
+ * dan operator bicara dua bahasa berbeda untuk status yang identik.
+ */
+const STATUS_LABEL = ORDER_STATUS_LABELS;
 
 type CatalogSyncSummaryResult = {
   catalogItems: number;
@@ -1746,21 +1760,27 @@ export default function AdminDashboard() {
           </span>
         </Link>
 
-        <nav className="acc-nav" aria-label="Admin navigation">
-          {NAV.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={section === item.id ? "active" : ""}
-              onClick={() => {
-                setSection(item.id);
-                setQuery("");
-                setNotice("");
-              }}
-            >
-              <span>{item.short}</span>
-              <b>{item.label}</b>
-            </button>
+        <nav className="acc-nav" aria-label="Navigasi admin">
+          {NAV_GROUPS.map((group) => (
+            <div className="acc-nav-group" key={group}>
+              <span className="acc-nav-group-label">{group}</span>
+              {NAV.filter((item) => item.group === group).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={section === item.id ? "active" : ""}
+                  aria-current={section === item.id ? "page" : undefined}
+                  onClick={() => {
+                    setSection(item.id);
+                    setQuery("");
+                    setNotice("");
+                  }}
+                >
+                  <span>{item.short}</span>
+                  <b>{item.label}</b>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -1858,8 +1878,8 @@ export default function AdminDashboard() {
               <section className="acc-grid-two">
                 <div className="acc-panel">
                   <SectionHead
-                    eyebrow="Recent activity"
-                    title="Order terbaru"
+                    eyebrow="Aktivitas terbaru"
+                    title="Pesanan terbaru"
                     copy="10 transaksi terakhir yang masuk ke sistem."
                     action={
                       <button
@@ -1893,7 +1913,7 @@ export default function AdminDashboard() {
 
                 <div className="acc-panel">
                   <SectionHead
-                    eyebrow="System health"
+                    eyebrow="Kesehatan sistem"
                     title="Integrasi"
                     copy="Status konfigurasi service utama Nambah."
                   />
@@ -1916,28 +1936,28 @@ export default function AdminDashboard() {
 
               <section className="acc-panel">
                 <SectionHead
-                  eyebrow="Roadmap"
+                  eyebrow="Peta jalan"
                   title="Modul Nambah"
                   copy="Fitur aktif dan pekerjaan yang sudah ada dalam roadmap production-ready."
                 />
                 <div className="acc-roadmap-grid">
                   <RoadmapCard
-                    title="Payment verification"
+                    title="Verifikasi pembayaran"
                     status="live"
                     copy="Midtrans webhook/status API, gross amount validation, dan anti-downgrade status."
                   />
                   <RoadmapCard
-                    title="Fulfillment orchestration"
+                    title="Pengiriman pesanan"
                     status="live"
                     copy="Simulate + Digiflazz testing dengan request_ref idempotent. Live tetap safety-locked."
                   />
                   <RoadmapCard
-                    title="Email receipt"
+                    title="Bukti via email"
                     status="live"
                     copy="Brevo transactional receipt dengan delivery log dan retry."
                   />
                   <RoadmapCard
-                    title="Promo engine"
+                    title="Mesin promo"
                     status="live"
                     copy="Campaign CRUD, quota reservation, per-user limit, scheduling data, dan product targeting aktif."
                   />
@@ -1947,27 +1967,27 @@ export default function AdminDashboard() {
                     copy="Saldo account, checkout redemption, success earning, customer ledger, dan admin monitoring aktif."
                   />
                   <RoadmapCard
-                    title="Affiliate lifecycle"
+                    title="Siklus afiliasi"
                     status="live"
                     copy="Commission pending/available/cancelled mengikuti status order; ledger admin aktif."
                   />
                   <RoadmapCard
-                    title="Digiflazz callback"
+                    title="Callback Digiflazz"
                     status="live"
                     copy="Callback Pending/Sukses/Gagal diterapkan ke supplier transaction dan order secara idempotent."
                   />
                   <RoadmapCard
-                    title="Reconciliation & retry"
+                    title="Rekonsiliasi &amp; ulangi"
                     status="live"
                     copy="Recovery paid/processing, polling Digiflazz test pending, retry receipt failed, dan stale sending detection."
                   />
                   <RoadmapCard
-                    title="Universal account checker"
+                    title="Pemeriksa akun"
                     status="live"
                     copy="Validasi schema per game + provider routing configurable, dengan local-only fallback yang tidak memblokir checkout."
                   />
                   <RoadmapCard
-                    title="Production hardening"
+                    title="Penguatan produksi"
                     status="planned"
                     copy="Health endpoint, rate limit, alert, audit log, dan explicit live guards."
                   />
@@ -1979,8 +1999,8 @@ export default function AdminDashboard() {
           {section === "orders" && (
             <>
               <SectionHead
-                eyebrow="Transactions"
-                title="Orders"
+                eyebrow="Transaksi"
+                title="Pesanan"
                 copy="100 order terbaru. Gunakan filter untuk audit status atau mencari transaksi."
               />
               <div className="acc-filterbar">
@@ -2114,8 +2134,8 @@ export default function AdminDashboard() {
           {section === "catalog" && catalog && (
             <>
               <SectionHead
-                eyebrow="Catalog"
-                title="Produk & pricing"
+                eyebrow="Katalog"
+                title="Produk & harga"
                 copy="Edit label, harga, status, dan mapping SKU tanpa mengubah source supplier."
               />
               <div className="acc-filterbar acc-filterbar-three">
@@ -2423,7 +2443,7 @@ export default function AdminDashboard() {
             <>
               <SectionHead
                 eyebrow="Supplier"
-                title="Digiflazz operations"
+                title="Operasional Digiflazz"
                 copy="Saldo, sync price list, mapping, dan automation supplier."
                 action={
                   <Link className="acc-primary-link" href="/admin/digiflazz">
@@ -2492,8 +2512,8 @@ export default function AdminDashboard() {
           {section === "receipts" && (
             <>
               <SectionHead
-                eyebrow="Delivery"
-                title="Receipt email"
+                eyebrow="Pengiriman"
+                title="Email bukti transfer"
                 copy="Log Brevo untuk melihat receipt terkirim, retry, dan error provider."
               />
               <div className="acc-table-card">
@@ -2542,7 +2562,7 @@ export default function AdminDashboard() {
           {section === "points" && pointsData && (
             <>
               <SectionHead
-                eyebrow="Loyalty"
+                eyebrow="Loyalitas"
                 title="Nambah Points"
                 copy="Outstanding liability, reservation, FIFO lots, expiry, dan immutable ledger points."
                 action={
@@ -2650,8 +2670,8 @@ export default function AdminDashboard() {
           {section === "finance" && (
             <>
               <SectionHead
-                eyebrow="Finance"
-                title="Financial reconciliation"
+                eyebrow="Keuangan"
+                title="Rekonsiliasi keuangan"
                 copy="Bandingkan frozen pricing, Midtrans, supplier cost, Points liability, dan affiliate ledger tanpa mengubah uang secara otomatis."
                 action={
                   <button
@@ -2729,7 +2749,7 @@ export default function AdminDashboard() {
           {section === "promotions" && overview && promotionData && (
             <>
               <SectionHead
-                eyebrow="Growth"
+                eyebrow="Pertumbuhan"
                 title="Promotions"
                 copy="Campaign promo dikelola tanpa SQL, dengan quota reservation yang aman terhadap checkout paralel."
                 action={
@@ -2949,8 +2969,8 @@ export default function AdminDashboard() {
           {section === "affiliates" && overview && affiliateData && (
             <>
               <SectionHead
-                eyebrow="Partners"
-                title="Affiliate"
+                eyebrow="Mitra"
+                title="Afiliasi"
                 copy="Commission lifecycle mengikuti status order, withdrawal memakai allocation ledger, dan payout tetap dikonfirmasi operator."
                 action={
                   <div className="acc-action-panel">
@@ -3016,16 +3036,16 @@ export default function AdminDashboard() {
           {section === "users" && (
             <>
               <SectionHead
-                eyebrow="Accounts"
-                title="Users & access"
+                eyebrow="Akun"
+                title="Pengguna & akses"
                 copy="Lookup customer memakai profile server-side dan agregasi transaksi tanpa mengekspos credential auth."
               />
               <div className="acc-table-card">
                 <div className="acc-users-head">
-                  <span>User</span>
+                  <span>Pengguna</span>
                   <span>WhatsApp</span>
-                  <span>Orders</span>
-                  <span>Success spend</span>
+                  <span>Pesanan</span>
+                  <span>Total belanja</span>
                 </div>
                 {(usersData?.users ?? []).slice(0, 100).map((item) => (
                   <div className="acc-users-row" key={item.userId}>
@@ -3055,8 +3075,8 @@ export default function AdminDashboard() {
           {section === "system" && overview && (
             <>
               <SectionHead
-                eyebrow="Operations"
-                title="System & production readiness"
+                eyebrow="Operasional"
+                title="Kesiapan sistem & produksi"
                 copy="Konfigurasi service sekarang dan backlog yang harus selesai sebelum live money."
               />
 

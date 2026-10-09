@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
+import {
+  elapsedSince,
+  isOpenOrder,
+  statusHint,
+  statusLabel,
+  statusTone,
+} from "@/lib/order-status-display";
 import AffiliateAccountPanel from "@/components/AffiliateAccountPanel";
 
 type AccountUser = {
@@ -61,14 +68,36 @@ type PointLedger = {
   createdAt: string;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_payment: "Menunggu pembayaran",
-  paid: "Pembayaran diterima",
-  processing: "Sedang diproses",
-  success: "Berhasil",
-  failed: "Gagal",
-  refunded: "Dikembalikan",
-  cancelled: "Dibatalkan",
+/**
+ * Tab dashboard.
+ *
+ * Sebelum ini semua konten ditumpuk vertikal dalam satu halaman: profil,
+ * points (dengan 30 baris aktivitas), afiliasi, lalu riwayat pesanan. Bagian
+ * yang paling sering dicek user — status order — justru paling bawah.
+ *
+ * Tab memakai `useState`, bukan routing: URL tetap `/account`, tidak ada
+ * request tambahan, dan tombol back browser tetap bekerja seperti sekarang.
+ */
+type AccountTab = "orders" | "points" | "profile";
+
+const TABS: ReadonlyArray<{ id: AccountTab; label: string; hint: string }> = [
+  { id: "orders", label: "Transaksi", hint: "Riwayat pesanan kamu" },
+  { id: "points", label: "Nambah Points", hint: "Saldo dan aktivitas points" },
+  { id: "profile", label: "Profil", hint: "Data untuk checkout" },
+];
+
+/**
+ * Istilah points dalam bahasa sehari-hari.
+ *
+ * "Reserved", "Lifetime earned", dan "Lifetime redeemed" adalah istilah akuntansi
+ * internal, bukan bahasa yang dipakai user. Angka dan mekanismenya tidak berubah —
+ * hanya yang ditampilkan.
+ */
+const POINTS_TERM_LABEL: Record<string, string> = {
+  reserved: "Sedang dipakai",
+  available: "Bisa dipakai",
+  lifetimeEarned: "Total pernah didapat",
+  lifetimeRedeemed: "Total pernah dipakai",
 };
 
 const POINT_TYPE_LABEL: Record<string, string> = {
@@ -97,8 +126,70 @@ function signedPoints(value: number) {
   return value.toLocaleString("id-ID");
 }
 
-export default function AccountDashboard() {
-  const [user, setUser] = useState<AccountUser | null>(null);
+/**
+ * Satu baris pesanan.
+ *
+ * Dipisah dari komponen utama karena dipakai dua kali: order yang sedang
+ * berjalan dan riwayat yang sudah selesai.
+ *
+ * Dua tambahan dari versi lama:
+ *
+ * - Waktu relatif untuk order yang belum selesai. "Sedang diproses" tanpa
+ *   waktu tidak bisa dinilai user: 3 menit itu wajar, 3 jam itu tidak.
+ * - Penjelasan singkat di bawah status, dari `statusHint`.
+ */
+function AccountOrderRow({ order }: { order: AccountOrder }) {
+  const open = isOpenOrder(order.status);
+  const elapsed = open ? elapsedSince(order.updatedAt) : null;
+
+  return (
+    <Link
+      className={"account-order-row tone-" + statusTone(order.status)}
+      href={"/order/" + encodeURIComponent(order.id)}
+    >
+      <div className="account-order-product">
+        <small>{order.id}</small>
+        <strong>{order.gameName}</strong>
+        <span>{order.packageLabel}</span>
+        {(order.pointsEarned > 0 || order.pointsRedeemed > 0) && (
+          <span className="account-order-points">
+            {order.pointsRedeemed > 0
+              ? "-" +
+                order.pointsRedeemed.toLocaleString("id-ID") +
+                " pts dipakai"
+              : ""}
+            {order.pointsRedeemed > 0 && order.pointsEarned > 0 ? " · " : ""}
+            {order.pointsEarned > 0
+              ? "+" + order.pointsEarned.toLocaleString("id-ID") + " pts"
+              : ""}
+          </span>
+        )}
+      </div>
+
+      <div className="account-order-time">
+        <small>{open ? "Berjalan sejak" : "Dibuat"}</small>
+        <span>{formatDate(open ? order.updatedAt : order.createdAt)}</span>
+        {elapsed && (
+          <em className="account-order-elapsed">{elapsed}</em>
+        )}
+      </div>
+
+      <div className="account-order-price">
+        <small>Total</small>
+        <strong>{formatIDR(order.finalPrice)}</strong>
+      </div>
+
+      <span className={"account-order-status tone-" + statusTone(order.status)}>
+        <b>{statusLabel(order.status)}</b>
+        {open && statusHint(order.status) && (
+          <small className="account-order-hint">{statusHint(order.status)}</small>
+        )}
+      </span>
+    </Link>
+  );
+}
+
+export default function AccountDashboard() {  const [user, setUser] = useState<AccountUser | null>(null);
   const [orders, setOrders] = useState<AccountOrder[]>([]);
   const [points, setPoints] = useState<PointsSummary | null>(null);
   const [ledger, setLedger] = useState<PointLedger[]>([]);
@@ -114,6 +205,7 @@ export default function AccountDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const [tab, setTab] = useState<AccountTab>("orders");
 
   useEffect(() => {
     let active = true;
@@ -279,6 +371,13 @@ export default function AccountDashboard() {
 
   if (!user) return null;
 
+  // Order yang belum selesai dipisah dari riwayat yang sudah selesai.
+  // User membuka dashboard ini paling sering karena order-nya jalan atau
+  // belum — bukan untuk membrowse arsip.
+  const openOrders = orders.filter((order) => isOpenOrder(order.status));
+  const closedOrders = orders.filter((order) => !isOpenOrder(order.status));
+  const openCount = openOrders.length;
+
   return (
     <>
       <section className="account-profile-card">
@@ -310,7 +409,30 @@ export default function AccountDashboard() {
         </button>
       </section>
 
-      <section className="account-profile-settings">
+      <nav className="account-tabs" aria-label="Bagian akun">
+        {TABS.map((item) => {
+          const count = item.id === "orders" ? openCount : 0;
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={active ? "active" : ""}
+              aria-current={active ? "page" : undefined}
+              onClick={() => setTab(item.id)}
+            >
+              <b>{item.label}</b>
+              <small>{item.hint}</small>
+              {count > 0 && (
+                <span className="account-tab-badge">{count} berjalan</span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {tab === "profile" && (
+        <section className="account-profile-settings">
         <div className="account-section-head">
           <div>
             <span className="eyebrow">Profil</span>
@@ -378,8 +500,10 @@ export default function AccountDashboard() {
         {profileMessage && (
           <p className="account-profile-message">{profileMessage}</p>
         )}
-      </section>
+        </section>
+      )}
 
+      {tab === "points" && (
       <section className="account-points-card" id="nambah-points">
         <div className="account-points-hero">
           <div>
@@ -400,18 +524,18 @@ export default function AccountDashboard() {
           </div>
           {points && (
             <div className="account-points-stats">
-              <article>
-                <small>Reserved</small>
+              <article title="Points yang sedang dipakai untuk order yang belum selesai.">
+                <small>{POINTS_TERM_LABEL.reserved}</small>
                 <strong>{points.reserved.toLocaleString("id-ID")} pts</strong>
               </article>
-              <article>
-                <small>Lifetime earned</small>
+              <article title="Semua points yang pernah didapat sejak akun dibuat.">
+                <small>{POINTS_TERM_LABEL.lifetimeEarned}</small>
                 <strong>
                   {points.lifetimeEarned.toLocaleString("id-ID")} pts
                 </strong>
               </article>
-              <article>
-                <small>Lifetime redeemed</small>
+              <article title="Semua points yang pernah dipakai untuk transaksi.">
+                <small>{POINTS_TERM_LABEL.lifetimeRedeemed}</small>
                 <strong>
                   {points.lifetimeRedeemed.toLocaleString("id-ID")} pts
                 </strong>
@@ -422,11 +546,11 @@ export default function AccountDashboard() {
 
         {points && (
           <div className="account-points-rule">
-            <span>1 point / {formatIDR(points.rules.earnEveryIdr)}</span>
-            <span>1 point = {formatIDR(points.rules.pointValueIdr)}</span>
-            <span>Min. redeem {points.rules.minimumRedeem} pts</span>
+            <span>Setiap {formatIDR(points.rules.earnEveryIdr)} belanja dapat 1 point</span>
+            <span>1 point setara {formatIDR(points.rules.pointValueIdr)}</span>
+            <span>Minimal pakai {points.rules.minimumRedeem} points</span>
             <span>
-              Maks. {Math.round(points.rules.maxRedeemRate * 100)}% subtotal
+              Maksimal {Math.round(points.rules.maxRedeemRate * 100)}% dari total belanja
             </span>
           </div>
         )}
@@ -482,9 +606,11 @@ export default function AccountDashboard() {
           )}
         </div>
       </section>
+      )}
 
       <AffiliateAccountPanel />
 
+      {tab === "orders" && (
       <section className="account-orders-card">
         <div className="account-section-head">
           <div>
@@ -495,6 +621,39 @@ export default function AccountDashboard() {
             Top up lagi
           </Link>
         </div>
+
+        {openCount > 0 && (
+          <div className="account-orders-open">
+            <strong className="account-orders-open-title">
+              {openCount} pesanan sedang berjalan
+            </strong>
+            <p>
+              Yang masih diproses atau menunggu pembayaran. Klik untuk melihat
+              detail danSN.
+            </p>
+            <div className="account-order-list">
+              {openOrders.map((order) => (
+                <AccountOrderRow key={order.id} order={order} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {closedOrders.length > 0 && (
+          <details
+            className="account-orders-closed"
+            open={openCount === 0}
+          >
+            <summary>
+              {openCount > 0 ? "Tampilkan" : ""} riwayat selesai ({closedOrders.length})
+            </summary>
+            <div className="account-order-list">
+              {closedOrders.map((order) => (
+                <AccountOrderRow key={order.id} order={order} />
+              ))}
+            </div>
+          </details>
+        )}
 
         {orders.length === 0 ? (
           <div className="account-empty">
@@ -507,58 +666,9 @@ export default function AccountDashboard() {
               Mulai top up <span>→</span>
             </Link>
           </div>
-        ) : (
-          <div className="account-order-list">
-            {orders.map((order) => (
-              <Link
-                className="account-order-row"
-                href={"/order/" + encodeURIComponent(order.id)}
-                key={order.id}
-              >
-                <div className="account-order-product">
-                  <small>{order.id}</small>
-                  <strong>{order.gameName}</strong>
-                  <span>{order.packageLabel}</span>
-                  {(order.pointsEarned > 0 ||
-                    order.pointsRedeemed > 0) && (
-                    <span className="account-order-points">
-                      {order.pointsRedeemed > 0
-                        ? "-" +
-                          order.pointsRedeemed.toLocaleString("id-ID") +
-                          " pts dipakai"
-                        : ""}
-                      {order.pointsRedeemed > 0 &&
-                      order.pointsEarned > 0
-                        ? " · "
-                        : ""}
-                      {order.pointsEarned > 0
-                        ? "+" +
-                          order.pointsEarned.toLocaleString("id-ID") +
-                          " pts"
-                        : ""}
-                    </span>
-                  )}
-                </div>
-                <div className="account-order-time">
-                  <small>Dibuat</small>
-                  <span>{formatDate(order.createdAt)}</span>
-                </div>
-                <div className="account-order-price">
-                  <small>Total</small>
-                  <strong>{formatIDR(order.finalPrice)}</strong>
-                </div>
-                <span
-                  className={
-                    "account-order-status status-" + order.status
-                  }
-                >
-                  {STATUS_LABEL[order.status] ?? order.status}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
+        ) : null}
       </section>
+      )}
     </>
   );
 }
