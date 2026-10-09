@@ -4,11 +4,13 @@ import {
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
 import { supabaseSelect } from "@/lib/supabase/server";
+import { gameDisplayName } from "@/lib/game-display-name";
 
 export const runtime = "nodejs";
 
 type AccountOrderRow = {
   id: string;
+  game_id: string;
   status: string;
   final_price: number | string;
   points_redeemed: number | string;
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
 
     const rows = await supabaseSelect<AccountOrderRow>("orders", {
       select:
-        "id,status,final_price,points_redeemed,points_discount,points_earned,created_at,updated_at,game:games(name,short_name),product:products(label)",
+        "id,game_id,status,final_price,points_redeemed,points_discount,points_earned,created_at,updated_at,game:games(name,short_name),product:products(label)",
       filters: {
         customer_user_id: `eq.${auth.user.id}`,
       },
@@ -53,7 +55,10 @@ export async function GET(request: Request) {
           pointsEarned: Number(row.points_earned),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
-          gameName: row.game?.name ?? row.game?.short_name ?? "Produk digital",
+          gameName: gameDisplayName(
+            row.game_id,
+            row.game?.name ?? row.game?.short_name ?? "Produk digital",
+          ),
           packageLabel: row.product?.label ?? "-",
         })),
       },

@@ -424,6 +424,234 @@ const TFT_MOBILE_USER: AccountField = {
   invalidMessage: "User ID harus 8-14 digit.",
 };
 
+// ── Katalog baru (2026-10-09) ────────────────────────────────────────────
+//
+// Delapan game yang masuk katalog lewat `catalog-sync` tanpa schema khusus,
+// sebelumnya jatuh ke cabang `generic` paling bawah `getGameAccountSchema`.
+// Cabang itu menerima teks bebas 3-64 karakter — terlalu longgar untuk ID
+// yang semua sumber independen sebutkan sebagai angka. Kalau ID salah,
+// validasi kita lolos lalu order-nya ditolak supplier SETELAH pembayaran.
+
+// LifeAfter Credits. Publisher NetEase, produk "Credits".
+//
+// Dua kolom, keduanya wajib. NetEase di pay.neteasegames.com/lifeafter/topup:
+// "Masukkan LifeAfter User ID Anda dan pilih server game".
+//
+// Yang dikirim ke supplier adalah KODE server enam digit, bukan nama server —
+// contoh order dari panel Digiflazz: `123456|500001`. Karena itu value dan
+// label dipisah: pelanggan melihat "MiskaTown (NA)", supplier menerima 500001.
+//
+// Sembilan puluh server. Semuanya dipakai sebagai dropdown, bukan teks bebas:
+// nama server LifeAfter mencakup Mandarin, katakana, hangul, dan titik
+// ("St.Rona"), jadi mengetiknya manual hampir pasti salah ketik.
+const LIFEAFTER_USER: AccountField = {
+  label: "User ID",
+  placeholder: "Masukkan User ID LifeAfter",
+  inputMode: "numeric",
+  maxLength: 12,
+  sanitize: "digits",
+  pattern: /^\d{6,12}$/,
+  invalidMessage: "User ID LifeAfter harus 6-12 digit.",
+};
+
+const LIFEAFTER_SERVER_OPTIONS: AccountFieldOption[] = [
+  { value: "500001", label: "MiskaTown (NA)" },
+  { value: "500002", label: "SandCastle (NA)" },
+  { value: "500003", label: "MouthSwamp (NA)" },
+  { value: "500004", label: "RedwoodTown (NA)" },
+  { value: "500005", label: "Obelisk (NA)" },
+  { value: "500006", label: "NewLand (NA)" },
+  { value: "500007", label: "ChaosOutpost (NA)" },
+  { value: "500008", label: "IronStride (NA)" },
+  { value: "500009", label: "CrystalthornSea (NA)" },
+  { value: "510001", label: "FallForest (AU)" },
+  { value: "510002", label: "MountSnow (AU)" },
+  { value: "520001", label: "NancyCity (SEA)" },
+  { value: "520002", label: "CharlesTown (SEA)" },
+  { value: "520003", label: "SnowHighlands (SEA)" },
+  { value: "520004", label: "Santopany (SEA)" },
+  { value: "520005", label: "LevinCity (SEA)" },
+  { value: "520006", label: "MileStone (SEA)" },
+  { value: "520007", label: "ChaosCity (SEA)" },
+  { value: "520008", label: "TwinIslands (SEA)" },
+  { value: "520009", label: "HopeWall (SEA)" },
+  { value: "520010", label: "LabyrinthSea (SEA)" },
+  { value: "530001", label: "多貝雪山 (HMT)" },
+  { value: "530002", label: "觸星山脈 (HMT)" },
+  { value: "530003", label: "諾倫半島 (HMT)" },
+  { value: "530004", label: "長嶺舊港 (HMT)" },
+  { value: "530005", label: "平樂古城 (HMT)" },
+  { value: "530006", label: "聖托帕尼 (HMT)" },
+  { value: "530007", label: "貝侖草原 (HMT)" },
+  { value: "530008", label: "墜星海畔 (HMT)" },
+  { value: "530009", label: "梅爾醫院 (HMT)" },
+  { value: "530010", label: "萊文市 (HMT)" },
+  { value: "530011", label: "方舟基地 (HMT)" },
+  { value: "530012", label: "重啟之地 (HMT)" },
+  { value: "530013", label: "地下城 (HMT)" },
+  { value: "530014", label: "希望之牆 (HMT)" },
+  { value: "530015", label: "深海秘境 (HMT)" },
+  { value: "540001", label: "秋の森林 (JP)" },
+  { value: "540002", label: "砂石の城 (JP)" },
+  { value: "540003", label: "ドベ雪山 (JP)" },
+  { value: "540004", label: "レイヴン市 (JP)" },
+  { value: "540005", label: "赤杉町 (JP)" },
+  { value: "540006", label: "新生の地 (JP)" },
+  { value: "540007", label: "混沌の城 (JP)" },
+  { value: "540008", label: "希望の壁 (JP)" },
+  { value: "540009", label: "棘の海域 (JP)" },
+  { value: "550001", label: "파플래닛 (KR)" },
+  { value: "550002", label: "미스카대학 (KR)" },
+  { value: "550003", label: "희망의골짜기 (KR)" },
+  { value: "550004", label: "다베트설산 (KR)" },
+  { value: "550005", label: "가을빛산림 (KR)" },
+  { value: "550006", label: "스노우힐 (KR)" },
+  { value: "560001", label: "FallForest (EU)" },
+  { value: "560002", label: "HopeValley (EU)" },
+  { value: "560003", label: "SandCastle (EU)" },
+  { value: "560004", label: "MountSnow (EU)" },
+  { value: "560005", label: "St.Rona (EU)" },
+  { value: "560006", label: "Oasis (EU)" },
+  { value: "560007", label: "SilentIsland (EU)" },
+  { value: "560008", label: "ArkCity (EU)" },
+  { value: "570001", label: "AsiaSurvival (JP)" },
+  { value: "570002", label: "ラッキーサバイバル (JP)" },
+  { value: "570003", label: "リバースデー (JP)" },
+  { value: "570004", label: "釣りライフ (JP)" },
+  { value: "570005", label: "サイボーグ覚醒 (JP)" },
+  { value: "700001", label: "簡單生存服 (HMT)" },
+  { value: "700002", label: "鷺水度假村 (HMT)" },
+  { value: "710001", label: "イージーサバイバル (JP)" },
+  { value: "710002", label: "まったり村 (JP)" },
+  { value: "720001", label: "SimpleSurvival (NA)" },
+  { value: "730001", label: "EasySurvival (SEA)" },
+];
+
+const LIFEAFTER_SERVER: AccountField = {
+  label: "Server",
+  placeholder: "Pilih server",
+  inputMode: "numeric",
+  maxLength: 6,
+  sanitize: "digits",
+  pattern: /^\d{6}$/,
+  invalidMessage: "Pilih salah satu server yang terdaftar di dalam game.",
+  options: LIFEAFTER_SERVER_OPTIONS,
+};
+
+// One Punch Man: The Strongest. User ID saja, TANPA kolom server.
+//
+// kolom Deskripsi Seller di panel Digiflazz (produk pre34663356, seller OPM1):
+//
+//   "Tujuan = ID saja salah otomatis gagal"
+//
+// while Deskripsi Produk untuk SKU yang sama menulis
+// `Format no tujuan [UID]|[Server]`. Seller yang benar-benar menerima order
+// tidak meminta server, jadi tabel reseller pihak ketiga yang menyebut
+// "User ID + Server ID" (Codashop, MooGold, KZStore) tidak diikut.
+const ONE_PUNCH_MAN_USER: AccountField = {
+  label: "User ID",
+  placeholder: "Masukkan User ID One Punch Man",
+  inputMode: "numeric",
+  maxLength: 12,
+  sanitize: "digits",
+  pattern: /^\d{6,12}$/,
+  invalidMessage: "User ID harus 6-12 digit.",
+};
+
+// Tom and Jerry: Chase. Publisher NetEase. Player ID saja, TANPA kolom server.
+//
+// Deskripsi Seller, dua seller independen (produk pre34663343 dan pre34663344):
+//
+//   "Tujuan = User ID"
+//   "Tujuan = User ID (Server Tidak Perlu)"
+//
+// Pernah kolom server ada di sini, bersandar pada Codashop SG dan itemku yang
+// menulis "Chase, for example: 11777888, Asia, iTeMkU". Keduanya pihak ketiga,
+// dan keduanya bertentangan dengan seller sebenarnya. Meminta server untuk game
+// yang hanya butuh ID berarti order ditolak setelah pelanggan membayar.
+const TOM_JERRY_USER: AccountField = {
+  label: "Player ID",
+  placeholder: "Masukkan Player ID",
+  inputMode: "numeric",
+  maxLength: 12,
+  sanitize: "digits",
+  pattern: /^\d{6,12}$/,
+  invalidMessage: "Player ID Tom and Jerry: Chase harus 6-12 digit.",
+};
+
+// ID-saja. Lima game; masing-masing punya sumber independen sendiri, jadi
+// placeholder-nya menyebut nama game itu — bukan teks generik.
+
+// Laplace M: Character ID numerik, dilihat di profil.
+// Codashop Support: "User ID akan dapat dilihat pada profil".
+const LAPLACE_M_USER: AccountField = {
+  label: "Character ID",
+  placeholder: "Masukkan Character ID",
+  inputMode: "numeric",
+  maxLength: 12,
+  sanitize: "digits",
+  pattern: /^\d{5,12}$/,
+  invalidMessage: "Character ID harus 5-12 digit.",
+};
+
+// Lords Mobile: IGG ID numerik, 10 digit pada contoh reseller.
+// Gravitas & Synapse: "Contoh: 4295037856".
+const LORDS_MOBILE_USER: AccountField = {
+  label: "IGG ID",
+  placeholder: "Contoh: 4295037856",
+  inputMode: "numeric",
+  maxLength: 12,
+  sanitize: "digits",
+  pattern: /^\d{8,12}$/,
+  invalidMessage: "IGG ID harus 8-12 digit.",
+};
+
+// Speed Drifters. Deskripsi Digiflazz-nya "-", dan TIDAK ADA satu pun sumber
+// yang menyebut server — bukan satu pun dari lima:
+//
+//   KALEOZ:  "[INSTANT] Garena Speed Drifters UID ONLY"
+//   MooGold: "Only Player ID Required"
+//   UniPin:  "Enter User ID" (Settings → General)
+//   Uquid:   "Enter your Player ID" + "Not for International and Vietnam Server"
+//   Kaisar:  "Masukkan ID"
+//
+// Untuk game Garena, ID-nya berumur panjang dan bisa sangat panjang, jadi batasnya
+// dibanding game lain.
+const SPEED_DRIFTERS_USER: AccountField = {
+  label: "Player ID",
+  placeholder: "Masukkan Player ID",
+  inputMode: "numeric",
+  maxLength: 20,
+  sanitize: "digits",
+  pattern: /^\d{4,20}$/,
+  invalidMessage: "Player ID harus 4-20 digit.",
+};
+
+// Werewolf (Party Game). Hanya User ID — Uquid: "Tap your Profile to get your
+// User ID and User Name". Tidak ada sumber yang menyebut server.
+const WEREWOLF_USER: AccountField = {
+  label: "User ID",
+  placeholder: "Masukkan User ID",
+  inputMode: "numeric",
+  maxLength: 16,
+  sanitize: "digits",
+  pattern: /^\d{4,16}$/,
+  invalidMessage: "User ID harus 4-16 digit.",
+};
+
+// AU2 Mobile. Mayoritas reseller hanya minta User ID: SEAGM dan Uquid eksplisit
+// "Only User ID is needed", TokoVCR dan KuponTop menyebut satu langkah
+// ("Masukkan User ID"). Codashop KHM juga tanpa server.
+const AU2_MOBILE_USER: AccountField = {
+  label: "User ID",
+  placeholder: "Masukkan User ID",
+  inputMode: "numeric",
+  maxLength: 16,
+  sanitize: "digits",
+  pattern: /^\d{4,16}$/,
+  invalidMessage: "User ID harus 4-16 digit.",
+};
+
 // SKU voucher kode redeem (Steam Wallet Code, Google Play, PSN, Garena Shells,
 // eFootball): produk dikirim berupa SN kode, jadi customer_no supplier cukup
 // berisi kontak referensi — email atau nomor HP aktif.
@@ -699,6 +927,100 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
       ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
       checker: "universal",
       helper: "Masukkan ID Akun Where Winds Meet dengan benar.",
+    };
+  }
+
+  // ── Katalog baru (2026-10-09) ──────────────────────────────────────────
+  //
+  // Diletakkan sebelum cabang voucher di bawah karena salah satu game punya
+  // publisher Garena (Speed Drifters) — kalau tidak, `\bgarena\b` akan
+  // capturing-nya sebagai voucher dan meminta email, bukan Player ID.
+  //
+  // Kedelapan game ini sebelumnya jatuh ke cabang `generic` paling bawah:
+  // teks bebas 3-64 karakter, tanpa server, tanpa checker. Sekarang semuanya
+  // punya kolom yang persis, diturunkan dari sumber independen per game.
+
+  // LifeAfter Credits: dua kolom wajib. Server dikirim sebagai kode angka.
+  if (/lifeafter|life after/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: LIFEAFTER_USER,
+      ...(requiresServer ? { server: LIFEAFTER_SERVER } : {}),
+      checker: null,
+      helper: "Masukkan User ID dan pilih server sesuai informasi akun LifeAfter.",
+    };
+  }
+
+  // One Punch Man: The Strongest — User ID saja, tanpa kolom server.
+  if (/one punch|\bopm\b/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: ONE_PUNCH_MAN_USER,
+      checker: null,
+      helper: "Masukkan User ID sesuai informasi akun di game.",
+    };
+  }
+
+  // Tom and Jerry: Chase — Player ID saja. Seller di panel Digiflazz menulis
+  // "Tujuan = User ID (Server Tidak Perlu)", jadi kolom server dihapus.
+  if (/tom and jerry|\btjc\b|chase/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: TOM_JERRY_USER,
+      checker: null,
+      helper: "Masukkan Player ID sesuai informasi akun di game.",
+    };
+  }
+
+  // Laplace M: Character ID numerik, tanpa server.
+  if (/laplace/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: LAPLACE_M_USER,
+      checker: null,
+      helper: "Masukkan Character ID. ID bisa dilihat di profil karakter.",
+    };
+  }
+
+  // Lords Mobile: IGG ID numerik 10 digit. Nomor kingdom TIDAK dikirim —
+  // VGTopup: "Tanpa kotak server. Tanpa menu dropdown kingdom."
+  if (/lords mobile|\blm\b/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: LORDS_MOBILE_USER,
+      checker: null,
+      helper: "Masukkan IGG ID sesuai informasi akun di game.",
+    };
+  }
+
+  // Speed Drifters: Publisher Garena, jadi HARUS di atas cabang voucher
+  // `\bgarena\b`. Hanya Player ID — tidak ada sumber yang menyebut server.
+  if (/speed drifters|drifters/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: SPEED_DRIFTERS_USER,
+      checker: null,
+      helper: "Masukkan Player ID sesuai informasi akun di game.",
+    };
+  }
+
+  // Werewolf (Party Game): hanya User ID.
+  if (/werewolf|wolf party|party game/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: WEREWOLF_USER,
+      checker: null,
+      helper: "Masukkan User ID sesuai informasi akun di game.",
+    };
+  }
+
+  // AU2 Mobile: hanya User ID.
+  if (/au2|alpha ultra|ultraman/.test(identity)) {
+    return {
+      kind: "numeric-player",
+      user: AU2_MOBILE_USER,
+      checker: null,
+      helper: "Masukkan User ID sesuai informasi akun di game.",
     };
   }
 

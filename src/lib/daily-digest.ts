@@ -15,6 +15,7 @@ import {
   supabaseUpdate,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { gameDisplayName } from "@/lib/game-display-name";
 
 /**
  * Digest harian ke Telegram.
@@ -163,7 +164,9 @@ export async function buildDailyDigest(dateKey: string): Promise<DailyDigest> {
       }),
     ]);
 
-  const gameName = new Map(games.map((game) => [game.id, game.name]));
+  const gameName = new Map(
+    games.map((game) => [game.id, gameDisplayName(game.id, game.name)]),
+  );
 
   const byStatus: Record<string, number> = {};
   const revenueByGame = new Map<string, { orders: number; revenue: number }>();
@@ -204,7 +207,10 @@ export async function buildDailyDigest(dateKey: string): Promise<DailyDigest> {
 
   const topGames = [...revenueByGame.entries()]
     .map(([gameId, bucket]) => ({
-      name: gameName.get(gameId) ?? gameId,
+      // `?? gameId` pernah jadi tempat `lifeafter-credits` bocor ke pesan
+      // Telegram. Sekarang `gameName` sudah berisi override, jadi saat game
+      // tidak ditemukan di DB pun yang tampil tetap nama yang bisa dibaca.
+      name: gameName.get(gameId) ?? gameDisplayName(gameId, gameId),
       orders: bucket.orders,
       revenue: bucket.revenue,
     }))

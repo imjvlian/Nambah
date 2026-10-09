@@ -6,6 +6,7 @@ import {
   type PaymentMethod,
 } from "@/lib/catalog";
 import { isSupabaseConfigured, supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
+import { gameDisplayNames } from "@/lib/game-display-name";
 
 type GameRow = {
   id: string;
@@ -315,10 +316,15 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
           referencePrice: Number(product.reference_price),
         }));
 
-      return {
-        id: game.id,
+      const display = gameDisplayNames(game.id, {
         name: game.name,
         shortName: game.short_name,
+      });
+
+      return {
+        id: game.id,
+        name: display.name,
+        shortName: display.shortName,
         category: game.category,
         accent: game.accent,
         initials: game.initials,

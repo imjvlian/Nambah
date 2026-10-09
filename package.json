@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "assets:sync": "node scripts/sync-codashop-product-assets.mjs",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test": "node --experimental-strip-types --import ./scripts/tsconfig-alias-register.mjs --test tests/*.test.ts",
     "check": "npm run test && npm run build"
   },
   "dependencies": {

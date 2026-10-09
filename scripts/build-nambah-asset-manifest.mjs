@@ -24,6 +24,15 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const ASSET_DIR = path.join(ROOT, "public", "nambah-assets");
+
+// Folder kedua untuk aset katalog baru (2026-10-09).
+//
+// Dipisah supaya game yang barunya masuk tidak tercampur dengan kumpulan aset
+// lama — dan supaya folder lama tidak perlu disentuh sama sekali saat menambah
+// game berikutnya. Folder ini OPTIONAL: kalau belum ada, build tetap jalan
+// dengan isinya saja.
+const NEW_CATALOG_DIR = path.join(ROOT, "public", "nambah-assets-katalog-baru");
+
 const MANIFEST_PATH = path.join(ASSET_DIR, "manifest.json");
 
 /** Prefiks nama file -> game id. */
@@ -54,6 +63,10 @@ const GAME_BY_PREFIX = {
   Zenles_Zone_Zero: "zenless-zone-zero",
   Where_Winds_Meet: "where-winds-meet",
   Wuthering_Waves: "wuthering-waves",
+  // ── Katalog baru (2026-10-09), folder `nambah-assets-katalog-baru/` ───────
+  Laplace_M: "laplace-m",
+  One_Punch_Man: "one-punch-man",
+  Tom_And_Jerry_Chase: "tom-and-jerry-chase",
 };
 
 /**
@@ -175,30 +188,59 @@ function parsePrefix(fileName) {
   };
 }
 
-async function main() {
-  let entries;
-  try {
-    entries = await readdir(ASSET_DIR, { withFileTypes: true });
-  } catch {
-    throw new Error(`Folder aset tidak ditemukan: ${ASSET_DIR}`);
+/**
+ * Gambar dari semua folder aset, lengkap dengan folder asalnya.
+ *
+ * Folder katalog baru bersifat opsional — belum tentu ada saat build jalan.
+ *
+ * `folder` wajib ikut diteruskan karena `localPath` di manifest adalah path
+ * URL publik (`/nambah-assets/...`), bukan path filesystem. Kalau folder
+ * asal dibuang, file di folder katalog baru akan tercatat menunjuk ke
+ * `/nambah-assets/` — path yang benar-benar tidak ada, dan gambarnya tidak
+ * akan pernah render.
+ */
+async function listAssetFiles() {
+  const files = [];
+  for (const dir of [ASSET_DIR, NEW_CATALOG_DIR]) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      // Folder lama wajib ada; folder katalog baru boleh belum.
+      if (dir === ASSET_DIR) {
+        throw new Error(`Folder aset tidak ditemukan: ${dir}`);
+      }
+      continue;
+    }
+    const urlPrefix = "/" + path.relative(path.join(ROOT, "public"), dir).split(path.sep).join("/");
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!IMAGE_EXT.has(path.extname(entry.name).toLowerCase())) continue;
+      files.push({ fileName: entry.name, urlPrefix });
+    }
   }
+  return files.sort((a, b) => a.fileName.localeCompare(b.fileName));
+}
 
-  const files = entries
-    .filter((entry) => entry.isFile() && IMAGE_EXT.has(path.extname(entry.name).toLowerCase()))
-    .map((entry) => entry.name)
-    .sort();
+/** Path URL publik untuk satu aset. */
+function publicPath(file) {
+  return `${file.urlPrefix}/${file.fileName}`;
+}
+
+async function main() {
+  const files = await listAssetFiles();
 
   const grouped = new Map();
   const unknown = [];
 
-  for (const fileName of files) {
-    const parsed = parsePrefix(fileName);
+  for (const file of files) {
+    const parsed = parsePrefix(file.fileName);
     if (!parsed) {
-      unknown.push(fileName);
+      unknown.push(file.fileName);
       continue;
     }
     const list = grouped.get(parsed.gameId) ?? [];
-    list.push({ ...parsed, fileName });
+    list.push({ ...parsed, ...file });
     grouped.set(parsed.gameId, list);
   }
 
@@ -259,7 +301,7 @@ async function main() {
         assets.push({
           alt: labelFor(gameId, value),
           kind: "nominal",
-          localPath: `/nambah-assets/${item.fileName}`,
+          localPath: publicPath(item),
           denomination: value,
         });
       });
@@ -271,7 +313,7 @@ async function main() {
         assets.push({
           alt: `${gameId} currency`,
           kind: "nominal",
-          localPath: `/nambah-assets/${item.fileName}`,
+          localPath: publicPath(item),
         });
       }
     }
@@ -284,7 +326,7 @@ async function main() {
       assets.push({
         alt: middle === null ? `${gameId} currency` : labelFor(gameId, middle),
         kind: "nominal",
-        localPath: `/nambah-assets/${item.fileName}`,
+        localPath: publicPath(item),
         ...(middle === null ? {} : { denomination: middle }),
       });
     }
@@ -295,7 +337,7 @@ async function main() {
       assets.push({
         alt: "Battle Pass",
         kind: "nominal",
-        localPath: `/nambah-assets/${item.fileName}`,
+        localPath: publicPath(item),
       });
     }
 
@@ -304,7 +346,7 @@ async function main() {
       assets.push({
         alt: null,
         kind: "cover",
-        localPath: `/nambah-assets/${cover.fileName}`,
+        localPath: publicPath(cover),
       });
     }
 
@@ -322,7 +364,7 @@ async function main() {
     if (assets.length === 0) continue;
 
     const coverPath = cover
-      ? `/nambah-assets/${cover.fileName}`
+      ? publicPath(cover)
       : (assets.find((asset) => asset.kind === "cover")?.localPath ?? null);
 
     products[gameId] = {

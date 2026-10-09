@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { gameDisplayName } from "@/lib/game-display-name";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { getFulfillmentMode } from "@/lib/fulfillment";
 import { getMidtransEnvironment } from "@/lib/midtrans/client";
@@ -12,6 +13,7 @@ export const runtime = "nodejs";
 
 type OrderRow = {
   id: string;
+  game_id: string;
   status: string;
   final_price: number | string;
   target_user_id: string;
@@ -108,7 +110,7 @@ export async function GET(request: Request) {
     ] = await Promise.all([
       supabaseSelect<OrderRow>("orders", {
         select:
-          "id,status,final_price,target_user_id,target_server_id,receipt_email,created_at,updated_at,game:games(name,short_name),product:products(label)",
+          "id,game_id,status,final_price,target_user_id,target_server_id,receipt_email,created_at,updated_at,game:games(name,short_name),product:products(label)",
         order: "created_at.desc",
         limit: 10,
       }),
@@ -196,7 +198,10 @@ export async function GET(request: Request) {
         targetUserId: order.target_user_id,
         targetServerId: order.target_server_id,
         hasReceiptEmail: Boolean(order.receipt_email),
-        gameName: order.game?.name ?? order.game?.short_name ?? "Produk digital",
+        gameName: gameDisplayName(
+          order.game_id,
+          order.game?.name ?? order.game?.short_name ?? "Produk digital",
+        ),
         packageLabel: order.product?.label ?? "-",
         createdAt: order.created_at,
         updatedAt: order.updated_at,

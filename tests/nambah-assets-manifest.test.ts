@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { resolveProductAsset, resolveProductCover } from "../src/lib/product-asset-resolver.ts";
 
@@ -15,6 +15,11 @@ import { resolveProductAsset, resolveProductCover } from "../src/lib/product-ass
  */
 
 const ASSET_DIR = path.join(process.cwd(), "public", "nambah-assets");
+
+// Folder kedua untuk aset katalog baru (2026-10-09). Opsional — belum tentu
+// ada. `build-nambah-asset-manifest.mjs` menggabungkan keduanya ke satu
+// manifest, jadi test di sini cukup mengikuti path yang tersimpan di manifest.
+const NEW_CATALOG_DIR = path.join(process.cwd(), "public", "nambah-assets-katalog-baru");
 // Manifest dibaca lewat `readFileSync` + `JSON.parse`, bukan
 // `import ... with { type: "json" }`. Node type-stripping tidak bisa menangani
 // import attribute di file TypeScript.
@@ -36,10 +41,26 @@ const manifestProducts = manifest.products;
 
 const IMAGE_EXT = new Set([".png", ".webp", ".jpg", ".jpeg"]);
 
-/** Semua file gambar yang ada di folder aset. */
+/**
+ * Nama file gambar di kedua folder aset.
+ *
+ * Yang dikembalikan HANYA nama file, bukan path. Manifest menyimpan
+ * `localPath` yang sudah termasuk foldernya, jadi existence check cukup
+ * mencocokkan nama file — nama yang sama di folder berbeda tetap dihitung
+ * satu entry, dan itu memang tidak terjadi karena `GAME_BY_PREFIX` unik.
+ */
 function assetFiles() {
-  return readdirSync(ASSET_DIR)
-    .filter((name) => IMAGE_EXT.has(path.extname(name).toLowerCase()));
+  const names: string[] = [];
+  for (const dir of [ASSET_DIR, NEW_CATALOG_DIR]) {
+    try {
+      for (const name of readdirSync(dir)) {
+        if (IMAGE_EXT.has(path.extname(name).toLowerCase())) names.push(name);
+      }
+    } catch {
+      // Folder katalog baru boleh belum ada.
+    }
+  }
+  return names;
 }
 
 function game(id: string) {
@@ -52,19 +73,51 @@ test("manifest memakai game id yang dikenal sistem", () => {
   const known = new Set(Object.keys(manifestProducts));
   assert.ok(known.size >= 20, `hanya ${known.size} game punya aset`);
 
-  // Setiap `localPath` harus benar-benar menunjuk file yang ada.
+  // Setiap `localPath` harus benar-benar menunjuk file yang ada, di salah satu
+  // dari dua folder aset yang digabung ke manifest ini.
+  //
+  // Yang diperiksa adalah PATH LENGKAP, bukan cuma nama file. Bug awalnya
+  // ketahuan karena test versi ini cuma mencocokkan `path.basename` — manifest
+  // mencatat `/nambah-assets/Laplace_M_Icon.jpg` untuk file yang sebenarnya
+  // ada di `nambah-assets-katalog-baru/`, nama file-nya cocok, path-nya tidak.
+  // Asetnya tidak pernah render.
+  const assetRoots = ["nambah-assets", "nambah-assets-katalog-baru"];
   for (const [id, product] of Object.entries(manifestProducts)) {
     for (const asset of [...product.assets]) {
       assert.ok(
-        asset.localPath.startsWith("/nambah-assets/"),
-        `${id}: path tidak di folder nambah-assets`,
+        assetRoots.some((root) => asset.localPath.startsWith(`/${root}/`)),
+        `${id}: path di luar folder aset — ${asset.localPath}`,
+      );
+      assert.ok(
+        existsSync(path.join(process.cwd(), "public", asset.localPath.replace(/^\//, ""))),
+        `${id}: file tidak ada di path itu — ${asset.localPath}`,
       );
       const fileName = path.basename(asset.localPath);
       assert.ok(
         assetFiles().includes(fileName),
-        `${id}: file tidak ada — ${fileName}`,
+        `${id}: file tidak terdaftar di folder aset — ${fileName}`,
       );
     }
+  }
+});
+
+test("cover memakai path yang benar-benar ada", () => {
+  // Regresi langsung: `resolveProductCover` mengembalikan path yang tidak ada,
+  // jadi kartu game di beranda jatuh ke avatar inisial tanpa error yang terlihat.
+  // Aset di folder katalog baru HARUS punya prefix foldernya sendiri.
+  const expectations: Array<[string, string]> = [
+    ["laplace-m", "/nambah-assets-katalog-baru/Laplace_M_Icon.jpg"],
+    ["one-punch-man", "/nambah-assets-katalog-baru/One_Punch_Man_Icon.png"],
+    ["tom-and-jerry-chase", "/nambah-assets-katalog-baru/Tom_And_Jerry_Chase_Icon.jpg"],
+  ];
+
+  for (const [id, expected] of expectations) {
+    const cover = resolveProductCover(game(id));
+    assert.equal(cover?.src, expected, `${id}: cover salah`);
+
+    // Dan path-nya harus bisa dibaca dari disk.
+    const local = path.join(process.cwd(), "public", expected.replace(/^\//, ""));
+    assert.ok(existsSync(local), `${id}: cover menunjuk file yang tidak ada — ${expected}`);
   }
 });
 

@@ -208,8 +208,9 @@ test("lima game baru punya target kurasi yang sesuai kebutuhannya", () => {
     // Ragnarok M & HSR: pemisah `|` (HSR terbukti dari "Contoh : 12345|os_asia").
     { id: "ragnarok-m-eternal-love", template: "{user_id}|{server_id}", server: true },
     { id: "honkai-star-rail", template: "{user_id}|{server_id}", server: true },
-    // Heroes Evolved: pemisah KOMA ("Contoh : 12345,100").
-    { id: "heroes-evolved", template: "{user_id},{server_id}", server: true },
+    // Heroes Evolved: pemisah PIPE. Deskripsi Produk-nya
+    // `Format no tujuan [UID]|[Server]`, sama dengan LifeAfter.
+    { id: "heroes-evolved", template: "{user_id}|{server_id}", server: true },
     // Dua ini cuma minta ID.
     { id: "league-of-legends-pc", template: "{user_id}", server: false },
     { id: "teamfight-tactics-mobile", template: "{user_id}", server: false },
@@ -257,17 +258,24 @@ test("setiap game di peta kurasi punya template yang valid", () => {
 });
 
 test("game ber-server memakai pemisah yang sesuai format supplier", () => {
-  // Pemisah ditentukan per game dari sumber yang berbeda-beda, bukan dari
-  // deskripsi `[UID]|[Server]` yang tanda `|`-nya notasi.
+  // Dua gaya Deskripsi Produk di Digiflazz, dan keduanya punya arti berbeda:
   //
-  //   `|`  -> Dragon Nest M (Deskripsi Seller di panel: "Contoh : 400628|030003")
-  //           dan Honkai Star Rail (tabel reseller: "12345|os_asia")
-  //   `,`  -> Heroes Evolved ("Contoh : 12345,100") dan NBA Infinite
-  //           ("Contoh : 12345,1001")
-  //   (none) -> "no tujuan = gabungan antara user_id dan zone_id"
+  //   "no tujuan = gabungan user id dan zone id"   -> TANPA pemisah (disambung)
+  //   "Format no tujuan [UID]|[Server]"            -> pemisah PIPE
   //
-  // Genshin, ZZZ, WuWa, dan Ragnarok M masih `|` sebagai asumsi — belum ada
-  // sumber yang mengonfirmasinya.
+  // Yang menyebut kata "gabung" memang bermaksud disambung. Yang memakai
+  // notasi kurung siku dengan tanda pisah di dalamnya bermaksud dipisah.
+  // Kalau maksudnya disambung, seller akan menulis "gabung" seperti Mobile
+  // Legends dan Mobile Legends Adventure lakukan.
+  //
+  // Bukti literal untuk pipe: LifeAfter, seller menulis di panel
+  // "FORMAT : USER ID|SERVER contoh 123456|500001".
+  //
+  // Pemisah KOMA sekarang hanya NBA Infinite, dari tabel reseller
+  // ("Contoh : 12345,1001"). Heroes Evolved pindah dari koma ke pipe pada
+  // 2026-10-09: kolom Deskripsi Produk-nya `Format no tujuan [UID]|[Server]`,
+  // sama persis dengan LifeAfter, dan sumber reseller pihak ketiga tidak
+  // mengalahkan kolom milik Digiflazz sendiri.
   const pipe = [
     "genshin-impact",
     "wuthering-waves",
@@ -275,6 +283,8 @@ test("game ber-server memakai pemisah yang sesuai format supplier", () => {
     "honkai-star-rail",
     "dragon-nest-m-classic",
     "ragnarok-m-eternal-love",
+    "lifeafter-credits",
+    "heroes-evolved",
   ];
   for (const id of pipe) {
     assert.equal(
@@ -284,7 +294,7 @@ test("game ber-server memakai pemisah yang sesuai format supplier", () => {
     );
   }
 
-  const comma = ["heroes-evolved", "nba-infinite"];
+  const comma = ["nba-infinite"];
   for (const id of comma) {
     assert.equal(
       getCuratedGameTarget(id)?.template,
@@ -300,6 +310,25 @@ test("game ber-server memakai pemisah yang sesuai format supplier", () => {
       "{user_id}{server_id}",
       `${id} harus digabung tanpa pemisah`,
     );
+  }
+});
+
+test("Deskripsi Seller mengalahkan Deskripsi Produk", () => {
+  // Regresi dari koreksi 2026-10-09.
+  //
+  // One Punch Man punya Deskripsi Produk `Format no tujuan [UID]|[Server]` —
+  // string yang PERSIS sama dengan LifeAfter dan Honkai Star Rail, yang
+  // keduanya memang butuh server. Tapi Deskripsi Seller-nya menyatakan
+  // "Tujuan = ID saja salah otomatis gagal", jadi game ini TIDAK butuh
+  // server.
+  //
+  // Jadi kolom Deskripsi Produk bisa jadi boilerplate. Kalau aturan ini
+  // dilanggar, notasi kurung siku akan diperlakukan sebagai "pemisah berarti
+  // server opsional" dan game ini akan salah mengirim `uid|server`.
+  for (const id of ["one-punch-man", "tom-and-jerry-chase"]) {
+    const target = getCuratedGameTarget(id);
+    assert.equal(target?.requiresServer, false, `${id} tidak butuh server`);
+    assert.equal(target?.template, "{user_id}", `${id} template harus {user_id}`);
   }
 });
 
@@ -325,6 +354,13 @@ test("tidak ada game yang gagal total saat fulfillment", () => {
     "zenless-zone-zero": "os_cht",
     "honkai-star-rail": "os_cht",
     "wuthering-waves": "HMT",
+    // Katalog baru (2026-10-09). LifeAfter mengirim KODE server enam digit
+    // (`123456|500001`), bukan nama server — nama Mandarin-nya tidak akan
+    // melewati filter karakter `customer_no` kalau tidak diterjemahkan ke kode.
+    "lifeafter-credits": "500001",
+    "one-punch-man": "123456",
+    // Tom and Jerry: server berupa NAMA ("Asia"), pemisah koma.
+    "tom-and-jerry-chase": "Asia",
   };
   for (const [id, target] of Object.entries(CURATED_GAME_TARGETS)) {
     if (!target.template || !target.requiresServer) continue;

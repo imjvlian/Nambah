@@ -1,10 +1,12 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { gameDisplayName } from "@/lib/game-display-name";
 import { supabaseSelect } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 type AdminOrderRow = {
   id: string;
+  game_id: string;
   status: string;
   final_price: number | string;
   target_user_id: string;
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
   try {
     const rows = await supabaseSelect<AdminOrderRow>("orders", {
       select:
-        "id,status,final_price,target_user_id,target_server_id,receipt_email,customer_user_id,created_at,updated_at,paid_at,fulfilled_at,game:games(name,short_name),product:products(label),payment:payment_methods(name)",
+        "id,game_id,status,final_price,target_user_id,target_server_id,receipt_email,customer_user_id,created_at,updated_at,paid_at,fulfilled_at,game:games(name,short_name),product:products(label),payment:payment_methods(name)",
       order: "created_at.desc",
       limit: 100,
     });
@@ -48,7 +50,10 @@ export async function GET(request: Request) {
         targetServerId: row.target_server_id,
         receiptEmail: maskEmail(row.receipt_email),
         customerUserId: row.customer_user_id,
-        gameName: row.game?.name ?? row.game?.short_name ?? "Produk digital",
+        gameName: gameDisplayName(
+            row.game_id,
+            row.game?.name ?? row.game?.short_name ?? "Produk digital",
+          ),
         packageLabel: row.product?.label ?? "-",
         paymentName: row.payment?.name ?? "-",
         createdAt: row.created_at,

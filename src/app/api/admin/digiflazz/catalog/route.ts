@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { gameDisplayName } from "@/lib/game-display-name";
 import {
   supabaseSelect,
   supabaseSelectAll,
@@ -160,7 +161,10 @@ export async function GET(request: Request) {
     const nambahProducts = products.map((product) => ({
       id: product.id,
       gameId: product.game_id,
-      gameName: gamesById.get(product.game_id)?.name ?? product.game_id,
+      gameName: gameDisplayName(
+        product.game_id,
+        gamesById.get(product.game_id)?.name ?? product.game_id,
+      ),
       label: product.label,
       active: product.active,
     }));

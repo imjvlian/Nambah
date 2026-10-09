@@ -112,6 +112,20 @@ const PRODUCT_SLUG_ALIASES: Record<string, string[]> = {
   // `fc-mobile`. Tanpa alias ini, cover FC Mobile tidak ketemu dan kartu game
   // di beranda jatuh ke avatar inisial padahal gambarnya tersedia.
   "fc-mobile": ["ea-sports-fc-mobile"],
+  // ── Katalog baru (2026-10-09) ──────────────────────────────────────────
+  //
+  // Hanya alias slug. Tidak ada game baru yang masuk `CODASHOP_ONLY` atau
+  // `NOMINAL_IMAGE_OVERRIDE` — keduanya tetap apa adanya.
+  //
+  // Empat game punya halaman Codashop Indonesia dengan slug yang berbeda dari
+  // `game.id`. Empat lainnya (LifeAfter, Lords Mobile, AU2, Werewolf) tidak
+  // ada di Codashop ID sama sekali, jadi tidak punya alias — resolver akan
+  // mengembalikan `null` dan kartu game memakai avatar inisial, sama seperti
+  // sepuluh game lain yang sudah seperti itu.
+  "one-punch-man": ["one-punch-man-the-strongest"],
+  "lifeafter-credits": ["lifeafter"],
+  "lords-mobile": ["lords-mobile"],
+  "au2-mobile": ["au2-mobile"],
 };
 
 function normalize(value: string) {

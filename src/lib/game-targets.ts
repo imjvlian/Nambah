@@ -36,17 +36,26 @@ export type GameFulfillmentTarget = {
    *
    *   "no tujuan = gabungan user id dan zone id"  -> tanpa pemisah (Mobile
    *       Legends, Mobile Legends Adventure)
-   *   Dragon Nest M / Genshin / HSR / ZZZ / WuWa / Ragnarok M -> pemisah `|`
-   *       (lihat catatan Deskripsi Seller di bawah)
-   *   "Masukkan ID dan Server"                     -> pemisah KOMA (Heroes
-   *       Evolved, NBA Infinite). Tabel format reseller menyebut
-   *       `Contoh : 12345,100` dan `Contoh : 12345,1001`.
-   *   Genshin / HSR / ZZZ -> `|` dari Deskripsi Seller ZZZ di panel:
-   *       "Format order : UID|Server uid,server uid|server uid(server)".
-   *       Seller menyebut `|` eksplisit di antara dua bentuk lain, jadi tanda
-   *       itu karakter literal, bukan notasi.
-   *   Wuthering Waves / Ragnarok M -> `|` sebagai ASUMSI. Belum ada Deskripsi
-   *       Seller yang dilihat untuk keduanya.
+   *
+   *   "Format no tujuan [UID]|[Server]"            -> pemisah `|`
+   *
+   *       Dua-duanya tidak sama. Yang menyebut kata "GABUNG" memang bermaksud
+   *       disambung tanpa pemisah. Yang memakai notasi kurung siku dengan tanda
+   *       pisah di dalamnya bermaksud dipisah — kalau maksudnya disambung,
+   *       seller akan menulis "gabung" seperti dua game di atas.
+   *
+   *       Bukti literal: LifeAfter, seller menulis "FORMAT : USER ID|SERVER
+   *       contoh 123456|500001" di panel. Pipe-nya nyata, bukan notasi.
+   *
+   *   "Masukkan ID dan Server"                     -> pemisah KOMA (NBA
+   *       Infinite), dari tabel format reseller: `Contoh : 12345,1001`.
+   *       RAGUNAROK M punya Deskripsi Produk yang persis sama tapi memakai
+   *       pipe. Keduanya prose, jadi tidak ada pola yang bisa membedakan.
+   *
+   * PENTING: kolom Deskripsi Produk bisa jadi boilerplate. One Punch Man punya
+   *   string `Format no tujuan [UID]|[Server]` yang sama persis dengan LifeAfter,
+   *   tapi Deskripsi Seller-nya menyatakan "Tujuan = ID saja". Karena itu
+   *   Deskripsi Seller — kalau ada — yang menang atas kolom Deskripsi Produk.
    *
    * null berarti game ini belum diverifikasi dan belum boleh dikirim ke
    * supplier. Sengaja dibiarkan kosong supaya readiness menandainya blocker,
@@ -83,6 +92,25 @@ export const CURATED_GAME_TARGETS: Readonly<Record<string, GameFulfillmentTarget
   "zenless-zone-zero": { requiresServer: true, template: "{user_id}|{server_id}" },
   "honkai-star-rail": { requiresServer: true, template: "{user_id}|{server_id}" },
   "dragon-nest-m-classic": { requiresServer: true, template: "{user_id}|{server_id}" },
+  // Heroes Evolved. Deskripsi Produknya `Format no tujuan [UID]|[Server]` —
+  // string yang sama persis dengan LifeAfter, HSR, dan WuWa, dan pipe-nya di
+  // kelompok game itu terbukti literal.
+  //
+  // Sebelumnya template ini KOMA, bersandar pada tabel reseller pihak ketiga
+  // (kuotapulsa.com: "Contoh : 12345,100"). Sumber itu bukan acuan: kolom
+  // Deskripsi Produk milik Digiflazz sendiri lebih tinggi otoritivitasnya, dan
+  // perbedaan "gabung" (disambung) vs "[UID]|[Server]" (dipisah) memang
+  // terlihat di data kita.
+  //
+  // Deskripsi Seller untuk game ini (PT*** dan Om***) TIDAK menyebut format
+  // sama sekali — hanya promosi, dan satu kalimat "ID Salah = Otomatis Gagal"
+  // yang bicara soal User ID, bukan pemisah. Jadi pipe di sini bersandar pada
+  // Deskripsi Produk saja.
+  //
+  // Kalau order pertama ditolak supplier, PEMISAH adalah hal pertama yang
+  // diperiksa duluan. Koma adalah alternatif yang mungkin; koreksinya satu
+  // baris SQL, tidak ada perubahan kode.
+  "heroes-evolved": { requiresServer: true, template: "{user_id}|{server_id}" },
 
   // Ragnarok M: "Masukkan ID dan Server". Pemisah `|` belum terverifikasi —
   // tidak ada reseller maupun panel yang menyebut formatnya, dan deskripsi
@@ -91,13 +119,84 @@ export const CURATED_GAME_TARGETS: Readonly<Record<string, GameFulfillmentTarget
   "ragnarok-m-eternal-love": { requiresServer: true, template: "{user_id}|{server_id}" },
 
   // ── ID + server, pemisah koma ───────────────────────────────────────────
-  // Keduanya "Masukkan ID dan Server", dan tabel format order reseller Digiflazz
-  // menyebut `Format tujuan : User ID,Server` — pemisah KOMA, bukan pipe.
-  // Server juga berupa kode angka, bukan nama region:
-  //   Heroes Evolved: 100, 101, 111, 112, 121, 122, 131, 132, 133, 134, 135
-  //   NBA Infinite:   1001, 5001, 6001, 7001, 8001
-  "heroes-evolved": { requiresServer: true, template: "{user_id},{server_id}" },
+  // NBA Infinite: Deskripsi Produknya "Masukkan ID dan Server" — prose, tanpa
+  // notasi kurung siku. Pemisah koma berasal dari tabel format order reseller
+  // Digiflazz (kuotapulsa.com): "Format tujuan : User ID,Server  Contoh : 12345,1001".
+  // Server berupa kode angka, bukan nama region: 1001 Oceania, 5001
+  // SouthAmerica, 6001 NA, 7001 Asia, 8001 Europe.
+  //
+  // CATATAN: ini masih ASUMSI satu sumber. Ragnarok M punya Deskripsi Produk
+  // yang persis sama ("Masukkan ID dan Server") tapi memakai pipe. Keduanya
+  // prose, jadi tidak ada pola yang bisa membedakan. Kalau order NBA Infinite
+  // ditolak supplier, periksa pemisah ini duluan.
   "nba-infinite": { requiresServer: true, template: "{user_id},{server_id}" },
+
+  // ── Katalog baru (2026-10-09) ───────────────────────────────────────────
+  // Delapan game yang masuk katalog setelah peta ini pertama dibuat. Semuanya
+  // sebelumnya ada di `games` tanpa `fulfillment_target_template`, jadi
+  // `gamesMissingCuratedTarget` menandainya sebagai blocker.
+  //
+  // Untuk game yang tadinya tidak punya template, bedanya bukan format tapi
+  // KETERSEDIAAN: sebelum ini, satu-satunya cara tahu formatnya adalah
+  // Deskripsi Seller di panel Digiflazz. Sekarang tiap nilai di bawah punya
+  // sumber independen yang bisa diperiksa ulang.
+  //
+  // "ID saja" berarti tidak ada kolom server sama sekali — form hanya satu,
+  // dan `customer_no` = ID apa adanya.
+  //
+  // Speed Drifters: deskripsi Digiflazz-nya `-`, dan lima sumber reseller
+  // (KALEOZ "UID ONLY", MooGold "Only Player ID Required", UniPin, Uquid,
+  // Kaisar) tidak satu pun menyebut server. `-` di sini berarti memang tidak
+  // ada field tambahan, bukan data yang hilang.
+  "laplace-m": { requiresServer: false, template: "{user_id}" },
+  "lords-mobile": { requiresServer: false, template: "{user_id}" },
+  "speed-drifters": { requiresServer: false, template: "{user_id}" },
+  "werewolf-party-game": { requiresServer: false, template: "{user_id}" },
+  // AU2 Mobile: sebagian besar reseller hanya minta User ID (SEAGM dan Uquid
+  // eksplisit "Only User ID is needed"; TokoVCR dan KuponTop menyebut satu
+  // langkah, "Masukkan User ID"). Codashop KHM juga tanpa
+  // server. Minority yang minta server (UniPin) tidak kita ikuti.
+  "au2-mobile": { requiresServer: false, template: "{user_id}" },
+
+  // LifeAfter Credits: deskripsi Digiflazz "Format no tujuan [UID]|[Server]".
+  // Server dikirim sebagai KODE angka enam digit (500001…730001), bukan nama
+  // server — contoh order dari panel: `123456|500001`. Daftar lengkap kode dan
+  // nama ada di `LIFEAFTER_SERVER_OPTIONS` (`game-account.ts`).
+  //
+  // NetEase (publisher) mengonfirmasi dua kolom: "Masukkan LifeAfter User ID
+  // Anda dan pilih server game" di pay.neteasegames.com/lifeafter/topup.
+  "lifeafter-credits": { requiresServer: true, template: "{user_id}|{server_id}" },
+
+  // One Punch Man: The Strongest. TIDAK butuh server.
+  //
+  // Kolom "Deskripsi Produk" menulis `Format no tujuan [UID]|[Server]`, tapi
+  // Deskripsi Seller untuk game ini justru menyatakan sebaliknya, dan itu yang
+  // diikut:
+  //
+  //   pre34663356 (OPM1): "Tujuan = ID saja salah otomatis gagal"
+  //
+  // Nama produknya `ONEPUNCH_13` — angka itu nominal kupon, bukan server.
+  //
+  // Ini bukti bahwa kolom Deskripsi Produk bisa jadi boilerplate: game ini
+  // punya string yang sama persis dengan LifeAfter dan Wuthering Waves, yang
+  // memang butuh server. Sumber pihak ketiga (Codashop, MooGold, KZStore)
+  // semuanya menyebut User ID + Server ID, tapi seller yang benar-benar
+  // menerima orderIni tidak memintanya. Kalau tetap mengirim `12345679|123456`,
+  // order-nya ditolak setelah pembayaran.
+  "one-punch-man": { requiresServer: false, template: "{user_id}" },
+
+  // Tom and Jerry: Chase. TIDAK butuh server.
+  //
+  // Deskripsi Produknya literally "-", jadi tidak ada sinyal sama sekali dari
+  // sana. Dua seller independen menyatakan hal yang sama, eksplisit:
+  //
+  //   pre34663343 (TTAJ60): "Tujuan = User ID"
+  //   pre34663344 (TJ180):  "Tujuan = User ID (Server Tidak Perlu)"
+  //
+  // Sebelumnya template ini `{user_id},{server_id}` dengan server berupa nama
+  // ("Asia"), bersandar pada Codashop SG, NetEase, dan itemku. Ketiganya
+  // pihak ketiga, dan Bertentangan dengan seller sebenarnya.
+  "tom-and-jerry-chase": { requiresServer: false, template: "{user_id}" },
 
   // ── ID + Zone ID, digabung tanpa pemisah ────────────────────────────────
   // Deskripsinya eksplisit: "no tujuan = gabungan antara user_id dan zone_id".

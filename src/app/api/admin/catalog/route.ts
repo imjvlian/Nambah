@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { gameDisplayNames } from "@/lib/game-display-name";
 import { supabaseSelect, supabaseSelectAll } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -79,8 +80,14 @@ export async function GET(request: Request) {
       return {
         id: product.id,
         gameId: product.game_id,
-        gameName: game?.name ?? product.game_id,
-        gameShortName: game?.short_name ?? product.game_id,
+        gameName: gameDisplayNames(product.game_id, {
+          name: game?.name ?? product.game_id,
+          shortName: game?.short_name ?? product.game_id,
+        }).name,
+        gameShortName: gameDisplayNames(product.game_id, {
+          name: game?.name ?? product.game_id,
+          shortName: game?.short_name ?? product.game_id,
+        }).shortName,
         label: product.label,
         note: product.note,
         sellingPrice: Number(product.selling_price),

@@ -225,6 +225,18 @@
         }
       ]
     },
+    "laplace-m": {
+      "name": "laplace-m",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets-katalog-baru/Laplace_M_Icon.jpg",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets-katalog-baru/Laplace_M_Icon.jpg"
+        }
+      ]
+    },
     "league-of-legends-pc": {
       "name": "league-of-legends-pc",
       "source": "nambah-assets",
@@ -426,6 +438,18 @@
         }
       ]
     },
+    "one-punch-man": {
+      "name": "one-punch-man",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets-katalog-baru/One_Punch_Man_Icon.png",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets-katalog-baru/One_Punch_Man_Icon.png"
+        }
+      ]
+    },
     "point-blank": {
       "name": "point-blank",
       "source": "nambah-assets",
@@ -527,6 +551,18 @@
           "alt": null,
           "kind": "cover",
           "localPath": "/nambah-assets/Teamfight_Tactics_Mobile_Icon.webp"
+        }
+      ]
+    },
+    "tom-and-jerry-chase": {
+      "name": "tom-and-jerry-chase",
+      "source": "nambah-assets",
+      "cover": "/nambah-assets-katalog-baru/Tom_And_Jerry_Chase_Icon.jpg",
+      "assets": [
+        {
+          "alt": null,
+          "kind": "cover",
+          "localPath": "/nambah-assets-katalog-baru/Tom_And_Jerry_Chase_Icon.jpg"
         }
       ]
     },
