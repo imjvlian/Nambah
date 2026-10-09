@@ -367,7 +367,15 @@
   margin-top: 18px;
   padding: 2px 0 9px;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
+  /* Scrollbar disembunyikan, sama seperti `.catalog-category-tabs` dan
+   * `.home-category-grid`. Melihat garis abu-abu di bawah kartu bukan petunjuk
+   * yang berguna — yang dicari pengguna adalah chip yang terpotong di tepi. */
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.home-popular-track::-webkit-scrollbar {
+  display: none;
 }
 
 .home-popular-card {
@@ -774,17 +782,41 @@
   }
 
   .home-popular-track {
-    margin-right: -20px;
-    padding-right: 20px;
+    /* Bleed sampai tepi layar, sama seperti `.home-category-grid` di bawah.
+     * `--bleed` = jarak elemen ke tepi layar; dikurangi 20px karena shell
+     * sudah memakai 20px per sisi. */
+    --bleed: calc(100vw - 100%);
+    margin-right: calc(-1 * (var(--bleed) - 20px));
+    padding-right: calc(var(--bleed) - 20px);
   }
 
   .home-oura-refine .home-category-grid {
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    margin-right: -20px;
-    padding-right: 20px;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .home-oura-refine .home-category-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-oura-refine .home-category-grid button {
+    min-width: 184px;
+    flex: 0 0 184px;
+  }
+
+  .home-oura-refine .home-category-grid {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .home-oura-refine .home-category-grid::-webkit-scrollbar {
+    display: none;
   }
 
   .home-oura-refine .home-category-grid button {

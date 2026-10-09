@@ -30,13 +30,31 @@
   line-height: 1.5;
 }
 
+/* Barisan kategori bisa digulir horizontal, tapi scrollbar-nya disembunyikan.
+ *
+ * `scrollbar-width: none` (Firefox + Chrome 121+) dan `::-webkit-scrollbar`
+ * (Safari, Chrome lama) harus dua-duanya — salah satu saja tidak cukup dan
+ * hasilnya berbeda per browser. Polanya sama dengan `.package-group-tabs` di
+ * pricing.css.
+ *
+ * Catatan: disembunyikannya bukan berarti kategori tidak bisa digulir. Di layar
+ * sempit chip terakhir memang terpotong sebagian, dan itu justru penanda bahwa
+ * masih ada yang bisa digulir.
+ */
 .catalog-category-tabs {
   display: flex;
   gap: 9px;
   width: 100%;
   overflow-x: auto;
   padding: 2px 0 7px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  /* Ios Safari memakai momentum scrolling; tanpa ini Categories terasa berat
+   * saat digulir. */
+  -webkit-overflow-scrolling: touch;
+}
+
+.catalog-category-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .catalog-category-tabs button {
@@ -103,12 +121,49 @@
     gap: 10px;
   }
 
+  /* Bleed sampai tepi LAYAR, bukan tepi `.shell`.
+   *
+   * `.shell` memakai `width: min(1180px, calc(100% - 40px))`, jadi di 390px
+   * konten jadi 350px dan ada 20px ruang kosong per sisi. `margin-right: -20px`
+   * hanya menjulang sampai tepi shell — chip terakhir terpotong 20px dari tepi
+   * layar dan terbaca sebagai bug, bukan sebagai "masih ada yang bisa digulir".
+   *
+   * `--bleed` = jarak dari tepi elemen ke tepi viewport. Dikurangi 20px
+   * karena shell sudah menyediakan 20px itu. `margin-right` negatif menjulang
+   * keluar, `padding-right` yang sama mengembalikan ruang kosong di dalam
+   * supaya chip terakhir tidak menempel tepi.
+   *
+   * `scroll-padding-right` menjaga posisi berhenti tetap rapi setelah digulir
+   * penuh — tanpa itu, gulir penuh meninggalkan chip terakhir menempel tepi.
+   */
   .catalog-category-tabs {
-    margin-right: -20px;
-    padding-right: 20px;
+    --bleed: calc(100vw - 100%);
+    margin-right: calc(-1 * (var(--bleed) - 20px));
+    padding-right: calc(var(--bleed) - 20px);
+    scroll-padding-right: calc(var(--bleed) - 20px);
+    /* Disembunyikan scrollbarnya, tapi TIDAK mematikan scrollnya — `overflow-x:
+     * auto` tetap aktif, jadi Categories masih bisa digulir dengan jari,
+     * trackpad, atau tombol panah keyboard. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    /* Finger swipe tidak boleh memicu backscoop di iOS — gesture geser ke
+     * belakang akan menggeser halaman, bukan carousel. */
+    overscroll-behavior-x: contain;
   }
 
+  .catalog-category-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 7 kategori x 130px + 6 gap = 970px. Di 390px tidak akan pernah muat, jadi
+   * lebar minimum dikecilkan supaya lebih banyak chip terlihat sekaligus dan
+   * jelas bahwa sisanya bisa digulir — bukan terpotong di tengah.
+   */
   .catalog-category-tabs button {
-    min-width: 130px;
+    min-width: 118px;
+    gap: 10px;
+    padding: 0 9px 0 12px;
+    font-size: 11px;
   }
 }

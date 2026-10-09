@@ -731,10 +731,105 @@
     min-height: 27px;
     padding-inline: 8px 6px;
   }
+
+  /* ── Kartu v4 di dua kolom: judul dapat lebar penuh ──────────────────
+   *
+   * Dua kolom di 390px memberi kartu ~165px. Dengan
+   * `34px minmax(0,1fr) auto`, kolom harga yang `auto` + `nowrap`
+   * mengambil lebar teksnya sendiri ("Rp 7.899.000" ≈ 70px) dan TIDAK PERNAH
+   * melebar. Sisa untuk judul cuma ~25px — cukup satu karakter per baris, dan
+   * nama nominal terbaca vertikal.
+   *
+   * Jumlah kolom bukan penyebabnya. Selama harga ada di baris yang sama, 1 kolom
+   * juga akan menyisakan 25px untuk judul.
+   *
+   * Perbaikannya: harga turun ke baris sendiri, sejajar dengan judul, dan kolom
+   * `auto` dihapus. Judul sekarang dapat ~115px — "2.786 Diamonds" muat satu
+   * baris.
+   *
+   * Desktop tidak tersentuh: di layar lebar kartu cukup untuk 3 kolom.
+   */
+  .package-option.package-card-v4 {
+    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    gap: 3px 8px;
+    padding: 8px;
+  }
+
+  .package-card-v4-visual {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: 15px !important;
+  }
+
+  .package-card-v4 .package-item-visual.diamond {
+    font-size: 14px !important;
+  }
+
+  .package-card-v4-body {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* Harga pindah ke baris 2, rata kiri — sejajar dengan judul supaya mudah
+   * dipindai mata. Kanan terlihat rapi tapi jauh dari judulnya. */
+  .package-card-v4-price {
+    grid-column: 2;
+    grid-row: 2;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .package-card-v4-price .package-current-price {
+    font-size: 10px;
+  }
+
+  .package-badge,
+  .package-card-v4-meta .package-badge {
+    min-height: 15px;
+    padding: 0 6px;
+    font-size: 6.5px;
+  }
+
+  /* Badge tetap di baris paling bawah, membentang penuh. */
+  .package-card-v4-meta {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: 3px;
+    margin-top: 1px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
 }
 
 @media (max-width: 390px) {
   .package-grid.package-grid-v3 {
     grid-template-columns: 1fr;
+  }
+
+  /* Kartu v4 tetap 2 kolom bahkan di 390px.
+   *
+   * Aturan ini sebelumnya dibuat karena kartu 3 kolom tidak muat di satu kolom
+   * sempit — judulnya tergencet jadi satu karakter per baris. Sekarang harga
+   * sudah pindah ke baris sendiri (lihat blok 700px di atas), jadi judul dapat
+   * ~105px dan masih terbaca. Satu kolom di sini justru membuang ruang: kartu
+   * jadi 350px dengan 30px ikon, sisa ruang tidak terpakai.
+   */
+  .nominal-section-best-deals .package-grid.package-grid-v3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Ikon dan padding dikecilkan sedikit di layar paling sempit supaya judul
+   * dapat lebih lebar lagi tanpa kehilangan daya baca ikon. */
+  .package-option.package-card-v4 {
+    grid-template-columns: 26px minmax(0, 1fr);
+    padding: 7px;
+  }
+
+  .package-card-v4-visual {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
   }
 }

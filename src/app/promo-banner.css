@@ -225,10 +225,23 @@
     min-height: 200px;
   }
 
-  /* Di layar kecil frame banner dibuat lebih tinggi (16/9) supaya teks
-     overlay tetap muat; crop-nya terkontrol di sisi kiri-kanan saja. */
+  /* Rasi banner TIDAK diubah dari 3/1.
+   *
+   * Semua banner di `promo_banners` berukuran 1200×400 — persis 3:1. Memaksa
+   * frame jadi 16/9 membuat `cover` harus memotong ~44% dari tinggi gambar,
+   * dan karena desainnya melebar ke kanan, teks headline di sisi kanan ikut
+   * hilang. Itu yang membuat banner terlihat "terpotong" di layar kecil.
+   *
+   * 3/1 di 390px menghasilkan tinggi 130px — pendek, tapi utuh. Banner pendek
+   * lebih baik daripada banner yang teksnya hilang.
+   *
+   * `min-height` sengaja TIDAK ditambahkan: begitu ada, tinggi minimum
+   * mengalahkan rasionya dan `cover` memotong lagi — bug yang sama seperti
+   * yang sebelumnya ada di `.promo-popup-media-clean`.
+   */
   .promo-slide-banner {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 3 / 1;
+    min-height: 0;
   }
 
   .promo-slide-cta {
@@ -268,17 +281,38 @@
   background-position: center;
 }
 
-/* Mode bersih: gambar memenuhi popup dan menjadi satu tombol besar. */
+/* Mode bersih: gambar memenuhi popup dan menjadi satu tombol besar.
+ *
+ * `aspect-ratio` saja, TANPA `min-height`.
+ *
+ * Sebelumnya ada `min-height: 180px` bersama `aspect-ratio: 3 / 1`. Di popup
+ * 440px, 3:1 menghasilkan tinggi 147px — lebih kecil dari min-height, jadi
+ * yang menang adalah `min-height` dan rasionya bukan 3:1 lagi. Dengan
+ * `background-size: cover`, gambar banner terpotong di tepi dan teksnya ikut
+ * hilang.
+ *
+ * Banner promo dibuat potret, bukan lanseps. Rasio dibuat lebih tinggi supaya
+ * komposisi aslinya terbaca: 3:1 memotong bagian atas dan bawah, tempat
+ * headline biasanya berada.
+ */
 .promo-popup-media-clean {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 1;
+  aspect-ratio: 4 / 5;
   height: auto;
-  min-height: 180px;
   border: 0;
   padding: 0;
   cursor: pointer;
   background-color: transparent;
+  background-repeat: no-repeat;
+}
+
+/* Di layar pendek (landscape ponsel, tablet tegak) popup boleh lebih
+ * vertikal lagi supaya seluruh banner masuk tanpa terpotong. */
+@media (max-height: 640px) {
+  .promo-popup-media-clean {
+    aspect-ratio: 1 / 1;
+  }
 }
 
 .promo-popup-media-clean:focus-visible {

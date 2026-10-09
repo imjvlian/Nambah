@@ -422,6 +422,22 @@
   .product-page .topup-intro {
     position: static;
   }
+
+  /* Di mobile, form checkout harus DI ATAS dan rating DI BAWAH.
+   *
+   * `grid-template-columns: 1fr` di atas membuat rail rating turun ke baris
+   * pertama — jadi rating muncul sebelum form. Urutannya dibalik di sini
+   * dengan `order`, dan `position: static` dipakai lagi karena `sticky` di
+   * `.topup-intro` (globals.css) masih berlaku: di satu kolom, rating akan
+   * ikut menempel di layar saat form digulir.
+   */
+  .product-page .topup-intro-rail {
+    order: 2;
+  }
+
+  .product-page .order-card {
+    order: 1;
+  }
 }
 
 @media (max-width: 700px) {
