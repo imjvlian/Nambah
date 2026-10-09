@@ -1,30 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 /**
  * Pratinjau HTML receipt tanpa mengirim email.
  *
  * Kenapa ini perlu ada: email yang sudah masuk inbox tidak bisa diedit dan
  * tidak bisa ditarik kembali. Satu kesalahan layout baru ketahuan setelah
- * pelanggan menerimanya. Pratinjau memakai endpoint yang memanggil
- * `renderReceiptHtml` yang sama dengan pengiriman sungguhan, jadi yang
- * terlihat di sini persis yang akan diterima.
+ * pelanggan menerimanya. Pratinjau memanggil `renderReceiptHtml` yang sama
+ * dengan pengiriman sungguhan, jadi yang terlihat di sini persis yang akan
+ * diterima.
  *
- * Pratinjau dibuka di iframe, bukan disisipkan langsung ke DOM admin.
- * Alasannya bukan tampilan: HTML receipt penuh dengan CSS inline dan
- * atribut yang tidak berguna di dalam konteks panel admin, dan menyisipkannya
- * akan membuat gaya panel ikut mewarisi hal-hal yang tidak relevan.
+ * Pratinjau ditampilkan lewat `srcDoc`, bukan `src` + iframe biasa.
+ * Alasannya teknis, bukan estetika: `src` membuat browser memuat dokumen
+ * dari origin sendiri, dan `frame-ancestors` pada CSP route itu akan
+ * menolaknya. Dengan `srcDoc`, isinya menjadi dokumen milik panel admin —
+ * tidak ada permintaan jaringan kedua, tidak ada origin baru.
+ *
+ * Isinya diambil lewat `fetch` yang sudah membawa cookie sesi admin, jadi
+ * route preview tetap bisa menjaga itself dengan `authorizeAdminRequest`.
  */
 export default function ReceiptPreview() {
   const [orderId, setOrderId] = useState("");
-  const [open, setOpen] = useState(false);
+  const [html, setHtml] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const trimmed = orderId.trim();
-  const previewHref = trimmed
-    ? `/api/admin/receipt-preview?orderId=${encodeURIComponent(trimmed)}`
-    : "";
+
+  const load = useCallback(async (id: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/admin/receipt-preview?orderId=${encodeURIComponent(id)}`,
+        {
+          cache: "no-store",
+          credentials: "same-origin",
+        },
+      );
+
+      if (!response.ok) {
+        // Endpoint mengembalikan JSON untuk error dan HTML untuk sukses.
+        // Coba baca JSON dulu supaya pesan server sampai ke admin apa adanya.
+        let message = `Preview gagal (HTTP ${response.status}).`;
+        try {
+          const body = (await response.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          /* body bukan JSON — pakai pesan default */
+        }
+        setError(message);
+        setHtml("");
+        return;
+      }
+
+      setHtml(await response.text());
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? `Preview gagal: ${fetchError.message}`
+          : "Preview gagal dimuat.",
+      );
+      setHtml("");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -32,59 +74,59 @@ export default function ReceiptPreview() {
       setError("Masukkan order ID lebih dulu.");
       return;
     }
-    setError("");
-    setOpen(true);
+    void load(trimmed);
+  };
+
+  // Cmd/Ctrl+Enter = pratinjau tanpa menyentuh tombol. Form biasa
+  // mengabaikan tombol Enter di dalam input, jadi tanpa handler eksplisit
+  // pengguna harus pakai mouse.
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      if (trimmed) void load(trimmed);
+    }
   };
 
   return (
     <div className="acc-receipt-preview">
-      <form
-        className="acc-receipt-preview-form"
-        onSubmit={submit}
-      >
+      <form className="acc-receipt-preview-form" onSubmit={submit}>
         <input
           value={orderId}
           onChange={(event) => {
             setOrderId(event.target.value);
             setError("");
           }}
-          placeholder="Order ID, contoh: ORD-2409-8F2A91C4"
+          onKeyDown={onKeyDown}
+          placeholder="Order ID, contoh: NBH-20261008-44BA21FB45"
           aria-label="Order ID untuk pratinjau receipt"
           spellCheck={false}
           autoComplete="off"
         />
-        <button type="submit" disabled={!trimmed}>
-          Pratinjau
+        <button type="submit" disabled={!trimmed || loading}>
+          {loading ? "Memuat" : "Pratinjau"}
         </button>
       </form>
 
       <p className="acc-receipt-preview-note">
         Pratinjau tidak mengirim email dan tidak mengubah status pengiriman.
-        Order tidak harus <code>success</code> — status apa pun bisa
-        diperiksa di sini.
+        Order tidak harus berstatus <code>success</code> — status apa pun bisa
+        diperiksa di sini. Tekan <code>Ctrl</code>/<code>Cmd</code> +
+        <code>Enter</code> untuk pratinjau cepat.
       </p>
 
       {error && <p className="acc-error-text">{error}</p>}
 
-      {open && previewHref && (
+      {html && (
         <div className="acc-receipt-preview-frame">
           <div className="acc-receipt-preview-bar">
             <span>Pratinjau · {trimmed}</span>
-            <button type="button" onClick={() => setOpen(false)}>
+            <button type="button" onClick={() => setHtml("")}>
               Tutup
             </button>
           </div>
-          {/*
-            `sandbox` mengizinkan HTML & script tapi TIDAK `allow-same-origin`.
-            Tanpa itu, isi iframe berjalan di origin yang sama dengan panel
-            admin dan bisa menyentuh cookie sesi. Ini bukan Style, ini
-           batas keamanan untuk konten yang datanya berasal dari input
-            pengguna (`order_id`, nama game, label produk).
-          */}
           <iframe
             title={`Pratinjau receipt ${trimmed}`}
-            src={previewHref}
-            sandbox="allow-same-origin"
+            srcDoc={html}
             className="acc-receipt-preview-iframe"
           />
         </div>

@@ -45,6 +45,31 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        /*
+         * ATURAN SINGKEL untuk semua route, termasuk halaman pelanggan.
+         *
+         * `frame-ancestors 'none'` + `X-Frame-Options: DENY` berarti tidak
+         * ada halaman yang boleh di-embed, oleh siapa pun. Itu memang
+         * benar: tanpa ini, penyerang bisa membungkus halaman checkout di
+         * iframe miliknya dan meniru tampilannya untuk mencuri kredensial
+         * (clickjacking).
+         *
+         * Pratinjau receipt admin TIDAK butuh pengecualian di sini. Ia
+         * memakai `srcDoc` (lihat `ReceiptPreview.tsx`), jadi isinya
+         * menjadi dokumen milik panel admin sendiri — tidak ada navigasi
+         * jaringan, tidak ada origin baru, dan `frame-ancestors` tidak
+         * relevan karena tidak ada iframe lintas dokumen.
+         *
+         * Percobaan sebelumnya sempat melonggarkan header untuk route
+         * preview dan itu tidak memperbaiki apa pun: `X-Frame-Options`
+         * menang atas CSP, dan `sandbox="allow-same-origin"` tanpa
+         * `allow-scripts` membuat iframe mendapat opaque origin yang
+         * ditolak meski header sudah benar. Masalahnya ada di sisi klien.
+         *
+         * JANGAN longgarkan aturan ini untuk route baru tanpa alasan
+         * yang benar-benar 유사. Pengecualian selalu berarti mengurangi
+         * proteksi di seluruh situs.
+         */
         source: "/(.*)",
         headers: securityHeaders,
       },
