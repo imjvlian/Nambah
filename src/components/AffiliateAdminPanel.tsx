@@ -392,10 +392,10 @@ export default function AffiliateAdminPanel() {
   }
 
   return (
-    <main className="acc-page">
-      <section className="acc-workspace" style={{ marginLeft: 0 }}>
+    <main className="acc-page-sub">
+      <section className="acc-workspace">
         <header className="acc-topbar">
-          <div>
+          <div className="acc-topbar-title">
             <small>Admin / Affiliate</small>
             <strong>Withdrawal Center</strong>
           </div>

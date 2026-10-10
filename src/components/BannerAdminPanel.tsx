@@ -228,10 +228,10 @@ export default function BannerAdminPanel() {
   }
 
   return (
-    <main className="acc-page">
-      <section className="acc-workspace" style={{ marginLeft: 0 }}>
+    <main className="acc-page-sub">
+      <section className="acc-workspace">
         <header className="acc-topbar">
-          <div>
+          <div className="acc-topbar-title">
             <small>Admin / Konten</small>
             <strong>Promo Banners</strong>
           </div>

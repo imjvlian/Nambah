@@ -20,6 +20,8 @@ type AdminSection =
   | "receipts"
   | "points"
   | "finance"
+  | "cashflow"
+  | "transactions"
   | "merchants"
   | "promotions"
   | "affiliates"
@@ -322,6 +324,22 @@ type MerchantForm = {
 };
 
 /**
+ * Form pelunasan merchant.
+ *
+ * `merchantId` null = form tertutup. Nilai nominaldefault-nya diisi dari
+ * piutang yang sedang berjalan, jadi kasus umum (merchant melunasi semuanya)
+ * cukup satu klik tanpa mengetik angka.
+ */
+type MerchantPaymentForm = {
+  merchantId: string | null;
+  merchantName: string;
+  amount: string;
+  method: "transfer" | "cash" | "other";
+  reference: string;
+  note: string;
+};
+
+/**
  * Form kosong untuk membuat toko baru.
  *
  * Default fee 3% dan termin 7 hari mengikuti keputusan bisnis awal. Bukan 0%
@@ -364,6 +382,93 @@ type FinancePayload = {
   }>;
 };
 
+/**
+ * Bentuk laporan arus kas yang dikembalikan `/api/admin/cash-flow`.
+ *
+ * Tipe ini diduplikasi dari `@/lib/cash-flow-rules` karena komponen tidak
+ * boleh mengimpor modul `server-only`. Yang penting di sini adalah
+ * `merchantServiceFee` dan `merchantReceivable`: keduanya adalah angka yang
+ * SERING disalahbaca sebagai pendapatan Lacte, jadi keberadaan keduanya
+ * di tipe ini pengingat bahwa keduanya ada dan bukan hal yang bisa
+ * disembunyikan dari tampilan.
+ */
+type CashFlowPayload = {
+  from: string;
+  to: string;
+  days: Array<{
+    date: string;
+    orders: number;
+    grossRevenue: number;
+    supplierCost: number;
+    profit: number;
+    merchantSettled: number;
+  }>;
+  totals: {
+    orders: number;
+    grossRevenue: number;
+    supplierCost: number;
+    grossProfit: number;
+    marginPercent: number;
+    discounts: number;
+    affiliateCommission: number;
+    merchantServiceFee: number;
+    merchantOrders: number;
+    merchantReceivable: number;
+    merchantSettled: number;
+    merchantOutstanding: number;
+    failedOrders: number;
+  };
+  byMethod: Array<{
+    paymentMethodId: string;
+    orders: number;
+    revenue: number;
+    supplierCost: number;
+    profit: number;
+  }>;
+};
+
+/**
+ * Bentuk laporan transaksi dari `/api/admin/transactions`.
+ *
+ * `truncated` ada karena laporan bisa melebihi batas baris. Kalau tidak
+ * ada penandanya, angka total akan terlihat lengkap padahal hanya sebagian
+ * yang masuk - dan laporan keuangan yang terlihat lengkap tapi tidak
+ * lengkap adalah jenis kesalahan yang paling mahal.
+ */
+type TransactionReportPayload = {
+  from: string;
+  to: string;
+  truncated: boolean;
+  totalFiltered: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  summary: {
+    count: number;
+    grossRevenue: number;
+    supplierCost: number;
+    profit: number;
+    marginPercent: number;
+    excludedCount: number;
+  };
+  rows: Array<{
+    id: string;
+    created_at: string;
+    status: string;
+    gameName: string | null;
+    productLabel: string | null;
+    paymentName: string | null;
+    reference_price: number;
+    selling_price: number;
+    final_price: number;
+    supplier_cost: number;
+    nambah_profit: number;
+    merchant_id: string | null;
+    service_fee_amount: number | null;
+    target_user_id: string | null;
+  }>;
+};
+
 type ReadinessPayload = {
   version: string;
   stage: string;
@@ -396,37 +501,44 @@ type BootstrapResult = {
   };
 };
 
-const NAV: Array<{
-  id: AdminSection;
-  label: string;
-  short: string;
-  group: string;
-}> = [
-  { id: "overview", label: "Ringkasan", short: "OV", group: "Harian" },
-  { id: "orders", label: "Pesanan", short: "PE", group: "Harian" },
-  { id: "receipts", label: "Bukti Transfer", short: "BT", group: "Harian" },
-  { id: "catalog", label: "Katalog", short: "KA", group: "Katalog" },
-  { id: "supplier", label: "Supplier", short: "SU", group: "Katalog" },
-  { id: "promotions", label: "Promo", short: "PR", group: "Katalog" },
-  { id: "finance", label: "Keuangan", short: "KE", group: "Keuangan" },
-  { id: "merchants", label: "Toko Ritel", short: "TR", group: "Keuangan" },
-  { id: "points", label: "Lacte Points", short: "NP", group: "Keuangan" },
-  { id: "affiliates", label: "Afiliasi", short: "AF", group: "Keuangan" },
-  { id: "users", label: "Pengguna", short: "PE", group: "Sistem" },
-  { id: "system", label: "Sistem", short: "SY", group: "Sistem" },
-];
-
 /**
- * Groups untuk sidebar.
+ * Peta seksi admin.
  *
- * Sebelas seksi dalam satu daftar panjang tidak menunjukkan alur kerja.
- * Urutannya sekarang mengikuti urutan yang dipakai operator sehari-hari:
- * cek apa yang masuk hari ini, lalu apa yang bermasalah, baru sisanya.
+ * `Icon` DIPILIH SECARA EKSPLISIT, bukan diturunkan dari nama. Alasan:
+ * nama seksi bisa diubah kapan saja (mis. "Keuangan" menjadi
+ * "Rekonsiliasi"), sementara ikonnya tidak ikut berganti kalau
+ * dipetakan lewat string.
  *
- * Backward-compatible: `NAV` tidak berubah isinya, hanya `group` yang
- * ditambahkan. Semua pemanggilan `setSection(item.id)` tetap bekerja.
+ * `hint` menjelaskan apa yang ADA di seksi itu dalam satu kalimat. Tanpa
+ * itu, "Keuangan" dan "Arus Kas" dan "Transaksi" terdengar seperti tiga
+ * nama yang bersaing untuk hal yang sama - padahal yang satu
+ * rekonsiliasi invariants, yang satu agregasi harian, dan yang satu daftar
+ * per transaksi. Ketiganya memang perlu ada, tapi hanya yang pertama
+ * bekerja di luar order.
  */
-const NAV_GROUPS = ["Harian", "Katalog", "Keuangan", "Sistem"] as const;
+/**
+ * Peta seksi diambil dari sidebar, bukan didefinisikan ulang di sini.
+ *
+ * Sidebar sekarang dirender `layout.tsx` untuk semua route `/admin`, jadi
+ * dashboard hanya MEMAKAI peta itu - bukan memiliki versinya sendiri.
+ * Dua salinan akan menyimpang begitu salah satunya diedit, dan yang
+ * terlihat akibatnya bukan pesan error, melainkan submenu yang isinya
+ * tidak cocok dengan isi halamannya.
+ *
+ * `NAV` masih dipakai di dalam dashboard untuk mencari section aktif dan
+ * untuk handler `?seksi=`, jadi diekspor ulang di sini supaya pemanggil
+ * lama tidak perlu tahu dari mana asalnya.
+ */
+import {
+  ADMIN_NAV as NAV,
+  ADMIN_NAV_GROUPS as NAV_GROUPS,
+} from "@/components/admin/AdminSidebar";
+import {
+  useAdminSection,
+  usePublishAdminSection,
+} from "@/components/admin/AdminSectionContext";
+
+export { NAV, NAV_GROUPS };
 
 /**
  * Label status order.
@@ -590,6 +702,80 @@ function SectionHead({
   );
 }
 
+/**
+ * Grafik batang omzet harian.
+ *
+ * SVG inline, bukan chart library. Alasannya ukuran: satu seri, satu sumbu,
+ * dan{max 90} bar yang datanya sudah dihitung di server. Chart library
+ * menambah ratusan kilobyte ke halaman admin untuk sesuatu yang bisa
+ * dirender sebagai daftar `<rect>`.
+ *
+ * SUMBUNYA TIDAK DIMULAI DARI NOL saat semua hari kosong - kalau tidak,
+ * chart akan menampilkan batang raksasa yang sebenarnya tidak ada, dan
+ * terbaca sebagai ada omzet. Kasus itu ditandai eksplisit lewat
+ * `acc-empty`.
+ */
+function CashFlowChart({
+  days,
+  profit,
+}: {
+  days: CashFlowPayload["days"];
+  profit: number;
+}) {
+  if (days.length === 0) {
+    return <div className="acc-empty">Belum ada data pada periode ini.</div>;
+  }
+
+  const hasRevenue = days.some((day) => day.grossRevenue > 0);
+  if (!hasRevenue) {
+    return (
+      <div className="acc-empty">
+        Belum ada penjualan selesai pada periode ini. Order yang gagal atau
+        masih diproses tidak dihitung sebagai omzet.
+      </div>
+    );
+  }
+
+  const max = Math.max(...days.map((day) => day.grossRevenue), 1);
+  // 90 hari pada lebar penuh ~= 4px per batang. Di bawah itu batang
+  // mulai saling tumpang tindih dan grafik jadi noise.
+  const barGap = days.length > 60 ? 1 : days.length > 30 ? 2 : 4;
+  const chartHeight = 150;
+
+  return (
+    <div className="acc-chart">
+      <div className="acc-chart-bars" style={{ gap: `${barGap}px` }}>
+        {days.map((day) => {
+          const height = Math.max(
+            day.grossRevenue > 0 ? 3 : 1,
+            Math.round((day.grossRevenue / max) * chartHeight),
+          );
+          const label = `${day.date}: ${formatIDR(day.grossRevenue)} dari ${day.orders} pesanan`;
+          return (
+            <span
+              key={day.date}
+              className={
+                day.grossRevenue > 0 ? "acc-chart-bar" : "acc-chart-bar empty"
+              }
+              style={{ height: `${height}px` }}
+              title={label}
+              aria-label={label}
+              role="img"
+            />
+          );
+        })}
+      </div>
+      <div className="acc-chart-axis">
+        <span>{days[0]?.date.slice(5)}</span>
+        <span>
+          puncak {formatIDR(max)} · margin total {formatIDR(profit)}
+        </span>
+        <span>{days[days.length - 1]?.date.slice(5)}</span>
+      </div>
+    </div>
+  );
+}
+
 function RoadmapCard({
   title,
   status,
@@ -621,6 +807,56 @@ export default function AdminDashboard() {
     "loading" | "guest" | "forbidden" | "ready"
   >("loading");
   const [section, setSection] = useState<AdminSection>("overview");
+
+  /*
+   * Deep-link dari halaman dokumentasi: `/admin?seksi=merchants`.
+   *
+   * Tanpa ini, tombol "Buka halaman ini" di docs akan mendarat di
+   * Ringkasan karena section selalu mulai dari overview - dan operator
+   * mengira docs-nya salah.
+   *
+   * Query TIDAK lagi dihapus dari URL setelah dibaca. Query itu adalah
+   * satu-satunya penanda section untuk sidebar dari luar dashboard, dan
+   * menghapusnya membuat `/admin` tidak pernah menampilkan tab aktif.
+   * Membiarkannya juga membuat section bisa di-bookmark dan dibagikan,
+   * dan menyegarkan halaman tidak lagi melempar operator ke Ringkasan.
+   */
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get(
+      "seksi",
+    );
+    if (!requested) return;
+
+    const match = NAV.find((item) => item.id === requested);
+    if (match) {
+      setSection(match.id);
+    }
+  }, []);
+
+  /*
+   * Laporkan section yang sedang tampil ke sidebar.
+   *
+   * Sidebar tinggal membaca konteks ini, jadi tidak perlu menebak dari
+   * pathname atau query - dua sumber yang bisa saling tidak sengaja.
+   */
+  usePublishAdminSection(section);
+
+  /*
+   * Reaksi terhadap klik sidebar.
+   *
+   * Sidebar tidak memuat ulang halaman saat sudah berada di `/admin`; dia
+   * menulis section baru ke konteks. Tanpa efek ini, klik di sidebar akan
+   * menutup drawer saja dan isinya tidak akan berubah sama sekali.
+   *
+   * `external` ditolak supaya nilai dari halaman lain (yang memberi
+   * `null`) tidak menimpa section yang sedang tampil.
+   */
+  const { section: requestedSection } = useAdminSection();
+  useEffect(() => {
+    if (requestedSection && requestedSection !== section) {
+      setSection(requestedSection);
+    }
+  }, [requestedSection, section]);
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
   const [adminRole, setAdminRole] = useState("");
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
@@ -633,8 +869,46 @@ export default function AdminDashboard() {
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
   const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
+  const [cashFlowData, setCashFlowData] = useState<CashFlowPayload | null>(null);
+  /*
+   * Periode laporan arus kas.
+   *
+   * Default "30" bukan "7": sebagian besar toko ritel baru jalan kurang
+   * dari sebulan, jadi laporan 7 hari hampir selalu kosong dan terlihat
+   * seperti fiturnya rusak. Tiga puluh hari juga cukup untuk melihat pola
+   * mingguan.
+   */
+  const [cashFlowPreset, setCashFlowPreset] = useState("30");
+
+  /*
+   * Filter laporan transaksi.
+   *
+   * Semua filter disimpan sebagai state terpisah, bukan satu objek
+   * JSON, supaya reset per-field (mis. hanya mengosongkan pencarian)
+   * tidak memicu fetch ulang yang tidak perlu.
+   */
+  const [txPreset, setTxPreset] = useState("30");
+  const [txQuery, setTxQuery] = useState("");
+  const [txStatus, setTxStatus] = useState("");
+  const [txPayment, setTxPayment] = useState("");
+  const [txOffset, setTxOffset] = useState(0);
+  const [txReport, setTxReport] = useState<TransactionReportPayload | null>(
+    null,
+  );
+  /*
+   * Nilai pencarian yang benar-benar dipakai saat fetch. Admin mengetik
+   * cepat, jadi input dan query dipisah: input berubah tiap ketukan,
+   * query baru dipakai setelah operator menekan Enter atau tombol Cari.
+   *
+   * Kalau pencarian ikut berubah tiap ketukan, setiap huruf memicu satu
+   * query ke database.
+   */
+  const [txAppliedQuery, setTxAppliedQuery] = useState("");
   const [merchantData, setMerchantData] = useState<MerchantsPayload | null>(null);
   const [merchantForm, setMerchantForm] = useState<MerchantForm | null>(null);
+  const [merchantPaymentForm, setMerchantPaymentForm] =
+    useState<MerchantPaymentForm | null>(null);
+
   const [issuedPin, setIssuedPin] = useState<{
     code: string;
     pin: string;
@@ -939,6 +1213,127 @@ export default function AdminDashboard() {
     setFinanceData(data);
   }
 
+  async function loadCashFlow(preset = cashFlowPreset) {
+    const response = await fetch(
+      `/api/admin/cash-flow?preset=${encodeURIComponent(preset)}`,
+      { cache: "no-store" },
+    );
+    const data = (await response.json()) as CashFlowPayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Laporan arus kas gagal dimuat.");
+    }
+    setCashFlowData(data);
+  }
+
+  /**
+   * Unduh laporan sebagai CSV.
+   *
+   * Fetch lalu dibuat blob, bukan langsung `<a href>` ke endpoint. Alasannya
+   * endpoint CSV memakai header `Content-Disposition`, dan navigasi langsung
+   * akan mengunduh file tanpa memberi umpan balik apa pun ke operator -
+   * tombolnya terlihat seperti tidak merespons.
+   */
+  async function downloadCashFlowCsv() {
+    setBusy("cashflow-csv");
+    try {
+      const response = await fetch(
+        `/api/admin/cash-flow?preset=${encodeURIComponent(cashFlowPreset)}&format=csv`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("Unduh CSV gagal.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const stamp = cashFlowData
+        ? `${cashFlowData.from.slice(0, 10)}_${cashFlowData.to.slice(0, 10)}`
+        : "arus-kas";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `arus-kas_${stamp}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Object URL harus dicabut; tanpa ini blob-nya tertahan di memori
+      // sampai halaman ditutup.
+      URL.revokeObjectURL(url);
+      setNotice("CSV arus kas sudah diunduh.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Unduh CSV gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /**
+   * Susun query string laporan transaksi dari filter saat ini.
+   *
+   * Diekstrak jadi satu fungsi karena dipakai oleh dua tempat: pemuatan
+   * tampilan dan unduh CSV. Kalau keduanya menyusun query sendiri, cepat
+   * atau lambat operator bisa mengunduh CSV yang berbeda dari yang
+   * sedang tampil di layar - dan itu kesalahan yang tidak akan pernah
+   * ketahuan karena keduanya terlihat berfungsi.
+   */
+  function buildTransactionQuery(extra?: Record<string, string>) {
+    const params = new URLSearchParams();
+    params.set("preset", txPreset);
+    if (txAppliedQuery.trim()) params.set("q", txAppliedQuery.trim());
+    if (txStatus) params.set("status", txStatus);
+    if (txPayment) params.set("payment", txPayment);
+    for (const [key, value] of Object.entries(extra ?? {})) {
+      params.set(key, value);
+    }
+    return params.toString();
+  }
+
+  async function loadTransactions(override?: { offset?: number }) {
+    const query = buildTransactionQuery({
+      offset: String(override?.offset ?? txOffset),
+    });
+    const response = await fetch(`/api/admin/transactions?${query}`, {
+      cache: "no-store",
+    });
+    const data = (await response.json()) as TransactionReportPayload & {
+      error?: string;
+    };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Laporan transaksi gagal dimuat.");
+    }
+    setTxReport(data);
+  }
+
+  async function downloadTransactionsCsv() {
+    setBusy("tx-csv");
+    try {
+      const response = await fetch(
+        `/api/admin/transactions?${buildTransactionQuery({ format: "csv" })}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("Unduh CSV gagal.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `transaksi_${txPreset}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Tanpa revoke, blob-nya tertahan di memori sampai tab ditutup.
+      URL.revokeObjectURL(url);
+      setNotice("CSV transaksi sudah diunduh (semua baris terfilter).");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Unduh CSV gagal.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function loadMerchants() {
     const response = await fetch("/api/admin/merchants", { cache: "no-store" });
     const data = (await response.json()) as MerchantsPayload & { error?: string };
@@ -1036,6 +1431,76 @@ export default function AdminDashboard() {
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Gagal menyimpan toko.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /**
+   * Catat pelunasan merchant.
+   *
+   * Allocation-nya FIFO dan terjadi di server - form ini tidak pernah
+   * menentukan order mana yang lunas. Konsekuensinya, `credit` (sisa bayar)
+   * harus ditampilkan: kalau transfer lebih besar dari piutang, admin perlu
+   * tahu kelebihan itu tersimpan sebagai kredit, bukan hilang.
+   */
+  async function recordMerchantPayment() {
+    if (!merchantPaymentForm?.merchantId) return;
+
+    const amount = Number(merchantPaymentForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setNotice("Nominal pelunasan harus lebih besar dari nol.");
+      return;
+    }
+
+    setBusy("merchant-payment");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/merchant-payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          merchantId: merchantPaymentForm.merchantId,
+          amount: merchantPaymentForm.amount,
+          method: merchantPaymentForm.method,
+          reference: merchantPaymentForm.reference,
+          note: merchantPaymentForm.note,
+        }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        amount?: number;
+        applied?: number;
+        credit?: number;
+        settledCount?: number;
+        remainingOutstanding?: number;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal mencatat pelunasan.");
+      }
+
+      // Muat ulang daftar toko supaya kolom piutang langsung berubah
+      // ke angka terbaru - kalau tidak, admin akan melihat angka lama dan
+      // mengira pencatatan gagal padahal berhasil.
+      await loadMerchants();
+
+      const parts = [
+        `${formatIDR(data.applied ?? 0)} dicatat dari ${formatIDR(data.amount ?? 0)}.`,
+        `${data.settledCount ?? 0} tagihan lunas.`,
+      ];
+      if (data.credit && data.credit > 0) {
+        parts.push(
+          `Sisa bayar ${formatIDR(data.credit)} disimpan sebagai kredit toko.`,
+        );
+      }
+
+      setNotice(parts.join(" "));
+      setMerchantPaymentForm(null);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Gagal mencatat pelunasan.",
       );
     } finally {
       setBusy("");
@@ -1147,6 +1612,8 @@ export default function AdminDashboard() {
       if (section === "promotions") await loadPromotions();
       if (section === "users") await loadUsers();
       if (section === "finance") await loadFinance();
+      if (section === "cashflow") await loadCashFlow();
+      if (section === "transactions") await loadTransactions();
       if (section === "merchants") await loadMerchants();
       if (section === "system") await loadReadiness();
       setNotice("Data admin diperbarui.");
@@ -1269,6 +1736,24 @@ export default function AdminDashboard() {
         ),
       );
     }
+    if (section === "cashflow" && !cashFlowData) {
+      void loadCashFlow().catch((error) =>
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Laporan arus kas gagal dimuat.",
+        ),
+      );
+    }
+    if (section === "transactions" && !txReport) {
+      void loadTransactions().catch((error) =>
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Laporan transaksi gagal dimuat.",
+        ),
+      );
+    }
     if (section === "merchants" && !merchantData) {
       void loadMerchants().catch((error) =>
         setNotice(
@@ -1294,21 +1779,6 @@ export default function AdminDashboard() {
       );
     }
   }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness]);
-
-  async function logout() {
-    setBusy("logout");
-    try {
-      await Promise.all([
-        fetch("/api/admin/session", { method: "DELETE" }),
-        fetch("/api/auth/logout", {
-          method: "POST",
-          credentials: "same-origin",
-        }),
-      ]);
-    } finally {
-      window.location.replace("/login?next=%2Fadmin");
-    }
-  }
 
   function updateDraft(productId: string, patch: Partial<DraftProduct>) {
     setDrafts((current) => ({
@@ -1944,8 +2414,24 @@ export default function AdminDashboard() {
           </p>
           <button
             type="button"
-            className="admin-secondary-button"
-            onClick={() => void logout()}
+            onClick={() => {
+              // Logout ditulis di tempat, bukan fungsi terpisah, karena
+              // sidebar sudah punya salinannya sendiri, dan menduplikasi
+              // endpoint di dua tempat mudah menghasilkan perilaku beda.
+              void (async () => {
+              try {
+                await Promise.all([
+                  fetch("/api/admin/session", { method: "DELETE" }),
+                  fetch("/api/auth/logout", {
+                    method: "POST",
+                    credentials: "same-origin",
+                  }),
+                ]);
+              } finally {
+                window.location.replace("/login?next=%2Fadmin");
+              }
+            })();
+          }}
           >
             Keluar & ganti akun
           </button>
@@ -1957,62 +2443,24 @@ export default function AdminDashboard() {
   const activeNav = NAV.find((item) => item.id === section) ?? NAV[0]!;
 
   return (
-    <main className="acc-page">
-      <aside className="acc-sidebar">
-        <Link className="acc-brand" href="/">
-          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
-          <span>
-            <b>{BRAND.shortName}</b>
-            <small>Control Center</small>
-          </span>
-        </Link>
-
-        <nav className="acc-nav" aria-label="Navigasi admin">
-          {NAV_GROUPS.map((group) => (
-            <div className="acc-nav-group" key={group}>
-              <span className="acc-nav-group-label">{group}</span>
-              {NAV.filter((item) => item.group === group).map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  className={section === item.id ? "active" : ""}
-                  aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => {
-                    setSection(item.id);
-                    setQuery("");
-                    setNotice("");
-                  }}
-                >
-                  <span>{item.short}</span>
-                  <b>{item.label}</b>
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
-
-        <div className="acc-sidebar-foot">
-          {adminUser && (
-            <div className="acc-admin-user">
-              <span>
-                {adminUser.displayName.slice(0, 1).toUpperCase()}
-              </span>
-              <div>
-                <strong>{adminUser.displayName}</strong>
-                <small>{adminRole || "admin"}</small>
-              </div>
-            </div>
-          )}
-          <button type="button" onClick={() => void logout()}>
-            Keluar
-          </button>
-        </div>
-      </aside>
-
+    <section className="acc-page-sub">
       <section className="acc-workspace">
+        {/*
+         * Tombol drawer TIDAK ada di sini. Sidebar sekarang dirender oleh
+         * `layout.tsx` untuk semua route `/admin`, dan tombolnya ikut
+         * di sana - jadi menyalinnya ke sini hanya akan menghasilkan dua
+         * tombol yang mengatur state berbeda.
+         */}
         <header className="acc-topbar">
-          <div>
-            <small>Admin / {activeNav.label}</small>
+          <div className="acc-topbar-title">
+            {/*
+             * Breadcrumb sebelumnya menulis "Admin / Ringkasan" di atas
+             * "Ringkasan" - nama seksi yang sama dua kali bersebelahan.
+             * Sekarang baris atas menunjukkan GRUP-nya, jadi dua baris ini
+             * memberi informasi berbeda:Toko Ritel tahu ada di grup
+             * "Keuangan", bukan di "Katalog".
+             */}
+            <small>{activeNav.group}</small>
             <strong>{activeNav.label}</strong>
           </div>
           <div className="acc-topbar-actions">
@@ -2029,6 +2477,12 @@ export default function AdminDashboard() {
             <Link href="/" target="_blank">
               Website ↗
             </Link>
+            {/*
+             * Tautan dokumentasi selalu terlihat, bukan hanya saat sedang
+             * bingung. Masalahnya dokumentasi yang hanya muncul kalau
+             * sudah diketahuidi adalah dokumentasi yang tidak pernah dibaca.
+             */}
+            <Link href="/admin/docs">Panduan</Link>
           </div>
         </header>
 
@@ -2921,6 +3375,7 @@ export default function AdminDashboard() {
                           <th>Termin</th>
                           <th>Piutang</th>
                           <th>Status</th>
+                          <th>Pelunasan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2955,12 +3410,12 @@ export default function AdminDashboard() {
                               })
                             }
                           >
-                            <td>
+                            <td data-label="Toko">
                               <strong>{merchant.name}</strong>
                               <br />
                               <code>{merchant.code}</code>
                             </td>
-                            <td>
+                            <td data-label="Fee">
                               {/*
                                * Fee 0 ditampilkan sebagai "Belum diatur", bukan
                                * "Rp0".
@@ -2980,8 +3435,8 @@ export default function AdminDashboard() {
                                 </span>
                               )}
                             </td>
-                            <td>{merchant.paymentTermDays} hari</td>
-                            <td>
+                            <td data-label="Termin">{merchant.paymentTermDays} hari</td>
+                            <td data-label="Piutang">
                               {formatIDR(merchant.outstanding)}
                               {merchant.overdueCount > 0 ? (
                                 <>
@@ -2992,13 +3447,42 @@ export default function AdminDashboard() {
                                 </>
                               ) : null}
                             </td>
-                            <td>
+                            <td data-label="Status">
                               <span
                                 className={`acc-status ${merchantStatusClass(merchant.status)}`}
                               >
                                 {MERCHANT_STATUS_LABEL[merchant.status] ??
                                   merchant.status}
                               </span>
+                            </td>
+                            <td data-label="Pelunasan">
+                              {/*
+                               * Tombol pelunasan sengaja TIDAK disable
+                               * saat piutang nol. Merchant bisa transfer
+                               * lebih besar dari piutang yang sedang
+                               * berjalan, dan excess-nya jadi kredit yang
+                               * mengurangi tagihan berikutnya - jadi ada
+                               * kasus sah di mana nominal diisi 0.
+                               */}
+                              <button
+                                type="button"
+                                className="acc-btn"
+                                onClick={() =>
+                                  setMerchantPaymentForm({
+                                    merchantId: merchant.id,
+                                    merchantName: merchant.name,
+                                    amount:
+                                      merchant.outstanding > 0
+                                        ? String(merchant.outstanding)
+                                        : "",
+                                    method: "transfer",
+                                    reference: "",
+                                    note: "",
+                                  })
+                                }
+                              >
+                                Catat pelunasan
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -3007,6 +3491,114 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+
+                {merchantPaymentForm?.merchantId ? (
+                  <div className="acc-table-card acc-merchant-payment">
+                    <h3 className="acc-card-head">
+                      Catat pelunasan — {merchantPaymentForm.merchantName}
+                    </h3>
+
+                    {/*
+                     * Sisa bayar adalah keadaan yang sah dan perlu
+                     * dijelaskan di depan form, bukan Unexpected setelah
+                     * menekan Simpan: admin akan mengira ada selisih
+                     * tagihan yang belum ditemukan.
+                     */}
+                    <p className="acc-payment-hint">
+                      Pembayaran dialokasikan otomatis ke tagihan paling lama
+                      lebih dulu. Kalau nominal lebih besar dari piutang,
+                      sisanya disimpan sebagai kredit toko dan mengurangi
+                      tagihan berikutnya.
+                    </p>
+
+                    <label className="acc-field">
+                      <span>Nominal diterima (Rp)</span>
+                      <input
+                        type="number"
+                        step="100"
+                        min="1"
+                        value={merchantPaymentForm.amount}
+                        onChange={(event) =>
+                          setMerchantPaymentForm((current) =>
+                            current
+                              ? { ...current, amount: event.target.value }
+                              : current,
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Metode</span>
+                      <select
+                        value={merchantPaymentForm.method}
+                        onChange={(event) =>
+                          setMerchantPaymentForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  method: event.target
+                                    .value as MerchantPaymentForm["method"],
+                                }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="transfer">Transfer bank</option>
+                        <option value="cash">Tunai</option>
+                        <option value="other">Lainnya</option>
+                      </select>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Referensi (nomor transfer / nota)</span>
+                      <input
+                        value={merchantPaymentForm.reference}
+                        onChange={(event) =>
+                          setMerchantPaymentForm((current) =>
+                            current
+                              ? { ...current, reference: event.target.value }
+                              : current,
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Catatan (opsional)</span>
+                      <input
+                        value={merchantPaymentForm.note}
+                        onChange={(event) =>
+                          setMerchantPaymentForm((current) =>
+                            current
+                              ? { ...current, note: event.target.value }
+                              : current,
+                          )
+                        }
+                      />
+                    </label>
+
+                    <div className="acc-actions-row">
+                      <button
+                        type="button"
+                        className="acc-btn"
+                        disabled={busy === "merchant-payment"}
+                        onClick={recordMerchantPayment}
+                      >
+                        {busy === "merchant-payment"
+                          ? "Menyimpan..."
+                          : "Simpan pelunasan"}
+                      </button>
+                      <button
+                        type="button"
+                        className="acc-ghost-link"
+                        onClick={() => setMerchantPaymentForm(null)}
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="acc-table-card acc-merchant-form">
                   <h3 className="acc-card-head">
@@ -3225,6 +3817,566 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+            </>
+          )}
+
+          {section === "cashflow" && (
+            <>
+              <SectionHead
+                eyebrow="Keuangan"
+                title="Laporan arus kas"
+                copy="Uang masuk dari penjualan, biaya supplier, margin, dan arus kas dari toko ritel. Biaya layanan merchant tidak dihitung sebagai pendapatan Lacte karena uangnya langsung ke merchant."
+                action={
+                  <button
+                    className="acc-primary-link"
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void downloadCashFlowCsv()}
+                  >
+                    {busy === "cashflow-csv" ? "Menyiapkan..." : "Unduh CSV"}
+                  </button>
+                }
+              />
+
+              {/*
+               * Kontrol periode.
+               *
+               * Tombol radio, bukan `<select>`: hanya empat pilihan, dan
+               * radio membuat periode aktif terlihat tanpa harus membuka
+               * daftar. Di layar sempit tombolnya membungkus sendiri.
+               */}
+              <div className="acc-cashflow-controls">
+                <div
+                  className="acc-segmented"
+                  role="group"
+                  aria-label="Periode laporan"
+                >
+                  {[
+                    { value: "7", label: "7 hari" },
+                    { value: "30", label: "30 hari" },
+                    { value: "90", label: "90 hari" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={cashFlowPreset === option.value}
+                      className={
+                        cashFlowPreset === option.value ? "active" : ""
+                      }
+                      onClick={() => {
+                        setCashFlowPreset(option.value);
+                        void loadCashFlow(option.value).catch((error) =>
+                          setNotice(
+                            error instanceof Error
+                              ? error.message
+                              : "Laporan arus kas gagal dimuat.",
+                          ),
+                        );
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {cashFlowData ? (
+                  <small className="acc-cashflow-range">
+                    {formatTime(cashFlowData.from)} &mdash;{" "}
+                    {formatTime(cashFlowData.to)}
+                  </small>
+                ) : null}
+              </div>
+
+              <div className="acc-metrics">
+                <article>
+                  <small>Omzet</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.grossRevenue ?? 0)}
+                  </strong>
+                  <span>
+                    {cashFlowData?.totals.orders ?? 0} pesanan selesai
+                  </span>
+                </article>
+                <article>
+                  <small>Biaya supplier</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.supplierCost ?? 0)}
+                  </strong>
+                  <span>Modal fulfill</span>
+                </article>
+                <article>
+                  <small>Margin Lacte</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.grossProfit ?? 0)}
+                  </strong>
+                  <span>{cashFlowData?.totals.marginPercent ?? 0}% dari omzet</span>
+                </article>
+                <article>
+                  <small>Masuk dari toko ritel</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.merchantSettled ?? 0)}
+                  </strong>
+                  <span>Transfer yang sudah dicatat</span>
+                </article>
+              </div>
+
+              {cashFlowData ? (
+                <>
+                  {/*
+                   * Grafik batang omzet harian.
+                   *
+                   * SVG inline, bukan chart library: satu seri, satu
+                   *sumbu, dan datanya sudah di server. Chart library akan
+                   * menambah ratusan kilobyte untuk sesuatu yang bisa
+                   * dirender 30 baris SVG.
+                   */}
+                  <div className="acc-table-card">
+                    <div className="acc-card-head">Omzet harian</div>
+                    <CashFlowChart
+                      days={cashFlowData.days}
+                      profit={cashFlowData.totals.grossProfit}
+                    />
+                  </div>
+
+                  <div className="acc-grid-two">
+                    <div className="acc-table-card">
+                      <div className="acc-card-head">
+                        Rincian per metode pembayaran
+                      </div>
+                      <div className="acc-table-scroll">
+                        <table className="acc-table">
+                          <thead>
+                            <tr>
+                              <th>Metode</th>
+                              <th>Pesanan</th>
+                              <th>Omzet</th>
+                              <th>Biaya</th>
+                              <th>Margin</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cashFlowData.byMethod.map((method) => (
+                              <tr key={method.paymentMethodId}>
+                                <td data-label="Metode">
+                                  {method.paymentMethodId}
+                                </td>
+                                <td data-label="Pesanan">{method.orders}</td>
+                                <td data-label="Omzet">
+                                  {formatIDR(method.revenue)}
+                                </td>
+                                <td data-label="Biaya">
+                                  {formatIDR(method.supplierCost)}
+                                </td>
+                                <td data-label="Margin">
+                                  {formatIDR(method.profit)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {cashFlowData.byMethod.length === 0 ? (
+                        <div className="acc-empty">
+                          Belum ada transaksi pada periode ini.
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="acc-table-card">
+                      <div className="acc-card-head">Rincian biaya</div>
+                      <div className="acc-cost-list">
+                        <div>
+                          <span>Diskon (promo, poin, referral)</span>
+                          <strong>
+                            {formatIDR(cashFlowData.totals.discounts)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Komisi affiliate</span>
+                          <strong>
+                            {formatIDR(
+                              cashFlowData.totals.affiliateCommission,
+                            )}
+                          </strong>
+                        </div>
+                        {/*
+                         * Biaya layanan merchant ditampilkan dengan
+                         * catatan tegas. Angka ini terlihat seperti
+                         * pendapatan di laporan lain, dan itu sebab
+                         * disengaja agar tidak disalahartikan.
+                         */}
+                        <div>
+                          <span>
+                            Biaya layanan merchant{" "}
+                            <small>(bukan pendapatan Lacte)</small>
+                          </span>
+                          <strong>
+                            {formatIDR(
+                              cashFlowData.totals.merchantServiceFee,
+                            )}
+                          </strong>
+                        </div>
+                        {cashFlowData.totals.failedOrders > 0 ? (
+                          <div>
+                            <span>Pesanan gagal</span>
+                            <strong>
+                              {cashFlowData.totals.failedOrders}
+                            </strong>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="acc-receivable-box">
+                        <div className="acc-receivable-head">
+                          <strong>Posisi piutang toko ritel</strong>
+                        </div>
+                        <div>
+                          <span>Piutang dari {cashFlowData.totals.merchantOrders} pesanan</span>
+                          <strong>
+                            {formatIDR(cashFlowData.totals.merchantReceivable)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Sudah ditransfer merchant</span>
+                          <strong>
+                            {formatIDR(cashFlowData.totals.merchantSettled)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>
+                            {cashFlowData.totals.merchantOutstanding < 0
+                              ? "Sisa bayar (kredit merchant)"
+                              : "Masih terutang"}
+                          </span>
+                          <strong>
+                            {formatIDR(
+                              Math.abs(cashFlowData.totals.merchantOutstanding),
+                            )}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="acc-empty">Memuat laporan arus kas...</div>
+              )}
+            </>
+          )}
+
+          {section === "transactions" && (
+            <>
+              <SectionHead
+                eyebrow="Keuangan"
+                title="Laporan transaksi"
+                copy="Detail tiap transaksi: item yang dibeli, harga supplier, harga jual, dan margin Lacte. Harga katalog, harga jual, dan harga final sengaja ditampilkan terpisah karena ketiganya berbeda."
+                action={
+                  <button
+                    className="acc-primary-link"
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void downloadTransactionsCsv()}
+                  >
+                    {busy === "tx-csv" ? "Menyiapkan..." : "Unduh CSV"}
+                  </button>
+                }
+              />
+
+              {/*
+               * Panel filter.
+               *
+               * Preset dan rentang bebas saling menyembunyikan: memilih
+               * preset mengisi rentang bebas, jadi admin bisa langsung
+               * menyempurnakan tanggalnya tanpa mengetik ulang.
+               */}
+              <div className="acc-table-card acc-tx-filters">
+                <div className="acc-tx-filter-row">
+                  <div
+                    className="acc-segmented"
+                    role="group"
+                    aria-label="Periode laporan"
+                  >
+                    {[
+                      { value: "7", label: "7 hari" },
+                      { value: "30", label: "30 hari" },
+                      { value: "90", label: "90 hari" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={txPreset === option.value}
+                        className={txPreset === option.value ? "active" : ""}
+                        onClick={() => {
+                          setTxPreset(option.value);
+                          setTxOffset(0);
+                          void loadTransactions({ offset: 0 }).catch(
+                            (error) =>
+                              setNotice(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Laporan transaksi gagal dimuat.",
+                              ),
+                          );
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="acc-field acc-tx-search">
+                    <span>Cari (id order, game, item, atau akun)</span>
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        setTxAppliedQuery(txQuery);
+                        setTxOffset(0);
+                        void loadTransactions({ offset: 0 }).catch((error) =>
+                          setNotice(
+                            error instanceof Error
+                              ? error.message
+                              : "Laporan transaksi gagal dimuat.",
+                          ),
+                        );
+                      }}
+                    >
+                      <input
+                        value={txQuery}
+                        placeholder="mis. NBH-2026 atau Google Play"
+                        onChange={(event) => setTxQuery(event.target.value)}
+                      />
+                      <button type="submit">Cari</button>
+                    </form>
+                  </label>
+                </div>
+
+                <div className="acc-tx-filter-row">
+                  <label className="acc-field">
+                    <span>Status</span>
+                    <select
+                      value={txStatus}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setTxStatus(next);
+                        setTxOffset(0);
+                        void loadTransactions({ offset: 0 }).catch((error) =>
+                          setNotice(
+                            error instanceof Error
+                              ? error.message
+                              : "Laporan transaksi gagal dimuat.",
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="">Semua status</option>
+                      <option value="success">Selesai</option>
+                      <option value="processing">Diproses</option>
+                      <option value="pending_payment">Menunggu bayar</option>
+                      <option value="pending_merchant">Menunggu scan</option>
+                      <option value="failed">Gagal</option>
+                      <option value="cancelled">Batal</option>
+                    </select>
+                  </label>
+
+                  <label className="acc-field">
+                    <span>Metode pembayaran</span>
+                    <select
+                      value={txPayment}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setTxPayment(next);
+                        setTxOffset(0);
+                        void loadTransactions({ offset: 0 }).catch((error) =>
+                          setNotice(
+                            error instanceof Error
+                              ? error.message
+                              : "Laporan transaksi gagal dimuat.",
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="">Semua metode</option>
+                      <option value="qris">QRIS</option>
+                      <option value="ewallet">E-Wallet</option>
+                      <option value="va">Virtual Account</option>
+                      <option value="merchant_retail">Toko Ritel</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              {txReport ? (
+                <>
+                  {/*
+                   * Ringkasan dihitung dari SELURUH baris terfilter,
+                   * bukan dari halaman yang sedang tampil. Kalau tidak,
+                   * total akan berubah-ubah tiap pindah halaman dan itu
+                   * terbaca sebagai omzet naik-turun sendiri.
+                   */}
+                  <div className="acc-metrics">
+                    <article>
+                      <small>Transaksi</small>
+                      <strong>{txReport.summary.count}</strong>
+                      <span>
+                        {txReport.summary.excludedCount > 0
+                          ? `${txReport.summary.excludedCount} tidak dihitung`
+                          : "Semua selesai"}
+                      </span>
+                    </article>
+                    <article>
+                      <small>Omzet</small>
+                      <strong>
+                        {formatIDR(txReport.summary.grossRevenue)}
+                      </strong>
+                      <span>Harga final yang dibayar</span>
+                    </article>
+                    <article>
+                      <small>Harga supplier</small>
+                      <strong>
+                        {formatIDR(txReport.summary.supplierCost)}
+                      </strong>
+                      <span>Total modal</span>
+                    </article>
+                    <article>
+                      <small>Margin Lacte</small>
+                      <strong>{formatIDR(txReport.summary.profit)}</strong>
+                      <span>{txReport.summary.marginPercent}% dari omzet</span>
+                    </article>
+                  </div>
+
+                  {txReport.truncated ? (
+                    <div className="acc-warning-card">
+                      Periode ini melebihi batas baris laporan. Angka di atas
+                      berasal dari sebagian data - persempit rentang atau
+                      tambah filter untuk angka yang pasti benar.
+                    </div>
+                  ) : null}
+
+                  <div className="acc-table-card">
+                    <div className="acc-table-scroll">
+                      <table className="acc-table">
+                        <thead>
+                          <tr>
+                            <th>Order</th>
+                            <th>Waktu</th>
+                            <th>Item</th>
+                            <th>Katalog</th>
+                            <th>Jual</th>
+                            <th>Final</th>
+                            <th>Supplier</th>
+                            <th>Margin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {txReport.rows.map((row) => (
+                            <tr key={row.id}>
+                              <td data-label="Order">
+                                <strong>{row.id}</strong>
+                                <br />
+                                <small>{row.status}</small>
+                              </td>
+                              <td data-label="Waktu">
+                                {formatTime(row.created_at)}
+                                <br />
+                                <small>{row.paymentName ?? "-"}</small>
+                              </td>
+                              <td data-label="Item">
+                                <strong>{row.gameName ?? "-"}</strong>
+                                <br />
+                                <small>{row.productLabel ?? "-"}</small>
+                              </td>
+                              <td data-label="Katalog">
+                                {formatIDR(row.reference_price)}
+                              </td>
+                              <td data-label="Jual">
+                                {formatIDR(row.selling_price)}
+                              </td>
+                              <td data-label="Final">
+                                {formatIDR(row.final_price)}
+                                {row.merchant_id ? (
+                                  <>
+                                    <br />
+                                    <small>termasuk biaya layanan</small>
+                                  </>
+                                ) : null}
+                              </td>
+                              <td data-label="Supplier">
+                                {formatIDR(row.supplier_cost)}
+                              </td>
+                              <td data-label="Margin">
+                                {formatIDR(row.nambah_profit)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {txReport.rows.length === 0 ? (
+                      <div className="acc-empty">
+                        Tidak ada transaksi yang cocok filter.
+                      </div>
+                    ) : null}
+
+                    {txReport.totalFiltered > 0 ? (
+                      <div className="acc-tx-pagination">
+                        <span>
+                          Menampilkan{" "}
+                          {txReport.offset + 1}-
+                          {Math.min(
+                            txReport.offset + txReport.rows.length,
+                            txReport.totalFiltered,
+                          )}{" "}
+                          dari {txReport.totalFiltered} transaksi
+                        </span>
+                        <div>
+                          <button
+                            type="button"
+                            disabled={txReport.offset === 0}
+                            onClick={() => {
+                              const next = Math.max(
+                                0,
+                                txReport.offset - txReport.limit,
+                              );
+                              setTxOffset(next);
+                              void loadTransactions({
+                                offset: next,
+                              }).catch((error) =>
+                                setNotice(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Gagal memuat halaman.",
+                                ),
+                              );
+                            }}
+                          >
+                            Sebelumnya
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!txReport.hasMore}
+                            onClick={() => {
+                              const next = txReport.offset + txReport.limit;
+                              setTxOffset(next);
+                              void loadTransactions({
+                                offset: next,
+                              }).catch((error) =>
+                                setNotice(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Gagal memuat halaman.",
+                                ),
+                              );
+                            }}
+                          >
+                            Berikutnya
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <div className="acc-empty">Memuat laporan transaksi...</div>
+              )}
             </>
           )}
 
@@ -3706,6 +4858,6 @@ export default function AdminDashboard() {
           )}
         </div>
       </section>
-    </main>
+    </section>
   );
 }

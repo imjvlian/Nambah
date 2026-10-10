@@ -105,10 +105,10 @@ export default function OperationsCenter() {
     (data?.counts.failedReceipts ?? 0) + (data?.counts.staleReceipts ?? 0);
 
   return (
-    <main className="acc-page acc-page-standalone">
+    <main className="acc-page-sub">
       <section className="acc-workspace">
         <header className="acc-topbar">
-          <div>
+          <div className="acc-topbar-title">
             <small>Admin / Operations</small>
             <strong>Recovery Center</strong>
           </div>

@@ -223,12 +223,72 @@ export async function checkMerchantCredit(
   });
 }
 
-/** Refresh cache `merchant_balances` supaya dashboard admin akurat. */
+/**
+ * Sisa bayar yang belum terpakai - uang yang sudah diterima Lacte tapi
+ * melebihi piutang yang sedang berjalan.
+ *
+ * Hitung dari dua sumber yang tidak boleh saling menimpa:
+ *
+ *   total diterima  = SUM(merchant_payments.amount)
+ *   total dilunasi  = SUM(orders.final_price WHERE receivable_paid_at IS NOT NULL)
+ *   kredit          = total diterima - total dilunasi
+ *
+ * Hanya order yang DITANDAI lunas yang ikut dihitung. Order yang baru terpubei
+ * sebagian tidak mengurangi piutang, jadi uang yang menutupnya belum
+ * "terpakai" dan masih harus mengurangi tagihan berikutnya.
+ *
+ * Fungsi ini ada karena `syncMerchantBalance` dihitung dari order saja.
+ * Kalau kredit tidak ikut di sana, setiap refresh cache akan menghapusnya
+ * dan kelebihan bayar merchant hilang tanpa pernah tercatat - persis bug yang
+ * ditemukan saat pengujian: Rp91.800 lenyap setelah `recordMerchantPayment`
+ * selesai.
+ */
+export async function getUnappliedPaymentCredit(merchantId: string) {
+  const [payments, settled] = await Promise.all([
+    supabaseSelect<{ amount: number | string }>("merchant_payments", {
+      select: "amount",
+      filters: { merchant_id: `eq.${merchantId}` },
+    }),
+    supabaseSelect<{ final_price: number | string }>("orders", {
+      select: "final_price",
+      filters: {
+        merchant_id: `eq.${merchantId}`,
+        receivable_paid_at: "not.is.null",
+      },
+    }),
+  ]);
+
+  const received = payments.reduce(
+    (total, row) => total + (Number(row.amount) || 0),
+    0,
+  );
+  const consumed = settled.reduce(
+    (total, row) => total + (Number(row.final_price) || 0),
+    0,
+  );
+
+  return received - consumed;
+}
+
+/**
+ * Refresh cache `merchant_balances` supaya dashboard admin akurat.
+ *
+ * `balance` adalah PIUTANG BERSIH: piutang yang sedang berjalan dikurangi
+ * sisa bayar. Angka ini boleh negatif - hanya itu alasan `merchant_balances`
+ * tidak punya CHECK >= 0 di migrasi 036. Nilai negatif berarti Lacte punya
+ * uang merchant yang belum terpakai, bukan berarti merchant berutang.
+ *
+ * Mengembalikan PIUTANG BERSIH, bukan piutang mentah, supaya pemanggil yang
+ * butuh angka untuk ditampilkan memakai definisi yang sama dengan cache.
+ */
 export async function syncMerchantBalance(merchantId: string) {
-  const [balance, pending] = await Promise.all([
+  const [outstanding, pending, credit] = await Promise.all([
     getOutstandingReceivable(merchantId),
     getPendingMerchantCommitment(merchantId),
+    getUnappliedPaymentCredit(merchantId),
   ]);
+
+  const balance = outstanding - credit;
   const checkedAt = new Date().toISOString();
 
   await supabaseUpsert(

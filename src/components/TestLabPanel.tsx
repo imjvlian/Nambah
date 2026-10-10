@@ -91,10 +91,10 @@ export default function TestLabPanel() {
   }
 
   return (
-    <main className="acc-page acc-page-standalone">
+    <main className="acc-page-sub">
       <section className="acc-workspace">
         <header className="acc-topbar">
-          <div>
+          <div className="acc-topbar-title">
             <small>Admin / System</small>
             <strong>Staging Test Lab</strong>
           </div>
