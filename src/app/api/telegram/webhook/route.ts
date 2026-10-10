@@ -1,115 +1,131 @@
-import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
+import {
+  isTelegramConfigured,
+  sendTelegramMessage,
+} from "@/lib/telegram";
 import { parseTelegramCommand } from "@/lib/telegram-format";
 import { runBotCommand } from "@/lib/telegram-commands";
-import { supabaseInsert, supabaseSelect } from "@/lib/supabase/server";
+import {
+  supabaseInsert,
+  supabaseSelect,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
-
-/**
- * Webhook masuk dari Telegram.
- *
- * Empat lapis guard, dari yang paling murah:
- *
- * 1. Secret token. Telegram mengirimnya sebagai header
- *    `X-Telegram-Bot-Api-Secret-Token`, dan header itu sudah diverifikasi di
- *    sisi Telegram — jadi tanpa ini siapa pun bisa menyuruh bot.
- * 2. Allowlist chat. Hanya `TELEGRAM_ADMIN_CHAT_ID` yang boleh memberi perintah.
- *    Grup yang menambahkan bot tidak otomatis boleh.
- * 3. `update_id` harus berupa angka.
- * 4. Dedupe `update_id`. Telegram mengirim ulang update yang belum dijawab dan
- *    polling `getUpdates` bisa diputar ulang, jadi satu ketikan tidak boleh
- *    menjalankan `/retry-receipt` dua kali.
- */
 
 type TelegramUpdate = {
   update_id: number;
   message?: {
     text?: string;
-    chat: { id: number | string; type: string };
-    from?: { username?: string };
+    chat: {
+      id: number | string;
+      type: string;
+    };
+    from?: {
+      username?: string;
+    };
   };
 };
 
-function safeEqual(left: string, right: string) {
-  if (!left || !right || left.length !== right.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+function safeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+
+  let result = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    result |= left.charCodeAt(i) ^ right.charCodeAt(i);
   }
-  return mismatch === 0;
+  return result === 0;
 }
 
-function readHeader(request: Request, name: string) {
+function readHeader(request: Request, name: string): string {
   return request.headers.get(name) ?? "";
 }
 
-function isAllowedChat(chatId: string) {
-  const configured = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() ?? "";
-  return Boolean(configured) && chatId === configured;
+/** Allow only explicitly configured Telegram groups/supergroups. */
+function isAllowedGroupChat(chatId: string, chatType: string): boolean {
+  if (chatType !== "group" && chatType !== "supergroup") return false;
+
+  const allowedGroupIds = (process.env.TELEGRAM_ALLOWED_GROUP_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  return allowedGroupIds.includes(chatId);
 }
 
-/**
- * Dedupe `update_id`.
- *
- * Sengaja di-tolerant: kalau tabelnya belum ada (migrasi belum dijalankan),
- * hasilnya dianggap "belum pernah diproses" dan perintah tetap jalan. Bot
- * menerima satu update dua kali bukan masalah besar; webhook mati total jauh
- * lebih merepotkan.
- */
-async function alreadyProcessed(updateId: number) {
-  try {
-    const seen = await supabaseSelect<{ update_id: number }>("telegram_updates", {
-      select: "update_id",
-      filters: { update_id: `eq.${updateId}` },
-      limit: 1,
-    });
-    return seen.length > 0;
-  } catch {
-    return false;
-  }
+async function alreadyProcessed(updateId: number): Promise<boolean> {
+  const result = await supabaseSelect("telegram_updates", {
+    select: "update_id",
+    filters: {
+      update_id: `eq.${updateId}`,
+    },
+    limit: 1,
+  });
+
+  return Boolean(result?.length);
 }
 
-async function rememberUpdate(updateId: number) {
-  try {
-    await supabaseInsert("telegram_updates", { update_id: updateId });
-  } catch (error) {
-    // 23505 = duplikat (bagus), 404 = tabel belum ada. Keduanya bukan alasan
-    // untuk menggagalkan balasan.
-    console.error(`Failed to remember telegram update ${updateId}`, error);
-  }
+async function rememberUpdate(updateId: number): Promise<void> {
+  await supabaseInsert("telegram_updates", {
+    update_id: updateId,
+  });
 }
 
 export async function POST(request: Request) {
   if (!isTelegramConfigured()) {
-    return Response.json({ error: "Bot Telegram belum dikonfigurasi." }, { status: 503 });
+    return Response.json(
+      { ok: false, error: "Konfigurasi Telegram belum lengkap." },
+      { status: 503 },
+    );
   }
 
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? "";
   if (!secret) {
     return Response.json(
-      { error: "TELEGRAM_WEBHOOK_SECRET belum dikonfigurasi — webhook ditolak." },
+      { ok: false, error: "TELEGRAM_WEBHOOK_SECRET belum diatur." },
       { status: 503 },
     );
   }
 
-  if (!safeEqual(readHeader(request, "x-telegram-bot-api-secret-token"), secret)) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  const receivedSecret = readHeader(
+    request,
+    "x-telegram-bot-api-secret-token",
+  );
+  if (!safeEqual(receivedSecret, secret)) {
+    return Response.json(
+      { ok: false, error: "Secret webhook tidak valid." },
+      { status: 401 },
+    );
   }
 
   let update: TelegramUpdate;
   try {
     update = (await request.json()) as TelegramUpdate;
   } catch {
-    return Response.json({ error: "Body bukan JSON." }, { status: 400 });
+    return Response.json(
+      { ok: false, error: "Payload JSON tidak valid." },
+      { status: 400 },
+    );
   }
 
   const message = update.message;
   const text = message?.text?.trim();
+  if (!message || !text) {
+    return Response.json({ ok: true, ignored: true });
+  }
 
-  // Group dan channel tetap bisa chatting, tapi hanya chat admin yang boleh
-  // menjalankan perintah.
-  if (!message || !text || !isAllowedChat(String(message.chat.id))) {
+  // Use the chat ID from the incoming Telegram update as the reply destination.
+  const chatId = String(message.chat.id);
+  const chatType = message.chat.type;
+  const allowed = isAllowedGroupChat(chatId, chatType);
+
+  console.log("[Telegram Webhook] Incoming message", {
+    updateId: update.update_id,
+    chatId,
+    chatType,
+    allowed,
+  });
+
+  if (!allowed) {
     return Response.json({ ok: true, ignored: true });
   }
 
@@ -118,21 +134,32 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, ignored: "bukan-perintah" });
   }
 
-  if (await alreadyProcessed(update.update_id)) {
-    return Response.json({ ok: true, duplicate: true });
-  }
-
   try {
+    if (await alreadyProcessed(update.update_id)) {
+      return Response.json({ ok: true, duplicate: true });
+    }
+
     const result = await runBotCommand({
       command: parsed.command,
       argument: parsed.argument,
-      chatId: String(message.chat.id),
+      chatId,
     });
 
-    await sendTelegramMessage(result.text, {
+    console.log("[Telegram Webhook] Reply target", {
+      command: parsed.command,
+      chatId,
+    });
+
+    // Explicitly route the response to the originating group, not the admin DM.
+    const delivery = await sendTelegramMessage(result.text, {
       kind: "command",
       parseMode: "HTML",
+      chatId,
     });
+
+    if (!delivery.sent) {
+      throw new Error(`Balasan Telegram tidak terkirim: ${delivery.reason}`);
+    }
 
     await rememberUpdate(update.update_id);
 
@@ -142,27 +169,32 @@ export async function POST(request: Request) {
       mutating: result.mutating ?? false,
     });
   } catch (error) {
-    console.error(`Telegram command ${parsed.command} failed`, error);
+    console.error("[Telegram Webhook] Perintah gagal:", error);
 
-    // Error tetap dibalas supaya Telegram tidak mengirim ulang update yang
-    // sama dalam 24 jam.
+    const errorMessage =
+      error instanceof Error ? error.message : "Kesalahan tidak diketahui.";
+
+    // Error response also goes to the originating group.
     await sendTelegramMessage(
-      `Perintah ${parsed.command} gagal: ${
-        error instanceof Error ? error.message : "error tidak diketahui"
-      }`,
-      { kind: "command" },
-    ).catch(() => undefined);
+      `Perintah ${parsed.command} gagal: ${errorMessage}`,
+      {
+        kind: "command",
+        chatId,
+      },
+    ).catch((sendError) => {
+      console.error(
+        "[Telegram Webhook] Gagal mengirim pesan error:",
+        sendError,
+      );
+    });
 
-    // 200: perintah gagal, transport-nya succeed. Kalau 5xx, Telegram akan
-    // mencoba mengirim ulang update yang sama.
-    return Response.json({ ok: false, error: "Perintah gagal dijalankan." });
+    return Response.json(
+      { ok: false, error: "Perintah gagal dijalankan." },
+      { status: 500 },
+    );
   }
 }
 
-/**
- * Telegram hanya mengirim POST. GET tetap dijawab supaya monitor tidak
- * menganggap endpoint mati, tapi isinya jujur menyatakan belum dipakai.
- */
 export async function GET() {
   return Response.json({
     ok: false,
