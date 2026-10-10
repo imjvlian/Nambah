@@ -10,4 +10,12 @@
  * di sini, urutan import antara kedua modul bisa membuat cycle.
  */
 
-export type MerchantStatus = "active" | "frozen" | "inactive";
+/**
+ * Status merchant.
+ *
+ * `pending` = mendaftar sendiri, menunggu persetujuan admin. Toko dalam
+ * status ini tidak bisa muncul di checkout, tidak bisa memindai pesanan,
+ * dan tidak bisa punya piutang. Hanya admin yang bisa mengaktifkannya lewat
+ * `PATCH /api/admin/merchants`.
+ */
+export type MerchantStatus = "pending" | "active" | "frozen" | "inactive";

@@ -50,6 +50,13 @@ export type PublicOrder = {
     paidAt: string | null;
     providerTransactionId?: string | null;
   };
+  /**
+   * Kode yang dipindai kasir di konter. Hanya ada di order `merchant_retail`.
+   *
+   * Dipakai untuk merender QR dan menampilkan kode pendek di layar. Order
+   * Midtrans/DOKU punya `null` di sini - tidak ada yang memindainya.
+   */
+  merchantScanCode?: string | null;
   /** Sesi DOKU (mis. konten QRIS) untuk dirender inline di halaman order. */
   doku?: {
     qrContent?: string;

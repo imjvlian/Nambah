@@ -55,6 +55,15 @@
     position: sticky;
     top: 146px;
     z-index: 7;
+    /*
+     * Tinggi tetap 308px dipilih untuk blok metode pembayaran.
+     *
+     * Pemilih toko ritel (`merchant-picker`) juga cocok dengan selector ini
+     * karena memuat `.payment-list`, dan ia muncul di bawah blok metode saat
+     * metode ritel dipilih. Dua blok dengan tinggi tetap akan menutupi
+     * ringkasan harga di layar pendek, jadi blok kedua dibiarkan tumbuh
+     * sendiri.
+     */
     height: 308px;
     margin: 0;
     padding: 18px;
@@ -65,6 +74,20 @@
     box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
     backdrop-filter: blur(14px);
     scrollbar-width: thin;
+  }
+
+  /*
+   * Pemilih toko: tinggi otomatis, dan tidak ikut sticky.
+   *
+   * Kalau ikut sticky, blok ini akan menimpa ringkasan harga di layar
+   * pendek - user memilih toko, lalu tidak bisa melihat total yang harus
+   * dia bayar. Ini lebih buruk daripada menggulir sedikit.
+   */
+  .product-page .order-card > .form-block.merchant-picker:has(.payment-list) {
+    position: static;
+    height: auto;
+    max-height: 340px;
+    top: auto;
   }
 
   .product-page .order-card > .form-block:has(.payment-list) .form-label {

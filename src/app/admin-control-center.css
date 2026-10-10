@@ -1604,6 +1604,219 @@
   text-align: center;
 }
 
+/* ==========================================================================
+   Toko ritel
+   ==========================================================================
+   Kelas di blok ini semua punya satu pemilik: seksi "Toko Ritel" di
+   `AdminDashboard.tsx`. Tidak ada kelas generik yang ditulis ulang untuk
+   kebutuhan satu seksi - kalau dipindah ke pustaka bersama, pemanggilnya
+   jadi sulit dilacak.
+   ========================================================================== */
+
+/* Kartu peringatan (jalur ritel dimatikan, PIN baru terbit). */
+.acc-warning-card {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,193,7,.24);
+  border-radius: 12px;
+  background: rgba(255,193,7,.06);
+  color: #e8d9a8;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.acc-warning-card strong {
+  color: #f4e2a6;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+
+.acc-warning-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Tautan sekunder di dalam kartu peringatan. */
+.acc-ghost-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9fb4d8;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.acc-ghost-link:hover {
+  color: #c3d3ee;
+}
+
+/* Penanda piutang lewat tenggat di kolom tabel. */
+.acc-merchant-overdue {
+  color: #e0aaaa;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Checkbox "ganti PIN" - bentuk label penuh, bukan input telanjang. */
+.acc-checkbox-field {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.acc-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--lime);
+  cursor: pointer;
+}
+
+.acc-checkbox-field span {
+  color: #cfd5c9;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* Baris tombol di bawah form. */
+.acc-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+/* Baris tabel toko: nama + kode di satu kolom, lalu angka. */
+.acc-table code {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+/* Pembuat toko */
+.acc-merchant-form {
+  display: grid;
+  gap: 14px;
+}
+
+/* Baris "biaya layanan toko" di ringkasan harga.
+   Pisah dari baris lain karena warnanya berbeda: ini biaya yang dibayar ke
+   toko, bukan ke Lacte, dan membacanya sebagai "biaya pembayaran" biasa
+   akan menyesatkan. */
+.summary-line.merchant-fee {
+  color: #cbb9f2;
+}
+
+.summary-line.merchant-fee strong {
+  color: #ded0ff;
+}
+
+/* Wrapper daftar produk di katalog admin.
+
+   Baris di dalamnya sudah punya grid-nya sendiri (`.admin-product-row`).
+   Yang hilang cuma wrapper-nya, sehingga kartu tidak punya batas bawah yang
+   rapi setelah baris terakhir - kartu terlihat melayang. */
+.admin-product-list {
+  display: grid;
+}
+
+/* Baris terakhir di dalam daftar produk: tanpa garis bawah, sama seperti
+   `.acc-table`. Garis terakhir yang menggantung membuat daftar terlihat
+   belum selesai. */
+.admin-product-list > .admin-product-row:last-child {
+  border-bottom: 0;
+}
+
+/*
+ * Penanda seksi checkout.
+ *
+ * Ketiga kelas ini sudah dipakai di `TopupExperience.tsx` sejak sebelumnya
+ * tanpa definisi - elemennya tetap tampil karena `.form-block` yang memberi
+ * bentuk, tapi seksi yang diberi penanda tidak bisa dibedakan dari luar.
+ * Sebagai penemu masalah (memilih satu blok di antara beberapa blok yang
+ * bentuknya sama) ketiganya tidak berguna, jadi didefinisikan di sini.
+ */
+.account-form-block,
+.nominal-form-block,
+.points-checkout-block {
+  position: relative;
+}
+
+/* Blok poin di paling bawah rail: tanpa garis pemisah setelahnya, karena
+   tidak ada blok lain yang mengikuti. Garis menggantung di bawah kolom
+   terlihat seperti elemen yang terpotong. */
+.points-checkout-block {
+  border-bottom: 0;
+}
+
+/* Tabel daftar toko.
+
+   Seksi lain di panel ini memakai grid (`acc-orders-row`, `acc-receipts-row`)
+   karena kolomnya tetap. Daftar toko punya jumlah kolom tetap, jadi tabel
+   native lebih baik: browser yang mengatur lebar kolom, dan isi yang
+   membungkus tidak merusak baris lain. */
+.acc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.acc-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.acc-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.045);
+  color: #d9ded3;
+  font-size: 11px;
+  vertical-align: top;
+}
+
+/* Baris terakhir tanpa garis - kartu sudah punya batas sendiri, garis
+   terakhir hanya membuat tabel terlihat belum selesai. */
+.acc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Baris tabel yang bisa diklik (dipakai untuk memilih toko yang mau diubah).
+   Sasarannya harus terlihat sebagai target, bukan hanya berubah warna saat
+   kursor lewat - di layar sentuh tidak ada hover sama sekali. */
+.acc-table tbody tr {
+  cursor: pointer;
+  transition: background .12s ease;
+}
+
+.acc-table tbody tr:hover {
+  background: rgba(255,255,255,.03);
+}
+
+.acc-table tbody tr:focus-within {
+  background: rgba(255,255,255,.045);
+}
+
+/* Kolom nominal: rata kanan supaya digit sejajar dan mudah dibandingkan
+   satu sama lain. */
+.acc-table td:nth-child(2),
+.acc-table td:nth-child(3),
+.acc-table td:nth-child(4) {
+  white-space: nowrap;
+}
+
 @media (max-width: 1120px) {
   .acc-page {
     grid-template-columns: 84px minmax(0,1fr);

@@ -1,27 +1,11 @@
-import { resolveNambahAuth } from "@/lib/nambah-auth";
-import {
-  confirmMerchantScan,
-} from "@/lib/merchant-confirm";
-import { resolveMerchantForCode } from "@/lib/merchant-auth";
-import { fulfillPaidOrder } from "@/lib/fulfillment";
+import { confirmMerchantScan } from "@/lib/merchant-confirm";
+import { authenticateMerchant } from "@/lib/merchant-route-auth";
 import {
   isMerchantRetailEnabled,
   syncMerchantBalance,
 } from "@/lib/merchant-retail";
+import { fulfillPaidOrder } from "@/lib/fulfillment";
 
-/**
- * POST /api/merchant/confirm — kasir memindai kode pesanan.
- *
- * Autentikasi merchant memakai `code` + `pin`, bukan sesi Supabase. Alasannya
- * operasional: kasir berada di konter dengan satu perangkat, sering berubah,
- * dan harus bisa masuk tanpa email. `merchants.user_id` tetap tersedia untuk
- * merchant yang memang punya akun, tapi jalur kodenya cukup untuk pekerjaan
- * harian dan tidak menambah langkah login yang tidak perlu.
- *
- * PIN tidak disimpan di database. Yang disimpan adalah hash-nya, pakai
- * scrypt yang sama dengan password pengguna, supaya kebocoran satu merchant
- * tidak langsung memberi akses ke yang lain.
- */
 export async function POST(request: Request) {
   if (!isMerchantRetailEnabled()) {
     return Response.json(
@@ -30,53 +14,40 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { code?: unknown; pin?: unknown; orderId?: unknown };
+  let body: { code?: unknown; pin?: unknown; orderCode?: unknown };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Permintaan tidak valid." }, { status: 400 });
   }
 
-  const code = typeof body.code === "string" ? body.code.trim() : "";
-  const pin = typeof body.pin === "string" ? body.pin : "";
-  const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
+  const auth = await authenticateMerchant(request, body, "merchant_confirm");
+  if ("response" in auth) return auth.response;
+  const merchant = auth.merchant;
 
-  if (!code || !pin || !orderId) {
+  // Nama field-nya `orderCode`, bukan `code`, supaya tidak tertukar dengan
+  // kode toko di payload yang sama.
+
+  const orderCode =
+    typeof body.orderCode === "string" ? body.orderCode.trim() : "";
+
+  if (!orderCode) {
     return Response.json(
-      { error: "Kode toko, PIN, dan kode pesanan wajib diisi." },
+      { error: "Kode pesanan wajib diisi." },
       { status: 400 },
     );
   }
 
-  const merchant = await resolveMerchantForCode(code, pin);
-
-  if (!merchant) {
-    /*
-     * Satu pesan untuk "kode tidak ada" dan "PIN salah". Membedakan keduanya
-     * akan membantu penyerang: dia bisa menguji daftar kode toko
-     * tanpa PIN yang benar.
-     */
-    return Response.json(
-      { error: "Kode toko atau PIN salah." },
-      { status: 401 },
-    );
-  }
-
-  if (merchant.status !== "active") {
-    return Response.json(
-      { error: "Toko sedang tidak menerima pesanan." },
-      { status: 403 },
-    );
-  }
-
-  const scan = await confirmMerchantScan(orderId, merchant.id);
+  const scan = await confirmMerchantScan(orderCode, merchant.id);
 
   if (!scan.ok) {
     console.warn(
-      `Merchant scan gagal (${scan.code}) — merchant ${merchant.id}, order ${orderId}`,
+      `Merchant scan gagal (${scan.code}) — merchant ${merchant.id}, kode ${orderCode}`,
     );
     return Response.json({ error: scan.reason }, { status: scan.status });
   }
+
+  const orderId = scan.orderId;
 
   /*
    * Fulfillment sengaja TIDAK awaited sebelum respons.
@@ -84,7 +55,7 @@ export async function POST(request: Request) {
    * Ini bukan sekadar optimasi. `fulfillPaidOrder` memanggil API supplier,
    * yang bisa memakan puluhan detik. Menahannya membuat kasir mengira
    * pemindaian gagal lalu memindai ulang - padahal order sudah `paid` dan
-   * top up sedang berjalan, sehingga goodbye terjadi dua kali.
+top up sedang berjalan, sehingga top up terjadi dua kali.
    *
    * Order sudah aman pada titik ini: status `paid` + `requestRef` yang
    * deterministik membuat proses yang berjalan terlambat tetap idempoten.

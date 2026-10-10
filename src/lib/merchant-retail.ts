@@ -45,7 +45,11 @@ export type MerchantRow = {
   user_id: string | null;
   name: string;
   code: string;
-  service_fee_percent: number | string;
+  /** Alamat toko. Wajib diisi saat pendaftaran mandiri (migrasi 040). */
+  address: string | null;
+  /** Nomor HP/WA toko, opsional. */
+  contact: string | null;
+  service_fee_flat_idr: number | string;
   payment_term_days: number;
   status: MerchantStatus;
   notes: string | null;

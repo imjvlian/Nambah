@@ -65,17 +65,18 @@ test("merchant_retail: fee menambah harga user tanpa menambah profit Lacte", () 
     paymentMethod: merchantRetail,
     promotion: null,
     referral: null,
-    merchantServiceFeePercent: 0,
+    merchantServiceFeeFlat: 0,
+    merchantServiceFeeFlat: 0,
   });
   const withFee = calculatePricing({
     item: healthyMargin,
     paymentMethod: merchantRetail,
     promotion: null,
     referral: null,
-    merchantServiceFeePercent: 5,
+    merchantServiceFeeFlat: 1_500,
   });
 
-  // Harga katalog 30.000, fee 5% → user bayar 1.500 lebih.
+  // Harga katalog 30.000, biaya layanan flat 1.500 → user bayar 1.500 lebih.
   assert.equal(withFee.merchantServiceFee, 1_500);
   assert.equal(withFee.finalPrice, plain.finalPrice + 1_500);
 
@@ -87,6 +88,49 @@ test("merchant_retail: fee menambah harga user tanpa menambah profit Lacte", () 
     plain.nambahProfit,
     "fee merchant tidak boleh masuk ke profit Lacte",
   );
+});
+
+test("fee flat TIDAK ikut berubah saat promo atau points aktif", () => {
+  /*
+   * Ini konsekuensi langsung dari fee flat, dan alasannya spesifik.
+   *
+   * Dulu fee berupa persen, jadi nilainya harus mengikuti basis perhitungan
+   * - pertanyaan "dari harga mana?" harus dijawab setiap kali. Dengan
+   * nominal, pertanyaan itu hilang: biaya layanannya 1.500, apa pun yang
+   * terjadi pada harga produk.
+   *
+   * Kalau fee ikut turun saat promo aktif, user akan melihat total yang
+   * bergerak-gerak dan tidak bisa menebak nominal yang benar-benar dia
+   * bayar ke kasir.
+   */
+  const withPoints = calculatePricing({
+    item: healthyMargin,
+    paymentMethod: merchantRetail,
+    promotion: null,
+    referral: null,
+    merchantServiceFeeFlat: 0,
+    pointsDiscount: 5_000,
+    merchantServiceFeeFlat: 1_500,
+  });
+
+  assert.equal(withPoints.merchantServiceFee, 1_500);
+  // Harga produk turun karena points, fee tetap.
+  assert.equal(withPoints.finalPrice, 30_000 - 5_000 + 1_500);
+});
+
+test("fee flat pecahan dibulatkan ke rupiah penuh", () => {
+  // Kasir tidak pernah menghitung pecahan, dan nominal yang tampil harus
+  // sama dengan yang benar-benar dibayar.
+  const result = calculatePricing({
+    item: healthyMargin,
+    paymentMethod: merchantRetail,
+    promotion: null,
+    referral: null,
+    merchantServiceFeeFlat: 0,
+    merchantServiceFeeFlat: 1_500.4,
+  });
+
+  assert.equal(result.merchantServiceFee, 1_500);
 });
 
 test("fee merchant TIDAK berlaku untuk payment method lain", () => {
@@ -105,12 +149,55 @@ test("fee merchant TIDAK berlaku untuk payment method lain", () => {
   assert.equal(result.finalPrice, 30_000);
 });
 
+test("merchant_retail tanpa fee sama sekali DITOLAK, bukan dianggap gratis", () => {
+  /*
+   * Guard ini ada karena bug nyata: `calculatePricing` dipanggil DUA kali
+   * di route checkout dan preview - sekali untuk pratinjau dasar, sekali
+   * lagi setelah points dihitung. Fee diteruskan di yang pertama dan
+   * terlupa di yang kedua.
+   *
+   * Akibatnya order tersimpan dengan total lebih kecil dari yang dilihat
+   * user, dan `service_fee_amount` = 0 padahal pembeli membayar. Dua-duanya
+   * angka yang terlihat wajar saat dibaca sekilas, jadi tidak akan ketahuan
+   * tanpa guard.
+   *
+   * PENTING: test ini sengaja TIDAK menyebutkan `merchantServiceFeeFlat`.
+   */
+  assert.throws(
+    () =>
+      calculatePricing({
+        item: healthyMargin,
+        paymentMethod: merchantRetail,
+        promotion: null,
+        referral: null,
+      }),
+    /Biaya layanan merchant wajib diisi/,
+  );
+});
+
+test("merchant_retail dengan fee 0 yang disengaja tetap boleh", () => {
+  // Admin boleh menetapkan biaya layanan 0. Yang dilarang adalah TIDAK
+  // menyentuhnya sama sekali, karena itu berarti pemanggil tidak tahu.
+  const result = calculatePricing({
+    item: healthyMargin,
+    paymentMethod: merchantRetail,
+    promotion: null,
+    referral: null,
+    merchantServiceFeeFlat: 0,
+    merchantServiceFeeFlat: 0,
+  });
+
+  assert.equal(result.merchantServiceFee, 0);
+  assert.equal(result.finalPrice, 30_000);
+});
+
 test("merchant_retail: guard minimumNambahProfit dilewati", () => {
   const result = calculatePricing({
     item: thinMargin,
     paymentMethod: merchantRetail,
     promotion: null,
     referral: null,
+    merchantServiceFeeFlat: 0,
   });
 
   assert.equal(
@@ -127,6 +214,7 @@ test("merchant_retail: nambahProfit tetap dihitung dari margin, bukan di-nol-kan
     paymentMethod: merchantRetail,
     promotion: null,
     referral: null,
+    merchantServiceFeeFlat: 0,
   });
 
   /*
@@ -192,6 +280,7 @@ test("merchant_retail: guard points tetap berlaku", () => {
     paymentMethod: merchantRetail,
     promotion: null,
     referral: null,
+    merchantServiceFeeFlat: 0,
     pointsDiscount: 999_999,
     loyaltyEligible: true,
   });

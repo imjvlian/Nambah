@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { Game, PaymentMethod } from "@/lib/catalog";
+import { MERCHANT_RETAIL_PAYMENT_METHOD_ID, type Game, type PaymentMethod } from "@/lib/catalog";
 import {
   accountFieldOptionLabel,
   accountFieldOptionValue,
@@ -21,6 +21,20 @@ import {
 import { BRAND } from "@/lib/brand";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+
+/**
+ * Toko ritel yang bisa dipilih di checkout.
+ *
+ * HANYA nama, lokasi, dan tarif yang dikirim. Tidak ada kode toko, PIN,
+ * atau id akun kasir di sini - kolom itu hanya dipakai server-side saat
+ * kasir memindai, dan membocorkannya ke browser pembeli berarti siapa pun
+ * bisa mencoba login ke konter.
+ */
+type PublicMerchant = {
+  id: string;
+  name: string;
+  address: string | null;
+};
 type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
 type GroupedPackage = Game["packages"][number] & { groups?: ProductGroup[] };
 type ProductArtwork = {
@@ -249,6 +263,8 @@ export default function TopupExperience({
   const [contactError, setContactError] = useState("");
   const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
   const [pricingError, setPricingError] = useState("");
+  const [merchantList, setMerchantList] = useState<PublicMerchant[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 const [confirmOpen, setConfirmOpen] = useState(false);
@@ -389,6 +405,49 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     selectedGame.packages[0]!;
   const paymentMethod =
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
+
+  const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+  const selectedMerchant =
+    merchantList.find((merchant) => merchant.id === selectedMerchantId) ?? null;
+
+  /*
+   * Pilihan toko DIBERSIHKAN saat metode pembayaran berganti.
+   *
+   * Tanpa ini, user bisa memilih "Toko A" di jalur ritel, lalu berganti ke
+   * QRIS, lalu memilih "Toko B" - dan `merchantId` terakhir yang lolos ke
+   * server adalah B, sementara fee yang user lihat berasal dari A. Tampilan
+   * dan tagihan tidak akan cocok.
+   */
+  useEffect(() => {
+    if (!isMerchantRetail && selectedMerchantId) {
+      setSelectedMerchantId("");
+    }
+  }, [isMerchantRetail, selectedMerchantId]);
+
+  // Daftar toko hanya diambil saat jalur ritel benar-benar dipakai.
+  useEffect(() => {
+    if (!isMerchantRetail || merchantList.length) return;
+    const controller = new AbortController();
+
+    void fetch("/api/merchants", { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data: { merchants?: PublicMerchant[] }) => {
+        const list = Array.isArray(data.merchants) ? data.merchants : [];
+        setMerchantList(list);
+        /*
+         * Satu toko? Langsung dipilih, karena memaksa user mengambil
+         * satu keputusan yang sudah punya satu jawaban.
+         */
+        if (list.length === 1) setSelectedMerchantId(list[0].id);
+      })
+      .catch(() => {
+        // Sengaja diam. Gagal memuat daftar toko akan tampil sebagai "belum
+        // ada toko yang bisa dipilih" di bawah, dan checkout tetap bisa
+        // diselesaikan lewat metode lain.
+      });
+
+    return () => controller.abort();
+  }, [isMerchantRetail, merchantList.length]);
   const pricing = serverPricing ?? createPublicPricingFallback(selectedPackage);
   const selectedGameArtwork = artworkByGameId[selectedGame.id];
 
@@ -536,6 +595,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
             promoCode: appliedPromoCode,
             referralCode: appliedReferralCode,
             pointsToRedeem,
+            merchantId: selectedMerchantId || undefined,
           }),
           signal: controller.signal,
         });
@@ -855,6 +915,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           promoCode: appliedPromoCode,
           referralCode: appliedReferralCode,
           pointsToRedeem,
+          merchantId: selectedMerchantId || undefined,
           ...(pendingCheckout.guestContact
             ? {
                 receiptEmail: pendingCheckout.guestContact.email,
@@ -1433,6 +1494,46 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 </label>
               ))}
             </div>
+
+            {isMerchantRetail ? (
+              <div className="merchant-picker form-block">
+                <div className="form-label">
+                  <span className="step-number">5</span>
+                  <div>
+                    <strong>Pilih toko</strong>
+                    <small>Anda membayar langsung ke toko ini. Lacte hanya meneruskan pesanan ke penyedia.</small>
+                  </div>
+                </div>
+
+                {!merchantList.length ? (
+                  <p className="inline-message warning">
+                    Belum ada toko yang menerima pembelian ritel. Pilih metode pembayaran lain.
+                  </p>
+                ) : (
+                  <div className="payment-list">
+                    {merchantList.map((merchant) => (
+                      <label
+                        className={`payment-option ${selectedMerchantId === merchant.id ? "active" : ""}`}
+                        key={merchant.id}
+                      >
+                        <input
+                          checked={selectedMerchantId === merchant.id}
+                          name="merchant"
+                          type="radio"
+                          value={merchant.id}
+                          onChange={() => setSelectedMerchantId(merchant.id)}
+                        />
+                        <span className="radio-dot" />
+                        <span>
+                          <strong>{merchant.name}</strong>
+                          {merchant.address ? <small>{merchant.address}</small> : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className={`pricing-summary ${pricingLoading ? "is-loading" : ""}`}>
@@ -1460,6 +1561,26 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               <span>Biaya pembayaran</span>
               <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
             </div>
+            {/*
+             * Biaya layanan toko ditampilkan sebagai BARIS TERPISAH, bukan
+             * dilebur ke harga produk.
+             *
+             * Alasan: ini uang yang benar-benar keluar dari tangan user,
+             * tapi TIDAK diterima Lacte — langsung masuk ke merchant sebagai
+             * pendapatannya. Kalau dilebur, user akan mengira Lacte yang
+             *charging dia, dan total yang tertera tidak bisa dipercaya saat
+             * ada dispute. Baris terpisah juga menjelaskan kenapa totalnya
+             * lebih besar dari harga katalog.
+             */}
+            {pricing.merchantServiceFee > 0 && (
+              <div className="summary-line merchant-fee">
+                <span>
+                  Biaya layanan toko
+                  {selectedMerchant ? ` · ${selectedMerchant.name}` : ""}
+                </span>
+                <strong>{formatIDR(pricing.merchantServiceFee)}</strong>
+              </div>
+            )}
             <div className="summary-total"><span>Total</span><strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong></div>
           </div>
 

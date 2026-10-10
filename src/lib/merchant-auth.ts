@@ -22,7 +22,7 @@ export type MerchantAuthRow = {
   id: string;
   name: string;
   code: string;
-  status: "active" | "frozen" | "inactive";
+  status: "pending" | "active" | "frozen" | "inactive";
   pin_hash: string | null;
 };
 

@@ -12,6 +12,11 @@ import { readLinkReferralCode } from "@/lib/affiliate-link-cookie";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
 import { toPublicPricing } from "@/lib/public-pricing";
+import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
+import {
+  getMerchantById,
+  isMerchantRetailEnabled,
+} from "@/lib/merchant-retail";
 
 export const runtime = "nodejs";
 
@@ -23,6 +28,7 @@ export async function POST(request: Request) {
     promoCode?: string;
     referralCode?: string;
     pointsToRedeem?: number;
+    merchantId?: string;
   };
 
   try {
@@ -71,7 +77,25 @@ export async function POST(request: Request) {
     minimumNambahProfit,
   } = result.context;
 
-  const basePricing = calculatePricing({
+  /*
+   * Biaya layanan merchant.
+   *
+   *merchant WAJIB dipilih eksplisit untuk preview ini — kalau tidak ada
+   * `merchantId`, fee-nya tidak boleh ditampilkan sebagai 0 karena itu akan
+   * membuat total terlihat seperti tidak ada biaya sama sekali, dan user
+   * baru tahu bedanya setelah order dibuat.
+   *
+   * Merchant yang tidak ada / tidak aktif / beku menghasilkan `null`, bukan
+   * error, supaya pratinjau tetap bisa dihitung. `POST /api/orders` yang
+   * menjadi gate terakhir dan menolak order-nya dengan pesan jelas.
+   */
+const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+const merchant =
+  isMerchantRetail && isMerchantRetailEnabled() && body.merchantId
+    ? await getMerchantById(body.merchantId)
+    : null;
+
+const basePricing = calculatePricing({
     item: selectedPackage,
     paymentMethod,
     promotion,
@@ -80,6 +104,9 @@ export async function POST(request: Request) {
     linkAffiliate,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
+    merchantServiceFeeFlat: merchant
+      ? Number(merchant.service_fee_flat_idr ?? 0)
+      : 0,
   });
 
   let pointsSummary = null as Awaited<ReturnType<typeof getPointsSummary>> | null;
@@ -143,6 +170,11 @@ export async function POST(request: Request) {
     pointsDiscount,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
+    // Sama seperti di `basePricing` di atas. Kalau fee hanya diteruskan di
+    // panggilan pertama, pratinjau akan menunjukkan total TANPA biaya
+    // layanan - user menekan tombol dengan angka yang salah, lalu menemukan
+    // selisihnya di halaman order.
+    merchantServiceFeeFlat: merchant ? Number(merchant.service_fee_flat_idr ?? 0) : 0,
   });
 
   return Response.json(

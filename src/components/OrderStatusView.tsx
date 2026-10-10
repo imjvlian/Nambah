@@ -25,6 +25,7 @@ import {
 } from "@/lib/order-status";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
+import MerchantScanCode from "@/components/MerchantScanCode";
 
 import { BRAND } from "@/lib/brand";
 
@@ -703,6 +704,23 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 {isPreview ? "Menunggu pembayaran" : STATUS_LABEL[liveStatus]}
               </span>
             </div>
+
+            /*
+             * QR + kode pindai kasir.
+             *
+             * HANYA untuk order ritel yang masih menunggu scan. Setelah
+             * kasir memindai, kode ini tidak berguna lagi - dan menampilkannya
+             * lagi bisa membuat pelanggan atau kasir mencoba memindai order
+             * yang sudah jalan, lalu bingung kenapa ditolak.
+             */
+            {order?.merchantScanCode &&
+            payment.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID &&
+            liveStatus === "pending_merchant" ? (
+              <MerchantScanCode
+                code={order.merchantScanCode}
+                amount={pricing.finalPrice}
+              />
+            ) : null}
 
             <div className="order-id-row">
               <div className="order-id-primary">

@@ -20,10 +20,32 @@ type AdminSection =
   | "receipts"
   | "points"
   | "finance"
+  | "merchants"
   | "promotions"
   | "affiliates"
   | "users"
   | "system";
+
+const MERCHANT_STATUS_LABEL: Record<string, string> = {
+  pending: "Menunggu persetujuan",
+  active: "Aktif",
+  frozen: "Dibekukan",
+  inactive: "Nonaktif",
+};
+
+/**
+ * Varian `.acc-status` yang dipakai untuk warna.
+ *
+ * `pending` memakai warna biru yang sama dengan `processing`, bukan warna
+ * gagal: menunggu persetujuan bukan kegagalan, dan menandainya merah akan
+ * membuat admin terburu-buru menutup antrean yang justru perlu dirawat.
+ */
+function merchantStatusClass(status: string): string {
+  if (status === "pending") return "processing";
+  if (status === "active") return "success";
+  return "failed";
+}
+
 
 type AdminSessionUser = {
   email: string;
@@ -266,6 +288,59 @@ type AdminUsersPayload = {
   }>;
 };
 
+type MerchantRow = {
+  id: string;
+  name: string;
+  code: string;
+  serviceFeeFlatIdr: number;
+  paymentTermDays: number;
+  status: "active" | "frozen" | "inactive";
+  notes: string | null;
+  createdAt: string;
+  outstanding: number;
+  overdue: number;
+  overdueCount: number;
+  dueSoon: number;
+  dueSoonCount: number;
+};
+
+type MerchantsPayload = {
+  merchants: MerchantRow[];
+  retailEnabled: boolean;
+};
+
+type MerchantForm = {
+  /** Null = sedang membuat toko baru, bukan mengedit. */
+  id: string | null;
+  name: string;
+  code: string;
+  serviceFeeFlatIdr: string;
+  paymentTermDays: string;
+  status: "active" | "frozen" | "inactive";
+  notes: string;
+  resetPin: boolean;
+};
+
+/**
+ * Form kosong untuk membuat toko baru.
+ *
+ * Default fee 3% dan termin 7 hari mengikuti keputusan bisnis awal. Bukan 0%
+ * karena fee 0% akan terlihat seperti fiturnya rusak, dan bukan 10% karena
+ * angka yang itu perlu dipilih dengan sengaja.
+ */
+function blankMerchantForm(): MerchantForm {
+  return {
+    id: null,
+    name: "",
+    code: "",
+    serviceFeeFlatIdr: "0",
+    paymentTermDays: "7",
+    status: "active",
+    notes: "",
+    resetPin: false,
+  };
+}
+
 type FinancePayload = {
   stats: {
     checked: number;
@@ -334,6 +409,7 @@ const NAV: Array<{
   { id: "supplier", label: "Supplier", short: "SU", group: "Katalog" },
   { id: "promotions", label: "Promo", short: "PR", group: "Katalog" },
   { id: "finance", label: "Keuangan", short: "KE", group: "Keuangan" },
+  { id: "merchants", label: "Toko Ritel", short: "TR", group: "Keuangan" },
   { id: "points", label: "Lacte Points", short: "NP", group: "Keuangan" },
   { id: "affiliates", label: "Afiliasi", short: "AF", group: "Keuangan" },
   { id: "users", label: "Pengguna", short: "PE", group: "Sistem" },
@@ -557,6 +633,13 @@ export default function AdminDashboard() {
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
   const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
+  const [merchantData, setMerchantData] = useState<MerchantsPayload | null>(null);
+  const [merchantForm, setMerchantForm] = useState<MerchantForm | null>(null);
+  const [issuedPin, setIssuedPin] = useState<{
+    code: string;
+    pin: string;
+    notice: string;
+  } | null>(null);
   const [readiness, setReadiness] = useState<ReadinessPayload | null>(null);
   const [promoDraft, setPromoDraft] = useState({
     code: "",
@@ -856,6 +939,109 @@ export default function AdminDashboard() {
     setFinanceData(data);
   }
 
+  async function loadMerchants() {
+    const response = await fetch("/api/admin/merchants", { cache: "no-store" });
+    const data = (await response.json()) as MerchantsPayload & { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Data toko ritel gagal dimuat.");
+    }
+    setMerchantData(data);
+    setMerchantForm(null);
+  }
+
+  async function createMerchant() {
+    if (!merchantForm?.name.trim() || !merchantForm.code.trim()) {
+      setNotice("Nama toko dan kode toko wajib diisi.");
+      return;
+    }
+    setBusy("merchant-create");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/merchants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: merchantForm.name,
+          code: merchantForm.code,
+          serviceFeeFlatIdr: merchantForm.serviceFeeFlatIdr,
+          paymentTermDays: merchantForm.paymentTermDays,
+          notes: merchantForm.notes,
+        }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        pin?: string;
+        pinNotice?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal membuat toko.");
+      }
+
+      /*
+       * PIN baru SEKALI ini ditampilkan, lalu langsung disembunyikan.
+       * Menyimpan PIN di state setelah efek ini selesai hanya prolongasi
+       * jendela di mana PIN terlihat di layar admin.
+       */
+      setIssuedPin({
+        code: merchantForm.code.trim().toUpperCase(),
+        pin: data.pin ?? "",
+        notice: data.pinNotice ?? "",
+      });
+      await loadMerchants();
+      setNotice("Toko dibuat. PIN kasir sudah ditampilkan di bawah.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Gagal membuat toko.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function updateMerchant() {
+    if (!merchantForm?.id) return;
+    setBusy("merchant-update");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/merchants", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: merchantForm.id,
+          serviceFeeFlatIdr: merchantForm.serviceFeeFlatIdr,
+          paymentTermDays: merchantForm.paymentTermDays,
+          status: merchantForm.status,
+          notes: merchantForm.notes,
+          resetPin: merchantForm.resetPin,
+        }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        pin?: string;
+        pinNotice?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal menyimpan toko.");
+      }
+
+      setIssuedPin(
+        data.pin
+          ? {
+              code: merchantForm.code,
+              pin: data.pin,
+              notice: data.pinNotice ?? "",
+            }
+          : null,
+      );
+      await loadMerchants();
+      setNotice(data.pin ? "PIN kasir diganti." : "Toko diperbarui.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Gagal menyimpan toko.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function runFinanceReconciliation() {
     setBusy("finance-reconcile");
     setNotice("");
@@ -961,6 +1147,7 @@ export default function AdminDashboard() {
       if (section === "promotions") await loadPromotions();
       if (section === "users") await loadUsers();
       if (section === "finance") await loadFinance();
+      if (section === "merchants") await loadMerchants();
       if (section === "system") await loadReadiness();
       setNotice("Data admin diperbarui.");
     } catch (error) {
@@ -1082,6 +1269,23 @@ export default function AdminDashboard() {
         ),
       );
     }
+    if (section === "merchants" && !merchantData) {
+      void loadMerchants().catch((error) =>
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Data toko ritel gagal dimuat.",
+        ),
+      );
+    }
+    /*
+     * Form "buat toko baru" perlu mulai ada begitu tab dibuka, kalau tidak
+     * semua input terkunci (`merchantForm` null = semua handler mengembalikan
+     * nilai yang sama) dan admin bingung kenapa tidak bisa mengetik apa pun.
+     */
+    if (section === "merchants" && merchantData && !merchantForm) {
+      setMerchantForm(blankMerchantForm());
+    }
     if (section === "system" && !readiness) {
       void loadReadiness().catch((error) =>
         setNotice(
@@ -1089,7 +1293,7 @@ export default function AdminDashboard() {
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, readiness]);
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness]);
 
   async function logout() {
     setBusy("logout");
@@ -2668,6 +2872,239 @@ export default function AdminDashboard() {
                       </b>
                     </div>
                   ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {section === "merchants" && merchantData && (
+            <>
+              <SectionHead
+                eyebrow="Keuangan"
+                title="Toko ritel"
+                copy="Buat toko, atur biaya layanan yang dibebankan ke pembeli, dan pantau piutang yang belum dilunasi. Biaya layanan dibayar langsung ke toko — Lacte tidak mengambil bagian dari nilai itu."
+              />
+
+              {!merchantData.retailEnabled ? (
+                <div className="acc-warning-card">
+                  Jalur checkout ritel masih dimatikan (MERCHANT_RETAIL_ENABLED tidak aktif).
+                  Toko bisa dibuat, tapi pembeli tidak akan melihat metode pembayarannya.
+                </div>
+              ) : null}
+
+              {issuedPin ? (
+                <div className="acc-warning-card">
+                  <strong>PIN kasir untuk {issuedPin.code}: {issuedPin.pin}</strong>
+                  <p>{issuedPin.notice}</p>
+                  <button
+                    className="acc-ghost-link"
+                    type="button"
+                    onClick={() => setIssuedPin(null)}
+                  >
+                    Saya sudah mencatatnya
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="acc-grid-two">
+                <div className="acc-table-card">
+                  <h3>Daftar toko</h3>
+                  {!merchantData.merchants.length ? (
+                    <p className="acc-empty">Belum ada toko. Buat satu di samping.</p>
+                  ) : (
+                    <table className="acc-table">
+                      <thead>
+                        <tr>
+                          <th>Toko</th>
+                          <th>Fee</th>
+                          <th>Termin</th>
+                          <th>Piutang</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {merchantData.merchants.map((merchant) => (
+                          <tr
+                            key={merchant.id}
+                            onClick={() =>
+                              setMerchantForm({
+                                id: merchant.id,
+                                name: merchant.name,
+                                code: merchant.code,
+                                serviceFeeFlatIdr: String(merchant.serviceFeeFlatIdr),
+                                paymentTermDays: String(merchant.paymentTermDays),
+                                status: merchant.status,
+                                notes: merchant.notes ?? "",
+                                resetPin: false,
+                              })
+                            }
+                          >
+                            <td>
+                              <strong>{merchant.name}</strong>
+                              <br />
+                              <code>{merchant.code}</code>
+                            </td>
+                            <td>{formatIDR(merchant.serviceFeeFlatIdr)}</td>
+                            <td>{merchant.paymentTermDays} hari</td>
+                            <td>
+                              {formatIDR(merchant.outstanding)}
+                              {merchant.overdueCount > 0 ? (
+                                <>
+                                  <br />
+                                  <span className="acc-merchant-overdue">
+                                    {merchant.overdueCount} lewat tenggat
+                                  </span>
+                                </>
+                              ) : null}
+                            </td>
+                            <td>
+                              <span
+                                className={`acc-status ${merchantStatusClass(merchant.status)}`}
+                              >
+                                {MERCHANT_STATUS_LABEL[merchant.status] ??
+                                  merchant.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div className="acc-table-card acc-merchant-form">
+                  <h3>{merchantForm?.id ? "Ubah toko" : "Buat toko"}</h3>
+                  <label className="acc-field">
+                    <span>Nama toko</span>
+                    <input
+                      value={merchantForm?.name ?? ""}
+                      disabled={Boolean(merchantForm?.id)}
+                      onChange={(event) =>
+                        setMerchantForm((current) =>
+                          current
+                            ? { ...current, name: event.target.value }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="acc-field">
+                    <span>Kode toko (4-16 huruf kapital/angka)</span>
+                    <input
+                      value={merchantForm?.code ?? ""}
+                      disabled={Boolean(merchantForm?.id)}
+                      onChange={(event) =>
+                        setMerchantForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                code: event.target.value.toUpperCase(),
+                              }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="acc-field">
+                    <span>Biaya layanan (Rp)</span>
+                    <input
+                      type="number"
+                      step="100"
+                      min="0"
+                      value={merchantForm?.serviceFeeFlatIdr ?? ""}
+                      onChange={(event) =>
+                        setMerchantForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                serviceFeeFlatIdr: event.target.value,
+                              }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="acc-field">
+                    <span>Termin pelunasan (hari)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={merchantForm?.paymentTermDays ?? ""}
+                      onChange={(event) =>
+                        setMerchantForm((current) =>
+                          current
+                            ? { ...current, paymentTermDays: event.target.value }
+                            : current,
+                        )
+                      }
+                    />
+                  </label>
+
+                  {merchantForm?.id ? (
+                    <>
+                      <label className="acc-field">
+                        <span>Status</span>
+                        <select
+                          value={merchantForm.status}
+                          onChange={(event) =>
+                            setMerchantForm((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    status: event.target.value as MerchantForm["status"],
+                                  }
+                                : current,
+                            )
+                          }
+                        >
+                          <option value="active">Aktif</option>
+                          <option value="frozen">Dibekukan</option>
+                          <option value="inactive">Nonaktif</option>
+                        </select>
+                      </label>
+
+                      <label className="acc-checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={merchantForm.resetPin}
+                          onChange={(event) =>
+                            setMerchantForm((current) =>
+                              current
+                                ? { ...current, resetPin: event.target.checked }
+                                : current,
+                            )
+                          }
+                        />
+                        <span>Ganti PIN kasir (PIN baru ditampilkan sekali)</span>
+                      </label>
+                    </>
+                  ) : null}
+
+                  <div className="acc-actions-row">
+                    <button
+                      className="acc-primary-link"
+                      type="button"
+                      disabled={Boolean(busy) || !merchantForm}
+                      onClick={() =>
+                        void (merchantForm?.id ? updateMerchant() : createMerchant())
+                      }
+                    >
+                      {merchantForm?.id ? "Simpan perubahan" : "Buat toko"}
+                    </button>
+                    {merchantForm?.id ? (
+                      <button
+                        className="acc-ghost-link"
+                        type="button"
+                        onClick={() => setMerchantForm(null)}
+                      >
+                        Batal
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </>

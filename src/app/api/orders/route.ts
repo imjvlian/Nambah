@@ -13,6 +13,7 @@ import {
 } from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
+import { allocateMerchantScanCode } from "@/lib/merchant-confirm";
 import {
   MERCHANT_ORDER_EXPIRY_WINDOW_MS,
   checkMerchantCredit,
@@ -297,8 +298,8 @@ if (isMerchantRetail) {
     // Biaya layanan merchant, dibaca dari baris `merchants` yang sudah
     // dicek di atas. Nilainya di-snapshot ke order nanti — kalau admin
     // mengubah tarif setelah checkout, order lama tidak boleh ikut berubah.
-    merchantServiceFeePercent: isMerchantRetail
-      ? Number(merchant?.service_fee_percent ?? 0)
+    merchantServiceFeeFlat: isMerchantRetail
+      ? Number(merchant?.service_fee_flat_idr ?? 0)
       : 0,
   });
 
@@ -356,6 +357,18 @@ if (isMerchantRetail) {
     pointsDiscount,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
+    /*
+     * Fee WAJIB diteruskan di panggilan kedua ini juga.
+     *
+     * Panggilan ini yang hasilnya disimpan ke order - `finalPrice`, dan
+     * `service_fee_amount` yang dibaca piutang merchant. Melewatkan fee di
+     * sini berarti total yang tercatat di order lebih kecil dari yang
+     * dilihat user, dan piutang merchant terlewat dari biaya layanan yang
+     * sebenarnya sudah dibayar pembeli.
+     */
+    merchantServiceFeeFlat: isMerchantRetail
+      ? Number(merchant?.service_fee_flat_idr ?? 0)
+      : 0,
   });
 
   if (!pricing.safeToCheckout) {
@@ -429,10 +442,15 @@ if (isMerchantRetail) {
       // Snapshot merchant. Tanpa ini, admin mengubah tarif setelah user
       // checkout akan membuat nota dan piutang merchant berbeda.
       merchant_id: isMerchantRetail ? merchant?.id : null,
-      service_fee_percent_snapshot: isMerchantRetail
-        ? Number(merchant?.service_fee_percent ?? 0)
+      service_fee_flat_snapshot: isMerchantRetail
+        ? Number(merchant?.service_fee_flat_idr ?? 0)
         : null,
       service_fee_amount: isMerchantRetail ? pricing.merchantServiceFee : null,
+      // Kode yang dipindai kasir. Hanya order merchant yang punya - order
+      // Midtrans/DOKU tidak pernah dipindai siapa pun.
+      merchant_scan_code: isMerchantRetail
+        ? await allocateMerchantScanCode()
+        : null,
       promotion_discount: pricing.promotionDiscount,
       referral_discount: pricing.referralDiscount,
       points_redeemed: pricing.pointsRedeemed,

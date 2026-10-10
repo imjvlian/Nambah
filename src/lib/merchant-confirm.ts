@@ -1,10 +1,56 @@
 import "server-only";
 
-import { supabaseUpdate } from "@/lib/supabase/server";
+import { randomInt } from "node:crypto";
+import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import {
   getOrderForMerchantScan,
   type MerchantScanOrder,
 } from "@/lib/merchant-retail";
+import {
+  SCAN_ALPHABET_SIZE,
+  generateScanCodeFrom,
+  normalizeScanCode,
+} from "@/lib/merchant-scan-code";
+
+/**
+ * Generate kode pindai yang benar-benar belum terpakai.
+ *
+ * Sekitar satu miliar kombinasi membuat tabrakan sangat tidak mungkin secara
+ * praktis, tapi "tidak mungkin" bukan "tidak pernah" - dan order yang gagal
+ * dibuat karena tabrakan akan hilang begitu saja, tanpa jejak. Jadi kodenya
+ * diperiksa dulu dengan query sebelum dipakai.
+ *
+ * Retry dibatasi 5 kali. Kalau lima kali berturut-turut gagal, itu berarti
+ * sesuatu yang salah secara struktural (misalnya alfabet berubah jadi lebih
+ * pendek dari yang di-hardcode di sini), dan lebih baik error terlihat
+ * daripada mengulang tanpa henti.
+ */
+export async function allocateMerchantScanCode(): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    /*
+     * `randomInt` dibangun di atas rejection sampling, jadi hasilnya
+     * terdistribusi merata. `Math.random() % n` akan sering mengorbankan
+     * bilangan kecil - yang membuat kode bisa ditebak.
+     *
+     * Rentangnya INDEKS ALFABET, bukan [0,1). Lihat kontrak
+     * `generateScanCodeFrom`: salah membaca rentangnya akan menghasilkan
+     * kode "undefined" untuk semua order.
+     */
+    const code = generateScanCodeFrom(() => randomInt(0, SCAN_ALPHABET_SIZE));
+
+    const taken = await supabaseSelect<{ id: string }>("orders", {
+      select: "id",
+      filters: { merchant_scan_code: `eq.${code}` },
+      limit: 1,
+    });
+
+    if (taken.length === 0) return code;
+  }
+
+  throw new Error(
+    "Gagal membuat kode pindai merchant yang unik setelah 5 percobaan.",
+  );
+}
 
 /**
  * Konfirmasi order merchant saat kasir memindai kodenya.
@@ -70,20 +116,84 @@ export type ScanResult =
  */
 const SCANNABLE_STATUS = "pending_merchant";
 
+/**
+ * Resolve input kasir menjadi Order ID.
+ *
+ * Kasir bisa mengetik kode pendek (`MR7K2-X9Q`) ATAU Order ID lengkap
+ * (`NBH-20261008-44BA21FB45`). Keduanya adalah kode yang sah untuk order
+ * yang sama, dan keduanya harus bekerja: yang pertama untuk input manual
+ * yang cepat, yang kedua untuk QR yang gagal dibaca atau order lama yang
+ * dibuat sebelum migrasi 039.
+ *
+ * Mendeteksi jenis input dilakukan dari POLA, bukan dari mencoba query dua
+ * kali. Query `or=(code.eq.X,id.eq.X)` terdengar elegan, tapi PostgREST
+ * membalas baris pertama yang cocok tanpa urutan yang dijamin - dan kita
+ * butuh tahu kode mana yang benar-benar yang diketik.
+ */
+type OrderLookupRow = {
+  id: string;
+  merchant_id: string | null;
+  status: string;
+  final_price: number | string;
+  expires_at: string | null;
+  merchants: unknown;
+};
+
+/**
+ * Nama toko dari relasi Foreign Key.
+ *
+ * PostgREST mengirim relasi satu-ke-satu sebagai objek, tapi bentuk
+ * jawabannya tidak dijamin lintas versi — karena itu dua-duanya dinormalisasi
+ * di sini, bukan di pemanggil.
+ */
+function relatedName(value: unknown): string | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  if (!first || typeof first !== "object") return null;
+  const picked = (first as Record<string, unknown>).name;
+  return typeof picked === "string" ? picked : null;
+}
+
+async function resolveOrderId(
+  rawInput: string,
+  merchantId: string,
+): Promise<{ order: MerchantScanOrder | null }> {
+  const trimmed = rawInput.trim();
+
+  // Kode pindai selalu diawali `MR` setelah normalisasi.
+  const scanCode = normalizeScanCode(trimmed);
+  if (scanCode) {
+    const byCode = await supabaseSelect<OrderLookupRow>("orders", {
+      select:
+        "id,merchant_id,status,final_price,expires_at,merchants!left(name)",
+      filters: { merchant_scan_code: `eq.${scanCode}` },
+      limit: 1,
+    });
+    const row = byCode[0];
+    if (!row) return { order: null };
+    return { order: { ...row, merchant_name: relatedName(row.merchants) } };
+  }
+
+  // Bukan kode pindai - perlakukan sebagai Order ID.
+  const order = await getOrderForMerchantScan(trimmed);
+  return { order };
+}
+
 export async function confirmMerchantScan(
-  orderId: string,
+  rawCode: string,
   merchantId: string,
 ): Promise<ScanResult> {
-  const order = await getOrderForMerchantScan(orderId);
+  const { order } = await resolveOrderId(rawCode, merchantId);
 
   if (!order) {
     return {
       ok: false,
       status: 404,
-      reason: "Kode tidak ditemukan.",
+      reason: "Kode tidak ditemukan. Minta pelanggan memeriksa layar pesanannya.",
       code: "order_not_found",
     };
   }
+
+  const orderId = order.id;
 
   // Dicentang sebelum status apa pun dibaca. Merchant harus tidak bisa
   // memindai order milik toko lain hanya karena tahu ID-nya.

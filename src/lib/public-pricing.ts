@@ -18,6 +18,7 @@ export type PublicPricingResult = Pick<
   | "pointsRedeemed"
   | "pointsEarned"
   | "customerPaymentFee"
+  | "merchantServiceFee"
   | "finalPrice"
   | "safeToCheckout"
   | "rejectionReason"
@@ -46,6 +47,7 @@ export function toPublicPricing(pricing: PricingResult): PublicPricingResult {
     pointsRedeemed: pricing.pointsRedeemed,
     pointsEarned: pricing.pointsEarned,
     customerPaymentFee: pricing.customerPaymentFee,
+    merchantServiceFee: pricing.merchantServiceFee,
     finalPrice: pricing.finalPrice,
     safeToCheckout: pricing.safeToCheckout,
     rejectionReason: pricing.rejectionReason,
@@ -74,6 +76,7 @@ export function createPublicPricingFallback(item: GamePackage): PublicPricingRes
     pointsRedeemed: 0,
     pointsEarned: 0,
     customerPaymentFee: 0,
+    merchantServiceFee: 0,
     finalPrice: item.sellingPrice,
     safeToCheckout: true,
     rejectionReason: null,

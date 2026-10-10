@@ -172,6 +172,79 @@
   color: #e4bf82;
 }
 
+/* ==========================================================================
+   Kode pindai kasir
+   ==========================================================================
+   Panel yang harus dibaca KASIR dari jarak satu meter, bukan dibaca pemilik
+   order. Dua konsekuensinya:
+
+   - QR besar, kontras tinggi, dengan area putih. QR yangCfg darkened atau
+     terlalu kecil gagal_reader pada kamera HP murah yang biasa dipakai
+     kasir.
+   - Kode teks dicetak besar dan monospace di bawahnya, supaya bisa dibaca
+     keras-keras sebagai alternatif kalau kamera gagal.
+   ========================================================================== */
+
+.merchant-scan {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.merchant-scan-head {
+  text-align: center;
+}
+
+.merchant-scan-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.merchant-scan-head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Latar putih wajib: kontras modul QR dengan latar gelap tetap tinggi, tapi
+   kamera mengembalikan gambar yang terlalu gelap di konter yang kurang
+   terang. */
+.merchant-scan-qr {
+  width: 200px;
+  height: 200px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* Placeholder selama QR dirender. Tingginya sama supaya layout tidak
+   bergeser setelah gambar selesai dimuat - pergeseran ini membuat user
+   salah klik. */
+.merchant-scan-qr-skeleton {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.merchant-scan-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #fff;
+}
+
+.merchant-scan-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6ee7c8;
+  font-variant-numeric: tabular-nums;
+}
+
 .order-id-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

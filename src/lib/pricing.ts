@@ -243,7 +243,10 @@ function evaluatePrice({
   pointsDiscount,
   affiliateRate,
   loyaltyEligible,
-  merchantServiceFeePercent = 0,
+  // Tanpa default yang sama seperti di `calculatePricing`. Fungsi ini sudah
+  // dipanggil dari dalam sana dengan nilai yang sudah dinormalisasi, jadi
+  // default hanya akan menutupi kelalaian.
+  merchantServiceFeeFlat = 0,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
@@ -252,7 +255,7 @@ function evaluatePrice({
   pointsDiscount: number;
   affiliateRate: number;
   loyaltyEligible: boolean;
-  merchantServiceFeePercent?: number;
+  merchantServiceFeeFlat?: number;
 }) {
   const loyaltyEligibleSpend = Math.max(
     0,
@@ -288,7 +291,7 @@ function evaluatePrice({
    */
   const merchantServiceFee =
     paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID
-      ? percentageOf(item.sellingPrice, merchantServiceFeePercent)
+      ? merchantServiceFeeFlat
       : 0;
 
   const finalPrice =
@@ -363,7 +366,10 @@ export function calculatePricing({
   pointsDiscount = 0,
   loyaltyEligible = false,
   minimumNambahProfit = MINIMUM_NAMBAH_PROFIT,
-  merchantServiceFeePercent = 0,
+  // Sengaja TANPA default. Default `0` membuat `undefined` mustahil terjadi,
+  // sehingga guard "fee wajib diisi untuk jalur ritel" tidak pernah menyala -
+  // dan kelalaian diteruskannya argumen akan lolos tanpa suara.
+  merchantServiceFeeFlat,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
@@ -389,21 +395,46 @@ export function calculatePricing({
    * admin bisa mengubahnya tanpa menyentuh katalog global.
    *
    * PENGECUALIAN PENTING: nilai yang dipakai di checkout WAJIB ikut
-   * di-snapshot ke `orders.service_fee_percent_snapshot`. Kalau admin
+   * di-snapshot ke `orders.service_fee_flat_snapshot`. Kalau admin
    * mengubah tarif setelah user menekan tombol bayar, order yang sudah
    * dibuat harus tetap memakai angka yang dilihat user — kalau tidak, nota
    * dan piutang merchant bisa berbeda.
    */
-  merchantServiceFeePercent?: number;
+  merchantServiceFeeFlat?: number;
 }): PricingResult {
   const normalizedPointsDiscount =
     Number.isInteger(pointsDiscount) && pointsDiscount > 0
       ? pointsDiscount
       : 0;
-  const normalizedMerchantFeePercent =
-    Number.isFinite(merchantServiceFeePercent) &&
-    (merchantServiceFeePercent as number) > 0
-      ? (merchantServiceFeePercent as number)
+
+  /*
+   * Fee merchant WAJIB diberikan secara eksplisit untuk jalur ritel.
+   *
+   * Ini dijaga dengan melempar error, bukan menerima default 0, karena
+   * kelalaian "saya lupa meneruskan fee di panggilan kedua" menghasilkan
+   * order dengan total yang lebih kecil dari yang dilihat user - dan
+   * piutang merchant yang kehilangan sebagian biaya layanan. Keduanya angka yang
+   * terlihat wajar, jadi tidak akan ditemukan saat eyeballing.
+   *
+   * Default `0` di signature tetap ada untuk pemanggil yang memang tidak
+   * punya merchant (mis. pratinjau sebelum toko dipilih) - yang melempar
+   * hanya kalau jalur ritel dipilih DAN fee tidak diisi sama sekali.
+   */
+  if (
+    paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID &&
+    merchantServiceFeeFlat === undefined
+  ) {
+    throw new Error(
+      "Biaya layanan merchant wajib diisi untuk jalur merchant_retail.",
+    );
+  }
+
+  // Fee dibulatkan ke rupiah penuh: kasir tidak menghitung pecahan, dan
+  // nominal yang tampil di layar harus sama dengan yang benar-benar
+  // dibayar.
+  const normalizedMerchantFeeFlat =
+    Number.isFinite(merchantServiceFeeFlat) && (merchantServiceFeeFlat as number) > 0
+      ? Math.round(merchantServiceFeeFlat as number)
       : 0;
   const promo = calculatePromotionDiscount(item.sellingPrice, promotion);
   const referralBenefit = calculateReferralRequestedDiscount(
@@ -429,7 +460,7 @@ export function calculatePricing({
       pointsDiscount: normalizedPointsDiscount,
       affiliateRate,
       loyaltyEligible,
-      merchantServiceFeePercent: normalizedMerchantFeePercent,
+      merchantServiceFeeFlat: normalizedMerchantFeeFlat,
     });
 
   const baseEvaluation = evaluate(0);

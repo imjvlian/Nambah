@@ -1,0 +1,184 @@
+/* ==========================================================================
+   Halaman pendaftaran toko ritel (/merchant/register)
+   ==========================================================================
+   Halaman publik, jadi harus tetap terbaca di layar kecil - pemilik toko
+   sering mendaftar dari HP, bukan dari laptop.
+
+   Kredensial (kode + PIN) sengaja berukuran besar dan monospace. Nilai ini
+   hanya ditampilkan sekali; kalau terlalu kecil untuk dibaca atau salah
+   dibaca, pemilik toko harus minta admin menggantinya, dan itu mencabut
+   kredensial yang sedang dipakai kasir di konter.
+   ========================================================================== */
+
+.merchant-register-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(120, 92, 255, 0.16), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgba(0, 194, 168, 0.12), transparent 50%),
+    #0b0d12;
+}
+
+.merchant-register-card {
+  width: min(560px, 100%);
+  background: rgba(20, 23, 31, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 32px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.merchant-register-card h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.merchant-register-lead {
+  margin: 0 0 24px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.merchant-register-field {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.merchant-register-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.merchant-register-field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.merchant-register-field input:focus {
+  outline: none;
+  border-color: rgba(120, 92, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.merchant-register-error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #ffb4b4;
+  background: rgba(255, 90, 90, 0.12);
+  border: 1px solid rgba(255, 90, 90, 0.28);
+  border-radius: 10px;
+}
+
+.merchant-register-submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cff, #5b8dff);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.15s ease;
+}
+
+.merchant-register-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.merchant-register-submit:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.merchant-register-note {
+  margin: 20px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+/* --------------------------------------------------------------------------
+   Kredensial setelah pendaftaran
+   -------------------------------------------------------------------------- */
+
+.merchant-credentials {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.merchant-credentials > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.merchant-credentials small {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Monospace dan besar: nilai ini dibaca sekali, lalu ditulis di kertas.
+   Huruf yang mirip (I/1, O/0) tidak ada di alfabet kodenya, tapi PIN
+   semuanya angka dan harus dibaca dengan benar. */
+.merchant-credential-code,
+.merchant-credential-pin {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #fff;
+}
+
+.merchant-credential-pin {
+  color: #6ee7c8;
+}
+
+.merchant-register-warning {
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #ffd6a5;
+  background: rgba(255, 176, 46, 0.1);
+  border: 1px solid rgba(255, 176, 46, 0.3);
+  border-radius: 10px;
+}
+
+@media (max-width: 480px) {
+  .merchant-register-card {
+    padding: 24px 20px;
+  }
+
+  .merchant-credentials > div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}

@@ -27,6 +27,8 @@ type OrderRow = {
   promotion_code: string | null;
   affiliate_code: string | null;
   status: PublicOrderStatus;
+  /** Kode pindai kasir - hanya order merchant_retail (migrasi 039). */
+  merchant_scan_code: string | null;
   selling_price: number | string;
   customer_payment_fee: number | string;
   promotion_discount: number | string;
@@ -93,7 +95,7 @@ type MidtransSource = "webhook" | "status_api";
 export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
-      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at",
+      "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at,merchant_scan_code",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
@@ -202,6 +204,10 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       paidAt: payment?.paid_at ?? null,
       providerTransactionId: payment?.provider_transaction_id ?? null,
     },
+    // Hanya order ritel yang punya. Exposed ke pemilik order lewat token
+    // akses yang sudah diberikan - ini memang tujuannya, supaya pelanggan
+    // bisa menunjuk layar ke kasir.
+    merchantScanCode: order.merchant_scan_code ?? null,
     ...(payment?.provider === "doku"
       ? {
           doku: {
