@@ -390,7 +390,7 @@ export function calculatePricing({
    * Biaya layanan merchant, dalam persen dari harga katalog.
    *
    * HANYA dipakai untuk `merchant_retail` — lihat `evaluatePrice`. Nilai ini
-   * datang dari `merchants.service_fee_percent`, bukan dari tabel
+   * datang dari `merchants.service_fee_flat_idr`, bukan dari tabel
    * `payment_methods`, supaya tiap merchant bisa punya tarifnya sendiri dan
    * admin bisa mengubahnya tanpa menyentuh katalog global.
    *

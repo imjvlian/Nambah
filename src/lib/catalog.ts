@@ -56,7 +56,7 @@ export type PaymentMethod = {
  * untuk jalur yang salah.
  *
  * Biaya jalur ini BUKAN dari tabel `payment_methods`: nilainya diambil dari
- * `merchants.service_fee_percent` saat checkout, supaya bisa berbeda per
+ * `merchants.service_fee_flat_idr` saat checkout, supaya bisa berbeda per
  * merchant dan bisa diedit admin tanpa mengubah katalog global.
  */
 export const MERCHANT_RETAIL_PAYMENT_METHOD_ID = "merchant_retail";

@@ -242,7 +242,16 @@ export async function PATCH(request: Request) {
     updated_at: new Date().toISOString(),
   };
 
-  if (body.serviceFeePercent !== undefined) {
+  /*
+   * Nama field di bawah harus PERSIS sama dengan yang dikirim
+   * `updateMerchant()` di panel admin.
+   *
+   * Pernah versi lama memakai penjaga `serviceFeePercent` sambil membaca
+   * `serviceFeeFlatIdr` - sisa rename dari persen ke nominal. Karena tidak
+   * pernah cocok, seluruh blok dilewati dan biaya layanan TIDAK PERNAH
+   * tersimpan, tanpa pesan error apa pun: request-nya tetap 200.
+   */
+  if (body.serviceFeeFlatIdr !== undefined) {
     patch.service_fee_flat_idr = normalizeFee(body.serviceFeeFlatIdr);
   }
   if (body.paymentTermDays !== undefined) {

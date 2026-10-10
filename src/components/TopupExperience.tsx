@@ -645,6 +645,16 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     appliedPromoCode,
     appliedReferralCode,
     pointsToRedeem,
+    /*
+     * WAJIB ada di sini. Tanpa ini, pratinjau hanya dihitung ulang saat
+     * metode pembayaran berubah - bukan saat toko dipilih. Akibatnya user
+     * memilih metode ritel (pratinjau dihitung dengan `merchantId` kosong,
+     * fee 0), lalu memilih toko, dan fee-nya TIDAK PERNAH muncul karena
+     * tidak ada yang memicu perhitungan ulang.
+     *
+     * Gejalanya persis: "biaya layanan tidak tampil dan tidak masuk total".
+     */
+    selectedMerchantId,
   ]);
 
   // Ticker countdown promo — hanya berdetak selama promo berbatas waktu aktif.

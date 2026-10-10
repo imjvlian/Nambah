@@ -2960,7 +2960,26 @@ export default function AdminDashboard() {
                               <br />
                               <code>{merchant.code}</code>
                             </td>
-                            <td>{formatIDR(merchant.serviceFeeFlatIdr)}</td>
+                            <td>
+                              {/*
+                               * Fee 0 ditampilkan sebagai "Belum diatur", bukan
+                               * "Rp0".
+                               *
+                               * Bedanya penting: toko yang didaftarkan lewat
+                               * `/merchant/register` mulai dengan fee 0 sampai
+                               * admin mengaturnya. Kalau angka 0 ditampilkan
+                               * apa adanya, admin mengira toko memang tanpa
+                               * biaya - padahal itu settings yang belum diisi.
+                               */
+                              }
+                              {merchant.serviceFeeFlatIdr > 0 ? (
+                                formatIDR(merchant.serviceFeeFlatIdr)
+                              ) : (
+                                <span className="acc-merchant-overdue">
+                                  Belum diatur
+                                </span>
+                              )}
+                            </td>
                             <td>{merchant.paymentTermDays} hari</td>
                             <td>
                               {formatIDR(merchant.outstanding)}
