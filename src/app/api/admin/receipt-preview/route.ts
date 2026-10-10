@@ -38,13 +38,44 @@ export async function GET(request: Request) {
     );
   }
 
-  const orderId = new URL(request.url).searchParams.get("orderId")?.trim() ?? "";
+  const searchParams = new URL(request.url).searchParams;
+  const orderId = searchParams.get("orderId")?.trim() ?? "";
   if (!orderId) {
     return Response.json(
       { error: "Parameter orderId wajib diisi." },
       { status: 400 },
     );
   }
+
+  /*
+   * Mode unduh.
+   *
+   * Pratinjau dan unduh memakai FUNGSI render yang sama persis
+   * (`renderReceiptHtml`), jadi berkas yang diunduh identik dengan yang
+   * diterima pelanggan. Kalau nanti dipisah, pratinjau hanya akan berbohong.
+   *
+   * HTML dipilih, bukan PDF, dengan alasan yang disengaja: receipt dikirim
+   * sebagai email HTML. PDF memerlukan pustaka baru dan hasilnya PASTI
+   * berbeda dari yang pelanggan terima — persis kebalikan dari tujuan
+   * pratinjau ini.
+   */
+  const wantsDownload = searchParams.get("download") === "1";
+
+  /*
+   * Sanitasi nama berkas — berlapis, bukan paranoia.
+   *
+   * `orderId` di sini SUDAH divalidasi secara tidak langsung: order harus
+   * benar-benar ada di database, dan ID-nya dibuat sendiri oleh
+   * `createOrderId()`. Order dengan ID berisi kutip atau CRLF tidak akan
+   * pernah ketemu, jadi secara praktis tidak bisa sampai ke header.
+   *
+   * Tapi header `Content-Disposition` adalah tempat paling berbahaya untuk
+   * nilai yang tidak dipercaya: CRLF di dalamnya bisa memecah respons
+    * menjadi dua respons dan memungkinkan injeksi header. Jadi apa pun yang
+   * lolos ke sini tetap disaring — murahan, dan mengubahnya nanti jadi
+   * tidak perlu melihat ulang logika keamanan.
+   */
+  const safeFileName = orderId.replace(/[^A-Za-z0-9_-]/g, "");
 
   try {
     const context = await loadReceiptContext(orderId);
@@ -65,6 +96,20 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        /*
+         * `attachment` memaksa browser menyimpan berkas, bukan menampilkannya.
+         *
+         * Nama file memakai `orderId` yang SUDAH divalidasi: order ID dibuat
+         * sendiri oleh `createOrderId()` (format `NBH-YYYYMMDD-XXXXXXXX`),
+         * bukan input pengguna mentah. Kalau input dibiarkan bebas, nilai ini
+         * bisa membawa CRLF dan memecah header — jadi jangan diganti tanpa
+         * sanitasi eksplisit.
+         */
+        ...(wantsDownload && safeFileName
+          ? {
+              "Content-Disposition": `attachment; filename="receipt-${safeFileName}.html"`,
+            }
+          : {}),
         // Tidak di-cache: preview harus selalu mencerminkan data terbaru.
         "Cache-Control": "private, no-store",
         // Mencegah browser menebak-nebak tipe konten dan mencurangi

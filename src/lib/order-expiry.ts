@@ -52,6 +52,78 @@ type PendingOrderRow = {
   id: string;
 };
 
+/**
+ * Sweeper order merchant yang tidak pernah di-scan.
+ *
+ * PENTING: order `pending_merchant` SENGAJA TIDAK ikut query
+ * `sweepExpiredPendingOrders` di atas. Batasnya berbeda (2 jam vs 30 menit)
+ * karena yang ditunggu bukan transfer online melainkan orang datang ke
+ * konter. Kalau keduanya disapu dengan ambang yang sama, order merchant akan
+ * dibatalkan sebelum sempat dipindai — user sudah datang ke toko, kasir
+ * tidak.scan, dan order hilang.
+ *
+ * Sebaliknya, order merchant yang tidak pernah dipindai harus tetap
+ * dibersihkan: `reserved_points` dan kuota promo-nya terkunci sampai order
+ * dihapus manual. Itu kebocoran yang sama seperti yang motivates file ini
+ * dibuat di tempat pertama, jadi perlu
+ * sweeper sendiri.
+ */
+export async function sweepExpiredMerchantOrders(
+  limit: number,
+): Promise<OrderExpirySweepResult> {
+  const result: OrderExpirySweepResult = {
+    checked: 0,
+    cancelled: 0,
+    alreadySettled: 0,
+    paymentDetected: 0,
+    failures: [],
+  };
+
+  const cutoff = new Date(
+    Date.now() - ORDER_EXPIRY_GRACE_MS,
+  ).toISOString();
+
+  // Tidak ada order `pending_merchant` sebelum migrasi 036, jadi blok NULL di
+  // bawah ini tidak diperlukan — `expires_at` selalu terisi saat insert.
+  const expired = await supabaseSelect<PendingOrderRow>("orders", {
+    select: "id",
+    filters: {
+      status: "eq.pending_merchant",
+      expires_at: `lt.${cutoff}`,
+    },
+    order: "expires_at.asc",
+    limit,
+  });
+
+  for (const order of expired) {
+    result.checked += 1;
+
+    try {
+      // `cancelOrderWithCleanup` compare-and-swap di status, jadi kalau
+      // merchant kebetulan scan bersamaan dengan cron ini, update tidak cocok
+      // dan order aman. Itu alasan `paymentDetected` tidak dipakai di sini:
+      // tidak ada tabel `payments` yang bisa dicek untuk jalur merchant.
+      const cancelled = await cancelOrderWithCleanup(
+        order.id,
+        "merchant_never_scanned",
+      );
+      if (cancelled) {
+        result.cancelled += 1;
+      } else {
+        result.alreadySettled += 1;
+      }
+    } catch (error) {
+      result.failures.push({
+        orderId: order.id,
+        message:
+          error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      });
+    }
+  }
+
+  return result;
+}
+
 export async function sweepExpiredPendingOrders(
   limit: number,
 ): Promise<OrderExpirySweepResult> {

@@ -14,7 +14,10 @@ import { applyDokuStatus } from "@/lib/order-service";
 import { fetchGatewayStatus } from "@/lib/payments";
 import { getDokuMode } from "@/lib/payments/doku";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
-import { sweepExpiredPendingOrders } from "@/lib/order-expiry";
+import {
+  sweepExpiredMerchantOrders,
+  sweepExpiredPendingOrders,
+} from "@/lib/order-expiry";
 import { resolvePersistedTestScenario } from "@/lib/test-lab-policy";
 import { supabaseSelect } from "@/lib/supabase/server";
 
@@ -218,6 +221,30 @@ export async function runNambahReconciliation(input?: {
     }
   } catch (error) {
     issue(result, "order", "expired_order_sweep", error);
+  }
+
+  /*
+   * Sweeper merchant DIPAANGGIL TERPISAH, bukan digabung ke atas.
+   *
+   * Query dan ambangnya memang berbeda, tapi menambahkannya ke blok try yang
+   * sama berarti kegagalan satu jalur menutupi kegagalan yang lain di log.
+   * Jalur merchant dan jalur gateway punya sebab yang sepenuhnya berbeda —
+   * satu soal kasir tidak.scan, satu soal webhook telat — dan saat produksi
+   * bermasalah, yang perlu terlihat adalah keduanya, bukan hanya yang error
+   * duluan.
+   */
+  try {
+    const merchantExpiry = await sweepExpiredMerchantOrders(limit);
+    result.expiry.checked += merchantExpiry.checked;
+    result.expiry.cancelled += merchantExpiry.cancelled;
+    result.expiry.alreadySettled += merchantExpiry.alreadySettled;
+    result.expiry.failed += merchantExpiry.failures.length;
+
+    for (const failure of merchantExpiry.failures) {
+      issue(result, "order", failure.orderId, new Error(failure.message));
+    }
+  } catch (error) {
+    issue(result, "order", "expired_merchant_order_sweep", error);
   }
 
   // Polling status gateway DOKU untuk order yang masih `pending_payment`.

@@ -16,12 +16,15 @@ import { paymentTypeLabel } from "@/lib/payment-label";
 import { formatIDR } from "@/lib/pricing";
 import OrderRatingForm from "@/components/OrderRatingForm";
 import {
+  MERCHANT_TIMELINE_STEPS,
   STATUS_CTA,
   STATUS_DESCRIPTION,
   STATUS_LABEL,
   TIMELINE_STEPS,
   calculateCountdown,
 } from "@/lib/order-status";
+import type { PublicOrderStatus } from "@/lib/order-public";
+import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 
 import { BRAND } from "@/lib/brand";
 
@@ -245,8 +248,24 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return () => window.clearInterval(timer);
   }, [order?.expiresAt, order?.status]);
 
+  /*
+   * Status yang perlu dipantau otomatis.
+   *
+   * `pending_merchant` WAJIB ada di sini. Order ritel tidak punya webhook
+   * gateway yang mendorong perubahan status — satu-satunya jalan dari
+   * "menunggu konfirmasi toko" ke "diproses" adalah kasir yang scan. Tanpa
+   * polling, customer akan melihat status membeku di layar yang sama
+   * padahal top up sudah selesai beberapa detik lalu.
+   */
+  const livePolledStatuses: PublicOrderStatus[] = [
+    "pending_payment",
+    "pending_merchant",
+    "paid",
+    "processing",
+  ];
+
   useEffect(() => {
-    if (!order || !["pending_payment", "paid", "processing"].includes(order.status)) return;
+    if (!order || !livePolledStatuses.includes(order.status)) return;
 
     const timer = window.setInterval(() => {
       void loadLiveOrder(order.id).then((fresh) => {
@@ -257,6 +276,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }, 5000);
 
     return () => window.clearInterval(timer);
+    // `livePolledStatuses` dibuat baru tiap render, jadi memakainya sebagai
+    // dependensi akan me-reset interval tiap tick. Yang dipantau hanyalah
+    // status order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id, order?.status, accessToken]);
 
   useEffect(() => {
@@ -521,9 +544,23 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const displayId = preview?.id ?? order!.id;
   const createdAt = preview?.createdAt ?? order!.createdAt;
   const liveStatus = order?.status ?? "pending_payment";
+
+  /*
+   * Timeline mengikuti jalur pembayaran yang dipakai order ini.
+   *
+   * Menentukan dari payment method, bukan dari status: order ritel dimulai
+   * di `pending_merchant`, tapi begitu merchant scan statusnya jadi
+   * `processing` / `success` — identik dengan order Midtrans. Kalau
+   * pemilihan timeline ikut status, order ritel akan melompat ke timeline
+   * generic begitu discan, dan langkah "Transaksi diverifikasi oleh sistem"
+   * akan muncul di depan customer yang membayarnya tunai di konter.
+   */
+  const isMerchantOrder = payment.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+  const activeTimeline = isMerchantOrder ? MERCHANT_TIMELINE_STEPS : TIMELINE_STEPS;
+
   const timelineIndex = isPreview
     ? 0
-    : Math.max(0, TIMELINE_STEPS.findIndex((step) => step.status === liveStatus));
+    : Math.max(0, activeTimeline.findIndex((step) => step.status === liveStatus));
   // Countdown sudah lewat tapi status masih `pending_payment`: order baru saja
   // melewati batas, atau cron sweeper belum sempat membatalkannya (jalur
   // paling lama 10 menit, plus 5 menit grace di `order-expiry.ts`).
@@ -690,7 +727,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </div>
 
             <div className="order-timeline">
-              {TIMELINE_STEPS.map((item, index) => (
+              {activeTimeline.map((item, index) => (
                 <div
                   className={`order-timeline-item ${index <= timelineIndex ? "current" : "upcoming"}`}
                   key={item.title}

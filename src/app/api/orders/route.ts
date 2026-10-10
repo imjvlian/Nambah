@@ -12,6 +12,14 @@ import {
   validateGuestReceiptContact,
 } from "@/lib/customer-contact";
 import { validateGameAccountTarget } from "@/lib/game-account";
+import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
+import {
+  MERCHANT_ORDER_EXPIRY_WINDOW_MS,
+  checkMerchantCredit,
+  getMerchantById,
+  isMerchantRetailEnabled,
+  type MerchantRow,
+} from "@/lib/merchant-retail";
 import {
   getPointsSummary,
   maxRedeemablePointsForSubtotal,
@@ -47,6 +55,14 @@ type CreateOrderBody = {
   receiptEmail?: string;
   receiptWhatsapp?: string;
   pointsToRedeem?: number;
+  /**
+   * Merchant yang dipilih untuk jalur ritel.
+   *
+   * WAJIB eksplisit — tidak ada default. Kalau merchant dipilih otomatis,
+   * user bisa membayar ke toko yang tidak ia pilih. Divalidasi ulang di
+   * server: nilai ini datang dari browser dan tidak boleh dipercaya.
+   */
+  merchantId?: string;
 };
 
 type GameAccountRow = {
@@ -202,13 +218,68 @@ export async function POST(request: Request) {
     return Response.json({ error: account.error }, { status: 400 });
   }
 
-  const enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id];
-  if (!enabledPayments) {
+  /*
+ * Jalur merchant Dan jalur Midtrans/DOKU dipisah di sini, bukan digabung.
+ *
+ * Jalur merchant TIDAK lewat payment gateway sama sekali: user membayar ke
+ * merchant, merchant yang scan kodenya. Jadi semua gate Midtrans di bawah
+ * (payment type, expiry window, webhook) TIDAK berlaku untuknya — memaksa
+ * order merchant lewat Midtrans akan membuat customer membayar dua kali.
+ *
+ * Sebaliknya, jalur merchant punya gate sendiri: env flag, merchant harus
+ * ada dan aktif, dan kapasitas piutangnya harus cukup.
+ */
+const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+let merchant: MerchantRow | null = null;
+
+/*
+ * Hanya dipakai di jalur gateway. Di jalur merchant nilainya tidak pernah
+ * dibaca — `createPaymentSession` seluruhnya dilewati. tetap dideklarasikan di
+ * luar `else` karena TypeScript membutuhkannya ada di scope saat blok
+ * `if (!isMerchantRetail)` dievaluasi.
+ */
+let enabledPayments: string[] = [];
+
+if (isMerchantRetail) {
+  if (!isMerchantRetailEnabled()) {
+    return Response.json(
+      { error: "Pembelian lewat toko ritel belum tersedia." },
+      { status: 403 },
+    );
+  }
+
+  // Merchant dipilih eksplisit. Tidak ada default: memilih merchant acak
+  // berarti user membayar ke orang yang tidak dipilihnya.
+  const requestedMerchantId =
+    typeof body.merchantId === "string" ? body.merchantId.trim() : "";
+  if (!requestedMerchantId) {
+    return Response.json(
+      { error: "Pilih toko ritel sebelum melanjutkan checkout." },
+      { status: 400 },
+    );
+  }
+
+  merchant = await getMerchantById(requestedMerchantId);
+  if (!merchant) {
+    return Response.json(
+      { error: "Toko ritel yang dipilih tidak ditemukan." },
+      { status: 404 },
+    );
+  }
+
+  const credit = await checkMerchantCredit(merchant.id);
+  if (!credit.eligible) {
+    return Response.json({ error: credit.reason }, { status: 409 });
+  }
+} else {
+  enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
+  if (!enabledPayments.length) {
     return Response.json(
       { error: "Metode pembayaran belum didukung Midtrans." },
       { status: 400 },
     );
   }
+}
 
   const pointsRequest = validateRequestedPoints(body.pointsToRedeem);
   if (!pointsRequest.ok) {
@@ -223,6 +294,12 @@ export async function POST(request: Request) {
     linkAffiliate,
     loyaltyEligible: Boolean(auth.user),
     minimumNambahProfit,
+    // Biaya layanan merchant, dibaca dari baris `merchants` yang sudah
+    // dicek di atas. Nilainya di-snapshot ke order nanti — kalau admin
+    // mengubah tarif setelah checkout, order lama tidak boleh ikut berubah.
+    merchantServiceFeePercent: isMerchantRetail
+      ? Number(merchant?.service_fee_percent ?? 0)
+      : 0,
   });
 
   if (!basePricing.safeToCheckout) {
@@ -294,7 +371,22 @@ export async function POST(request: Request) {
 
   const orderId = createOrderId();
   const now = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+  /*
+   * Jangka kedaluwarsa berbeda per jalur, dan alasannya berbeda.
+   *
+   * Midtrans/DOKU: 30 menit, karena pembayaran sudah otomatis dan tidak
+   * butuh orang.
+   *
+   * Merchant: 2 jam, karena yang ditunggu bukan transfer online melainkan
+   * orang datang ke konter dengan uang tunai. 30 menit tidak realistis —
+   * kode akan kedaluwarsa sebelum merchant sempat ke sana.
+   */
+  const expiresAt = new Date(
+    Date.now() +
+      (isMerchantRetail ? MERCHANT_ORDER_EXPIRY_WINDOW_MS : 30 * 60 * 1000),
+  ).toISOString();
+
   const access = createOrderAccessCredential();
 
   // Pembuatan order di bawah ini adalah saga 6 langkah, bukan transaksi: ada
@@ -325,12 +417,22 @@ export async function POST(request: Request) {
       promotion_code: pricing.promoCode,
       affiliate_code: pricing.affiliateCode,
       supplier_id: "digiflazz",
-      status: "pending_payment",
+      // Status awal berbeda per jalur. `pending_merchant` TIDAK boleh masuk
+      // sweeper 30 menit — setelah merchant scan, order sudah irreversible
+      // di sisi supplier dan membatalkannya tidak membatalkan top up.
+      status: isMerchantRetail ? "pending_merchant" : "pending_payment",
       reference_price: pricing.referencePrice,
       selling_price: pricing.sellingPrice,
       supplier_cost: pricing.supplierCost,
       customer_payment_fee: pricing.customerPaymentFee,
       merchant_payment_cost: pricing.merchantPaymentCost,
+      // Snapshot merchant. Tanpa ini, admin mengubah tarif setelah user
+      // checkout akan membuat nota dan piutang merchant berbeda.
+      merchant_id: isMerchantRetail ? merchant?.id : null,
+      service_fee_percent_snapshot: isMerchantRetail
+        ? Number(merchant?.service_fee_percent ?? 0)
+        : null,
+      service_fee_amount: isMerchantRetail ? pricing.merchantServiceFee : null,
       promotion_discount: pricing.promotionDiscount,
       referral_discount: pricing.referralDiscount,
       points_redeemed: pricing.pointsRedeemed,
@@ -377,82 +479,94 @@ export async function POST(request: Request) {
       }
     }
 
-    // Sesi pembayaran dibuat lewat router gateway aktif (Midtrans / DOKU).
-    // Provider dicatat di baris payments supaya webhook, status-check, dan
-    // rekonsiliasi selalu mengikuti gateway pembuat order — bukan switch
-    // global yang bisa berubah sewaktu-waktu.
-    await supabaseInsert("payments", {
-      order_id: orderId,
-      provider: "midtrans",
-      provider_transaction_id: null,
-      status: "pending",
-      amount: pricing.finalPrice,
-      raw_status: "snap_creating",
-      created_at: now,
-      updated_at: now,
-    });
-
-    let session;
-    try {
-      session = await createPaymentSession({
-        orderId,
-        grossAmount: pricing.finalPrice,
-        itemId: selectedPackage.id,
-        itemName: `${game.name} - ${selectedPackage.label}`,
-        paymentMethodId: paymentMethod.id,
-        enabledPayments,
-        customerEmail: receiptEmail,
-        customerPhone: receiptWhatsapp || undefined,
+    /*
+     * Order merchant TIDAK membuat sesi payment gateway. User membayar
+     * langsung ke merchant, jadi Madekan snapToken di sini akan membuat
+     * customer ditagih dua kali — sekali di konter merchant, sekali lewat
+     * gateway yang tidak pernah akan ia gunakan.
+     *
+     * Order merchant berhenti di status `pending_merchant` sampai merchant
+     * scan kodenya. Fulfillment dijalankan dari sana, bukan dari webhook.
+     */
+    if (!isMerchantRetail) {
+      // Sesi pembayaran dibuat lewat router gateway aktif (Midtrans / DOKU).
+      // Provider dicatat di baris payments supaya webhook, status-check, dan
+      // rekonsiliasi selalu mengikuti gateway pembuat order — bukan switch
+      // global yang bisa berubah sewaktu-waktu.
+      await supabaseInsert("payments", {
+        order_id: orderId,
+        provider: "midtrans",
+        provider_transaction_id: null,
+        status: "pending",
+        amount: pricing.finalPrice,
+        raw_status: "snap_creating",
+        created_at: now,
+        updated_at: now,
       });
-    } catch (error) {
-      await cancelOrderWithCleanup(orderId, "snap_create_failed");
-      await supabaseUpdate(
-        "payments",
-        { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
-        { filters: { order_id: `eq.${orderId}` } },
-      );
-      throw error;
-    }
 
-    await supabaseUpdate(
-      "payments",
-      {
-        provider: session.provider,
-        snap_token: session.payload.snapToken ?? null,
-        redirect_url: session.payload.redirectUrl ?? null,
-        raw_status: "pending",
-        updated_at: new Date().toISOString(),
-      },
-      { filters: { order_id: `eq.${orderId}` } },
-    );
-
-    // Sesi DOKU: simpan reference + payload (QR inline untuk SNAP, atau mode
-    // checkout) agar bisa dirender & di-query statusnya. payment_payload butuh
-    // migrasi 026 — kegagalannya tidak boleh menggagalkan order.
-    if (session.provider === "doku") {
-      const raw = session.payload.raw as
-        | { referenceNo?: string; requestId?: string; mode?: string }
-        | undefined;
+      let session;
       try {
+        session = await createPaymentSession({
+          orderId,
+          grossAmount: pricing.finalPrice,
+          itemId: selectedPackage.id,
+          itemName: `${game.name} - ${selectedPackage.label}`,
+          paymentMethodId: paymentMethod.id,
+          enabledPayments,
+          customerEmail: receiptEmail,
+          customerPhone: receiptWhatsapp || undefined,
+        });
+      } catch (error) {
+        await cancelOrderWithCleanup(orderId, "snap_create_failed");
         await supabaseUpdate(
           "payments",
-          {
-            provider_transaction_id: raw?.referenceNo ?? raw?.requestId ?? null,
-            payment_type: session.payload.kind === "qris" ? "qris" : "checkout",
-            payment_payload: {
-              mode: raw?.mode ?? (session.payload.kind === "qris" ? "snap" : "checkout"),
-              qrContent: session.payload.qrContent ?? null,
-              expiresAt: session.payload.expiresAt ?? null,
-              referenceNo: raw?.referenceNo ?? null,
-              requestId: raw?.requestId ?? null,
-            },
-            updated_at: new Date().toISOString(),
-          },
+          { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
           { filters: { order_id: `eq.${orderId}` } },
         );
-      } catch (error) {
-        console.error(`DOKU session payload persist failed for order ${orderId}`, error);
+        throw error;
       }
+
+      await supabaseUpdate(
+        "payments",
+        {
+          provider: session.provider,
+          snap_token: session.payload.snapToken ?? null,
+          redirect_url: session.payload.redirectUrl ?? null,
+          raw_status: "pending",
+          updated_at: new Date().toISOString(),
+        },
+        { filters: { order_id: `eq.${orderId}` } },
+      );
+
+      // Sesi DOKU: simpan reference + payload (QR inline untuk SNAP, atau mode
+      // checkout) agar bisa dirender & di-query statusnya. payment_payload butuh
+      // migrasi 026 — kegagalannya tidak boleh menggagalkan order.
+      if (session.provider === "doku") {
+        const raw = session.payload.raw as
+          | { referenceNo?: string; requestId?: string; mode?: string }
+          | undefined;
+        try {
+          await supabaseUpdate(
+            "payments",
+            {
+              provider_transaction_id: raw?.referenceNo ?? raw?.requestId ?? null,
+              payment_type: session.payload.kind === "qris" ? "qris" : "checkout",
+              payment_payload: {
+                mode: raw?.mode ?? (session.payload.kind === "qris" ? "snap" : "checkout"),
+                qrContent: session.payload.qrContent ?? null,
+                expiresAt: session.payload.expiresAt ?? null,
+                referenceNo: raw?.referenceNo ?? null,
+                requestId: raw?.requestId ?? null,
+              },
+              updated_at: new Date().toISOString(),
+            },
+            { filters: { order_id: `eq.${orderId}` } },
+          );
+        } catch (error) {
+          console.error(`DOKU session payload persist failed for order ${orderId}`, error);
+        }
+      }
+
     }
 
     const order = await getPublicOrder(orderId);
@@ -472,8 +586,21 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error("Payment order creation failed", error);
+    console.error("Order creation failed", error);
     const detail = error instanceof Error ? error.message : "";
+
+    /*
+     * Jalur merchant TIDAK pernah menyentuh gateway sama sekali, jadi menyebut
+     * Midtrans/DOKU di sini bukan cuma tidak akurat — ia membuat pelanggan mengira
+     * masalahnya ada di sistem pembayaran, lalu mencoba ulang lewat kanal yang salah.
+     */
+    if (isMerchantRetail) {
+      return Response.json(
+        { error: "Gagal membuat pesanan toko ritel. Silakan coba lagi." },
+        { status: 502 },
+      );
+    }
+
     const dokuFailure = /doku/i.test(detail);
     return Response.json(
       {

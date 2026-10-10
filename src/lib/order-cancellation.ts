@@ -19,7 +19,24 @@ export type OrderCancelReason =
   | "points_reservation_failed"
   | "promo_reservation_failed"
   | "snap_create_failed"
-  | "expired";
+  | "expired"
+  | "merchant_never_scanned";
+
+/**
+ * Status yang masih SEBENARNYA belum dibayar dan masih boleh dibatalkan.
+ *
+ * `pending_merchant` masuk daftar karena user di jalur ritel sudah 보는 nota
+ * tapi uangnya belum masuk — nilainya masih di merchant, dan reservasi
+ * points/promo masih terkunci. Kalau order seperti itu tidak bisa dibatalkan,
+ * reservasinya bocor permanen - bug yang sama seperti yang
+ * dulunya cuma ada di sweeper `order-expiry.ts` sebelum ditulis.
+ *
+ * Yang SENGAJA TIDAK ada: `paid`, `processing`, `awaiting_receivable`,
+ * `completed`. Setelah merchant scan, order sudah tidak bisa dibatalkan —
+ * top up sudah irrevocably terjadi di supplier dan membatalkannya tidak
+ * membatalkan apa pun, hanya menghilangkan bukti piutang merchant.
+ */
+const CANCELLABLE_STATUSES = ["pending_payment", "pending_merchant"] as const;
 
 /**
  * Lepas reservasi points dan promo untuk satu order.
@@ -54,13 +71,16 @@ export async function releaseOrderReservations(orderId: string) {
  * Batalkan order yang masih menunggu pembayaran, lalu lepas reservasinya.
  *
  * Transisi status memakai compare-and-swap: update hanya berlaku kalau order
- * masih `pending_payment`. Ini penting untuk dua hal:
+ * masih di salah satu status `CANCELLABLE_STATUSES`. Ini penting untuk tiga hal:
  *
  * 1. Sweeper kedaluwarsa tidak boleh membatalkan order yang pembayarannya
  *    bersamaan saja berhasil — `applyMidtransStatus` sudah memindahkan status
  *    ke `paid`, jadi update di sini tidak cocok dan reservasi tidak dilepas.
  * 2. Pemanggilan ganda (mis. webhook dan cron berbarengan) hanya menghasilkan
  *    satu pembatalan efektif.
+ * 3. Order merchant yang SUDAH di-scan merchant tidak boleh dibatalkan oleh
+ *    sweeper. Setelah scan, status sudah pindah ke `awaiting_receivable` dan
+ *    top up sudah terjadi — membatalkannya hanya menghapus bukti piutang.
  *
  * @returns `true` kalau order benar-benar dibatalkan oleh pemanggilan ini.
  */
@@ -78,7 +98,12 @@ export async function cancelOrderWithCleanup(
       terminal_at: now,
       updated_at: now,
     },
-    { filters: { id: `eq.${orderId}`, status: "eq.pending_payment" } },
+    {
+      filters: {
+        id: `eq.${orderId}`,
+        status: `in.(${CANCELLABLE_STATUSES.join(",")})`,
+      },
+    },
   );
 
   if (cancelled.length === 0) return false;

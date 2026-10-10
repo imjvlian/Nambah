@@ -120,9 +120,31 @@ export default function ReceiptPreview() {
         <div className="acc-receipt-preview-frame">
           <div className="acc-receipt-preview-bar">
             <span>Pratinjau · {trimmed}</span>
-            <button type="button" onClick={() => setHtml("")}>
-              Tutup
-            </button>
+            <div className="acc-receipt-preview-actions">
+              {/*
+                Unduh lewat `<a download>`, bukan form POST.
+
+                Berkas HTML-nya sudah ada di memori (state `html`) sebagai
+                `srcDoc`, tapi `srcDoc` tidak bisa diunduh browser. Cara
+                yang benar: biarkan browser meminta ulang ke endpoint yang
+                sama dengan `download=1`. Endpoint itu mengembalikan
+                `Content-Disposition: attachment`, jadi browser menyimpan
+                berkas tanpa pernah menampilkannya.
+
+                `href` dibangun ulang dari `trimmed` — bukan dari state
+                `html` — supaya isinya persis sama dengan yang baru saja
+                dirender.
+              */}
+              <a
+                href={`/api/admin/receipt-preview?orderId=${encodeURIComponent(trimmed)}&download=1`}
+                download
+              >
+                Unduh
+              </a>
+              <button type="button" onClick={() => setHtml("")}>
+                Tutup
+              </button>
+            </div>
           </div>
           <iframe
             title={`Pratinjau receipt ${trimmed}`}

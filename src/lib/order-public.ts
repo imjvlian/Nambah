@@ -1,5 +1,14 @@
 export type PublicOrderStatus =
   | "pending_payment"
+  /*
+   * Jalur merchant ritel. Dua status ini hanya muncul di order yang dibuat
+   * lewat `merchant_retail` — tidak ada order Midtrans/DOKU yang memakainya.
+   *
+   * `pending_merchant` = user sudah checkout, merchant belum scan.
+   * `awaiting_receivable` = sudah difulfill, tinggal merchant transfer.
+   */
+  | "pending_merchant"
+  | "awaiting_receivable"
   | "paid"
   | "processing"
   | "success"

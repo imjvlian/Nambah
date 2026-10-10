@@ -4,6 +4,11 @@ import {
   type DigiflazzTestOutcome,
 } from "@/lib/digiflazz/client";
 import { renderFulfillmentTarget } from "@/lib/fulfillment-target";
+import {
+  getMerchantForReceivable,
+  syncMerchantBalance,
+} from "@/lib/merchant-retail";
+import { openMerchantReceivable } from "@/lib/merchant-receivable";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { consumeDigiflazzTestScenario } from "@/lib/test-lab";
 import { normalizeDigiflazzStatus } from "@/lib/digiflazz-status-policy";
@@ -364,6 +369,30 @@ async function finalizeOrder(
   );
 
   if (updated.length === 0) return;
+
+  /*
+   * Bukalah piutang merchant setelah order sukses.
+   *
+   * Ditempatkan di sini, SESUDAH status `success` tertulis, karena titik
+   * itu adalah saat Lacte benar-benar menanggung: top up sudah dikirim ke
+   * customer, dan uang supplier sudah keluar dari saldo Lacte.
+   * SEBELUM blok ini ada, order merchant tidak pernah jadi piutang sama
+   * sekali - piutang akan tercatat jauh setelah Lacte menanggung cost.
+   * Kegagalan di sini sengaja ditelan: order sudah sukses untuk customer,
+   * dan menggagalkan finalisasi hanya akan membuat piutang hilang tanpa
+   * jejaknya. Reconciler bisa memulihkannya dari `merchant_id` + `fulfilled_at`.
+   */
+  if (status === "success") {
+    try {
+      const merchant = await getMerchantForReceivable(orderId);
+      if (merchant) {
+        await openMerchantReceivable(orderId, merchant.payment_term_days, now);
+        await syncMerchantBalance(merchant.id);
+      }
+    } catch (error) {
+      console.error(`Merchant receivable open failed for order ${orderId}`, error);
+    }
+  }
 
   try {
     await syncOrderPointsLifecycle(orderId, status);

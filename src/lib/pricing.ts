@@ -1,4 +1,5 @@
 import type { PaymentMethod } from "@/lib/catalog";
+import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 import {
   POINT_VALUE_IDR,
   calculateEarnedPoints,
@@ -70,6 +71,17 @@ export type PricingResult = {
   loyaltyEligibleSpend: number;
   customerPaymentFee: number;
   merchantPaymentCost: number;
+  /**
+   * Biaya layanan merchant, dalam rupiah. 100% milik merchant — Lacte tidak
+   * mengambil apa pun dari nilai ini.
+   *
+   * Masuk ke `finalPrice` (user membayarnya ke merchant) tapi SENGAJA tidak
+   * masuk ke `nambahProfit`. Nilai ini di-snapshot ke
+   * `orders.service_fee_amount` supaya piutang merchant bisa direkonsiliasi.
+   *
+   * Selalu 0 untuk payment method selain `merchant_retail`.
+   */
+  merchantServiceFee: number;
   finalPrice: number;
   netProfitBeforeAffiliate: number;
   affiliateRate: number;
@@ -231,6 +243,7 @@ function evaluatePrice({
   pointsDiscount,
   affiliateRate,
   loyaltyEligible,
+  merchantServiceFeePercent = 0,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
@@ -239,6 +252,7 @@ function evaluatePrice({
   pointsDiscount: number;
   affiliateRate: number;
   loyaltyEligible: boolean;
+  merchantServiceFeePercent?: number;
 }) {
   const loyaltyEligibleSpend = Math.max(
     0,
@@ -253,7 +267,32 @@ function evaluatePrice({
   const customerPaymentFee =
     paymentMethod.customerFeeFlat +
     percentageOf(loyaltyEligibleSpend, paymentMethod.customerFeePercent);
-  const finalPrice = loyaltyEligibleSpend + customerPaymentFee;
+
+  /*
+   * Biaya layanan merchant — 100% milik merchant.
+   *
+   * DITAMBAHKAN ke harga yang dibayar user, tapi SENGAJA TIDAK masuk ke
+   * `netProfitBeforeAffiliate`. Alasan: uang ini tidak pernah melewati Lacte.
+   * User membayar ke merchant, merchant IMPOR fees itu sebagai pendapatannya,
+   * Lacte cuma menampilkan angkanya di checkout.
+   *
+   * Kalau fee ini ikut dihitung sebagai revenue Lacte, `nambahProfit` naik
+   * dan guard profit akan terlihat lolos — padahal Lacte tidak menerima satu rupiah
+   * pun dari fee itu. Itu akan membuat dashboard berbohong dan keputusan
+   * \"apakah jalur ini untung\" tidak bisa diambil dari data.
+   *
+   * `pointsDiscount` TIDAK ikut jadi dasar perhitungan fee. User memakai
+   * points untuk harga produk; biaya layanannya tetap dihitung dari harga
+   * katalog, supaya fee merchant tidak ikut berkurang tanpa disadari saat
+   * promo atau points aktif.
+   */
+  const merchantServiceFee =
+    paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID
+      ? percentageOf(item.sellingPrice, merchantServiceFeePercent)
+      : 0;
+
+  const finalPrice =
+    loyaltyEligibleSpend + customerPaymentFee + merchantServiceFee;
 
   const merchantPaymentCost =
     paymentMethod.merchantFeeFlat +
@@ -261,8 +300,11 @@ function evaluatePrice({
 
   // Earned points are treated as a loyalty liability immediately so referral
   // commission and the minimum-profit guard cannot silently consume the reward.
+  //
+  // `merchantServiceFee` sengaja tidak ada di sini — lihat catatan di atas.
   const netProfitBeforeAffiliate =
-    finalPrice - item.supplierCost - merchantPaymentCost - pointsRewardValue;
+    finalPrice - merchantServiceFee - item.supplierCost - merchantPaymentCost -
+    pointsRewardValue;
   const affiliateCommission =
     affiliateRate > 0
       ? Math.max(0, Math.floor(netProfitBeforeAffiliate * affiliateRate))
@@ -274,6 +316,7 @@ function evaluatePrice({
     pointsEarned,
     pointsRewardValue,
     customerPaymentFee,
+    merchantServiceFee,
     finalPrice,
     merchantPaymentCost,
     netProfitBeforeAffiliate,
@@ -320,6 +363,7 @@ export function calculatePricing({
   pointsDiscount = 0,
   loyaltyEligible = false,
   minimumNambahProfit = MINIMUM_NAMBAH_PROFIT,
+  merchantServiceFeePercent = 0,
 }: {
   item: SupplierPricedPackage;
   paymentMethod: PaymentMethod;
@@ -336,10 +380,30 @@ export function calculatePricing({
   pointsDiscount?: number;
   loyaltyEligible?: boolean;
   minimumNambahProfit?: number;
+  /**
+   * Biaya layanan merchant, dalam persen dari harga katalog.
+   *
+   * HANYA dipakai untuk `merchant_retail` — lihat `evaluatePrice`. Nilai ini
+   * datang dari `merchants.service_fee_percent`, bukan dari tabel
+   * `payment_methods`, supaya tiap merchant bisa punya tarifnya sendiri dan
+   * admin bisa mengubahnya tanpa menyentuh katalog global.
+   *
+   * PENGECUALIAN PENTING: nilai yang dipakai di checkout WAJIB ikut
+   * di-snapshot ke `orders.service_fee_percent_snapshot`. Kalau admin
+   * mengubah tarif setelah user menekan tombol bayar, order yang sudah
+   * dibuat harus tetap memakai angka yang dilihat user — kalau tidak, nota
+   * dan piutang merchant bisa berbeda.
+   */
+  merchantServiceFeePercent?: number;
 }): PricingResult {
   const normalizedPointsDiscount =
     Number.isInteger(pointsDiscount) && pointsDiscount > 0
       ? pointsDiscount
+      : 0;
+  const normalizedMerchantFeePercent =
+    Number.isFinite(merchantServiceFeePercent) &&
+    (merchantServiceFeePercent as number) > 0
+      ? (merchantServiceFeePercent as number)
       : 0;
   const promo = calculatePromotionDiscount(item.sellingPrice, promotion);
   const referralBenefit = calculateReferralRequestedDiscount(
@@ -365,6 +429,7 @@ export function calculatePricing({
       pointsDiscount: normalizedPointsDiscount,
       affiliateRate,
       loyaltyEligible,
+      merchantServiceFeePercent: normalizedMerchantFeePercent,
     });
 
   const baseEvaluation = evaluate(0);
@@ -397,7 +462,25 @@ export function calculatePricing({
 
   // Penyebab di bawah ini murni internal (profit/margin). Angka ambang tidak
   // boleh sampai ke user — teks generik dipakai, kode disimpan untuk log.
-  if (!rejectionReason && baseEvaluation.nambahProfit < minimumNambahProfit) {
+  //
+  // PENGECUALIAN JALUR MERCHANT: guard ini dilewati untuk
+  // `payment_method = "merchant_retail"`.
+  //
+  // Bukan bug dan bukan shortcut. Pada jalur merchant, biaya layanan 100%
+  // milik merchant — Lacte tidak mengambil apa pun, jadi `nambahProfit`
+  // selalu 0 dan setiap order akan ditolak di sini kalau guard tidak
+  // dilewati. Model bisnisnya sudah diputuskan: LacteFSI armar ransom
+  // dari fee, tapi menganggap merchandise sebagai piutang. Margin di jalur
+  // ini bukan "profit", tapi uang yang akan masuk nanti lewat pelunasan —
+  // dan itu dicatat di `merchant_balances`, bukan di sini.
+  const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+  const profitGuardApplies = !isMerchantRetail;
+
+  if (
+    !rejectionReason &&
+    profitGuardApplies &&
+    baseEvaluation.nambahProfit < minimumNambahProfit
+  ) {
     rejectionReason = rejectionCodeCopy("profit_below_minimum");
     rejectionCode = "profit_below_minimum";
   }
@@ -438,6 +521,7 @@ export function calculatePricing({
     loyaltyEligibleSpend: finalEvaluation.loyaltyEligibleSpend,
     customerPaymentFee: finalEvaluation.customerPaymentFee,
     merchantPaymentCost: finalEvaluation.merchantPaymentCost,
+    merchantServiceFee: finalEvaluation.merchantServiceFee,
     finalPrice: finalEvaluation.finalPrice,
     netProfitBeforeAffiliate: finalEvaluation.netProfitBeforeAffiliate,
     affiliateRate,

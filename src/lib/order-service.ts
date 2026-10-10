@@ -250,6 +250,25 @@ export async function applyMidtransStatus(
 
   if (!order) throw new Error(`Order ${orderId} tidak ditemukan.`);
 
+  /*
+   * Order merchant ritol TIDAK BOLEH disentuh webhook Midtrans.
+   *
+   * Order itu tidak pernah punya sesi gateway sama sekali - tidak ada
+   * `snapToken`, tidak ada `payments` row. Jadi webhook yang tiba untuk
+   * order merchant berarti salah orderId atau sengaja dikirim
+   * mengirimnya. Menjalankannya akan mengembalikan status ke jalur payment
+   * dan, untuk `settlement`, menandai order sudah dibayar padahal user
+   * membayarnya ke merchant di konter.
+   *
+   * Ditolak SEBELUM validasi jumlah, karena error "tidak cocok" akan
+   * membocorkan bahwa order itu ada dan belum dibayar.
+   */
+  if (order.status === "pending_merchant" || order.status === "awaiting_receivable") {
+    throw new Error(
+      `Order ${orderId} adalah order merchant ritel dan tidak punya sesi pembayaran gateway.`,
+    );
+  }
+
   const grossAmount = Number(payload.gross_amount);
   if (!Number.isFinite(grossAmount) || Math.round(grossAmount) !== Number(order.final_price)) {
     throw new Error(`Gross amount Midtrans tidak cocok untuk order ${orderId}.`);
@@ -420,6 +439,14 @@ export async function applyDokuStatus(
     limit: 1,
   });
   if (!order) throw new Error(`Order ${orderId} tidak ditemukan.`);
+
+  // Sama seperti jalur Midtrans: order merchant ritel tidak punya sesi
+  // gateway, jadi notifikasi DOKU untuk order itu tidak mungkin sah.
+  if (order.status === "pending_merchant" || order.status === "awaiting_receivable") {
+    throw new Error(
+      `Order ${orderId} adalah order merchant ritel dan tidak punya sesi pembayaran gateway.`,
+    );
+  }
 
   // Validasi jumlah sama ketatnya dengan jalur Midtrans.
   if (input.amountValue) {

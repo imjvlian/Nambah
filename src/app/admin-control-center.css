@@ -1095,7 +1095,20 @@
   letter-spacing: .04em;
 }
 
-.acc-receipt-preview-bar button {
+/* Aksi di bar pratinjau (Unduh + Tutup) dikelompokkan supaya jaraknya
+ * supaya jarak ke label di sebelah kiri tidak terlalu jauh. */
+.acc-receipt-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 0 0 auto;
+}
+
+/* `a` dan `button` berbagi gaya. Keduanya tanpa garis bawah supaya tidak
+ * terlihat seperti link di dalam panel, dan keduanya pakai `color: inherit`
+ * supaya tidak mewarisi warna link default browser. */
+.acc-receipt-preview-bar button,
+.acc-receipt-preview-bar a {
   border: 0;
   background: none;
   color: var(--lime);
@@ -1104,7 +1117,13 @@
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
+  text-decoration: none;
   cursor: pointer;
+}
+
+/* Tutup sedikit lebih redup supaya "Unduh" terbaca sebagai aksi utama. */
+.acc-receipt-preview-bar button {
+  color: var(--muted);
 }
 
 /* Tinggi 620px: cukup untuk seluruh receipt pada 560px lebar maks,

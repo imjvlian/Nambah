@@ -47,6 +47,20 @@ export type PaymentMethod = {
   merchantFeePercent: number;
 };
 
+/**
+ * ID payment method untuk jalur merchant ritel.
+ *
+ * Didefinisikan di sini, bukan ditulis sebagai string di tiap modul, karena
+ * `pricing.ts` ikut-generation yang merujuknya — hardcode di dua tempat
+ * berarti keduanya bisa menyimpang diam-diam dan guard profit ikut hilang
+ * untuk jalur yang salah.
+ *
+ * Biaya jalur ini BUKAN dari tabel `payment_methods`: nilainya diambil dari
+ * `merchants.service_fee_percent` saat checkout, supaya bisa berbeda per
+ * merchant dan bisa diedit admin tanpa mengubah katalog global.
+ */
+export const MERCHANT_RETAIL_PAYMENT_METHOD_ID = "merchant_retail";
+
 // Public-safe catalog for the MVP only. Supplier costs intentionally live in a
 // server-side module and must never be sent to the customer bundle.
 // referencePrice must represent a defensible normal/reference price before going live.
