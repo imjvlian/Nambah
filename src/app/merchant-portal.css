@@ -182,6 +182,103 @@
   gap: 12px;
 }
 
+/* --------------------------------------------------------------------------
+   Kartu menu
+   --------------------------------------------------------------------------
+   Persegi, rounded, satu ikon besar di kotak, lalu nama fungsinya.
+
+   Bentuknya dipilih untuk layar sentuh: kotak sebesar ini adalah target yang
+   tidak mungkin tert tapped di konter yang ramai, dan ikon besar bisa dibaca
+   tanpa membaca teks - penting saat layar sudah berdebu atau terkena cahaya.
+   -------------------------------------------------------------------------- */
+
+.merchant-cards {
+  /* Lebar kolom DIKUNCI, bukan `auto-fit`.
+   *
+   * Dengan `auto-fit`, dua kartu akan melebar mengisi seluruh lebar card
+   * portal dan terlihat seperti tombol oversized - bukan menu.
+   * `justify-content: start` menahan sisanya di kiri supaya kartu tetap kecil
+   * di layar berapa pun. */
+  display: grid;
+  grid-template-columns: repeat(2, 124px);
+  justify-content: start;
+  gap: 10px;
+}
+
+.merchant-card {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 9px;
+  padding: 14px 8px;
+  /* Rasio 1:1 dipakai bersama lebar kolom yang dikunci di atas, jadi kartu
+     benar-benar persegi tanpa harus menghitung tinggi manual. */
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+  color: inherit;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.merchant-card:hover {
+  border-color: rgba(124, 92, 255, 0.6);
+  background: rgba(124, 92, 255, 0.09);
+}
+
+.merchant-card:active {
+  transform: scale(0.97);
+}
+
+/* Kotak logo. Square dengan radius lebih kecil dari kartunya supaya terlihat
+   sebagai lapisan di dalam, bukan sekadar kotak datar. */
+.merchant-card-logo {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.merchant-card-logo svg {
+  width: 21px;
+  height: 21px;
+}
+
+.merchant-card-logo-kasir {
+  color: #6ee7c8;
+  background: rgba(0, 194, 168, 0.12);
+  border-color: rgba(0, 194, 168, 0.28);
+}
+
+.merchant-card-logo-riwayat {
+  color: #adc4f1;
+  background: rgba(111, 156, 255, 0.12);
+  border-color: rgba(111, 156, 255, 0.28);
+}
+
+.merchant-card-body {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+
+.merchant-card-body strong {
+  font-size: 12px;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.merchant-card-body small {
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .merchant-portal-action {
   display: grid;
   gap: 4px;

@@ -150,28 +150,54 @@ export function readMerchantSession(request: Request): string | null {
 /**
  * Untuk Server Component, yang punya `cookies()` dari `next/headers` dan tidak
  * punya objek `Request`.
+ *
+ * ⚠️ ARGUMENNYA NILAI COOKIE SAJA, bukan header `name=value`.
+ *
+ * `cookies().get(nama)?.value` mengembalikan nilai cookie apa adanya - bukan
+ * baris `nama=nilai`. Memakainya sebagai header `name=value` membuat pencarian
+ * nama selalu gagal dan hasilnya selalu kosong, jadi setiap halaman yang
+ * butuh sesi akan mengira belum login dan mengarahkan ke form.
  */
-export function readMerchantSessionFromCookieHeader(
-  cookieHeader: string | null | undefined,
+export function readMerchantSessionFromValue(
+  value: string | null | undefined,
 ): string | null {
-  return verifyMerchantSessionToken(
-    readCookieValue(cookieHeader, MERCHANT_SESSION_COOKIE),
-  );
+  return verifyMerchantSessionToken(value ?? "");
 }
 
 export function merchantSessionCookie(token: string, maxAge: number): string {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  /*
+   * `Secure` aktif di produksi.
+   *
+   * PERHATIAN untuk pengujian: `Secure` membuat browser menolak cookie
+   * kalau situs diakses lewat `http://` pada alamat yang bukan localhost -
+   * termasuk lewat IP LAN seperti `http://192.168.x.x:3000`. Gejalanya
+   * persis seperti yang dilaporkan: server membalas 200, tapi cookie tidak
+   * pernah tersimpan, jadi `/merchant` tetap menampilkan form.
+   *
+   * `MERCHANT_COOKIE_INSECURE=true` mematikan flag itu. HANYA untuk
+   * pengujian lokal - jangan pernah dipakai di deploy sungguhan.
+   */
+  const useSecure =
+    process.env.NODE_ENV === "production" &&
+    process.env.MERCHANT_COOKIE_INSECURE !== "true";
+
   return [
     `${MERCHANT_SESSION_COOKIE}=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
-    // `Strict`: sesi kasir tidak pernah perlu ikut pada navigasi dari situs
-    // lain. Kalau cookie ikut pada request lintas origin, kasir yang
-    //(summary) membuka tautan dari grup WhatsApp bisa memicu request yang
-    // terotorisasi tanpa sadar.
+    /*
+     * `Strict`: sesi toko tidak pernah perlu ikut pada navigasi dari situs
+     * lain. Kalau cookie ikut pada request lintas origin, kasir yang
+     * membuka tautan dari grup WhatsApp bisa memicu request yang sudah
+     * terotorisasi tanpa sadar.
+     */
     "SameSite=Strict",
     `Max-Age=${maxAge}`,
-    secure,
+    // Perhatikan: NILAI sudah termasuk pemisah sendiri. Dulu baris ini
+    // memakai `"; Secure"` lalu di-`join("; ")` di bawah, sehingga hasilnya
+    // `Max-Age=43200; ; Secure` - dua pemisah berturut-turut, dan beberapa
+    // parser memperlakukan sisa baris sebagai atribut bernama kosong.
+    ...(useSecure ? ["Secure"] : []),
   ].join("; ");
 }
 

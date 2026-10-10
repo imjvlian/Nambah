@@ -1,19 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
  * Form login toko ritel.
  *
- * Setelah berhasil, halaman dimuat ulang dengan `router.refresh()`, bukan
- * `router.push("/merchant")`. Alasannya: `/merchant` adalah Server Component
- * yang membaca cookie sesi, dan `push` ke URL yang sedang aktif tidak
- * selalu menjalankan ulang server component-nya - jadi user bisa melihat
- * form login lagi tepat setelah login berhasil.
+ * Setelah berhasil, halaman dimuat ulang dengan navigasi keras
+ * (`window.location.assign`), bukan `router.refresh()` atau
+ * `router.push`. Alasannya dijelaskan di dalam `submit`.
  */
 export function MerchantLoginForm() {
-  const router = useRouter();
   const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +34,22 @@ export function MerchantLoginForm() {
         return;
       }
 
-      router.refresh();
+      /*
+       * Navigasi keras, bukan `router.refresh()`.
+       *
+       * Alasannya nyata: `refresh()` hanya meminta ulang payload RSC dan
+       * hopesikan server menukar form dengan menu. Kalau cookie sesinya tidak
+       * terpakai - mis. ditolak browser, atau header `Set-Cookie` tidak
+       * sampai - server mengembalikan form lagi, dan yang terjadi di layar
+       * hanya form yang sama dengan tombol yang tetap nonaktif.
+       *
+       * `window.location.assign()` memuat ulang dokumen dari nol. Server
+       * pasti membaca cookie yang baru saja disimpan, jadi hasilnya benar
+       * atau ada error yang terlihat - tidak ada keadaan setengah jalan
+       * yang tidak bisa dijelaskan.
+       */
+      setBusy(false);
+      window.location.assign("/merchant");
     } catch {
       setError("Tidak bisa menghubungi server.");
       setBusy(false);

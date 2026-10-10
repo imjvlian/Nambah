@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import {
   getMerchantById,
   isMerchantRetailEnabled,
 } from "@/lib/merchant-retail";
-import { readMerchantSessionFromCookieHeader } from "@/lib/merchant-session";
+import { readMerchantSessionFromValue } from "@/lib/merchant-session";
 import { buildMerchantDashboard } from "@/lib/merchant-dashboard";
 import { MerchantStatusBadge } from "@/components/merchant/MerchantStatusBadge";
 import "@/app/merchant-portal.css";
@@ -53,21 +54,21 @@ function formatDate(value: string): string {
 
 export default async function MerchantRiwayatPage() {
   if (!isMerchantRetailEnabled()) {
-    return <RiwayatKosong title="Program toko ritel belum dibuka" />;
+    redirect("/merchant");
   }
 
   const cookieStore = await cookies();
-  const merchantId = readMerchantSessionFromCookieHeader(
+  const merchantId = readMerchantSessionFromValue(
     cookieStore.get("nambah_merchant_session")?.value,
   );
 
   if (!merchantId) {
-    return <RiwayatKosong title="Belum masuk" />;
+    redirect("/merchant/login");
   }
 
   const merchant = await getMerchantById(merchantId);
   if (!merchant) {
-    return <RiwayatKosong title="Toko tidak ditemukan" />;
+    redirect("/merchant/login");
   }
 
   const dashboard = await buildMerchantDashboard(
@@ -186,19 +187,6 @@ export default async function MerchantRiwayatPage() {
             </table>
           )}
         </section>
-      </div>
-    </main>
-  );
-}
-
-function RiwayatKosong({ title }: { title: string }) {
-  return (
-    <main className="merchant-portal-page">
-      <div className="merchant-portal-card">
-        <h1>{title}</h1>
-        <p className="merchant-portal-lead">
-          <Link href="/merchant">Kembali ke halaman toko</Link>
-        </p>
       </div>
     </main>
   );

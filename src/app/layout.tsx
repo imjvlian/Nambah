@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import ChatWidget from "@/components/ChatWidget";
 import { BRAND } from "@/lib/brand";
@@ -48,7 +48,10 @@ export const metadata: Metadata = {
   description: BRAND.description,
   applicationName: BRAND.name,
   keywords: ["top up game", "voucher digital", "pulsa", BRAND.shortName, BRAND.name],
-  themeColor: BRAND.themeColor,
+  // `themeColor` TIDAK lagi di sini. Next.js 16 memindahkannya ke export
+  // `viewport` - kalau masih di `metadata`, setiap page load penuh
+  // menghasilkan warning, dan warninya ikut muncul di halaman merchant yang
+  // baru. Lihat `viewport` di bawah.
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -86,6 +89,16 @@ export const metadata: Metadata = {
     description: BRAND.description,
     images: ["/api/og"],
   },
+};
+
+/**
+ * `themeColor` pindah ke sini mulai Next.js 16.
+ *
+ * Nilainya sama persis dengan yang tadinya ada di `metadata` - dipindah,
+ * bukan diubah, jadi warna address bar di HP tidak berubah.
+ */
+export const viewport: Viewport = {
+  themeColor: BRAND.themeColor,
 };
 
 export default function RootLayout({
