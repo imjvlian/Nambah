@@ -1639,6 +1639,51 @@
   color: var(--muted);
 }
 
+/*
+ * Judul di dalam kartu.
+ *
+ * `.acc-table-card` sengaja tidak punya padding: section lain membungkus
+ * baris grid yang sudah membawa padding-nya sendiri, jadi padding di card
+ * akan menggandakan jarak setiap baris.
+ *
+ * Kartu yang berisi heading - lalu tabel atau form - memakai kelas ini
+ * untuk heading-nya, dan tabletnya tetap penuh ke tepi card. Hasilnya
+ * header tabel menempel tepi card (terlihat rapi) sementara judulnya punya
+ * ruang bernapas, tanpa harus menambah padding ke card yang sudah dipakai
+ * section lain.
+ */
+.acc-card-head {
+  margin: 0;
+  padding: 15px 16px 13px;
+  border-bottom: 1px solid var(--line);
+  color: #cfd5c9;
+  /*
+   * `font-family: inherit` itu disengaja. Heading global (`h1..h6` di
+   * globals.css) memakai display font; membiarkan warisan itu membuat
+   * judul kartu ini jadi satu-satunya elemen dengan font berbeda di seluruh
+   * panel admin. Semua label lain di sini memakai font body.
+   */
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  text-wrap: normal;
+}
+
+/* Kartu isian: card + padding. Dipisah dari `.acc-table-card` supaya
+   heading tabel lain tidak ikut kehilangan ruang. */
+.acc-merchant-form {
+  padding: 18px 16px 20px;
+}
+
+/* Judul di dalam kartu isian tidak butuh garis bawah - yang mengikuti
+   langsung adalah input pertama, bukan tabel. */
+.acc-merchant-form .acc-card-head {
+  margin: -4px 0 4px;
+  padding: 0 0 12px;
+}
+
 /* Tautan sekunder di dalam kartu peringatan. */
 .acc-ghost-link {
   padding: 0;
@@ -1698,12 +1743,6 @@
   color: var(--muted);
   font-size: 9px;
   letter-spacing: .08em;
-}
-
-/* Pembuat toko */
-.acc-merchant-form {
-  display: grid;
-  gap: 14px;
 }
 
 /* Baris "biaya layanan toko" di ringkasan harga.
@@ -1805,8 +1844,26 @@
   background: rgba(255,255,255,.03);
 }
 
-.acc-table tbody tr:focus-within {
+/* Baris yang sedang fokus keyboard. `outline` dipakai, bukan hanya
+   `background`, supaya kelihatan jelas untuk pengguna keyboard - dan itu
+   satu-satunya petunjuk bahwa baris ini bisa diaktifkan tanpa tetikus. */
+.acc-table tbody tr:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
   background: rgba(255,255,255,.045);
+}
+
+/*
+ * Wadah tabel yang bisa digulir mendatar.
+ *
+ * Lima kolom dengan angka rupiah bisa lebih lebar dari kolomnya. Tanpa
+ * wadah ini, tabel memaksa grid melebar danform di sebelahnya tergeser
+ * keluar - jadi satu merchant dengan piutang besar cukup untuk merapikan
+ * seluruh section.
+ */
+.acc-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 /* Kolom nominal: rata kanan supaya digit sejajar dan mudah dibandingkan

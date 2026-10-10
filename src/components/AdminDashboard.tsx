@@ -2908,10 +2908,11 @@ export default function AdminDashboard() {
 
               <div className="acc-grid-two">
                 <div className="acc-table-card">
-                  <h3>Daftar toko</h3>
+                  <h3 className="acc-card-head">Daftar toko</h3>
                   {!merchantData.merchants.length ? (
                     <p className="acc-empty">Belum ada toko. Buat satu di samping.</p>
                   ) : (
+                    <div className="acc-table-scroll">
                     <table className="acc-table">
                       <thead>
                         <tr>
@@ -2926,6 +2927,21 @@ export default function AdminDashboard() {
                         {merchantData.merchants.map((merchant) => (
                           <tr
                             key={merchant.id}
+                            tabIndex={0}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter" && event.key !== " ") return;
+                              event.preventDefault();
+                              setMerchantForm({
+                                id: merchant.id,
+                                name: merchant.name,
+                                code: merchant.code,
+                                serviceFeeFlatIdr: String(merchant.serviceFeeFlatIdr),
+                                paymentTermDays: String(merchant.paymentTermDays),
+                                status: merchant.status,
+                                notes: merchant.notes ?? "",
+                                resetPin: false,
+                              });
+                            }}
                             onClick={() =>
                               setMerchantForm({
                                 id: merchant.id,
@@ -2969,11 +2985,14 @@ export default function AdminDashboard() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </div>
 
                 <div className="acc-table-card acc-merchant-form">
-                  <h3>{merchantForm?.id ? "Ubah toko" : "Buat toko"}</h3>
+                  <h3 className="acc-card-head">
+                    {merchantForm?.id ? "Ubah toko" : "Buat toko"}
+                  </h3>
                   <label className="acc-field">
                     <span>Nama toko</span>
                     <input
@@ -3062,6 +3081,7 @@ export default function AdminDashboard() {
                           }
                         >
                           <option value="active">Aktif</option>
+                          <option value="pending">Menunggu persetujuan</option>
                           <option value="frozen">Dibekukan</option>
                           <option value="inactive">Nonaktif</option>
                         </select>
