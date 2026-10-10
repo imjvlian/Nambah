@@ -39,6 +39,23 @@ export const BRAND = {
 export type Brand = typeof BRAND;
 
 /**
+ * Origin publik situs, tanpa garis miring di akhir.
+ *
+ * Dipakai di `layout.tsx` (metadata), `robots.ts`, `sitemap.ts`, dan
+ * sekarang juga link afiliasi yang disalin operator. Semuanya dulu
+ * menulis sendiri `process.env.NEXT_PUBLIC_SITE_URL?.replace(...) ||
+ * BRAND.url`, yang berarti link yang bisa disalin admin berpotensi
+ * berbeda dari domain di sitemap.
+ *
+ * `NEXT_PUBLIC_*` di-inline saat build, jadi nilainya harus tetap berada
+ * di properti yang dibaca langsung oleh klien. Jangan dipindah ke modul
+ * server-only.
+ */
+export function siteUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || BRAND.url;
+}
+
+/**
  * Nama program loyalitas.
  *
  * Dahulu "Nambah Points". Diturunkan dari `shortName` supaya rebrand

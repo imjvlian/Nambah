@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { affiliateLink } from "@/lib/affiliate-link";
 import { formatIDR } from "@/lib/pricing";
+import CopyButton from "@/components/CopyButton";
 
 type AffiliateData = {
   affiliate: null | {
@@ -141,6 +143,27 @@ export default function AffiliateAccountPanel() {
     item.status === "pending" || item.status === "approved",
   );
 
+  /*
+  /*
+   * Link milik partner sendiri.
+   *
+   * Sebelumnya halaman ini hanya menampilkan kode-nya, padahal partner
+   * butuh link utuh untuk dibagikan - dan `/r/[code]` harus diakses lewat
+   * origin yang benar. Menempel `{origin}/r/{KODE}` jadi satu-satunya
+   * tempat partner tahu persis apa yang harus dia salin.
+   *
+   * `hasOwner: true` di sini bukan asumsi. `nambah_affiliate_summary`
+   * mencari `affiliates` dengan `where user_id = p_user_id`, jadi baris
+   * yang sampai ke halaman ini pasti milik akun yang sedang login. Kalau
+   * invariant itu suatu saat berubah, `affiliateLink` tetap menilai dari
+   * `status`, dan partner tetap melihat kode apa adanya.
+   */
+  const shareLink = affiliateLink({
+    code: affiliate.code,
+    status: affiliate.status,
+    hasOwner: true,
+  });
+
   return (
     <section className="account-profile-settings">
       <div className="account-section-head">
@@ -153,9 +176,23 @@ export default function AffiliateAccountPanel() {
         </span>
       </div>
 
+      <div className="account-affiliate-link">
+        <div>
+          <small>Link afiliasi Anda</small>
+          <code>{shareLink.url}</code>
+        </div>
+        {shareLink.usable ? (
+          <CopyButton value={shareLink.url} label="Salin link" />
+        ) : (
+          <p className="account-affiliate-link-warning">
+            {shareLink.warning} Hubungi admin untuk memperbaikinya.
+          </p>
+        )}
+      </div>
+
       <div className="account-points-stats">
         <article>
-          <small>Pending</small>
+          <small>Menunggu</small>
           <strong>{formatIDR(affiliate.pending)}</strong>
         </article>
         <article>

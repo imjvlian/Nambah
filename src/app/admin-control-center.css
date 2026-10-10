@@ -717,6 +717,67 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* Baris "Perlu perhatian".
+   Satu-satunya elemen di dashboard yang boleh memakai warna peringatan,
+   dan itu disengaja: kalau elemen ini berbagi visual dengan kartu biasa,
+   operator berhenti memperhatikannya begitu pun isinya bertambah. */
+.acc-attention {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(226, 138, 58, .42);
+  border-left-width: 3px;
+  border-radius: 14px;
+  background: rgba(58, 36, 12, .34);
+}
+
+.acc-attention-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.acc-attention-head strong {
+  font-size: 13px;
+  letter-spacing: -.01em;
+}
+
+.acc-attention-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acc-attention-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #e28a3a;
+  box-shadow: 0 0 0 4px rgba(226, 138, 58, .16);
+}
+
+.acc-attention-list {
+  display: grid;
+  gap: 8px;
+}
+
+.acc-attention-list > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acc-attention-list strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.acc-attention-list small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .acc-metrics article {
   min-width: 0;
   padding: 16px;
@@ -1329,6 +1390,158 @@
   font-size: 12px;
 }
 
+.acc-affiliate-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 7, 6, .74);
+}
+
+.acc-affiliate-dialog-card {
+  width: min(460px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(17, 19, 16, .98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+
+.acc-affiliate-dialog-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+.acc-affiliate-dialog-card > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.acc-affiliate-dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/*
+ * Panel yang bisa ditutup.
+ *
+ * Judulnya tetap terlihat saat tertutup - itu yang membuat operator
+ * tahu alat itu ADA tanpa harus mencari. Yang hilang adalah isinya,
+ * jadi halaman bisa dibaca tanpa melewati form yang tidak diperlukan.
+ */
+.acc-collapsible {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(17, 19, 16, .9);
+  overflow: hidden;
+}
+
+.acc-collapsible.open {
+  border-color: rgba(201, 255, 63, .28);
+}
+
+.acc-collapsible-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 15px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.acc-collapsible-chevron {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform .18s ease;
+}
+
+.acc-collapsible.open .acc-collapsible-chevron {
+  transform: rotate(45deg);
+}
+
+.acc-collapsible-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.acc-collapsible-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.acc-collapsible-text small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.acc-collapsible-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(201, 255, 63, .12);
+  color: var(--lime);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-collapsible-body {
+  padding: 4px 15px 15px;
+  border-top: 1px solid var(--line);
+}
+
+.acc-affiliate-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.acc-affiliate-share code {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Keterangan|link yang tidak bisa dipakai.
+ *
+ * Diberi `flex-basis: 100%` supaya turun ke baris sendiri: dicampur di
+ * sebelah tombol dalam lebar kolom yang sempit, kalimatnya akan terpotong
+ * jadi tidak menjelaskan apa pun - dan justru itu yang perlu dibaca admin
+ * sebelum Operator membagikan link-nya ke partner.
+ */
+.acc-affiliate-share em {
+  flex-basis: 100%;
+  color: #e2a25a;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
 .acc-catalog-card {
   box-shadow: none;
 }
@@ -1834,16 +2047,9 @@
   text-wrap: normal;
 }
 
-/* Kartu isian: card + padding. Dipisah dari `.acc-table-card` supaya
-   heading tabel lain tidak ikut kehilangan ruang. */
-.acc-merchant-form {
-  padding: 18px 16px 20px;
-}
-
-/* Kartu pelunasan merchant. Sengaja memakai gaya yang sama dengan
-   `.acc-merchant-form` karena keduanya adalah form input satu kolom di
-   dalam grid yang sama - memunculkan gaya ketiga hanya menambah satu tempat
-   lagi yang harus dijaga sinkron. */
+/* Kartu isian: card + padding.
+   Dipisah dari `.acc-table-card` supaya heading tabel lain tidak ikut
+   kehilangan ruang. */
 .acc-merchant-payment {
   padding: 18px 16px 20px;
 }
@@ -1863,13 +2069,6 @@
   color: var(--muted);
   font-size: 11px;
   line-height: 1.6;
-}
-
-/* Judul di dalam kartu isian tidak butuh garis bawah - yang mengikuti
-   langsung adalah input pertama, bukan tabel. */
-.acc-merchant-form .acc-card-head {
-  margin: -4px 0 4px;
-  padding: 0 0 12px;
 }
 
 /* Tautan sekunder di dalam kartu peringatan. */
@@ -2792,6 +2991,16 @@
 .acc-tx-pagination span {
   color: var(--muted);
   font-size: 11px;
+}
+
+/* Nomor halaman di antara dua tombol. Bukan tombol: tidak ada aksi yang
+   bisa dilakukan dari sini, dan membuatnya tampak seperti tombol hanya
+   * terlihat seperti tombol lalu diklik dan tidak terjadi apa-apa. */
+.acc-tx-pageinfo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .acc-tx-pagination > div {

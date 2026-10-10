@@ -533,10 +533,8 @@ import {
   ADMIN_NAV as NAV,
   ADMIN_NAV_GROUPS as NAV_GROUPS,
 } from "@/components/admin/AdminSidebar";
-import {
-  useAdminSection,
-  usePublishAdminSection,
-} from "@/components/admin/AdminSectionContext";
+import { useAdminSection } from "@/components/admin/AdminSectionContext";
+import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 
 export { NAV, NAV_GROUPS };
 
@@ -549,6 +547,21 @@ export { NAV, NAV_GROUPS };
  * dan operator bicara dua bahasa berbeda untuk status yang identik.
  */
 const STATUS_LABEL = ORDER_STATUS_LABELS;
+
+/**
+ * Status pengiriman receipt, diterjemahkan.
+ *
+ * Nilai di database tetap bahasa Inggris (`pending`, `sending`, `sent`,
+ * `failed`) karena itu yang dipakai constraint di migrasi 011 dan yang
+ * dibaca cron. Yang diterjemahkan hanya yang DITAMPILKAN - mengubah nilai
+ * di database akan membuat cron tidak mengenali statusnya.
+ */
+const RECEIPT_STATUS_LABEL: Record<string, string> = {
+  pending: "Menunggu",
+  sending: "Mengirim",
+  sent: "Terkirim",
+  failed: "Gagal",
+};
 
 type CatalogSyncSummaryResult = {
   catalogItems: number;
@@ -806,7 +819,26 @@ export default function AdminDashboard() {
   const [authState, setAuthState] = useState<
     "loading" | "guest" | "forbidden" | "ready"
   >("loading");
-  const [section, setSection] = useState<AdminSection>("overview");
+
+  /*
+   * Section aktif TIDAK lagi punya state sendiri di komponen ini.
+   *
+   * Dulu `const [section, setSection] = useState(...)` ada di sini dan
+   * salinannya diteruskan ke sidebar lewat konteks. Dua efek bridging
+   * menjaga kedua salinan itu tetap sama: satu push dari dashboard ke
+   * konteks, satu pull dari konteks ke dashboard. Begitu keduanya beda
+   * sesaat - yang pasti terjadi saat dashboard mount dengan sisa
+   * section dari kunjungan sebelumnya - keduanya saling menimpa dalam
+   * render berulang tanpa akhir, dan React melaporkan
+   * "Maximum update depth exceeded".
+   *
+   * Sekarang konteks jadi satu-satunya tempat section hidup. Dashboard
+   * membacanya, sidebar membacanya, dan keduanya menulis lewat
+   * `setSection` yang sama. Tidak ada lagi yang bisa tidak sinkron karena
+   * hanya ada satu nilai.
+   */
+  const { section: activeSection, setSection } = useAdminSection();
+  const section: AdminSection = activeSection ?? "overview";
 
   /*
    * Deep-link dari halaman dokumentasi: `/admin?seksi=merchants`.
@@ -815,48 +847,47 @@ export default function AdminDashboard() {
    * Ringkasan karena section selalu mulai dari overview - dan operator
    * mengira docs-nya salah.
    *
-   * Query TIDAK lagi dihapus dari URL setelah dibaca. Query itu adalah
-   * satu-satunya penanda section untuk sidebar dari luar dashboard, dan
-   * menghapusnya membuat `/admin` tidak pernah menampilkan tab aktif.
-   * Membiarkannya juga membuat section bisa di-bookmark dan dibagikan,
-   * dan menyegarkan halaman tidak lagi melempar operator ke Ringkasan.
+   * Query TIDAK dihapus dari URL setelah dibaca. Membiarkannya membuat
+   * section bisa di-bookmark dan dibagikan, dan menyegarkan halaman
+   * tidak lagi melempar operator ke Ringkasan.
+   *
+   * Syaratnya `activeSection !== null`, bukan penanda "sudah jalan".
+   * Itu bedanya aman dan tidak aman: konteks DIKOSONGKAN saat dashboard
+   * turun, jadi "masih kosong" otomatis berarti "dashboard baru mount".
+   * Penanda boolean akan bertahan lintas mount dan membuat deep-link
+   * berikutnya diabaikan begitu operator pernah membuka dashboard
+   * sekali saja. Jotak "kosong" ini juga idempoten di StrictMode, yang
+   * menjalankan efek dua kali - penanda boolean akan membuat hasil dua
+   * run itu berbeda.
    */
   useEffect(() => {
+    if (activeSection !== null) return;
+
     const requested = new URLSearchParams(window.location.search).get(
       "seksi",
     );
-    if (!requested) return;
+    const match = requested
+      ? NAV.find((item) => item.id === requested)
+      : undefined;
 
-    const match = NAV.find((item) => item.id === requested);
-    if (match) {
-      setSection(match.id);
-    }
-  }, []);
-
-  /*
-   * Laporkan section yang sedang tampil ke sidebar.
-   *
-   * Sidebar tinggal membaca konteks ini, jadi tidak perlu menebak dari
-   * pathname atau query - dua sumber yang bisa saling tidak sengaja.
-   */
-  usePublishAdminSection(section);
+    // Tanpa query yang cocok, tetap diisi dengan Ringkasan supaya tidak
+    // ada render pertama tanpa section.
+    setSection(match?.id ?? "overview");
+  }, [activeSection, setSection]);
 
   /*
-   * Reaksi terhadap klik sidebar.
+   * Saat dashboard tidak ada di layar, tidak boleh ada section yang
+   * terlihat aktif di sidebar.
    *
-   * Sidebar tidak memuat ulang halaman saat sudah berada di `/admin`; dia
-   * menulis section baru ke konteks. Tanpa efek ini, klik di sidebar akan
-   * menutup drawer saja dan isinya tidak akan berubah sama sekali.
+   * Tanpa ini, `/admin/docs` akan tetap menyorot butir section yang
+   * terakhir dibuka - dan karena grup yang memegang section aktif tidak
+   * boleh terlipat, satu grup pun tidak bisa ditutup selama operator
+   * berada di halaman mana pun selain dashboard.
    *
-   * `external` ditolak supaya nilai dari halaman lain (yang memberi
-   * `null`) tidak menimpa section yang sedang tampil.
+   * Efek ini HANYA membersihkan. Ia tidak pernah menulis section lain,
+   * lain, jadi tidak mungkin bertabrakan dengan efek di atas.
    */
-  const { section: requestedSection } = useAdminSection();
-  useEffect(() => {
-    if (requestedSection && requestedSection !== section) {
-      setSection(requestedSection);
-    }
-  }, [requestedSection, section]);
+  useEffect(() => () => setSection(null), []);
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
   const [adminRole, setAdminRole] = useState("");
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
@@ -2363,6 +2394,94 @@ export default function AdminDashboard() {
     });
   }, [orders, orderStatusFilter, query]);
 
+  /*
+   * Paginasi daftar pesanan.
+   *
+   * Tanpa ini seluruh 100 order dirender sekaligus. Di monitor itu masih
+   * terbaca, tapi di ponsel operator harus menggulir melewati semua baris
+   * hanya untuk menemukan yang berstatus success - dan seluruh halaman
+   * ikut menumpuk, membuat halaman terasa penuh tanpa perlu.
+   *
+   * Dipaginasi, bukan "muat lebih banyak", karena operator sering
+   * menyaring status dulu lalu menelusuri seluruh hasilnya - hasilnya
+   * selalu ada di halaman pertama, bukan tersebar di beberapa.
+   *
+   * Halaman dikembalikan ke awal setiap filter berubah: filter yang
+   * menyisakan 2 hasil tidak boleh tetap berada di halaman 4 dan
+   * menampilkan "tidak ada data".
+   */
+  const ORDERS_PER_PAGE = 25;
+  const [orderPage, setOrderPage] = useState(0);
+
+  const orderPageCount = Math.max(
+    1,
+    Math.ceil(filteredOrders.length / ORDERS_PER_PAGE),
+  );
+  const safeOrderPage = Math.min(orderPage, orderPageCount - 1);
+  const visibleOrders = filteredOrders.slice(
+    safeOrderPage * ORDERS_PER_PAGE,
+    safeOrderPage * ORDERS_PER_PAGE + ORDERS_PER_PAGE,
+  );
+
+  // Kembalikan ke halaman pertama saat filter berubah.
+  useEffect(() => {
+    setOrderPage(0);
+  }, [query, orderStatusFilter]);
+
+  /*
+   * Hal-hal yang benar-benar butuh tindakan operator.
+   *
+   * Sebelumnya semua angka ini ditampilkan sebagai kartu metrik dengan
+   * bobot visual yang sama. Akibatnya "email receipt gagal" - satu hal
+   * yang harus dibereskan hari ini - tampil berdampingan dengan "order
+   * hari ini" yang cuma angka, dan operator harus menilai sendiri mana
+   * yang penting setiap kali membuka halaman.
+   *
+   * Baris ini sengaja hanya dirender kalau isinya ada. Halaman yang
+   * bersih karena memang tidak ada masalah lebih berguna daripada baris
+   * "0 masalah" yang membuat pembaca mengira ada yang salah.
+   *
+   * `processing` dan `pendingPayment` sengaja TIDAK ikut di sini. Keduanya
+   * kondisi normal sesaat - order sedang diproses, user belum transfer -
+   * Memasukkannya akan membuat baris ini hampir selalu menyala,
+   * selalu menyala, dan peringatan yang selalu menyala sama sekali bukan
+   * peringatan.
+   */
+  const attentionItems = useMemo(() => {
+    if (!overview) return [];
+    const items: Array<{ id: string; title: string; detail: string }> = [];
+
+    const receiptFailed = overview.stats.receiptsFailed ?? 0;
+    if (receiptFailed > 0) {
+      items.push({
+        id: "receipt-failed",
+        title: `${numberOrDash(receiptFailed)} email receipt gagal`,
+        detail: "User sudah membayar tapi belum menerima bukti transfer.",
+      });
+    }
+
+    const supplierPending = overview.stats.supplierPending ?? 0;
+    if (supplierPending > 0) {
+      items.push({
+        id: "supplier-pending",
+        title: `${numberOrDash(supplierPending)} order menunggu supplier`,
+        detail: "Supplier belum mengirim status. Rekonsiliasi akan mengambilnya.",
+      });
+    }
+
+    for (const service of overview.system.services) {
+      if (service.state === "attention") {
+        items.push({
+          id: `service-${service.id}`,
+          title: `${service.name} belum siap`,
+          detail: service.detail,
+        });
+      }
+    }
+
+    return items;
+  }, [overview]);
+
   if (authState === "loading") {
     return (
       <main className="admin-shell">
@@ -2513,26 +2632,39 @@ export default function AdminDashboard() {
                 </div>
               </section>
 
-              <section className="acc-metrics">
+              {attentionItems.length > 0 && (
+                <section className="acc-attention">
+                  <div className="acc-attention-head">
+                    <span className="acc-attention-dot" />
+                    <strong>Perlu perhatian</strong>
+                    <small>{attentionItems.length} hal menunggu</small>
+                  </div>
+                  <div className="acc-attention-list">
+                    {attentionItems.map((item) => (
+                      <div key={item.id}>
+                        <strong>{item.title}</strong>
+                        <small>{item.detail}</small>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <section className="acc-metrics acc-metrics-three">
                 <article>
                   <small>Order hari ini</small>
                   <strong>{numberOrDash(overview.stats.ordersToday)}</strong>
-                  <span>{numberOrDash(overview.stats.successToday)} sukses</span>
+                  <span>{numberOrDash(overview.stats.successToday)} berhasil</span>
                 </article>
                 <article>
                   <small>GMV hari ini</small>
                   <strong>{formatIDR(overview.finance.gmvToday)}</strong>
-                  <span>Order berstatus success</span>
+                  <span>dari order berstatus berhasil</span>
                 </article>
                 <article>
-                  <small>Processing</small>
+                  <small>Sedang diproses</small>
                   <strong>{numberOrDash(overview.stats.processing)}</strong>
-                  <span>{numberOrDash(overview.stats.pendingPayment)} menunggu bayar</span>
-                </article>
-                <article>
-                  <small>Receipt gagal</small>
-                  <strong>{numberOrDash(overview.stats.receiptsFailed)}</strong>
-                  <span>{numberOrDash(overview.stats.receiptsSent)} terkirim</span>
+                  <span>{numberOrDash(overview.stats.pendingPayment)} menunggu pembayaran</span>
                 </article>
               </section>
 
@@ -2593,76 +2725,35 @@ export default function AdminDashboard() {
                 </div>
               </section>
 
-              <PaymentGatewayPanel />
+              {/*
+                PaymentGatewayPanel (konfigurasi Midtrans) dan blok peta
+                jalan DIHAPUS dari Ringkasan, bukan dipindah.
 
-              <section className="acc-panel">
-                <SectionHead
-                  eyebrow="Peta jalan"
-                  title={`Modul ${BRAND.name}`}
-                  copy="Fitur aktif dan pekerjaan yang sudah ada dalam roadmap production-ready."
-                />
-                <div className="acc-roadmap-grid">
-                  <RoadmapCard
-                    title="Verifikasi pembayaran"
-                    status="live"
-                    copy="Midtrans webhook/status API, gross amount validation, dan anti-downgrade status."
-                  />
-                  <RoadmapCard
-                    title="Pengiriman pesanan"
-                    status="live"
-                    copy="Simulate + Digiflazz testing dengan request_ref idempotent. Live tetap safety-locked."
-                  />
-                  <RoadmapCard
-                    title="Bukti via email"
-                    status="live"
-                    copy="Brevo transactional receipt dengan delivery log dan retry."
-                  />
-                  <RoadmapCard
-                    title="Mesin promo"
-                    status="live"
-                    copy="Campaign CRUD, quota reservation, per-user limit, scheduling data, dan product targeting aktif."
-                  />
-                  <RoadmapCard
-                    title="Lacte Points"
-                    status="live"
-                    copy="Saldo account, checkout redemption, success earning, customer ledger, dan admin monitoring aktif."
-                  />
-                  <RoadmapCard
-                    title="Siklus afiliasi"
-                    status="live"
-                    copy="Commission pending/available/cancelled mengikuti status order; ledger admin aktif."
-                  />
-                  <RoadmapCard
-                    title="Callback Digiflazz"
-                    status="live"
-                    copy="Callback Pending/Sukses/Gagal diterapkan ke supplier transaction dan order secara idempotent."
-                  />
-                  <RoadmapCard
-                    title="Rekonsiliasi &amp; ulangi"
-                    status="live"
-                    copy="Recovery paid/processing, polling Digiflazz test pending, retry receipt failed, dan stale sending detection."
-                  />
-                  <RoadmapCard
-                    title="Pemeriksa akun"
-                    status="live"
-                    copy="Validasi schema per game + provider routing configurable, dengan local-only fallback yang tidak memblokir checkout."
-                  />
-                  <RoadmapCard
-                    title="Penguatan produksi"
-                    status="planned"
-                    copy="Health endpoint, rate limit, alert, audit log, dan explicit live guards."
-                  />
-                </div>
-              </section>
+                Keduanya dokumentasi teknis, bukan pekerjaan operator. Yang
+                referensi, bukan sesuatu yang dikerjakan hari ini. Menaruh
+                referensi, bukan sesuatu yang dikerjakan hari ini. Menaruh
+                keduanya di halaman landing membuat Ringkasan berisi tiga
+                audiens berbeda sekaligus - operator, admin, dan pembaca
+                dokumentasi - sementara hanya yang pertama yang setiap hari
+                dibuka.
+
+                PaymentGatewayPanel sudah ada di halaman Sistem. Peta jalan
+                juga sudah ada di sana (enam kartu), jadi daftar sepuluh
+                kartu di sini tidak menambah informasi baru - hanya
+                mengulanginya dengan kalimat lebih panjang.
+
+                Kalau nanti konfigurasi gateway memang perlu diubah dari
+                dashboard, tombol di System sudah cukup jadi pintu masuk.
+              */}
             </>
           )}
 
           {section === "orders" && (
             <>
               <SectionHead
-                eyebrow="Transaksi"
+                eyebrow="Operasional"
                 title="Pesanan"
-                copy="100 order terbaru. Gunakan filter untuk audit status atau mencari transaksi."
+                copy="Order terbaru. Saring untuk memeriksa status atau mencari order tertentu."
               />
               <div className="acc-filterbar">
                 <input
@@ -2691,7 +2782,7 @@ export default function AdminDashboard() {
                   <span>Total</span>
                   <span>Status</span>
                 </div>
-                {filteredOrders.map((order) => (
+                {visibleOrders.map((order) => (
                   <div className="acc-orders-row" key={order.id}>
                     <div>
                       <small>{order.id}</small>
@@ -2720,7 +2811,7 @@ export default function AdminDashboard() {
                         disabled={Boolean(busy)}
                         onClick={() => void inspectOrder(order.id)}
                       >
-                        Inspect
+                        Detail
                       </button>
                     </div>
                   </div>
@@ -2728,6 +2819,43 @@ export default function AdminDashboard() {
                 {filteredOrders.length === 0 && (
                   <div className="acc-empty">Tidak ada order yang cocok.</div>
                 )}
+
+                {orderPageCount > 1 ? (
+                  <div className="acc-tx-pagination">
+                    <span>
+                      Menampilkan{" "}
+                      {safeOrderPage * ORDERS_PER_PAGE + 1}-
+                      {Math.min(
+                        (safeOrderPage + 1) * ORDERS_PER_PAGE,
+                        filteredOrders.length,
+                      )}{" "}
+                      dari {filteredOrders.length} order
+                    </span>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={safeOrderPage === 0}
+                        onClick={() => setOrderPage((page) => Math.max(0, page - 1))}
+                      >
+                        Sebelumnya
+                      </button>
+                      <span className="acc-tx-pageinfo">
+                        {safeOrderPage + 1} / {orderPageCount}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={safeOrderPage >= orderPageCount - 1}
+                        onClick={() =>
+                          setOrderPage((page) =>
+                            Math.min(orderPageCount - 1, page + 1),
+                          )
+                        }
+                      >
+                        Berikutnya
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {orderDetail && (
@@ -2822,13 +2950,10 @@ export default function AdminDashboard() {
                   onChange={(event) => setMappingFilter(event.target.value)}
                 >
                   <option value="all">Semua mapping</option>
-                  <option value="ready">Ready</option>
-                  <option value="mapped">Mapped</option>
-                  <option value="unmapped">Unmapped</option>
+                  <option value="ready">Siap</option>
+                  <option value="mapped">Terpetakan</option>
+                  <option value="unmapped">Belum terpetakan</option>
                 </select>
-              </div>
-
-              <div className="acc-filterbar acc-filterbar-tools">
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
@@ -2847,6 +2972,32 @@ export default function AdminDashboard() {
                   <option value="thin">Margin tipis (&lt;5%)</option>
                   <option value="no-cost">Tanpa data modal</option>
                 </select>
+                <span className="acc-filter-count">
+                  {filteredProducts.length} dari {catalog.products.length} produk
+                </span>
+              </div>
+
+              {/*
+                Alat penyesuaian harga DICIPAKAN, dan itu bagian yang
+                paling penting dari perubahan ini.
+
+                Tombol "Terapkan ke N terfilter" mengubah harga SELURUH
+                hasil filter dalam satu klik. Sebelumnya ia berdiri di baris
+                yang sama dengan kotak pencarian - level visual yang sama
+                untuk "cari" dan "ubah harga 200 produk", hanya beda
+                ketebalan huruf.
+
+                Filter dipisah jadi barisnya sendiri supaya operator tahu
+                garis batasnya: yang di bawah adalah semua produk, bukan
+                hanya yang terlihat. Badge di judul panel membuat "ada
+                yang belum disimpan" terlihat tanpa menggulir ke bawah.
+              */}
+              <CollapsiblePanel
+                title="Alat harga massal"
+                description={`Menyentuh ${filteredProducts.length} produk hasil filter saat ini. Tombol ini mengubah harga semuanya sekaligus.`}
+                badge={dirtyProductCount > 0 ? `${dirtyProductCount} belum disimpan` : null}
+                defaultOpen={dirtyProductCount > 0}
+              >
                 <div className="acc-bulk-adjust">
                   <input
                     type="number"
@@ -2889,20 +3040,19 @@ export default function AdminDashboard() {
                   />
                   <span>%</span>
                 </div>
-                <span className="acc-filter-count">
-                  {filteredProducts.length} dari {catalog.products.length} produk
-                </span>
-                <button
-                  className="admin-save-button acc-save-all"
-                  type="button"
-                  disabled={Boolean(busy) || dirtyProductCount === 0}
-                  onClick={() => void saveAllDirty()}
-                >
-                  {busy === "save-all"
-                    ? "Menyimpan..."
-                    : `Simpan semua (${dirtyProductCount})`}
-                </button>
-              </div>
+                <div className="acc-action-panel">
+                  <button
+                    className="admin-save-button acc-save-all"
+                    type="button"
+                    disabled={Boolean(busy) || dirtyProductCount === 0}
+                    onClick={() => void saveAllDirty()}
+                  >
+                    {busy === "save-all"
+                      ? "Menyimpan..."
+                      : `Simpan semua (${dirtyProductCount})`}
+                  </button>
+                </div>
+              </CollapsiblePanel>
 
               <div className="admin-catalog-card acc-catalog-card">
                 <div className="admin-table-head">
@@ -3120,9 +3270,9 @@ export default function AdminDashboard() {
                   <span>{formatTime(catalog.balance.checkedAt)}</span>
                 </article>
                 <article>
-                  <small>Ready supplier</small>
+                  <small>Siap dijual</small>
                   <strong>{catalog.stats.ready}</strong>
-                  <span>{catalog.stats.mapped} mapped</span>
+                  <span>{catalog.stats.mapped} terpetakan</span>
                 </article>
                 <article>
                   <small>Perlu mapping</small>
@@ -3172,10 +3322,21 @@ export default function AdminDashboard() {
 
           {section === "receipts" && (
             <>
+              {/*
+               * Halaman ini sebelumnya bernama "Bukti Transfer" dengan
+               * keterangan "Verifikasi bukti bayar", padahal isinya adalah
+               * log pengiriman EMAIL. Tidak ada alur verifikasi pembayaran
+               * manual di sistem ini - jadi nama lama tidak hanya
+               * menyesatkan, tapi menjanjikan fitur yang memang tidak ada.
+               *
+               * Sekarang namanya sesuai isi. Kalau nanti memang butuh
+               * verifikasi transfer manual, itu fitur BARU dan harus dibuat
+               * terpisah, bukan disamarkan lewat nama menu.
+               */}
               <SectionHead
-                eyebrow="Pengiriman"
-                title="Email bukti transfer"
-                copy="Log Brevo untuk melihat receipt terkirim, retry, dan error provider."
+                eyebrow="Operasional"
+                title="Log pengiriman email"
+                copy="Status pengiriman receipt ke user lewat Brevo. Bukan halaman verifikasi pembayaran."
               />
 
               <ReceiptPreview />
@@ -3183,9 +3344,9 @@ export default function AdminDashboard() {
               <div className="acc-table-card">
                 <div className="acc-receipts-head">
                   <span>Order</span>
-                  <span>Recipient</span>
-                  <span>Provider</span>
-                  <span>Attempt</span>
+                  <span>Penerima</span>
+                  <span>Penyedia</span>
+                  <span>Percobaan</span>
                   <span>Status</span>
                 </div>
                 {receipts.map((receipt) => (
@@ -3200,13 +3361,14 @@ export default function AdminDashboard() {
                       <span>
                         {receipt.providerMessageId
                           ? receipt.providerMessageId
-                          : "Belum ada message ID"}
+                          : "Belum ada ID pesan"}
                       </span>
                     </div>
                     <strong>{receipt.attempts}</strong>
                     <div>
                       <span className={`acc-status receipt-${receipt.status}`}>
-                        {receipt.status}
+                        {RECEIPT_STATUS_LABEL[receipt.status] ??
+                          receipt.status}
                       </span>
                       {receipt.lastError && (
                         <small className="acc-error-text">
@@ -3217,7 +3379,9 @@ export default function AdminDashboard() {
                   </div>
                 ))}
                 {receipts.length === 0 && (
-                  <div className="acc-empty">Belum ada log receipt.</div>
+                  <div className="acc-empty">
+                    Belum ada log pengiriman email.
+                  </div>
                 )}
               </div>
             </>
@@ -3600,10 +3764,11 @@ export default function AdminDashboard() {
                   </div>
                 ) : null}
 
-                <div className="acc-table-card acc-merchant-form">
-                  <h3 className="acc-card-head">
-                    {merchantForm?.id ? "Ubah toko" : "Buat toko"}
-                  </h3>
+                <CollapsiblePanel
+                  title={merchantForm?.id ? "Ubah toko" : "Buat toko"}
+                  description="Nama, kode kasir, biaya layanan, dan termin pelunasan."
+                  defaultOpen={Boolean(merchantForm)}
+                >
                   <label className="acc-field">
                     <span>Nama toko</span>
                     <input
@@ -3736,7 +3901,7 @@ export default function AdminDashboard() {
                       </button>
                     ) : null}
                   </div>
-                </div>
+                </CollapsiblePanel>
               </div>
             </>
           )}
@@ -3755,8 +3920,8 @@ export default function AdminDashboard() {
                     onClick={() => void runFinanceReconciliation()}
                   >
                     {busy === "finance-reconcile"
-                      ? "Checking..."
-                      : "Run reconciliation"}
+                      ? "Memeriksa..."
+                      : "Jalankan rekonsiliasi"}
                   </button>
                 }
               />
@@ -4384,8 +4549,8 @@ export default function AdminDashboard() {
             <>
               <SectionHead
                 eyebrow="Pertumbuhan"
-                title="Promotions"
-                copy="Campaign promo dikelola tanpa SQL, dengan quota reservation yang aman terhadap checkout paralel."
+                title="Promo"
+                copy="Campaign promo dikelola tanpa SQL, dengan kuota reservation yang aman terhadap checkout paralel."
                 action={
                   <div className="acc-action-panel">
                     <Link className="acc-inline-button" href="/admin/banners">
@@ -4397,20 +4562,23 @@ export default function AdminDashboard() {
 
               <div className="acc-module-summary">
                 <article>
-                  <small>Active promotions</small>
+                  <small>Promo aktif</small>
                   <strong>{promotionData.promotions.filter((item) => item.active).length}</strong>
                   <span>{promotionData.promotions.length} total campaign</span>
                 </article>
                 <article>
-                  <small>Redeemed</small>
+                  <small>Terpakai</small>
                   <strong>{promotionData.promotions.reduce((sum, item) => sum + item.redeemed, 0)}</strong>
-                  <span>{promotionData.promotions.reduce((sum, item) => sum + item.reserved, 0)} reserved</span>
+                  <span>{promotionData.promotions.reduce((sum, item) => sum + item.reserved, 0)} sedang dipesan</span>
                 </article>
               </div>
 
-              <div className="acc-action-panel">
+              <CollapsiblePanel
+                title="Buat campaign promo"
+                description="Kode, jenis diskon, kuota, dan jadwal berlaku."
+              >
                 <input
-                  placeholder="CODE"
+                  placeholder="KODE"
                   value={promoDraft.code}
                   onChange={(event) =>
                     setPromoDraft((current) => ({
@@ -4527,9 +4695,9 @@ export default function AdminDashboard() {
                   disabled={Boolean(busy)}
                   onClick={() => void createPromotion()}
                 >
-                  {busy === "promotion-create" ? "Creating..." : "Create promo"}
+                  {busy === "promotion-create" ? "Membuat..." : "Buat promo"}
                 </button>
-              </div>
+              </CollapsiblePanel>
 
               <div className="acc-table-card">
                 <div className="acc-receipts-head">
@@ -4730,26 +4898,28 @@ export default function AdminDashboard() {
 
               <div className="acc-system-note">
                 <div>
-                  <small>Fulfillment mode</small>
+                  <small>Mode pembayaran supplier</small>
                   <strong>{overview.system.fulfillmentMode}</strong>
                 </div>
                 <div>
-                  <small>Flow test</small>
+                  <small>Mode uji coba</small>
                   <strong>
-                    {overview.system.flowTest ? "Enabled" : "Disabled"}
+                    {overview.system.flowTest ? "Aktif" : "Nonaktif"}
                   </strong>
                 </div>
               </div>
+
+              <PaymentGatewayPanel />
 
               <div className="acc-action-panel">
                 <Link className="acc-inline-button" href="/admin/banners">
                   Kelola banner beranda →
                 </Link>
                 <Link className="acc-inline-button" href="/admin/operations">
-                  Open Operations Center →
+                  Buka Operations Center →
                 </Link>
                 <Link className="acc-inline-button" href="/admin/test-lab">
-                  Open Staging Test Lab →
+                  Buka Test Lab →
                 </Link>
                 <button
                   type="button"
@@ -4757,8 +4927,8 @@ export default function AdminDashboard() {
                   disabled={Boolean(busy)}
                 >
                   {busy === "reconciliation"
-                    ? "Reconciling..."
-                    : "Run reconciliation"}
+                    ? "Merekonsiliasi..."
+                    : "Jalankan rekonsiliasi"}
                 </button>
                 <button
                   type="button"
@@ -4781,10 +4951,10 @@ export default function AdminDashboard() {
                     : "Kirim antrean Telegram"}
                 </button>
                 <span className="acc-status processing">
-                  {numberOrDash(overview.stats.supplierPending)} supplier pending
+                  {numberOrDash(overview.stats.supplierPending)} order menunggu supplier
                 </span>
                 <span className="acc-status receipt-sending">
-                  {numberOrDash(overview.stats.receiptSending)} receipt sending
+                  {numberOrDash(overview.stats.receiptSending)} email sedang dikirim
                 </span>
               </div>
 
@@ -4797,12 +4967,12 @@ export default function AdminDashboard() {
                       </small>
                       <strong>
                         {readiness.automatedProductionReady
-                          ? "Automated production checks pass"
-                          : readiness.blockers + " production blocker"}
+                          ? "Semua pemeriksaan produksi otomatis lolos"
+                          : readiness.blockers + " hal menghalangi produksi"}
                       </strong>
                     </div>
                     <span>
-                      {readiness.warnings} warning · {readiness.checks.length} checks
+                      {readiness.warnings} peringatan · {readiness.checks.length} pemeriksaan
                     </span>
                   </div>
                   <div className="acc-readiness-list">

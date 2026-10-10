@@ -109,6 +109,19 @@ export default function AffiliatePerformancePanel() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reviewing, setReviewing] = useState<number | null>(null);
+  /*
+   * Mode peninjauan, bukan lagi ditebak dari isi `reason`.
+   *
+   * Versi lama memisahkan "approve" dan "reject" dengan memeriksa
+   * `reviewForm.reason` dan `reviewForm.reason.trim()` pada baris yang
+   * bersebelahan, dan tombol Tolak mengisi `reason: " "` - satu spasi.
+   *
+   * Jadi hanya karena spasi itu truthy sedangkan spasi.trim() falsy,
+   * ketiga blok form bergantian dengan benar. Dua definisi "kosong" untuk
+   * satu konsep: rapuh, dan tidak ada satu pun test yang bisa memegangnya.
+   * Satu enum membuat maksudnya terbaca dan tidak bisa rusak diam-diam.
+   */
+  const [reviewMode, setReviewMode] = useState<"approve" | "reject">("approve");
   const [reviewForm, setReviewForm] = useState({ code: "", commissionRate: "0.2", reason: "" });
 
   const load = useCallback(async () => {
@@ -176,6 +189,7 @@ export default function AffiliatePerformancePanel() {
           : "Permintaan ditolak.",
       );
       setReviewing(null);
+      setReviewMode("approve");
       setReviewForm({ code: "", commissionRate: "0.2", reason: "" });
       await load();
     } catch {
@@ -230,7 +244,7 @@ export default function AffiliatePerformancePanel() {
 
               {reviewing === item.id ? (
                 <div className="acc-request-form">
-                  {reviewForm.reason.trim() ? null : (
+                  {reviewMode === "approve" ? (
                     <>
                       <label>
                         <span>Kode affiliate (opsional)</span>
@@ -253,51 +267,63 @@ export default function AffiliatePerformancePanel() {
                           placeholder="0.2 untuk 20%"
                         />
                       </label>
+                      <div className="acc-request-actions">
+                        <button type="button" onClick={() => void decide(item.id, "approve")}>
+                          Setujui
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => setReviewMode("reject")}
+                        >
+                          Tolak
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => setReviewing(null)}
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label>
+                        <span>Alasan penolakan</span>
+                        <input
+                          value={reviewForm.reason}
+                          onChange={(event) =>
+                            setReviewForm((current) => ({ ...current, reason: event.target.value }))
+                          }
+                          placeholder="Minimal 5 karakter"
+                        />
+                      </label>
+                      <div className="acc-request-actions">
+                        <button
+                          type="button"
+                          disabled={reviewForm.reason.trim().length < 5}
+                          onClick={() => void decide(item.id, "reject")}
+                        >
+                          Kirim penolakan
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => setReviewMode("approve")}
+                        >
+                          Kembali
+                        </button>
+                      </div>
                     </>
                   )}
-                  {reviewForm.reason ? null : (
-                    <div className="acc-request-actions">
-                      <button type="button" onClick={() => void decide(item.id, "approve")}>
-                        Setujui
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() =>
-                          setReviewForm((current) => ({ ...current, reason: " " }))
-                        }
-                      >
-                        Tolak
-                      </button>
-                    </div>
-                  )}
-                  {reviewForm.reason ? (
-                    <div className="acc-request-actions">
-                      <input
-                        value={reviewForm.reason.trim() ? reviewForm.reason : ""}
-                        onChange={(event) =>
-                          setReviewForm((current) => ({ ...current, reason: event.target.value }))
-                        }
-                        placeholder="Alasan penolakan"
-                      />
-                      <button type="button" onClick={() => void decide(item.id, "reject")}>
-                        Kirim penolakan
-                      </button>
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => setReviewing(null)}
-                  >
-                    Batal
-                  </button>
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => {
                     setReviewing(item.id);
+                    setReviewMode("approve");
                     setReviewForm({ code: "", commissionRate: "0.2", reason: "" });
                   }}
                 >

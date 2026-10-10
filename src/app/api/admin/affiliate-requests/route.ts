@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
+import { reviewedByUserId } from "@/lib/admin-identity";
 import {
   AFFILIATE_CODE_PATTERN,
   generateAffiliateCode,
@@ -40,24 +41,6 @@ type RequestRow = {
   rejection_reason: string | null;
   created_at: string;
 };
-
-type AdminIdentity = {
-  userId: string;
-  email: string;
-};
-
-function adminIdentity(auth: unknown): AdminIdentity | null {
-  if (!auth || typeof auth !== "object") return null;
-  const record = auth as Record<string, unknown>;
-  const userId =
-    typeof record.userId === "string"
-      ? record.userId
-      : typeof record.sub === "string"
-        ? record.sub
-        : "";
-  const email = typeof record.email === "string" ? record.email : "";
-  return userId ? { userId, email } : null;
-}
 
 export async function GET(request: Request) {
   const auth = authorizeAdminRequest(request);
@@ -121,13 +104,9 @@ export async function PATCH(request: Request) {
   const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
-  const identity = adminIdentity(auth);
-  if (!identity) {
-    return Response.json(
-      { error: "Identitas admin tidak terbaca." },
-      { status: 401 },
-    );
-  }
+  // Otorisasi sudah dijamin di atas. Nilai ini hanya untuk jejak audit
+  // `reviewed_by`, dan `null` berarti "sesi tanpa identitas user".
+  const actorUserId = reviewedByUserId(auth);
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
@@ -180,7 +159,7 @@ export async function PATCH(request: Request) {
         {
           status: "rejected",
           rejection_reason: reason,
-          reviewed_by: identity.userId,
+          reviewed_by: actorUserId,
           reviewed_at: now,
           updated_at: now,
         },
@@ -299,7 +278,7 @@ export async function PATCH(request: Request) {
         status: "approved",
         granted_code: code,
         commission_rate: commissionRate,
-        reviewed_by: identity.userId,
+        reviewed_by: actorUserId,
         reviewed_at: now,
         updated_at: now,
       },

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import ChatWidget from "@/components/ChatWidget";
-import { BRAND } from "@/lib/brand";
+import { BRAND, siteUrl } from "@/lib/brand";
 import "./globals.css";
 import "./catalog-categories.css";
 import "./home-v2.css";
@@ -41,9 +41,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || BRAND.url,
-  ),
+  metadataBase: new URL(siteUrl()),
   title: `${BRAND.name} — ${BRAND.tagline}`,
   description: BRAND.description,
   applicationName: BRAND.name,

@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
+import { siteUrl } from "@/lib/brand";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-  "https://nambah.vercel.app";
+const BASE_URL = siteUrl();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

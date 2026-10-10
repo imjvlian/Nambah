@@ -43,7 +43,7 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     group: "Operasional",
     intro:
-      "Halaman yang dipakai setiap hari: order masuk, verifikasi pembayaran, dan laporan harga per transaksi.",
+      "Halaman yang dipakai setiap hari: order masuk, log pengiriman email, dan laporan harga per transaksi.",
     entries: [
       {
         section: "overview",
@@ -52,9 +52,14 @@ export const DOC_GROUPS: DocGroup[] = [
           "Kondisi bisnis saat ini: saldo supplier, order bermasalah, dan angka lain yang perlu diawasi.",
         steps: [
           "Mulai dari sini setiap pagi. Ringkasan di sini sengaja hanya memuat yang butuh tindakan.",
-          "Klik kartu mana pun untuk melompat ke halaman yang relevan.",
+          "Baris Perlu perhatian di paling atas muncul hanya kalau memang ada masalah. Kalau tidak muncul, berarti tidak ada yang perlu ditangani hari ini.",
+          "Tiga kartu di bawahnya adalah angka harian biasa, bukan peringatan.",
         ],
         notes: [
+          {
+            label: "Kenapa halaman ini tidak memuat semuanya",
+            text: "Peta jalan fitur dan konfigurasi payment gateway tidak lagi ada di Ringkasan. Keduanya dokumentasi teknis, bukan pekerjaan harian operator. Peta jalan dan konfigurasi gateway bisa ditemukan di halaman Sistem.",
+          },
           {
             label: "Flow Test aktif",
             text: "Kalau badge FLOW TEST muncul di kanan atas, semua data yang tampil berasal dari mode uji. Order uji tidak pernah fulfilled sungguhan dan tidak memakai uang sungguhan. Jangan mengambil kesimpulan bisnis dari angka saat badge itu menyala.",
@@ -67,11 +72,15 @@ export const DOC_GROUPS: DocGroup[] = [
         summary:
           "Daftar order yang masuk, beserta aksi untuk mengganti statusnya secara manual.",
         steps: [
-          "Klik Inspect untuk melihat seluruh detail order: akun tujuan, game, harga, dan status supplier.",
+          "Klik Detail untuk melihat seluruh detail order: akun tujuan, game, harga, dan status supplier.",
           "Aksi Ubah Status hanya dipakai kalau status tidak menyesuaikan sendiri, misalnya order nyangkut setelah webhook supplier tidak pernah sampai.",
           "Setelah mengganti status, isi alasan pada kolom yang tersedia agar jejaknya terbaca.",
         ],
         notes: [
+          {
+            label: "25 order per halaman",
+            text: "Daftar dipaginasi, bukan digulir penuh. Halaman selalu kembali ke awal begitu filter atau pencarian berubah, jadi hasil saringan tidak pernah tercecer di halaman keempat.",
+          },
           {
             label: "Jangan buru-buru ganti status",
             text: "Order yang sudah `success` berarti top up sudah terjadi di sisi supplier. Mengubahnya menjadi `failed` tidak membatalkan top up - itu hanya membuat catatan kita berbeda dari kenyataan supplier.",
@@ -84,18 +93,22 @@ export const DOC_GROUPS: DocGroup[] = [
       },
       {
         section: "receipts",
-        title: "Bukti Transfer",
+        title: "Log Email",
         summary:
-          "Verifikasi bukti pembayaran yang diunggah user untuk pesanan manual.",
+          "Status pengiriman email bukti transfer ke user lewat Brevo. Bukan halaman verifikasi pembayaran.",
         steps: [
-          "Buka daftar bukti transfer dan periksa nominal serta rekening tujuan.",
-          "Cocokkan dengan order yang terkait sebelum menekan tombol terverifikasi.",
-          "Penolakan ikut dicatat, jadi user tahu alasannya dan bisa mengunggah ulang.",
+          "Cari order yang email receipt-nya belum sampai.",
+          "Periksa kolom Percobaan - angka yang naik berulang kali menandakan masalah, bukan satu kegagalan yang terlewat.",
+          "Baca pesan error di bawah status jika ada, lalu jalankan rekonsiliasi dari halaman Sistem untuk mencoba ulang.",
         ],
         notes: [
           {
-            label: "Hanya untuk transfer manual",
-            text: "Order QRIS, e-wallet, dan virtual account tidak muncul di sini - pembayaran mereka sudah dikonfirmasi otomatis oleh payment gateway. Halaman ini khusus untuk transfer bank manual.",
+            label: "Kenapa tidak ada verifikasi pembayaran manual",
+            text: "Halaman ini dulunya bernama Bukti Transfer dengan keterangan Verifikasi bukti bayar. Nama itu salah: isinya log pengiriman email, dan tidak ada alur verifikasi pembayaran manual di Lacte sama sekali. Kalau nanti dibutuhkan, itu fitur baru yang harus dibangun terpisah - bukan sekadar mengganti label.",
+          },
+          {
+            label: "Status tidak bisa diubah manual",
+            text: "Kolom status dibaca dari tabel receipt_deliveries yang juga dipakai cron pengiriman. Rekonsiliasi mencoba ulang pengiriman yang gagal, dan status berubah sendiri setelah penyedia mengonfirmasi.",
           },
         ],
       },

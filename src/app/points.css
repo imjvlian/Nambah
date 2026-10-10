@@ -175,6 +175,103 @@
   font-size: 12px;
 }
 
+/*
+ * Percakapan pencairan.
+ *
+ * Layer gelap penuh layar karena ini keputusan yang menyentuh uang
+ * keluar: operator perlu melihat request yang sedang dibahas, dan
+ * dialog yang mengambang bebas di tengah layar justru menutupi request
+ *
+ * Menggantikan `window.prompt`, yang tidak punya konteks sama sekali -
+ * judulnya cuma "Alasan penolakan:" tanpa menunjukkan request mana.
+ */
+.acc-affiliate-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 7, 6, .74);
+}
+
+.acc-affiliate-dialog-card {
+  width: min(460px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel, #111310);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+
+.acc-affiliate-dialog-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+.acc-affiliate-dialog-card > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.acc-affiliate-dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/*
+ * Link afiliasi milik partner.
+ *
+ * Dipisah dari `account-points-stats` supaya link ini terbaca sebagai
+ * satu hal yang harus disalin, bukan statistik kelima. Petunjuk aksi
+ * ("Salin link") duduk di kanan, bukan di dalam teks link - supaya
+ * partner tahu persis apa yang harus diklik, bukan apa yang harus dibaca.
+ */
+.account-affiliate-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  background: rgba(255,255,255,.018);
+}
+
+.account-affiliate-link > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.account-affiliate-link small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.account-affiliate-link code {
+  display: block;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-affiliate-link-warning {
+  flex-basis: 100%;
+  margin: 0;
+  color: #e2a25a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .account-points-stats {
   display: grid;
   grid-template-columns: repeat(3,1fr);

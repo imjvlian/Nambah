@@ -121,9 +121,19 @@ export const ADMIN_NAV: AdminNavItem[] = [
   },
   {
     id: "receipts",
-    label: "Bukti Transfer",
+    /*
+     * Nama lama "Bukti Transfer" dengan keterangan "Verifikasi bukti
+     * bayar" SALAH: halaman ini tidak memuat bukti transfer sama sekali.
+     * Isinya adalah `receipt_deliveries` - log pengiriman EMAIL lewat
+     * Brevo, lengkap dengan provider message id dan jumlah percobaan.
+     *
+     * Tidak ada alur verifikasi pembayaran manual di sistem ini, jadi
+     * nama yang menyesatkan itu tidak pernah bisa dipenuhi. Sekarang
+     * Namanya sekarang apa adanya: apa yang halaman ini benar-benar lakukan.
+     */
+    label: "Log Email",
     Icon: IconReceipts,
-    hint: "Verifikasi bukti bayar",
+    hint: "Pengiriman receipt ke user",
     group: "Operasional",
   },
   {

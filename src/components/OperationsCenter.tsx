@@ -191,7 +191,7 @@ export default function OperationsCenter() {
             </div>
             <div className="acc-action-panel ops-action-buttons">
               <button type="button" disabled={Boolean(busy)} onClick={() => void reconcile()}>
-                {busy === "reconcile" ? "Reconciling..." : "Run order reconciliation"}
+                {busy === "reconcile" ? "Merekonsiliasi..." : "Jalankan rekonsiliasi order"}
               </button>
               <button type="button" disabled={Boolean(busy)} onClick={() => void finance()}>
                 {busy === "finance" ? "Checking..." : "Run finance reconciliation"}

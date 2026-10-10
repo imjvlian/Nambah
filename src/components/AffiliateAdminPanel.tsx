@@ -4,7 +4,37 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
 import { useConfirm } from "@/components/AdminConfirmDialog";
+import { affiliateLink } from "@/lib/affiliate-link";
 import { BRAND } from "@/lib/brand";
+import CopyButton from "@/components/CopyButton";
+
+/**
+ * Status affiliate, diterjemahkan.
+ *
+ * Nilai di database tetap bahasa Inggris - itu yang dibaca constraint di
+ * migrasi 034 dan yang dipakai route `/r/[code]` untuk menolak kode
+ * nonaktif. Yang diterjemahkan hanya yang ditampilkan.
+ */
+const STATUS_LABEL: Record<string, string> = {
+  active: "Aktif",
+  inactive: "Nonaktif",
+  suspended: "Ditangguhkan",
+};
+
+/**
+ * Status pencairan, diterjemahkan.
+ *
+ * `reserved` dihitung dari request `pending` dan `approved`: keduanya
+ * menahan komisi dari withdrawable, jadi nominalnya sudah tidak bisa
+ * ditarik partner Though belum ditransfer.
+ */
+const WITHDRAWAL_STATUS_LABEL: Record<string, string> = {
+  pending: "Menunggu",
+  approved: "Disetujui",
+  paid: "Lunas",
+  rejected: "Ditolak",
+  cancelled: "Dibatalkan",
+};
 
 type AffiliatePayload = {
   stats: {
@@ -89,6 +119,30 @@ export default function AffiliateAdminPanel() {
     userId: "",
     status: "active",
   });
+  /*
+   * Percakapan untuk satu aksi withdrawal.
+   *
+   * Sebelumnya alasan penolakan dan reference pembayaran diambil lewat
+   * `window.prompt`. Dialog itu punya tiga masalah yang semuanya terasa
+   * operator di saat tekanan:
+   *
+   *   - tidak ada konteks di samping kolomnya, jadi "Alasan penolakan:"
+   *   disiarkan tanpa tahu request mana yang sedang dibahas;
+   *   - `prompt` mengembalikan `null` saat ditutup, yang kode lamanya
+   *   perlakukan sama dengan membatalkan - jadi tidak ada jalan untuk
+   *   membatalkan dengan sengaja setelah mengetik;
+   *   - teks yang sudah diketik hilang begitu dialog ditutup, jadi
+   *   kesalahan ketik berarti mengetik ulang dari awal.
+   *
+   * Form di dalam halaman menghapus semua tiga itu, dan memberi
+   * kesempatan membaca ulang sebelum mengirim - yang memang hal yang
+   * paling penting untuk uang keluar.
+   */
+  const [dialog, setDialog] = useState<{
+    id: number;
+    action: "approve" | "reject" | "paid";
+  } | null>(null);
+  const [dialogText, setDialogText] = useState("");
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
   const confirm = useConfirm();
@@ -99,6 +153,34 @@ export default function AffiliateAdminPanel() {
   // cukup admin ke atas.
   const canPayout = role === "superadmin" || role === "legacy";
   const canManage = canPayout || role === "admin";
+
+  /*
+   * Syarat boleh mengirim, mengikuti validasi server supaya operator
+   * tidak gagal setelah menekan.
+   *
+   * Server memakai 3 karakter untuk keduanya; di sini 5 supaya alasan
+   * penolakan yang cuma "ok" tidak sampai ke partner.
+   */
+  const dialogBlocked =
+    dialog !== null && dialogText.trim().length < 5;
+
+  const dialogTitle =
+    dialog === null
+      ? ""
+      : dialog.action === "approve"
+        ? "Setujui pencairan"
+        : dialog.action === "paid"
+          ? "Tandai sudah dibayar"
+          : "Tolak pencairan";
+
+  const dialogHint =
+    dialog === null
+      ? ""
+      : dialog.action === "approve"
+        ? "Menyetujui berarti dana readiness dialokasikan ke request ini. Transfer tetap dilakukan di luar sistem."
+        : dialog.action === "paid"
+          ? "Tandai setelah transfer benar-benar dikirim. Reference dipakai untuk rekonsiliasi."
+          : "Alasan akan dibaca partner. Tulis yang bisa ditindaklanjuti.";
 
   async function load() {
     const [affiliateResponse, withdrawalResponse, sessionResponse, usersResponse] =
@@ -348,20 +430,12 @@ export default function AffiliateAdminPanel() {
   async function transition(
     withdrawalId: number,
     action: "approve" | "reject" | "paid",
+    text: string,
   ) {
-    let reason = "";
-    let externalReference = "";
-
-    if (action === "reject") {
-      reason = window.prompt("Alasan penolakan:")?.trim() ?? "";
-      if (!reason) return;
-    }
-
-    if (action === "paid") {
-      externalReference =
-        window.prompt("Reference pembayaran / transfer:")?.trim() ?? "";
-      if (!externalReference) return;
-    }
+    // Approve tidak butuh teks, tapi tetap mengirim string kosong supaya
+    // bentuk payload sama untuk ketiga aksi.
+    const reason = action === "reject" ? text.trim() : "";
+    const externalReference = action === "paid" ? text.trim() : "";
 
     setBusy(action + ":" + withdrawalId);
     setNotice("");
@@ -378,13 +452,21 @@ export default function AffiliateAdminPanel() {
       });
       const body = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(body.error ?? "Withdrawal gagal diperbarui.");
+        throw new Error(body.error ?? "Pencairan gagal diperbarui.");
       }
+      setDialog(null);
+      setDialogText("");
       await load();
-      setNotice("Withdrawal berhasil diperbarui: " + action + ".");
+      setNotice(
+        action === "approve"
+          ? "Pencairan disetujui. Transfer dana ke partner."
+          : action === "paid"
+            ? "Pencairan ditandai lunas."
+            : "Pencairan ditolak.",
+      );
     } catch (error) {
       setNotice(
-        error instanceof Error ? error.message : "Withdrawal gagal diperbarui.",
+        error instanceof Error ? error.message : "Pencairan gagal diperbarui.",
       );
     } finally {
       setBusy("");
@@ -407,12 +489,12 @@ export default function AffiliateAdminPanel() {
         <div className="acc-content">
           <section className="acc-hero">
             <div>
-              <span className="acc-eyebrow">Affiliate payout</span>
-              <h1>Review dulu, bayar di luar sistem.</h1>
+              <span className="acc-eyebrow">Pencairan afiliasi</span>
+              <h1>Tinjau dulu, bayar di luar sistem.</h1>
               <p>
-                ${BRAND.shortName} mengunci commission allocation secara atomic. Transfer
-                dana tetap dilakukan operator, lalu superadmin menandai request paid
-                dengan reference pembayaran.
+                {BRAND.shortName} mengunci alokasi komisi secara atomik. Transfer
+                dana tetap dilakukan operator di luar sistem, lalu superadmin
+                menandai request lunas dengan reference pembayaran.
               </p>
             </div>
           </section>
@@ -567,9 +649,9 @@ export default function AffiliateAdminPanel() {
                       }))
                     }
                   >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Nonaktif</option>
+                    <option value="suspended">Ditangguhkan</option>
                   </select>
                   <small>Suspended/inactive: kode tidak bisa dipakai customer.</small>
                 </label>
@@ -626,7 +708,7 @@ export default function AffiliateAdminPanel() {
             <div className="acc-section-head">
               <div>
                 <span className="acc-eyebrow">Ownership</span>
-                <h2>Hubungkan affiliate ke akun ${BRAND.shortName}.</h2>
+                <h2>Hubungkan affiliate ke akun {BRAND.shortName}.</h2>
                 <p>
                   Pilih user terdaftar. Satu akun hanya dapat
                   memiliki satu affiliate link.
@@ -678,56 +760,85 @@ export default function AffiliateAdminPanel() {
               <div className="acc-receipts-head">
                 <span>Affiliate</span>
                 <span>User</span>
-                <span>Rate</span>
+                <span>Komisi</span>
                 <span>Status</span>
                 <span>Aksi</span>
               </div>
-              {(affiliates?.affiliates ?? []).map((item) => (
-                <div className="acc-receipts-row" key={item.code}>
-                  <div>
-                    <strong>{item.code}</strong>
-                    <span>{item.displayName}</span>
+              {(affiliates?.affiliates ?? []).map((item) => {
+                const link = affiliateLink({
+                  code: item.code,
+                  status: item.status,
+                  hasOwner: Boolean(item.userId),
+                });
+
+                return (
+                  <div className="acc-receipts-row" key={item.code}>
+                    <div>
+                      <strong>{item.code}</strong>
+                      <span>{item.displayName}</span>
+                      {/*
+                       * Link lengkapnya ditampilkan, tapi tombol salin hanya
+                       * muncul kalau link itu benar-benar akan bekerja.
+                       * `/r/[code]` menolak kode tanpa pemilik supaya komisi
+                       * tidak masuk ke kode yang tidak ada yang mencairkan -
+                       * jadi menyalin link itu untuk kode yang belum siap
+                       * hanya menghasilkan trafik tanpa komisi.
+                       */}
+                      <span className="acc-affiliate-share">
+                        <code title={link.url}>{link.url}</code>
+                        {link.usable ? (
+                          <CopyButton value={link.url} />
+                        ) : (
+                          <em>{link.warning}</em>
+                        )}
+                      </span>
+                    </div>
+                    <span>
+                      {item.userId
+                        ? (userNameById.get(item.userId) ?? item.userId)
+                        : "Belum terhubung"}
+                    </span>
+                    <strong>{Math.round(item.commissionRate * 100)}%</strong>
+                    <span className={"acc-status " + item.status}>
+                      {STATUS_LABEL[item.status] ?? item.status}
+                    </span>
+                    <div className="acc-action-panel">
+                      <button
+                        type="button"
+                        disabled={!canManage || Boolean(busy)}
+                        onClick={() => startEdit(item)}
+                      >
+                        Ubah
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canManage || Boolean(busy)}
+                        onClick={() => void deleteAffiliate(item.code)}
+                      >
+                        {busy === "delete:" + item.code ? "Menghapus..." : "Hapus"}
+                      </button>
+                    </div>
                   </div>
-                  <span>
-                    {item.userId
-                      ? (userNameById.get(item.userId) ?? item.userId)
-                      : "Belum linked"}
-                  </span>
-                  <strong>{Math.round(item.commissionRate * 100)}%</strong>
-                  <span className={"acc-status " + item.status}>{item.status}</span>
-                  <div className="acc-action-panel">
-                    <button
-                      type="button"
-                      disabled={!canManage || Boolean(busy)}
-                      onClick={() => startEdit(item)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canManage || Boolean(busy)}
-                      onClick={() => void deleteAffiliate(item.code)}
-                    >
-                      {busy === "delete:" + item.code ? "Menghapus..." : "Hapus"}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div className="acc-table-card">
             <div className="acc-receipts-head">
               <span>Request</span>
-              <span>Destination</span>
-              <span>Amount</span>
-              <span>Action</span>
+              <span>Tujuan</span>
+              <span>Nominal</span>
+              <span>Aksi</span>
             </div>
             {withdrawals.map((item) => (
               <div className="acc-receipts-row" key={item.id}>
                 <div>
                   <strong>#{item.id} · {item.affiliateCode}</strong>
-                  <span>{item.status} · {formatDate(item.requestedAt)}</span>
+                  <span>
+                    {WITHDRAWAL_STATUS_LABEL[item.status] ?? item.status} ·{" "}
+                    {formatDate(item.requestedAt)}
+                  </span>
                 </div>
                 <div>
                   <strong>{item.method}</strong>
@@ -740,16 +851,22 @@ export default function AffiliateAdminPanel() {
                       <button
                         type="button"
                         disabled={!canPayout || Boolean(busy)}
-                        onClick={() => void transition(item.id, "approve")}
+                        onClick={() => {
+                          setDialog({ id: item.id, action: "approve" });
+                          setDialogText("");
+                        }}
                       >
-                        Approve
+                        Setujui
                       </button>
                       <button
                         type="button"
                         disabled={!canPayout || Boolean(busy)}
-                        onClick={() => void transition(item.id, "reject")}
+                        onClick={() => {
+                          setDialog({ id: item.id, action: "reject" });
+                          setDialogText("");
+                        }}
                       >
-                        Reject
+                        Tolak
                       </button>
                     </>
                   )}
@@ -758,33 +875,106 @@ export default function AffiliateAdminPanel() {
                       <button
                         type="button"
                         disabled={!canPayout || Boolean(busy)}
-                        onClick={() => void transition(item.id, "paid")}
+                        onClick={() => {
+                          setDialog({ id: item.id, action: "paid" });
+                          setDialogText("");
+                        }}
                       >
-                        Mark paid
+                        Tandai lunas
                       </button>
                       <button
                         type="button"
                         disabled={!canPayout || Boolean(busy)}
-                        onClick={() => void transition(item.id, "reject")}
+                        onClick={() => {
+                          setDialog({ id: item.id, action: "reject" });
+                          setDialogText("");
+                        }}
                       >
-                        Reject
+                        Tolak
                       </button>
                     </>
                   )}
                   {item.status === "paid" && (
-                    <span>{item.externalReference ?? "Paid"}</span>
+                    <span>{item.externalReference ?? "Lunas"}</span>
                   )}
                   {item.status === "rejected" && (
-                    <span>{item.rejectionReason ?? "Rejected"}</span>
+                    <span>{item.rejectionReason ?? "Ditolak"}</span>
                   )}
-                  {item.status === "cancelled" && <span>Cancelled by partner</span>}
+                  {item.status === "cancelled" && (
+                    <span>Dibatalkan partner</span>
+                  )}
                 </div>
               </div>
             ))}
             {withdrawals.length === 0 && (
-              <div className="acc-empty">Belum ada withdrawal affiliate.</div>
+              <div className="acc-empty">Belum ada permintaan pencairan.</div>
             )}
           </div>
+
+          {dialog !== null && (
+            <div className="acc-affiliate-dialog" role="dialog" aria-modal="true">
+              <div className="acc-affiliate-dialog-card">
+                <h3>{dialogTitle}</h3>
+                <p>{dialogHint}</p>
+
+                <label className="acc-field">
+                  <span>
+                    {dialog.action === "paid"
+                      ? "Reference pembayaran"
+                      : dialog.action === "reject"
+                        ? "Alasan penolakan"
+                        : "Catatan (opsional)"}
+                  </span>
+                  {dialog.action === "approve" ? (
+                    <input
+                      value={dialogText}
+                      onChange={(event) => setDialogText(event.target.value)}
+                      placeholder="Contoh: dicek saldo rekening partner"
+                    />
+                  ) : (
+                    <input
+                      value={dialogText}
+                      onChange={(event) => setDialogText(event.target.value)}
+                      placeholder={
+                        dialog.action === "paid"
+                          ? "Contoh: TRF/2026/11/00812"
+                          : "Minimal 5 karakter"
+                      }
+                      autoFocus
+                    />
+                  )}
+                </label>
+
+                <div className="acc-affiliate-dialog-actions">
+                  <button
+                    type="button"
+                    className="acc-primary-link"
+                    disabled={dialogBlocked || Boolean(busy)}
+                    onClick={() =>
+                      void transition(dialog.id, dialog.action, dialogText)
+                    }
+                  >
+                    {dialog.action === "approve"
+                      ? "Setujui"
+                      : dialog.action === "paid"
+                        ? "Tandai lunas"
+                        : "Kirim penolakan"}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-secondary-button"
+                    disabled={Boolean(busy)}
+                    onClick={() => {
+                      setDialog(null);
+                      setDialogText("");
+                    }}
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </main>
