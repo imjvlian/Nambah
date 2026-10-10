@@ -1557,28 +1557,40 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
             {viewerState === "authenticated" && pricing.pointsEarned > 0 && (
               <div className="summary-line points-earn"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
             )}
-            <div className="summary-line">
-              <span>Biaya pembayaran</span>
-              <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
-            </div>
             {/*
-             * Biaya layanan toko ditampilkan sebagai BARIS TERPISAH, bukan
-             * dilebur ke harga produk.
+             * SATU baris biaya, yang isinya berubah mengikuti metode pembayaran.
              *
-             * Alasan: ini uang yang benar-benar keluar dari tangan user,
-             * tapi TIDAK diterima Lacte — langsung masuk ke merchant sebagai
-             * pendapatannya. Kalau dilebur, user akan mengira Lacte yang
-             *charging dia, dan total yang tertera tidak bisa dipercaya saat
-             * ada dispute. Baris terpisah juga menjelaskan kenapa totalnya
-             * lebih besar dari harga katalog.
+             * Dulu ada dua baris: "Biaya pembayaran" yang selalu Rp0, dan
+             * "Biaya layanan toko" terpisah. Dua-duanya menampilkan biaya,
+             * jadi user melihat dua baris yang harus dijumlahkan sendiri - dan
+             * tidak ada yang memberi tahu baris mana yang sudah termasuk di
+             * total.
+             *
+             * Sekarang hanya satu baris. Metode biasa: biaya payment gateway.
+             * Jalur ritel: biaya layanan toko. Keduanya sudah termasuk di
+             * `finalPrice`, jadi user tidak perlu menghitung apa pun.
+             *
+             * Label "Biaya layanan toko" dipakai, bukan "Biaya pembayaran",
+             * karena uang itu benar-benar masuk ke merchant - bukan ke Lacte.
+             * Menyebutnya "biaya pembayaran" akan membuat user mengira Lacte
+             * yang menerimanya.
              */}
-            {pricing.merchantServiceFee > 0 && (
+            {isMerchantRetail ? (
               <div className="summary-line merchant-fee">
                 <span>
                   Biaya layanan toko
                   {selectedMerchant ? ` · ${selectedMerchant.name}` : ""}
                 </span>
                 <strong>{formatIDR(pricing.merchantServiceFee)}</strong>
+              </div>
+            ) : (
+              <div className="summary-line">
+                <span>Biaya pembayaran</span>
+                <strong>
+                  {pricing.customerPaymentFee === 0
+                    ? "Rp0 (MVP)"
+                    : formatIDR(pricing.customerPaymentFee)}
+                </strong>
               </div>
             )}
             <div className="summary-total"><span>Total</span><strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong></div>

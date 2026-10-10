@@ -41,56 +41,25 @@ const securityHeaders = [
 ];
 
 /*
- * Host untuk layar kasir dan pendaftaran toko.
+ * CATATAN REDIRECT SUBDOMAIN
  *
- * SENGAJA ditulis sebagai konstanta, bukan diturunkan dari `BRAND.domain`.
- * `BRAND.domain` masih `nambah.id` - itu pilihan yang disengaja supaya
- * domain lama yang sudah terindeks Google tidak hilang (lihat `brand.ts`).
- * Mengambil subdomain dari sana akan menghasilkan host yang salah sekali
- * deploy.
+ * Sebelumnya `/merchant` dialihkan ke `https://merchant.nambah.my.id` lewat
+ * `redirects()` di file ini. Redirect itu DIHAPUS, karena `/merchant`
+ * sekarang menjadi halaman portal yang nyata: pemilik toko membuka
+ * `/merchant`, login di sana, lalu memilih ke kasir atau ke riwayat.
  *
- * Kalau nanti hostnya dipindah ke domain sendiri, ubah SATU tempat ini.
+ * Kalau `/merchant` masih dialihkan, halaman portalnya tidak akan pernah
+ * terlihat - dan yang lebih buruk, di host `merchant.nambah.my.id` sendiri
+ * pola `/merchant` akan cocok lagi dan mengarahkan ke URL yang sama,
+ * menjadi redirect berulang.
+ *
+ * Kalau pemisahan host masih diinginkan, jangan lewat `redirects()` dengan
+ * pola polos. Batasi ke host asal, misalnya dengan `has: [{ type: 'header',
+ * key: 'host', value: 'nambah.my.id' }]`, supaya host merchant tidak ikut
+ * menyala dan tidak ada risiko loop.
  */
-const MERCHANT_HOST = "merchant.nambah.my.id";
-
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-
-  /*
-   * `/merchant` -> host kasir.
-   *
-   * Tiga keputusan, semuanya berdasarkan dacang yang bisa balik:
-   *
-   * 1. HANYA DI PRODUKSI. Redirect ini memindahkan orang ke host lain. Kalau
-   *    aktif di pengembangan, `/merchant` langsung hilang dan seluruh
-   *    pengujian layar kasir di localhost ikut mati - padahal halaman
-   *    `/merchant/kasir` dan `/merchant/register` justru masih hidup di
-   *    host utama dan masih dipakai untuk pengujian.
-   *
-   * 2. SEMENTARA (307), BUKAN PERMANEN (308). Subdomain-nya belum tentu
-   *    siap. 308 memberi tahu browser untuk meng-cache redirect SELAMANYA -
-   *    jadi kalau subdomainnya belum ada, orang menyimpan halaman 404 dan
-   *    tetap menyimpannya bahkan setelah subdomain-nya diperbaiki. 307 tidak
-   *    di-cache, jadi memperbaiki target cukup dilakukan sekali di server.
-   *
-   * 3. POLA `/merchant` TANPA `/:path*`. Redirect di sini dicek sebelum
-   *    filesystem, jadi pola yang longgar akan ikut menyapu
-   *    `/merchant/kasir` dan `/merchant/register` - dua halaman yang masih
-   *    hidup dan masih dipakai. Pola tanpa segmen tambahan hanya cocok
-   *    persis dengan `/merchant`.
-   */
-  async redirects() {
-    if (!isProduction) return [];
-
-    return [
-      {
-        source: "/merchant",
-        destination: `https://${MERCHANT_HOST}`,
-        permanent: false,
-      },
-    ];
-  },
-
   async headers() {
     return [
       {

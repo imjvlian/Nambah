@@ -1,0 +1,408 @@
+/* ==========================================================================
+   Portal merchant (/merchant, /merchant/riwayat)
+   ==========================================================================
+   Berbeda dari layar kasir: yang memakai ini adalah pemilik toko, bukan
+   orang yang berdiri di konter. Screen ini sering dibuka di HP, kadang di
+   koneksi seluler yang tidak stabil, dan kadang di depan pelanggan.
+
+   Konsekuensinya: target sentuh besar, kontras tinggi, dan tidak ada
+   informasi yang hanya tersedia lewat hover.
+   ========================================================================== */
+
+.merchant-portal-page {
+  min-height: 100dvh;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: 24px 16px 48px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(120, 92, 255, 0.14), transparent 55%),
+    radial-gradient(circle at 85% 100%, rgba(0, 194, 168, 0.1), transparent 50%),
+    #0b0d12;
+  color: #e8ebf2;
+}
+
+.merchant-portal-card {
+  width: min(560px, 100%);
+  padding: 26px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(20, 23, 31, 0.9);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.merchant-riwayat-card {
+  width: min(720px, 100%);
+}
+
+.merchant-portal-card h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.merchant-portal-card h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.merchant-portal-lead {
+  margin: 0 0 22px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.merchant-portal-note {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.merchant-portal-note a,
+.merchant-portal-lead a {
+  color: #9fb4ff;
+}
+
+/* --------------------------------------------------------------------------
+   Kepala kartu
+   -------------------------------------------------------------------------- */
+
+.merchant-portal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.merchant-portal-code {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.merchant-portal-signout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.merchant-portal-signout:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* --------------------------------------------------------------------------
+   Form login
+   -------------------------------------------------------------------------- */
+
+.merchant-portal-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.merchant-portal-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.merchant-portal-field input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  font-size: 18px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  outline: none;
+}
+
+.merchant-portal-field input:focus {
+  border-color: rgba(124, 92, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.merchant-portal-error {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  font-size: 13px;
+  color: #ffb4b4;
+  background: rgba(255, 90, 90, 0.12);
+  border: 1px solid rgba(255, 90, 90, 0.3);
+  border-radius: 10px;
+}
+
+.merchant-portal-submit {
+  width: 100%;
+  min-height: 50px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cff, #5b8dff);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.merchant-portal-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Pilihan setelah login
+   -------------------------------------------------------------------------- */
+
+.merchant-portal-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.merchant-portal-action {
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.merchant-portal-action strong {
+  font-size: 16px;
+  color: #fff;
+}
+
+.merchant-portal-action small {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.merchant-portal-action:hover {
+  border-color: rgba(124, 92, 255, 0.6);
+  background: rgba(124, 92, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Status toko
+   -------------------------------------------------------------------------- */
+
+.merchant-status {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 20px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.merchant-status strong {
+  font-size: 13px;
+}
+
+.merchant-status span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.merchant-status-ok {
+  border-color: rgba(0, 194, 168, 0.3);
+  background: rgba(0, 194, 168, 0.08);
+}
+.merchant-status-ok strong {
+  color: #6ee7c8;
+}
+
+.merchant-status-wait {
+  border-color: rgba(111, 156, 255, 0.3);
+  background: rgba(111, 156, 255, 0.08);
+}
+.merchant-status-wait strong {
+  color: #adc4f1;
+}
+
+.merchant-status-warn {
+  border-color: rgba(255, 176, 46, 0.32);
+  background: rgba(255, 176, 46, 0.09);
+}
+.merchant-status-warn strong {
+  color: #ffd6a5;
+}
+
+.merchant-status-off {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.merchant-status-off strong {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* --------------------------------------------------------------------------
+   Statistik omzet
+   -------------------------------------------------------------------------- */
+
+.merchant-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.merchant-stat {
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.merchant-stat small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.merchant-stat strong {
+  font-size: 19px;
+  color: #6ee7c8;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-stat span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   Piutang
+   -------------------------------------------------------------------------- */
+
+.merchant-receivable {
+  margin-bottom: 26px;
+}
+
+.merchant-receivable dl {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.merchant-receivable dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: rgba(20, 23, 31, 0.95);
+}
+
+.merchant-receivable dt {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.merchant-receivable dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-receivable dd.overdue {
+  color: #ffb4b4;
+}
+
+/* --------------------------------------------------------------------------
+   Tabel transaksi
+   -------------------------------------------------------------------------- */
+
+.merchant-transactions {
+  margin-top: 4px;
+}
+
+.merchant-table-scroll,
+.merchant-transactions {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.merchant-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 460px;
+}
+
+.merchant-table th {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.merchant-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.merchant-table-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 480px) {
+  .merchant-portal-card {
+    padding: 20px 16px;
+  }
+
+  .merchant-portal-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

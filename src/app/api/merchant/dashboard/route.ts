@@ -4,26 +4,28 @@ import {
   getMerchantById,
   isMerchantRetailEnabled,
 } from "@/lib/merchant-retail";
+import { readMerchantSession } from "@/lib/merchant-session";
 import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/merchant/dashboard — ringkasan piutang untuk toko yang sedang
- * memindai.
+ * Dashboard toko.
  *
- * AUTENTIKASI BERBEDA dari `/api/merchant/confirm` dan `/api/merchant/lookup`.
+ * `GET` memakai sesi cookie; `POST` (kode + PIN di body) dipakai kasir yang
+ * belum punya sesi - dipakai untuk memvalidasi kredensial sebelum membuka
+ * layar scan.
  *
- * Yang pertama menolak status non-`active`, karena kasir tidak boleh memindai
- * pesanan dari toko yang belum disetujui atau yang dibekukan karena menunggak.
- * Dashboard berbeda: pemilik toko yang baru mendaftar perlu melihat antrean
- * persetujuan, dan toko yang dibekukan justru yang paling perlu melihat
- * angka yang membuatnya bisa melunasi.
+ * Autentikasi dipakai bergantian, bukan menumpuk: kalau sesi ada, `GET`
+ * memakainya dan mengabaikan body sepenuhnya. Menjalankan keduanya
+ * bersamaan berarti PIN tetap_required setiap kali dashboard di-refresh,
+ * yang justru yang ingin dihindari oleh chastanya sesi.
  *
- * Jadi autentikasinya sama persis (kode + PIN, satu pesan untuk semua
- * kegagalan), tapi aturannya lebih longgar. Yang tetap dikunci: hanya
- * kode+PIN, dan merchant_id selalu datang dari hash yang sudah diverifikasi -
- * bukan dari request.
+ * Kasir tetap memerlukan kode + PIN di SETIAP pindai lewat
+ * `/api/merchant/confirm`. Sesi dashboard tidak dipakai di sana: perangkat
+ * kasir sering dipakai bersama dan tidak ada yang mengunci logout di akhir
+ * shift, jadi kredensial yang melekat di perangkat lebih berisiko daripada
+ * yang dietik ulang tiap pesanan.
  */
 export async function POST(request: Request) {
   if (!isMerchantRetailEnabled()) {
@@ -82,4 +84,42 @@ export async function POST(request: Request) {
   );
 
   return Response.json(dashboard);
+}
+
+/**
+ * Dashboard berbasis sesi.
+ *
+ * Route ini yang dipakai halaman dashboard. `merchantId` datang dari cookie
+ * bertanda tangan - TIDAK dari query atau body, jadi tidak ada jalan untuk
+ * membaca dashboard toko lain dengan session satu.
+ */
+export async function GET(request: Request) {
+  if (!isMerchantRetailEnabled()) {
+    return Response.json({ error: "Program toko ritel belum aktif." }, { status: 403 });
+  }
+
+  const merchantId = readMerchantSession(request);
+  if (!merchantId) {
+    return Response.json({ error: "Belum masuk." }, { status: 401 });
+  }
+
+  const merchant = await getMerchantById(merchantId);
+  if (!merchant) {
+    return Response.json({ error: "Toko tidak ditemukan." }, { status: 404 });
+  }
+
+  const dashboard = await buildMerchantDashboard(
+    merchant.id,
+    merchant.name,
+    merchant.code,
+    merchant.status,
+    merchant.address,
+  );
+
+  return Response.json(dashboard, {
+    // Data piutang berubah setiap kali ada scan dan setiap kali admin
+    // mencatat pelunasan. Tiga puluh detik cukup untuk terasa hidup tanpa
+    // membebaniSupabase dengan request tiap beberapa detik.
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
