@@ -26,6 +26,48 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
  * dengan informasi, bukan tebakan.
  */
 
+type ScanRunView = {
+  id: number;
+  status: "running" | "success" | "partial" | "failed";
+  startedAt: string;
+  finishedAt: string | null;
+  pages: number | null;
+  pagesFailed: number | null;
+  found: number | null;
+  baru: number | null;
+  updated: number | null;
+  unchanged: number | null;
+  deactivated: number | null;
+  error: string | null;
+  triggeredBy: string | null;
+};
+
+type ScanStatusPayload = {
+  runs: ScanRunView[];
+  lastSuccessAt: string | null;
+};
+
+function waktuLokal(iso: string | null) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "-"
+    : d.toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" });
+}
+
+function labelStatusScan(status: ScanRunView["status"]) {
+  switch (status) {
+    case "running":
+      return "Berjalan";
+    case "success":
+      return "Berhasil";
+    case "partial":
+      return "Berhasil sebagian";
+    default:
+      return "Gagal";
+  }
+}
+
 type Candidate = { sku: string; name: string; cost: number };
 
 type MappingRow = {
@@ -98,6 +140,7 @@ export default function MelostoreMappingPanel() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("");
   const [draf, setDraf] = useState<Record<string, string>>({});
+  const [scanRuns, setScanRuns] = useState<ScanStatusPayload | null>(null);
 
   async function load(nextQuery = query, nextGame = gameFilter) {
     const params = new URLSearchParams();
@@ -119,6 +162,7 @@ export default function MelostoreMappingPanel() {
       }
       setPayload(data);
       setDraf({});
+      void muatStatusScan();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Data gagal dimuat.");
     } finally {
@@ -130,6 +174,19 @@ export default function MelostoreMappingPanel() {
     void load("", "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function muatStatusScan() {
+    try {
+      const response = await fetch("/api/admin/digiflazz/melostore-sync", {
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+      setScanRuns((await response.json()) as ScanStatusPayload);
+    } catch {
+      // Status scan gagal dimuat bukan alasan menggagalkan halaman -
+      // tabel pemetaan tetap bisa dipakai.
+    }
+  }
 
   async function jalankan(aksi: string, body: Record<string, unknown>, label: string) {
     setBusy(aksi);
@@ -306,6 +363,32 @@ export default function MelostoreMappingPanel() {
               </p>
             </div>
           </section>
+
+          {scanRuns && scanRuns.runs.length > 0 ? (
+            <div className="acc-module-summary">
+              <article>
+                <small>Scan terakhir</small>
+                <strong>{labelStatusScan(scanRuns.runs[0].status)}</strong>
+                <span>{waktuLokal(scanRuns.runs[0].startedAt)}</span>
+              </article>
+              <article>
+                <small>Produk ditemukan</small>
+                <strong>{scanRuns.runs[0].found ?? "-"}</strong>
+                <span>
+                  {scanRuns.runs[0].baru ?? 0} baru, {scanRuns.runs[0].updated ?? 0} diperbarui
+                </span>
+              </article>
+              <article>
+                <small>Berhasil penuh terakhir</small>
+                <strong>{waktuLokal(scanRuns.lastSuccessAt)}</strong>
+                <span>
+                  {scanRuns.runs[0].pagesFailed
+                    ? `${scanRuns.runs[0].pagesFailed} halaman gagal di scan terakhir`
+                    : "Tidak ada halaman yang gagal"}
+                </span>
+              </article>
+            </div>
+          ) : null}
 
           {notice ? (
             <div className="acc-global-notice acc-inline-notice" role="status">

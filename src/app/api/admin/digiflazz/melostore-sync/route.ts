@@ -1,6 +1,11 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { MelostoreSupplierClient } from "@/lib/suppliers/melostore-client";
 import {
+  bukaScanRun,
+  riwayatScan,
+  tutupScanRun,
+} from "@/lib/suppliers/scan-runs";
+import {
   supabaseInsert,
   supabaseSelect,
   supabaseUpdate,
@@ -30,6 +35,39 @@ export const runtime = "nodejs";
  * ratusan pemetaan adalah cara memastikan tidak ada yang akan dipencet.
  */
 
+/**
+ * Jejak scan Melostore, terbaru dulu.
+ *
+ * Dipakai panel katalog untuk menampilkan status scan terakhir: berhasil,
+ * parsial, gagal, atau masih berjalan - beserta jumlah dan waktunya.
+ */
+export async function GET(request: Request) {
+  const auth = await authorizeAdminRequest(request);
+  if (!auth.ok) return auth.response;
+
+  const runs = await riwayatScan("melostore", 5);
+
+  return Response.json({
+    runs: runs.map((run) => ({
+      id: run.id,
+      status: run.status,
+      startedAt: run.started_at,
+      finishedAt: run.finished_at,
+      pages: run.pages_total,
+      pagesFailed: run.pages_failed,
+      found: run.found_count,
+      baru: run.new_count,
+      updated: run.updated_count,
+      unchanged: run.unchanged_count,
+      deactivated: run.deactivated_count,
+      error: run.error,
+      triggeredBy: run.triggered_by,
+    })),
+    lastSuccessAt:
+      runs.find((run) => run.status === "success")?.finished_at ?? null,
+  });
+}
+
 export async function POST(request: Request) {
   const auth = await authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
@@ -51,7 +89,8 @@ export async function POST(request: Request) {
 
   if (body.action === "balance") return syncBalance(client);
   if (body.action === "catalog") return syncCatalogCosts(client);
-  if (body.action === "cache-catalog") return cacheMelostoreCatalog(client);
+  if (body.action === "cache-catalog")
+    return cacheMelostoreCatalog(client, auth.principal.userId);
 
   return Response.json({ error: "Aksi tidak dikenal." }, { status: 400 });
 }
@@ -212,26 +251,103 @@ async function syncCatalogCosts(client: MelostoreSupplierClient) {
  * itulah yang benar, bukan data yang hilang. seller_name diisi tetap
  * supaya baris tidak pernah ambigu milik siapa.
  */
-async function cacheMelostoreCatalog(client: MelostoreSupplierClient) {
-  const katalog = await client.fetchCatalog();
-  if (katalog.length === 0) {
+/**
+ * Scan katalog Melostore: tarik, upsert, catat run.
+ *
+ * ATURAN YANG TIDAK BISA DILANGGAR DI FUNGSI INI
+ *
+ * 1. DEAKTIVASI HANYA SAAT SCAN SUKSES PENUH. Scan parsial kehilangan
+ *    halaman - SKU yang hilang dari hasil parsial bisa jadi ada di
+ *    halaman yang gagal. Menandainya tidak tersedia berarti menghapus
+ *    produk dari dropdown hanya karena supplier sempat rate-limit.
+ *
+ * 2. RESPONS KOSONG AKIBAT ERROR BUKAN KATALOG KOSONG. Katalog 0 SKU
+ *    dengan halaman gagal = scan gagal; katalog 0 SKU tanpa halaman
+ *    gagal = supplier benar-benar kosong. Dua hal yang berbeda.
+ *
+ * 3. SETIAP RUN TERCATAT, TERMASUK YANG GAGAL. Tanpa jejak, operator
+ *    tidak bisa membedakan "katalog belum pernah discan" dari "scan
+ *    terakhir gagal tiga kali berturut-turut".
+ */
+async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredBy: string | null) {
+  /*
+   * Kunci anti-scan-bersamaan.
+   *
+   * Dua scan yang berjalan bersamaan menghitung "baru"/"diperbarui"
+   * terhadap dasar yang berbeda - angkanya salah keduanya, bukan karena
+   * Postgres salah tapi karena dasar perbandingannya berbeda.
+   */
+  const run = await bukaScanRun("melostore", triggeredBy);
+  if (!run) {
     return Response.json(
-      { error: "Katalog Melostore kosong - tidak ada yang disimpan." },
-      { status: 502 },
+      {
+        error:
+          "Scan Melostore masih berjalan. Tunggu sampai selesai sebelum menjalankan lagi.",
+      },
+      { status: 409 },
     );
   }
 
-  const now = new Date().toISOString();
+  try {
+    const hasil = await client.scanCatalog();
 
-  /*
-   * Upsert per batch. Satu permintaan berisi 10.000 baris akan melewati
-   * batas ukuran body PostgREST, dan kegagalannya hanya terlihat setelah
-   * seluruh tarikan selesai.
-   */
-  const UKURAN_BATCH = 500;
-  let tersimpan = 0;
-  for (let i = 0; i < katalog.length; i += UKURAN_BATCH) {
-    const batch = katalog.slice(i, i + UKURAN_BATCH).map((item) => ({
+    /*
+     * Katalog kosong diperlakukan beda antara sukses dan gagal:
+     * - sukses + 0 SKU  : supplier benar-benar kosong (hampir pasti salah
+     *   konfigurasi akun, tapi itu fakta yang sah).
+     * - gagal/parsial + 0 SKU : respons kosong karena error - BUKAN
+     *   katalog kosong, dan BUKAN alasan menandai apa pun nonaktif.
+     */
+    if (hasil.items.length === 0) {
+      const status: "failed" | "success" =
+        hasil.pagesFailed > 0 ? "failed" : "success";
+      await tutupScanRun(
+        run.id,
+        status,
+        { pagesTotal: hasil.pagesTotal, pagesFailed: hasil.pagesFailed, found: 0 },
+        status === "failed" ? hasil.errors.join(" | ") : undefined,
+      );
+
+      return Response.json(
+        {
+          error:
+            status === "failed"
+              ? "Scan gagal - tidak ada SKU yang bisa diambil. Tidak ada yang diubah."
+              : "Katalog Melostore kosong - tidak ada yang disimpan.",
+          scan: { status, pages: hasil.pagesTotal, failed: hasil.pagesFailed },
+        },
+        { status: 502 },
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    /*
+     * Hitung baru/diperbarui/tidak-berubah SEBELUM upsert, terhadap
+     * kondisi yang sedang ada. Dihitung setelahnya berarti membandingkan
+     * dengan dasar yang sudah berubah - semuanya akan terlihat "tidak
+     * berubah".
+     */
+    const lama = await supabaseSelect<{
+      supplier_sku: string;
+      supplier_cost: number | string;
+      buyer_active: boolean;
+    }>("supplier_catalog_items", {
+      select: "supplier_sku,supplier_cost,buyer_active",
+      filters: { supplier_id: "eq.melostore" },
+      limit: 20000,
+    });
+
+    const sebelumnya = new Map(
+      lama.map((b) => [b.supplier_sku, b] as const),
+    );
+
+    let baru = 0;
+    let berubah = 0;
+    let sama = 0;
+
+    const UKURAN_BATCH = 500;
+    const baris = hasil.items.map((item) => ({
       supplier_id: "melostore",
       supplier_sku: item.sku,
       product_name: item.name || item.sku,
@@ -251,50 +367,88 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient) {
       last_seen_at: now,
     }));
 
-    await supabaseUpsert("supplier_catalog_items", batch, {
-      onConflict: "supplier_id,supplier_sku",
-    });
-    tersimpan += batch.length;
-  }
+    for (const row of baris) {
+      const sebelum = sebelumnya.get(row.supplier_sku);
+      if (!sebelum) baru += 1;
+      else if (Number(sebelum.supplier_cost) !== row.supplier_cost || sebelum.buyer_active !== row.buyer_active) {
+        berubah += 1;
+      } else sama += 1;
+    }
 
-  /*
-   * SKU yang hilang dari katalog terbaru ditandai tidak aktif.
-   *
-   * Menghapusnya akan merusak baris mapping yang menunjuk ke SKU itu -
-   * dan order yang sedang berjalan masih memakainya. Menandai buyer_active
-   * false membuat dropdown tidak lagi menawarkannya, tanpa menghapus
-   * rekam jejaknya.
-   */
-  const skuTersimpan = new Set(katalog.map((item) => item.sku));
-  const lama = await supabaseSelect<{ supplier_sku: string }>(
-    "supplier_catalog_items",
-    {
-      select: "supplier_sku",
-      filters: { supplier_id: "eq.melostore" },
-      limit: 20000,
-    },
-  );
-  let ditandai = 0;
-  for (const baris of lama) {
-    if (skuTersimpan.has(baris.supplier_sku)) continue;
-    await supabaseUpdate(
-      "supplier_catalog_items",
-      { buyer_active: false, last_seen_at: now },
+    for (let i = 0; i < baris.length; i += UKURAN_BATCH) {
+      await supabaseUpsert("supplier_catalog_items", baris.slice(i, i + UKURAN_BATCH), {
+        onConflict: "supplier_id,supplier_sku",
+      });
+    }
+
+    /*
+     * Deaktivasi HANYA saat sukses penuh. Scan parsial kehilangan halaman,
+     * jadi SKU yang "hilang" bisa jadi ada di halaman yang gagal.
+     */
+    let ditandai = 0;
+    const statusScan: "success" | "partial" =
+      hasil.pagesFailed > 0 ? "partial" : "success";
+
+    if (statusScan === "success") {
+      const skuTersimpan = new Set(hasil.items.map((item) => item.sku));
+      for (const barisLama of lama) {
+        if (skuTersimpan.has(barisLama.supplier_sku)) continue;
+        await supabaseUpdate(
+          "supplier_catalog_items",
+          { buyer_active: false, last_seen_at: now },
+          {
+            filters: {
+              supplier_id: "eq.melostore",
+              supplier_sku: `eq.${barisLama.supplier_sku}`,
+            },
+          },
+        );
+        ditandai += 1;
+      }
+    }
+
+    await tutupScanRun(
+      run.id,
+      statusScan,
       {
-        filters: {
-          supplier_id: "eq.melostore",
-          supplier_sku: `eq.${baris.supplier_sku}`,
-        },
+        pagesTotal: hasil.pagesTotal,
+        pagesFailed: hasil.pagesFailed,
+        found: hasil.items.length,
+        baru,
+        updated: berubah,
+        unchanged: sama,
+        deactivated: ditandai,
       },
+      statusScan === "partial" ? hasil.errors.join(" | ") : undefined,
     );
-    ditandai += 1;
-  }
 
-  return Response.json({
-    ok: true,
-    cached: tersimpan,
-    inactive: ditandai,
-    message:
-      `${tersimpan} SKU tersimpan, ${ditandai} tidak ada lagi di katalog dan ditandai nonaktif.`,
-  });
+    return Response.json({
+      ok: true,
+      scan: {
+        status: statusScan,
+        pages: hasil.pagesTotal,
+        pagesFailed: hasil.pagesFailed,
+      },
+      cached: baris.length,
+      baru,
+      updated: berubah,
+      unchanged: sama,
+      inactive: ditandai,
+      message:
+        (statusScan === "partial"
+          ? `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
+          : "") +
+        `${baris.length} SKU, ${baru} baru, ${berubah} diperbarui` +
+        (statusScan === "success" ? `, ${ditandai} ditandai nonaktif.` : "."),
+    });
+  } catch (error) {
+    const pesan = error instanceof Error ? error.message : "galat tidak diketahui";
+    await tutupScanRun(run.id, "failed", {}, pesan);
+    return Response.json(
+      {
+        error: "Scan gagal - tidak ada yang diubah. " + pesan,
+      },
+      { status: 502 },
+    );
+  }
 }
