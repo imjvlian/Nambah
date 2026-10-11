@@ -272,3 +272,22 @@ export function IconFlask({ className }: IconProps) {
     </Icon>
   );
 }
+
+/**
+ * Pemetaan supplier: dua kotak tersambung garis.
+ *
+ * Ikon lain di daftar ini menggambarkan SATU sumber (scan, saldo,
+ * katalog). Pemetaan Melostore justru soal menghubungkan dua hal -
+ * produk internal dan SKU supplier - jadi gambarnya dua simpul yang
+ * disambung, bukan satu kotak.
+ */
+export function IconMapping({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+      <path d="M10.5 7h4.5a2 2 0 0 1 2 2v4.5" />
+      <path d="m14.5 11.5 2.5 2 2.5-2" />
+    </Icon>
+  );
+}

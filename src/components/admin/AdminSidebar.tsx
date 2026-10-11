@@ -12,6 +12,7 @@ import {
   IconFinance,
   IconFlask,
   IconImage,
+  IconMapping,
   IconMerchants,
   IconOrders,
   IconOverview,
@@ -293,6 +294,20 @@ export const ADMIN_TOOLS: Array<{
      */
     group: "Katalog",
     Icon: IconScan,
+  },
+  {
+    href: "/admin/melostore-mapping",
+    label: "Katalog Melostore",
+    hint: "Petakan SKU supplier kedua",
+    /*
+     * Digiflazz adalah sumber produk; Melostore adalah pemetaannya.
+     * Keduanya satu urusan - katalog supplier - jadi masuk grup yang
+     * sama dan berdampingan. Kalau dipisah ke grup lain, operator
+     * yang mencari "supplier kedua" akan membuka grup ini dulu
+     * dan tidak menemukannya.
+     */
+    group: "Katalog",
+    Icon: IconMapping,
   },
   {
     href: "/admin/banners",

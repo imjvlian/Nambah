@@ -3380,27 +3380,6 @@ const txDataStamp = txRange.preset
                           )}
                         </div>
 
-                        <div className="admin-supplier-fields">
-                          <label>
-                            <span>SKU supplier</span>
-                            <input
-                              value={draft.supplierSku}
-                              placeholder="Belum mapped"
-                              onChange={(event) =>
-                                updateDraft(product.id, {
-                                  supplierSku: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <div className="admin-cost-line">
-                            <span>Modal</span>
-                            <strong>
-                              {product.supplier.cost === null
-                                ? "-"
-                                : formatIDR(product.supplier.cost)}
-                            </strong>
-                          </div>
 
                         {/*
                          * Supplier Mapping - dua dropdown, dua supplier.
@@ -3433,6 +3412,14 @@ const txDataStamp = txRange.preset
                               <small>{supplierCatalog.digiflazz.length} SKU di katalog Digiflazz</small>
                             ) : null}
                           </label>
+                          <div className="admin-cost-line">
+                            <span>Modal Digiflazz</span>
+                            <strong>
+                              {product.supplier.cost === null
+                                ? "-"
+                                : formatIDR(product.supplier.cost)}
+                            </strong>
+                          </div>
 
                           <label>
                             <span>SKU Melostore</span>
@@ -3469,7 +3456,6 @@ const txDataStamp = txRange.preset
                               <small>Kosong berarti hanya Digiflazz.</small>
                             )}
                           </label>
-                        </div>
                           {margin && (
                             <div
                               className={
