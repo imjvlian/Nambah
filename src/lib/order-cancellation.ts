@@ -1,6 +1,7 @@
 import { restoreOrderPointsRedemption } from "@/lib/loyalty";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
-import { supabaseUpdate } from "@/lib/supabase/server";
+import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { releaseSupplierReservation } from "@/lib/suppliers/reservation";
 
 /**
  * Pembatalan order terpusat.
@@ -25,8 +26,8 @@ export type OrderCancelReason =
 /**
  * Status yang masih SEBENARNYA belum dibayar dan masih boleh dibatalkan.
  *
- * `pending_merchant` masuk daftar karena user di jalur ritel sudah 보는 nota
- * tapi uangnya belum masuk — nilainya masih di merchant, dan reservasi
+ * `pending_merchant` masuk daftar karena user di jalur ritel sudah melihat
+ * nota tapi uangnya belum masuk - nilainya masih di merchant, dan reservasi
  * points/promo masih terkunci. Kalau order seperti itu tidak bisa dibatalkan,
  * reservasinya bocor permanen - bug yang sama seperti yang
  * dulunya cuma ada di sweeper `order-expiry.ts` sebelum ditulis.
@@ -48,15 +49,63 @@ const CANCELLABLE_STATUSES = ["pending_payment", "pending_merchant"] as const;
  * `allSettled` dipakai supaya kegagalan satu subsystem tidak memblokir yang
  * lain; order tetap sudah dibatalkan dan kedua reservasi dicoba dilepas.
  */
+/**
+ * Lepas reservasi saldo supplier untuk satu order.
+ *
+ * Nominal yang dilepas diambil dari `orders.supplier_cost` - kolom yang
+ * sudah jadi snapshot harga saat checkout. Memorial jumlah yang
+ * dilepas di tempat lain akan berbeda begitu harga supplier berubah, dan
+ * order lama akan melepas nominal yang salah.
+ *
+ * Order tanpa `supplier_id` atau tanpa supplier yang punya transaksi
+ * tidak melakukan apa-apa dan dianggap berhasil. Itu kondisi normal:
+ * order yang gagal sebelum memilih supplier tidak pernah mengunci
+ * apa pun.
+ *
+ * Sengaja TIDAK melempar kalau saldonya tidak ditemukan. Fungsi ini
+ * dipanggil dari pembatalan order, dan kegagalan di sini tidak boleh
+ * membatalkan pembatalannya - order sudah dibayar atau sudah kedaluwarsa,
+ * dan membatalkannya lagi hanya akan complicating keadaan.
+ */
+async function releaseSupplierBalanceForOrder(orderId: string): Promise<boolean> {
+  const [order] = await supabaseSelect<{
+    supplier_id: string | null;
+    supplier_cost: number | string;
+  }>("orders", {
+    select: "supplier_id,supplier_cost",
+    filters: { id: `eq.${orderId}` },
+    limit: 1,
+  });
+
+  if (!order?.supplier_id) return true;
+
+  const amount = Math.round(Number(order.supplier_cost));
+  if (!Number.isFinite(amount) || amount <= 0) return true;
+
+  return releaseSupplierReservation(order.supplier_id, amount);
+}
+
 export async function releaseOrderReservations(orderId: string) {
   const results = await Promise.allSettled([
     restoreOrderPointsRedemption(orderId),
     syncPromotionLifecycle(orderId, "cancelled"),
+    releaseSupplierBalanceForOrder(orderId),
   ]);
+
+  /*
+   * Nama subsystem diambil dari daftar, bukan dari index.
+   *
+   * Dulu `index === 0 ? ... : ...` - yang benar selama hanya ada dua
+   * pemanggilan. Menambah reservasi supplier jadi tiga, dan ekspresi itu
+   * diam-diam menandai "supplier" untuk semua yang di atas indeks 1.
+   * Lognya masih terbaca, tapi salah label - persis kelas bug yang paling
+   * sulit ditemukan: yang muncul di log, bukan yang hilang dari layar.
+   */
+  const subsystems = ["Lacte Points", "promo", "saldo supplier"] as const;
 
   results.forEach((result, index) => {
     if (result.status === "rejected") {
-      const subsystem = index === 0 ? "Lacte Points" : "promo";
+      const subsystem = subsystems[index] ?? `subsystem #${index}`;
       console.error(
         `${subsystem} release failed for order ${orderId}`,
         result.reason,
