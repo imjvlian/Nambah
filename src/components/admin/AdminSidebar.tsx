@@ -129,11 +129,11 @@ export const ADMIN_NAV: AdminNavItem[] = [
      *
      * Tidak ada alur verifikasi pembayaran manual di sistem ini, jadi
      * nama yang menyesatkan itu tidak pernah bisa dipenuhi. Sekarang
-     * Namanya sekarang apa adanya: apa yang halaman ini benar-benar lakukan.
+     * namanya apa adanya: apa yang halaman ini benar-benar lakukan.
      */
     label: "Log Email",
     Icon: IconReceipts,
-    hint: "Pengiriman receipt ke user",
+    hint: "Pengiriman email receipt ke user",
     group: "Operasional",
   },
   {
@@ -193,14 +193,14 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Lacte Points",
     Icon: IconPoints,
     hint: "Saldo dan poin user",
-    group: "Program",
+    group: "Pertumbuhan",
   },
   {
     id: "affiliates",
     label: "Afiliasi",
     Icon: IconAffiliates,
     hint: "Komisi dan penarikan",
-    group: "Program",
+    group: "Pertumbuhan",
   },
 
   {
@@ -222,17 +222,40 @@ export const ADMIN_NAV: AdminNavItem[] = [
 /**
  * Groups, URUTAN DARI PALING SERING DIPAKAI.
  *
- * Jumlah seksi per grup sengaja dijaga 2-4. Grup yang terlalu berisi sama
- * saja dengan tidak ada pengelompokan.
+ * Jumlah seksi per grup dijaga 2-4. Grup yang terlalu berisi sama saja
+ * dengan tidak ada pengelompokan.
  *
- * Daftar ini harus mencakup semua nilai `group` di `ADMIN_NAV`: grup yang
- * tidak terdaftar membuat seksinya tidak muncul sama sekali.
+ * Daftar ini harus mencakup semua nilai `group` di `ADMIN_NAV` dan
+ * `ADMIN_TOOLS`: grup yang tidak terdaftar membuat isinya tidak muncul
+ * sama sekali.
+ *
+ * PERUBAHAN v3
+ *
+ * "Alat" sebelumnya berisi enam halaman dan mencampur lima jenis
+ * pekerjaan: dokumentasi (Panduan), pemeliharaan (Operations, Test Lab),
+ * katalog supplier (Digiflazz), konten (Banner), dan uang keluar
+ * (Pencairan Afiliasi). Satu grup untuk lima jenis pekerjaan hampir
+ * sama dengan tidak mengelompokkan sama sekali.
+ *
+ * Yang dipindah:
+ *   - Katalog Digiflazz ke "Katalog" - SKU-nya adalah sumber Produk
+ *     dan Supply harga, jadi harus terbuka bersama keduanya.
+ *   - Pencairan Afiliasi ke "Keuangan" - pasangan dari Toko Ritel:
+ *     dua-duanya uang keluar yang dicatat satu per satu.
+ *   - Banner Beranda ke "Pertumbuhan" - alat pemasaran, bukan alat
+ *     teknis, dipakai tim yang sama dengan Points dan Afiliasi.
+ *
+ * "Program" diganti "Pertumbuhan" karena isinya bukan cuma program
+ * loyalitas.
+ *
+ * Yang tersisa di "Alat" memang tiga: satu dibaca, dua dipakai saat
+ * ada masalah. Itu satu jenis pekerjaan yang sama.
  */
 export const ADMIN_NAV_GROUPS = [
   "Operasional",
   "Katalog",
   "Keuangan",
-  "Program",
+  "Pertumbuhan",
   "Sistem",
   "Alat",
 ] as const;
@@ -262,14 +285,21 @@ export const ADMIN_TOOLS: Array<{
     href: "/admin/digiflazz",
     label: "Katalog Digiflazz",
     hint: "Scan dan publish SKU",
-    group: "Alat",
+    /*
+     * Sempat di "Alat", padahal yang dilaluinya adalah sumber dari
+     * dua halaman lain di grup ini: SKU yang di-scan di sini yang
+     * muncul sebagai "Produk" dan priced oleh "Supplier". Memisahkannya
+     * berarti operator harus tahu grup mana yang harus dibuka dulu.
+     */
+    group: "Katalog",
     Icon: IconScan,
   },
   {
     href: "/admin/banners",
     label: "Banner Beranda",
     hint: "Kelola banner promosi",
-    group: "Alat",
+    /* Alat pemasaran, bukan alat teknis. */
+    group: "Pertumbuhan",
     Icon: IconImage,
   },
   {
@@ -279,13 +309,15 @@ export const ADMIN_TOOLS: Array<{
      * itu - jadi operator tidak bisa menebak mana yang terbuka.
      *
      * Sekarang jadi butir tersendiri dengan nama yang menyebut isinya.
-     * Seksi "Afiliasi" di dashboard tetap handles komisi; halaman ini
-     * menangani pencairan dananya.
+     * Seksi "Afiliasi" di dashboard tetap menangani komisi; halaman ini
+     * menangani pencairan dananya - jadi ia masuk grup "Keuangan",
+     * bersama Toko Ritel: sama-sama uang keluar yang dicatat satu per
+     * satu, yang sebelumnya terpisah oleh beberapa grup.
      */
     href: "/admin/affiliates",
     label: "Pencairan Afiliasi",
     hint: "Review dan cairkan komisi",
-    group: "Alat",
+    group: "Keuangan",
     Icon: IconAffiliates,
   },
   {
@@ -307,20 +339,24 @@ export const ADMIN_TOOLS: Array<{
 /*
  * Kunci localStorage.
  *
- * Versinya naik (`.v2`) karena ARTIFAK preferensi berubah: versi lama
- * menyimpan daftar grup terlipat, dan default-nya `[]` - artinya semua
- * grup TERBUKA. Default sekarang adalah semua terlipat.
+ * Versinya naik (`.v3`) karena satu grup DIGANTI NAMA: "Program" menjadi
+ * "Pertumbuhan". Kunci lama tidak memuat nama itu, jadi grup BARU akan
+ * terbaca sebagai "tidak ada di daftar terlipat" - artinya selalu
+ * terbuka. Gejalanya persis seperti grouping gagal.
  *
- * Kalau kuncinya tidak dinaikkan, nilai `[]` yang sudah tersimpan di
+ * Versi `.v2` sebelumnya naik karena alasan yang lebih fundamental:
+ * versi lama menyimpan daftar grup terlipat dengan default `[]`, yang
+ * berarti semua grup TERBUKA. Default yang benar adalah semua terlipat.
+ *
+ * Kalau kunci tidak dinaikkan, nilai lama yang sudah tersimpan di
  * browser operator akan terbaca sebagai "preferensi sah" dan default
- * baru sama sekali tidak pernah berlaku - gejalanya persis seperti
- * tidak ada perubahan sama sekali.
+ * baru tidak akan pernah berlaku.
  *
  * Menaikkan kunci adalah cara yang benar di sini: preferensi lama bukan
  * keputusan yang perlu dipelihara, cuma artefak dari perilaku yang
- * memang salah.
+ * memang salah atau dari nama yang sudah tidak dipakai.
  */
-const STORAGE_KEY = "lacte.admin.nav.collapsed.v2";
+const STORAGE_KEY = "lacte.admin.nav.collapsed.v3";
 
 /**
  * Sidebar yang dipakai semua route di `/admin`.

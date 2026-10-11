@@ -126,7 +126,11 @@ export const DOC_GROUPS: DocGroup[] = [
         notes: [
           {
             label: "Empat harga yang berbeda",
-            text: "Harga Katalog adalah harga sebelum diskon apa pun. Harga Jual adalah yang ditawarkan ke user. Harga Final adalah yang benar-benar dibayar user - inilah satu-satunya angka yang boleh disebut omzet. Harga Supplier adalah modal yang keluar. Semuanya ditampilkan terpisah karena sering berbeda jauh.",
+            text: "Harga Katalog adalah harga sebelum diskon apa pun. Harga Jual adalah yang ditawarkan ke user. Harga Final adalah yang benar-benar dibayar user. Harga Supplier adalah modal yang keluar. Semuanya ditampilkan terpisah karena sering berbeda jauh.",
+          },
+          {
+            label: "Omzet bukan harga final",
+            text: "Harga Final mengandung biaya layanan merchant, dan biaya itu 100% milik merchant - Lacte tidak mengambil bagiannya. Jadi kartu Omzet Lacte = Harga Final dikurangi biaya layanan merchant, bukan Harga Final mentah. Nominal fee-nya ditulis di bawah angka omzet supaya selisihnya bisa Anda periksa sendiri.",
           },
           {
             label: "Margin bukan selisih dua harga",
@@ -301,8 +305,8 @@ export const DOC_GROUPS: DocGroup[] = [
   },
 
   {
-    group: "Program",
-    intro: "Saldo dan program yang dimiliki user serta partner.",
+    group: "Pertumbuhan",
+    intro: "Saldo, program, dan alat yang dipakai tim menambah pengguna.",
     entries: [
       {
         section: "points",
@@ -324,16 +328,21 @@ export const DOC_GROUPS: DocGroup[] = [
         section: "affiliates",
         title: "Afiliasi",
         summary:
-          "Komisi affiliate dan proses pencairannya.",
+          "Mitra afiliasi: permintaan gabung, kode, link, dan kinerjanya.",
         steps: [
-          "Komisi dialokasikan otomatis ketika order selesai.",
-          "Permintaan pencairan diperiksa dulu, lalu transfer dilakukan DI LUAR sistem.",
-          "Setelah uang benar-benar ditransfer, tandai request sebagai sudah dibayar dengan nomor referensi.",
+          "Permintaan baru ada paling atas. Setujui dengan mengetik komisi yang Anda pilih - pemohon tidak pernah menentukan nomornya sendiri.",
+          "Buat mitra di panel \"Buat mitra afiliasi\". Kode boleh dikosongkan untuk dibuat otomatis.",
+          "Bagikan link yang ada di tabel mitra. Tombol Salin hanya muncul kalau link itu benar-benar akan dipakai - kode tanpa pemilik ditolak sistem.",
+          "Komisi dialokasikan otomatis ketika order selesai. Cara mencairkannya ada di halaman Pencairan Afiliasi.",
         ],
         notes: [
           {
-            label: "Jangan tandai lunas sebelum transfer",
-            text: "Sistem mengunci alokasi komisi secara atomik, tapi transfer tetap manual. Menandai sudah dibayar sebelum uang benar-benar bergerak akan membuat pencatatan tidak cocok dengan rekening.",
+            label: "Kenapa Pencairan Afiliasi terpisah",
+            text: "Kirim link dan menambah kode ada di halaman Afiliasi. Halaman Pencairan hanya untuk antrean uang keluar: setujui, transfer di luar sistem, lalu tandai lunas. Dulu keduanya bercampur di satu halaman, jadi membuat mitra harus lewat halaman yang namanya soal pencairan.",
+          },
+          {
+            label: "Kode tanpa pemilik tidak bisa dipakai",
+            text: "Sistem menolak link yang kodenya belum terhubung ke akun. Kalau tidak begitu, komisi dari link itu masuk ke kode yang tidak ada yang bisa menarik. Tombol Salin sengaja disembunyikan di kode seperti itu.",
           },
         ],
       },

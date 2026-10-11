@@ -14,9 +14,31 @@
  *   `reference_price`  harga katalog sebelum diskon apa pun.
  *   `selling_price`   harga yang ditawarkan ke user SEBELUM promo, poin,
  *                     referral, dan biaya layanan merchant.
- *   `final_price`     yang benar-benar dibayar user. Inilah satu-satunya
- *                     angka yang boleh disebut "pendapatan".
+ *   `final_price`     yang benar-benar dibayar user. Mengandung biaya
+ *                     layanan merchant.
  *   `supplier_cost`   modal yang keluar untuk fulfill order ini.
+ *
+ * Kenapa `final_price` BUKAN omzet Lacte
+ *
+ * `pricing.ts` menghitung:
+ *
+ *   finalPrice   = loyaltyEligibleSpend + customerPaymentFee + merchantServiceFee
+ *   nambahProfit = finalPrice - merchantServiceFee - supplierCost - ...
+ *
+ * Jadi `merchantServiceFee` masuk ke `final_price` dan SENGAJA tidak masuk
+ * ke `nambahProfit`: biaya layanan itu 100% milik merchant, Lacte tidak
+ * mengambil bagiannya.
+ *
+ * Akibatnya, menjumlahkan `final_price` sebagai omzet akan menghitung uang
+ * yang Lacte terima sambil lalu dan terus zakihkan balik ke merchant. Di
+ * periode yang lewat selisihnya kecil; di periode dengan volume ritel
+ * besar, omzet di laporan bisa melebihi uang yang benar-benar diperoleh
+ * Lacte tepat sebesar total fee - dan persentase margin ikut turun karena
+ * pembagi yang sama.
+ *
+ * Karena itu omzet di sini = `final_price - service_fee_amount`. Fee-nya
+ * tetap ditampilkan sebagai angka tersendiri, supaya selisihnya bisa
+ * diperiksa dan bukan hanya dikurangi diam-diam.
  *
  * Selisih `final_price - supplier_cost` BUKAN margin Lacte, karena masih
  * ada diskon, komisi affiliate, dan poin yang terpotong dari sana. Margin
@@ -62,7 +84,21 @@ export type TransactionFilters = {
 
 export type TransactionSummary = {
   count: number;
+  /**
+   * Omzet Lacte: `final_price` dikurangi biaya layanan merchant.
+   *
+   * Bukan `final_price` mentah - lihat catatan definisi harga di atas
+   * file ini.
+   */
   grossRevenue: number;
+  /**
+   * Total biaya layanan merchant yang dikumpulkan lalu diteruskan.
+   *
+   * Bukan milik Lacte. Disimpan supaya operator bisa mengonfirmasi bahwa
+   * fee yang dipotong dari omzet benar-benar sebesar yang diteruskan,
+   * bukan selisih pembukuan yang tidak terlihat asalnya.
+   */
+  merchantServiceFee: number;
   supplierCost: number;
   profit: number;
   marginPercent: number;
@@ -152,6 +188,7 @@ export function summarizeTransactions(
   rows: TransactionRow[],
 ): TransactionSummary {
   let grossRevenue = 0;
+  let merchantServiceFee = 0;
   let supplierCost = 0;
   let profit = 0;
   let excludedCount = 0;
@@ -161,7 +198,20 @@ export function summarizeTransactions(
       excludedCount += 1;
       continue;
     }
-    grossRevenue += num(row.final_price);
+
+    const finalPrice = num(row.final_price);
+    const serviceFee = num(row.service_fee_amount);
+
+    merchantServiceFee += serviceFee;
+
+    /*
+     * `Math.max(0, ...)` menjaga satu baris rusak tidak membuat seluruh
+     * omzet negatif. Fee yang lebih besar dari harga final berarti ada
+     * data yang salah di order itu - tapi itu masalahnya sendiri, bukan
+     * alasan seluruh laporan jadi tidak punya makna. Baris itu tetap
+     * terlihat, dan fee-nya tetap ikut dijumlahkan di atas.
+     */
+    grossRevenue += Math.max(0, finalPrice - serviceFee);
     supplierCost += num(row.supplier_cost);
     profit += num(row.nambah_profit);
   }
@@ -169,6 +219,7 @@ export function summarizeTransactions(
   return {
     count: rows.length,
     grossRevenue,
+    merchantServiceFee,
     supplierCost,
     profit,
     marginPercent:
@@ -248,12 +299,13 @@ export function transactionsToCsv(
     "Harga Katalog",
     "Harga Jual",
     "Harga Final",
+    "Biaya Layanan Merchant",
+    "Omzet Lacte",
     "Harga Supplier",
     "Margin Lacte",
     "Diskon Promo",
     "Komisi Affiliate",
     "Diskon Points",
-    "Biaya Layanan Merchant",
   ];
 
   const escape = (value: string | number) => {
@@ -273,12 +325,13 @@ export function transactionsToCsv(
       num(row.reference_price),
       num(row.selling_price),
       num(row.final_price),
+      num(row.service_fee_amount),
+      Math.max(0, num(row.final_price) - num(row.service_fee_amount)),
       num(row.supplier_cost),
       num(row.nambah_profit),
       num(row.promotion_discount),
       num(row.affiliate_commission),
       num(row.points_discount),
-      num(row.service_fee_amount),
     ]
       .map(escape)
       .join(","),
@@ -287,25 +340,25 @@ export function transactionsToCsv(
   const lines = [header.map(escape).join(","), ...body];
 
   if (summary) {
+    /*
+     * Baris total diberi LABEL, bukan hanya angka yang disejajarkan.
+     *
+     * Versi lama menaruh tiga angka di posisi kolom tertentu tanpa
+     * menyatakan kolom mana yang mereka maksud. Begitu `grossRevenue` tidak
+     * lagi sama dengan `final_price`, angka yang tadinya "omzet" akan
+     * tetap muncul di kolom Harga Final - dan terlihat benar.
+     */
     lines.push("");
     lines.push(
-      [
-        "TOTAL",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        summary.grossRevenue,
-        summary.supplierCost,
-        summary.profit,
-      ]
-        .map(escape)
-        .join(","),
+      ["TOTAL", "", "", "", "", "", "", "", "", "", "", ""].join(","),
     );
+    lines.push(["", "", "Omzet Lacte", summary.grossRevenue].join(","));
+    lines.push(
+      ["", "", "Biaya Layanan Merchant", summary.merchantServiceFee].join(","),
+    );
+    lines.push(["", "", "Harga Supplier", summary.supplierCost].join(","));
+    lines.push(["", "", "Margin Lacte", summary.profit].join(","));
+    lines.push(["", "", "Margin (%)", summary.marginPercent].join(","));
   }
 
   return `\uFEFF${lines.join("\r\n")}\r\n`;

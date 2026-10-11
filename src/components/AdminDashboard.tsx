@@ -8,6 +8,7 @@ import AdminCatalogTools from "@/components/AdminCatalogTools";
 import PaymentGatewayPanel from "@/components/PaymentGatewayPanel";
 import { useConfirm } from "@/components/AdminConfirmDialog";
 import AffiliatePerformancePanel from "@/components/AffiliatePerformancePanel";
+import AffiliateDirectoryPanel from "@/components/AffiliateDirectoryPanel";
 import ReceiptPreview from "@/components/ReceiptPreview";
 import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
 import { BRAND } from "@/lib/brand";
@@ -446,6 +447,7 @@ type TransactionReportPayload = {
   summary: {
     count: number;
     grossRevenue: number;
+    merchantServiceFee: number;
     supplierCost: number;
     profit: number;
     marginPercent: number;
@@ -534,6 +536,9 @@ import {
   ADMIN_NAV_GROUPS as NAV_GROUPS,
 } from "@/components/admin/AdminSidebar";
 import { useAdminSection } from "@/components/admin/AdminSectionContext";
+import ReportRangePicker, {
+  type ReportRangeValue,
+} from "@/components/admin/ReportRangePicker";
 import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 
 export { NAV, NAV_GROUPS };
@@ -547,6 +552,45 @@ export { NAV, NAV_GROUPS };
  * dan operator bicara dua bahasa berbeda untuk status yang identik.
  */
 const STATUS_LABEL = ORDER_STATUS_LABELS;
+
+/**
+ * Status komisi, diterjemahkan.
+ *
+ * Nilai di database tetap bahasa Inggris karena dibaca constraint dan
+ * dipakai logika pencairan. Yang diterjemahkan hanya yang ditampilkan.
+ */
+/*
+ * Fee layanan merchant pada satu baris transaksi.
+ *
+ * Nilai ini datang dari PostgREST sebagai number, string, atau null
+ * tergantung kolomnya. `Number(null)` adalah 0 dan `Number("")` adalah 0,
+ * jadi konversi aman - tapi tetap ditulis eksplisit supaya nilainya
+ * tidak ikut berubah kalau bentuk kolomnya nanti berbeda.
+ */
+const numFee = (value: number | string | null) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+/**
+ * Pilihan periode untuk kedua laporan.
+ *
+ * Satu daftar untuk Arus Kas dan Transaksi. Kalau masing-masing punya daftar
+ * sendiri, Adding one preset to one report and forgetting the other will
+ * create a silent difference.
+ */
+const REPORT_PRESET_OPTIONS = [
+  { value: "7", label: "7 hari" },
+  { value: "30", label: "30 hari" },
+  { value: "90", label: "90 hari" },
+] as const;
+
+const COMMISSION_STATUS_LABEL: Record<string, string> = {
+  pending: "Menunggu",
+  available: "Siap dicairkan",
+  withdrawn: "Sudah dicairkan",
+  cancelled: "Batal",
+};
 
 /**
  * Status pengiriman receipt, diterjemahkan.
@@ -909,7 +953,15 @@ export default function AdminDashboard() {
    * seperti fiturnya rusak. Tiga puluh hari juga cukup untuk melihat pola
    * mingguan.
    */
-  const [cashFlowPreset, setCashFlowPreset] = useState("30");
+  /*
+   * Periode aktif. `preset` kosong berarti sedang memakai rentang
+   * tanggal yang diketik operator, bukan preset.
+   */
+  const [cashFlowRange, setCashFlowRange] = useState<ReportRangeValue>({
+    preset: "30",
+    from: "",
+    to: "",
+  });
 
   /*
    * Filter laporan transaksi.
@@ -918,7 +970,11 @@ export default function AdminDashboard() {
    * JSON, supaya reset per-field (mis. hanya mengosongkan pencarian)
    * tidak memicu fetch ulang yang tidak perlu.
    */
-  const [txPreset, setTxPreset] = useState("30");
+  const [txRange, setTxRange] = useState<ReportRangeValue>({
+    preset: "30",
+    from: "",
+    to: "",
+  });
   const [txQuery, setTxQuery] = useState("");
   const [txStatus, setTxStatus] = useState("");
   const [txPayment, setTxPayment] = useState("");
@@ -1244,11 +1300,21 @@ export default function AdminDashboard() {
     setFinanceData(data);
   }
 
-  async function loadCashFlow(preset = cashFlowPreset) {
-    const response = await fetch(
-      `/api/admin/cash-flow?preset=${encodeURIComponent(preset)}`,
-      { cache: "no-store" },
-    );
+  async function loadCashFlow(range: ReportRangeValue = cashFlowRange) {
+    /*
+     * Preset DAN rentang bebas dikirim. Server memutuskan: kalau `from`
+     * dan `to` keduanya ada dan valid, preset diabaikan. Mengirim
+     * keduanya membuat satu endpoint melayani dua cara tanpa perlu
+     * cabang di sisi klien.
+     */
+    const params = new URLSearchParams();
+    if (range.preset) params.set("preset", range.preset);
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+
+    const response = await fetch(`/api/admin/cash-flow?${params.toString()}`, {
+      cache: "no-store",
+    });
     const data = (await response.json()) as CashFlowPayload & { error?: string };
     if (!response.ok) {
       throw new Error(data.error ?? "Laporan arus kas gagal dimuat.");
@@ -1267,10 +1333,21 @@ export default function AdminDashboard() {
   async function downloadCashFlowCsv() {
     setBusy("cashflow-csv");
     try {
-      const response = await fetch(
-        `/api/admin/cash-flow?preset=${encodeURIComponent(cashFlowPreset)}&format=csv`,
-        { cache: "no-store" },
-      );
+      /*
+       * Rentang yang sama persis dengan yang sedang tampil.
+       * Dulu hanya preset yang terkirim, jadi mengunduh rentang bebas
+       * akan menghasilkan CSV 30 hari terakhir - file yang periodenya
+       * berbeda dari yang ada di layar, dan itu penyebab paling umum
+       * orang salah menyimpulkan dari laporan.
+       */
+      const params = new URLSearchParams({ format: "csv" });
+      if (cashFlowRange.preset) params.set("preset", cashFlowRange.preset);
+      if (cashFlowRange.from) params.set("from", cashFlowRange.from);
+      if (cashFlowRange.to) params.set("to", cashFlowRange.to);
+
+      const response = await fetch(`/api/admin/cash-flow?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (!response.ok) {
         throw new Error("Unduh CSV gagal.");
       }
@@ -1309,7 +1386,9 @@ export default function AdminDashboard() {
    */
   function buildTransactionQuery(extra?: Record<string, string>) {
     const params = new URLSearchParams();
-    params.set("preset", txPreset);
+  if (txRange.preset) params.set("preset", txRange.preset);
+  if (txRange.from) params.set("from", txRange.from);
+  if (txRange.to) params.set("to", txRange.to);
     if (txAppliedQuery.trim()) params.set("q", txAppliedQuery.trim());
     if (txStatus) params.set("status", txStatus);
     if (txPayment) params.set("payment", txPayment);
@@ -1349,7 +1428,18 @@ export default function AdminDashboard() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `transaksi_${txPreset}.csv`;
+      /*
+       * Nama file memakai periode yang SEDANG TAMPIL, bukan preset yang
+       * terakhir diklik. Kalau operator melihat rentang 1-31 Januari lalu
+       * mengunduh, file bernama "transaksi_30hari.csv" akan menyesatkan
+       * saat dicari lagi.
+       */
+      const txDataStamp = txReport
+        ? `${txReport.from.slice(0, 10)}_${txReport.to.slice(0, 10)}`
+        : txRange.preset
+          ? `${txRange.preset}hari`
+          : "transaksi";
+      link.download = `transaksi_${txDataStamp}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -3990,7 +4080,7 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Keuangan"
                 title="Laporan arus kas"
-                copy="Uang masuk dari penjualan, biaya supplier, margin, dan arus kas dari toko ritel. Biaya layanan merchant tidak dihitung sebagai pendapatan Lacte karena uangnya langsung ke merchant."
+                copy="Uang yang benar-benar bergerak lewat pembayaran langsung, dikurangi modal dan biaya. Jalur toko ritel dipisahkan: order-nya menambah piutang, dan uangnya baru masuk saat merchant mentransfer."
                 action={
                   <button
                     className="acc-primary-link"
@@ -4004,61 +4094,51 @@ export default function AdminDashboard() {
               />
 
               {/*
-               * Kontrol periode.
-               *
-               * Tombol radio, bukan `<select>`: hanya empat pilihan, dan
-               * radio membuat periode aktif terlihat tanpa harus membuka
-               * daftar. Di layar sempit tombolnya membungkus sendiri.
-               */}
-              <div className="acc-cashflow-controls">
-                <div
-                  className="acc-segmented"
-                  role="group"
-                  aria-label="Periode laporan"
-                >
-                  {[
-                    { value: "7", label: "7 hari" },
-                    { value: "30", label: "30 hari" },
-                    { value: "90", label: "90 hari" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={cashFlowPreset === option.value}
-                      className={
-                        cashFlowPreset === option.value ? "active" : ""
-                      }
-                      onClick={() => {
-                        setCashFlowPreset(option.value);
-                        void loadCashFlow(option.value).catch((error) =>
-                          setNotice(
-                            error instanceof Error
-                              ? error.message
-                              : "Laporan arus kas gagal dimuat.",
-                          ),
-                        );
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                {cashFlowData ? (
-                  <small className="acc-cashflow-range">
-                    {formatTime(cashFlowData.from)} &mdash;{" "}
-                    {formatTime(cashFlowData.to)}
-                  </small>
-                ) : null}
-              </div>
+                Kontrol periode.
 
-              <div className="acc-metrics">
+                Preset plus rentang bebas, lewat komponen yang sama dengan
+                laporan Transaksi. Keduanya memakai `resolveReportRange`
+                yang sama di server, jadi "30 hari" berarti 30 hari yang
+                sama di dua halaman - kalau masing-masing punya kendali
+                sendiri, perbandingan antara dua laporan jadi tidak bermakna.
+              */}
+              <ReportRangePicker
+                idPrefix="cashflow"
+                presets={REPORT_PRESET_OPTIONS}
+                busy={Boolean(busy)}
+                value={cashFlowRange}
+                onApply={(next) => {
+                  setCashFlowRange(next);
+                  void loadCashFlow(next).catch((error) =>
+                    setNotice(
+                      error instanceof Error
+                        ? error.message
+                        : "Laporan arus kas gagal dimuat.",
+                    ),
+                  );
+                }}
+              />
+
+              {/*
+                Enam angka dalam dua kelompok.
+
+                Kelompok pertama: uang yang benar-benar bergerak lewat
+                pembayaran langsung. Kelompok kedua: jalur ritel, yang
+                polanya berbeda - order-nya menambah piutang, bukan kas,
+                dan uangnya baru masuk saat merchant mentransfer.
+
+                Dipisah karena mencampur keduanya membuat kartu Omzet
+                memuat angka yang belum jadi milik Lacte, dan membuat
+                Transfer masuk kehilangan konteksnya.
+              */}
+              <div className="acc-metrics acc-metrics-three">
                 <article>
-                  <small>Omzet</small>
+                  <small>Omzet Lacte</small>
                   <strong>
                     {formatIDR(cashFlowData?.totals.grossRevenue ?? 0)}
                   </strong>
                   <span>
-                    {cashFlowData?.totals.orders ?? 0} pesanan selesai
+                    {cashFlowData?.totals.orders ?? 0} pesanan non-retail
                   </span>
                 </article>
                 <article>
@@ -4066,21 +4146,46 @@ export default function AdminDashboard() {
                   <strong>
                     {formatIDR(cashFlowData?.totals.supplierCost ?? 0)}
                   </strong>
-                  <span>Modal fulfill</span>
+                  <span>modal fulfill, termasuk pesanan ritel</span>
                 </article>
                 <article>
                   <small>Margin Lacte</small>
                   <strong>
                     {formatIDR(cashFlowData?.totals.grossProfit ?? 0)}
                   </strong>
-                  <span>{cashFlowData?.totals.marginPercent ?? 0}% dari omzet</span>
+                  <span>
+                    {cashFlowData?.totals.marginPercent ?? 0}% dari omzet
+                  </span>
+                </article>
+              </div>
+
+              <div className="acc-metrics acc-metrics-three">
+                <article>
+                  <small>Piutang toko ritel</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.merchantReceivable ?? 0)}
+                  </strong>
+                  <span>
+                    {cashFlowData?.totals.merchantOrders ?? 0} pesanan ritel
+                  </span>
                 </article>
                 <article>
-                  <small>Masuk dari toko ritel</small>
+                  <small>Transfer masuk</small>
                   <strong>
                     {formatIDR(cashFlowData?.totals.merchantSettled ?? 0)}
                   </strong>
-                  <span>Transfer yang sudah dicatat</span>
+                  <span>dari pelunasan yang dicatat</span>
+                </article>
+                <article>
+                  <small>Sisa piutang</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.merchantOutstanding ?? 0)}
+                  </strong>
+                  <span>
+                    {(cashFlowData?.totals.merchantServiceFee ?? 0) > 0
+                      ? `biaya layanan ${formatIDR(cashFlowData?.totals.merchantServiceFee ?? 0)} ikut di sini`
+                      : "belum dilunasi merchant"}
+                  </span>
                 </article>
               </div>
 
@@ -4146,8 +4251,22 @@ export default function AdminDashboard() {
                       ) : null}
                     </div>
 
+                    {/*
+                     * Pengurang pendapatan.
+                     *
+                     * Yang mengurangi omzet: diskon dan komisi. Fee
+                     * layanan merchant TIDAK ikut di sini - itu bukan
+                     * biaya Lacte, tapi uang yang dikumpulkan lalu
+                     * diteruskan ke merchant. Memasukkannya ke daftar
+                     * "biaya" membuatnya terlihat seperti pengeluaran Lacte,
+                     * padahal uangnya lewat tangan tanpa tersentuh.Angka
+                     * ini pindah ke panel piutang, di tempat yang benar-benar
+                     * menjelaskan perannya.
+                     */}
                     <div className="acc-table-card">
-                      <div className="acc-card-head">Rincian biaya</div>
+                      <div className="acc-card-head">
+                        Pengurang pendapatan
+                      </div>
                       <div className="acc-cost-list">
                         <div>
                           <span>Diskon (promo, poin, referral)</span>
@@ -4163,39 +4282,50 @@ export default function AdminDashboard() {
                             )}
                           </strong>
                         </div>
-                        {/*
-                         * Biaya layanan merchant ditampilkan dengan
-                         * catatan tegas. Angka ini terlihat seperti
-                         * pendapatan di laporan lain, dan itu sebab
-                         * disengaja agar tidak disalahartikan.
-                         */}
-                        <div>
-                          <span>
-                            Biaya layanan merchant{" "}
-                            <small>(bukan pendapatan Lacte)</small>
-                          </span>
+                        <div className="acc-cost-total">
+                          <span>Total pengurang</span>
                           <strong>
                             {formatIDR(
-                              cashFlowData.totals.merchantServiceFee,
+                              cashFlowData.totals.discounts +
+                                cashFlowData.totals.affiliateCommission,
                             )}
                           </strong>
                         </div>
                         {cashFlowData.totals.failedOrders > 0 ? (
                           <div>
-                            <span>Pesanan gagal</span>
+                            <span>Pesanan gagal (tidak masuk omzet)</span>
                             <strong>
                               {cashFlowData.totals.failedOrders}
                             </strong>
                           </div>
                         ) : null}
                       </div>
+                    </div>
 
-                      <div className="acc-receivable-box">
-                        <div className="acc-receivable-head">
-                          <strong>Posisi piutang toko ritel</strong>
-                        </div>
+                    {/*
+                     * Piutang toko ritel.
+                     *
+                     * Dulu ini kotak kecil di bawah "Rincian biaya",
+                     * terpisah dari tiga kartu metrik di atas yang
+                     * menampilkan angka yang sama persis. Satu layar, tiga
+                     * angka yang sama dua kali - yang bawah terlihat seperti
+                     * catatan kaki padahal bukan.
+                     *
+                     * Sekarang jadi satu kartu dengan judul sendiri, dan
+                     * jarak antar barisnya sama dengan daftar lain.
+                     */}
+                    <div className="acc-table-card acc-retail-panel">
+                      <div className="acc-card-head">
+                        <span>Posisi piutang toko ritel</span>
+                        <small className="acc-card-head-note">
+                          bukan kas masuk
+                        </small>
+                      </div>
+                      <div className="acc-cost-list">
                         <div>
-                          <span>Piutang dari {cashFlowData.totals.merchantOrders} pesanan</span>
+                          <span>
+                            Piutang dari {cashFlowData.totals.merchantOrders} pesanan
+                          </span>
                           <strong>
                             {formatIDR(cashFlowData.totals.merchantReceivable)}
                           </strong>
@@ -4206,7 +4336,7 @@ export default function AdminDashboard() {
                             {formatIDR(cashFlowData.totals.merchantSettled)}
                           </strong>
                         </div>
-                        <div>
+                        <div className="acc-cost-total">
                           <span>
                             {cashFlowData.totals.merchantOutstanding < 0
                               ? "Sisa bayar (kredit merchant)"
@@ -4215,6 +4345,17 @@ export default function AdminDashboard() {
                           <strong>
                             {formatIDR(
                               Math.abs(cashFlowData.totals.merchantOutstanding),
+                            )}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>
+                            Biaya layanan merchant{" "}
+                            <small>(diteruskan ke merchant)</small>
+                          </span>
+                          <strong>
+                            {formatIDR(
+                              cashFlowData.totals.merchantServiceFee,
                             )}
                           </strong>
                         </div>
@@ -4255,38 +4396,23 @@ export default function AdminDashboard() {
                */}
               <div className="acc-table-card acc-tx-filters">
                 <div className="acc-tx-filter-row">
-                  <div
-                    className="acc-segmented"
-                    role="group"
-                    aria-label="Periode laporan"
-                  >
-                    {[
-                      { value: "7", label: "7 hari" },
-                      { value: "30", label: "30 hari" },
-                      { value: "90", label: "90 hari" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={txPreset === option.value}
-                        className={txPreset === option.value ? "active" : ""}
-                        onClick={() => {
-                          setTxPreset(option.value);
-                          setTxOffset(0);
-                          void loadTransactions({ offset: 0 }).catch(
-                            (error) =>
-                              setNotice(
-                                error instanceof Error
-                                  ? error.message
-                                  : "Laporan transaksi gagal dimuat.",
-                              ),
-                          );
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                  <ReportRangePicker
+                    idPrefix="tx"
+                    presets={REPORT_PRESET_OPTIONS}
+                    busy={Boolean(busy)}
+                    value={txRange}
+                    onApply={(next) => {
+                      setTxRange(next);
+                      setTxOffset(0);
+                      void loadTransactions({ offset: 0 }).catch((error) =>
+                        setNotice(
+                          error instanceof Error
+                            ? error.message
+                            : "Laporan transaksi gagal dimuat.",
+                        ),
+                      );
+                    }}
+                  />
 
                   <label className="acc-field acc-tx-search">
                     <span>Cari (id order, game, item, atau akun)</span>
@@ -4388,11 +4514,15 @@ export default function AdminDashboard() {
                       </span>
                     </article>
                     <article>
-                      <small>Omzet</small>
+                      <small>Omzet Lacte</small>
                       <strong>
                         {formatIDR(txReport.summary.grossRevenue)}
                       </strong>
-                      <span>Harga final yang dibayar</span>
+                      <span>
+                        {txReport.summary.merchantServiceFee > 0
+                          ? `sudah dikurangi biaya layanan merchant ${formatIDR(txReport.summary.merchantServiceFee)}`
+                          : "harga final dikurangi biaya layanan merchant"}
+                      </span>
                     </article>
                     <article>
                       <small>Harga supplier</small>
@@ -4404,7 +4534,7 @@ export default function AdminDashboard() {
                     <article>
                       <small>Margin Lacte</small>
                       <strong>{formatIDR(txReport.summary.profit)}</strong>
-                      <span>{txReport.summary.marginPercent}% dari omzet</span>
+                      <span>{txReport.summary.marginPercent}% dari omzet Lacte</span>
                     </article>
                   </div>
 
@@ -4457,10 +4587,13 @@ export default function AdminDashboard() {
                               </td>
                               <td data-label="Final">
                                 {formatIDR(row.final_price)}
-                                {row.merchant_id ? (
+                                {numFee(row.service_fee_amount) > 0 ? (
                                   <>
                                     <br />
-                                    <small>termasuk biaya layanan</small>
+                                    <small>
+                                      termasuk biaya layanan{" "}
+                                      {formatIDR(numFee(row.service_fee_amount))}
+                                    </small>
                                   </>
                                 ) : null}
                               </td>
@@ -4773,48 +4906,56 @@ export default function AdminDashboard() {
               <SectionHead
                 eyebrow="Mitra"
                 title="Afiliasi"
-                copy="Commission lifecycle mengikuti status order, withdrawal memakai allocation ledger, dan payout tetap dikonfirmasi operator."
+                copy="Satu tempat untuk mitra: periksa permintaan, buat dan hubungkan kode, bagikan link, lalu pantau kinerjanya. Pencairan ada di halaman terpisah."
                 action={
                   <div className="acc-action-panel">
-                    <Link className="acc-inline-button" href="/admin/affiliates">
-                      + Buat affiliate
-                    </Link>
                     <Link className="acc-primary-link" href="/admin/affiliates">
-                      Open withdrawal center →
+                      Buka pencairan afiliasi →
                     </Link>
                   </div>
                 }
               />
+
+              {/*
+                Urutannya mengikuti pertanyaan operator:
+                  "ada yang minta gabung?" -> permissions
+                  "mitra saya siapa, link-nya mana?" -> direktori
+                  "bagaimana hasilnya?" -> kinerja + ledger
+                Direktori tidak lagi hidup di halaman pencairan, jadi
+                membuat mitra tidak lagi menuntut perpindahan halaman.
+              */}
               <AffiliatePerformancePanel />
+              <AffiliateDirectoryPanel />
+
               <div className="acc-metrics">
                 <article>
-                  <small>Active affiliates</small>
+                  <small>Mitra aktif</small>
                   <strong>{affiliateData.stats.active}</strong>
-                  <span>Dari {affiliateData.stats.affiliates} partner</span>
+                  <span>dari {affiliateData.stats.affiliates} mitra</span>
                 </article>
                 <article>
-                  <small>Pending</small>
+                  <small>Menunggu</small>
                   <strong>{formatIDR(affiliateData.stats.pending)}</strong>
-                  <span>Order paid / processing</span>
+                  <span>order lunas atau diproses</span>
                 </article>
                 <article>
-                  <small>Available</small>
+                  <small>Siap dicairkan</small>
                   <strong>{formatIDR(affiliateData.stats.available)}</strong>
-                  <span>{formatIDR(affiliateData.stats.reserved)} reserved</span>
+                  <span>{formatIDR(affiliateData.stats.reserved)} sedang dipesan</span>
                 </article>
                 <article>
-                  <small>Withdrawn</small>
+                  <small>Sudah dibayar</small>
                   <strong>{formatIDR(affiliateData.stats.withdrawn)}</strong>
-                  <span>Sudah dibayarkan</span>
+                  <span>pencairan selesai</span>
                 </article>
               </div>
 
               <div className="acc-table-card">
                 <div className="acc-receipts-head">
                   <span>Order</span>
-                  <span>Affiliate</span>
-                  <span>Base profit</span>
-                  <span>Commission</span>
+                  <span>Mitra</span>
+                  <span>Laba dasar</span>
+                  <span>Komisi</span>
                   <span>Status</span>
                 </div>
                 {affiliateData.commissions.slice(0, 50).map((row) => (
@@ -4826,11 +4967,13 @@ export default function AdminDashboard() {
                     <span>{row.affiliateCode}</span>
                     <strong>{formatIDR(row.baseProfit)}</strong>
                     <strong>{formatIDR(row.amount)}</strong>
-                    <span className={"acc-status " + row.status}>{row.status}</span>
+                    <span className={"acc-status " + row.status}>
+                      {COMMISSION_STATUS_LABEL[row.status] ?? row.status}
+                    </span>
                   </div>
                 ))}
                 {affiliateData.commissions.length === 0 && (
-                  <div className="acc-empty">Belum ada commission ledger.</div>
+                  <div className="acc-empty">Belum ada riwayat komisi.</div>
                 )}
               </div>
             </>

@@ -85,7 +85,19 @@ export type CashFlowDay = {
 };
 
 export type CashFlowTotals = {
+  /** Order NON-merchant yang selesai. Order ritel tidak dihitung di sini. */
   orders: number;
+  /**
+   * Omzet yang benar-benar masuk lewat pembayaran langsung.
+   *
+   * Order merchant TIDAK ikut di sini. Uang dari order ritel dibayar ke
+   * merchant di tokonya, tidak pernah masuk ke Lacte saat checkout - Lacte
+   * hanya mencatat piutang, dan baru menerima uang ketika merchant
+   * mentransfer lewat `merchant_payments`.
+   *
+   * Menghitungnya sebagai kas masuk akan menyatakan uang yang belum
+   * bergerak sebagai yang sudah masuk.
+   */
   grossRevenue: number;
   supplierCost: number;
   grossProfit: number;
@@ -93,7 +105,12 @@ export type CashFlowTotals = {
   /** Total biaya yang dikurangi dari omzet. */
   discounts: number;
   affiliateCommission: number;
-  /** Biaya layanan yang dibayar user ke merchant - bukan milik Lacte. */
+  /**
+   * Biaya layanan yang dibayar user ke merchant.
+   *
+   * Tidak milik Lacte dan tidak masuk omzet. Tetap dilacak supaya fee
+   * yang dipotong dari piutang bisa dicocokkan dengan yang diteruskan.
+   */
   merchantServiceFee: number;
   /** Jumlah order dari jalur merchant ritel. */
   merchantOrders: number;
@@ -195,17 +212,40 @@ export function buildCashFlowReport(input: {
     const profit = num(order.nambah_profit);
     const isMerchant = Boolean(order.merchant_id);
 
-    totals.orders += 1;
-    totals.grossRevenue += revenue;
+    /*
+ * Modal supplier dihitung untuk SEMUA order sukses, ritel atau bukan.
+ *
+ * Barangnya benar-benar dikirim di periode ini, jadi biayanya benar-benar
+ * keluar di periode ini. Menunggunya sampai merchant mentransfer akan
+ * membuat Lacte terlihat lebih untung daripada kenyataannya tepat pada
+ * periode ketika piutang paling besar.
+ */
     totals.supplierCost += supplierCost;
-    totals.grossProfit += profit;
-    totals.discounts += num(order.promotion_discount) + num(order.points_discount) + num(order.referral_discount);
-    totals.affiliateCommission += num(order.affiliate_commission);
-    totals.merchantServiceFee += num(order.service_fee_amount);
 
     if (isMerchant) {
+      /*
+       * Order ritel TIDAK menambah omzet, margin, maupun jumlah order
+       * pada kolom kas masuk.
+       *
+       * Uang dari order ini dibayar ke merchant di tokonya. Yang masuk ke
+       * Lacte cuma catatan piutang; uang nyatanya baru datang lewat
+       * `merchant_payments`, dan itu dihitung sebagai `merchantSettled`.
+       *
+       * Biaya layanannya tetap dilacak supaya bisa dicocokkan dengan yang
+       * diteruskan ke merchant.
+       */
       totals.merchantOrders += 1;
       totals.merchantReceivable += revenue;
+      totals.merchantServiceFee += num(order.service_fee_amount);
+    } else {
+      totals.orders += 1;
+      totals.grossRevenue += revenue;
+      totals.grossProfit += profit;
+      totals.discounts +=
+        num(order.promotion_discount) +
+        num(order.points_discount) +
+        num(order.referral_discount);
+      totals.affiliateCommission += num(order.affiliate_commission);
     }
 
     const key = dayKey(order.created_at);
@@ -218,10 +258,18 @@ export function buildCashFlowReport(input: {
         profit: 0,
         merchantSettled: 0,
       };
-      day.orders += 1;
-      day.grossRevenue += revenue;
+      /*
+       * Grafik harian harus ikut aturan yang sama dengan total. Kalau
+       * harian masih menjumlahkan order ritel, jumlah batanganya tidak
+       * akan sama dengan kartu omzet - dan operator akan-finding dua
+       * laporan yang berbeda di halaman yang sama.
+       */
+      if (!isMerchant) {
+        day.orders += 1;
+        day.grossRevenue += revenue;
+        day.profit += profit;
+      }
       day.supplierCost += supplierCost;
-      day.profit += profit;
       days.set(key, day);
     }
 
@@ -234,9 +282,17 @@ export function buildCashFlowReport(input: {
       profit: 0,
     };
     method.orders += 1;
-    method.revenue += revenue;
     method.supplierCost += supplierCost;
-    method.profit += profit;
+    /*
+     * Pendapatan per metode hanya untuk metode yang uangnya benar-benar
+     * masuk lewat metode itu. "Beli di Toko Ritel" tetap punya baris
+     * dengan modal dan jumlah order, tapi omzetnya nol - itu yang
+     * membedakannya dari metode yang benar-benar menerima uang.
+     */
+    if (!isMerchant) {
+      method.revenue += revenue;
+      method.profit += profit;
+    }
     methodTotals.set(methodId, method);
   }
 

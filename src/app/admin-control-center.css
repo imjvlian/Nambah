@@ -713,14 +713,13 @@
   margin-bottom: 18px;
 }
 
-.acc-metrics-three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-/* Baris "Perlu perhatian".
-   Satu-satunya elemen di dashboard yang boleh memakai warna peringatan,
-   dan itu disengaja: kalau elemen ini berbagi visual dengan kartu biasa,
-   operator berhenti memperhatikannya begitu pun isinya bertambah. */
+/*
+ * Baris "Perlu perhatian".
+ *
+ * Satu-satunya elemen di dashboard yang boleh memakai warna peringatan, dan
+ * itu disengaja: kalau elemen ini berbagi visual dengan kartu biasa,
+ * operator berhenti memperhatikannya begitu pun isinya bertambah.
+ */
 .acc-attention {
   margin-bottom: 16px;
   padding: 14px 16px;
@@ -776,6 +775,9 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
+}
+.acc-metrics-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .acc-metrics article {
@@ -2713,6 +2715,13 @@
    pseudo-element tidak bisa menempel ke `<td>` yang isinya cuma angka
    tanpa membungkus isinya di span.
    =================================================================== */
+
+/* Pembungkus satu bulan di dalam kalender. Tanpa aturan apa pun
+   isinya ditangani grid dan tombol yang sudah ada. */
+.acc-cal-month {
+  min-width: 0;
+}
+
 @media (max-width: 720px) {
   .acc-table-scroll {
     overflow-x: visible;
@@ -2858,34 +2867,27 @@
   font-size: 10px;
 }
 
-/* Rincian biaya: label kiri, nominal kanan. */
+/* Rincian biaya: label kiri, nominal kanan.
+ *
+ * Padding TIDAK ditulis di sini. `.acc-cost-list` sudah punya padding
+ * horizontal sendiri yang sama dengan judul kartu; kalau baris dalam
+ * ikut diberi padding, teks akan bergeser dari judulnya dan daftar ini
+ * terlihat tidak rata dengan kartu di sebelahnya.
+ *
+ * Aturan lengkap untuk daftar ini ada di bagian bawah file, bersama
+ * panel piutang ritel yang memakai kelas yang sama.
 .acc-cost-list > div,
 .acc-receivable-box > div {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 0;
+  padding: 10px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
 .acc-cost-list > div:last-child {
   border-bottom: 0;
-}
-
-.acc-cost-list span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.acc-cost-list small {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 10px;
-}
-
-.acc-cost-list strong {
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 /* Posisi piutang merchant dipisah dari rincian biaya karena ini bukan
@@ -4181,5 +4183,332 @@
 @media (max-width: 820px) {
   .promo-status-toggle {
     min-width: 92px;
+  }
+}
+
+/* ===================================================================
+   Direktori mitra afiliasi.
+
+   Hanya butuh jarak antar blok; isinya sendiri memakai kartu dan
+   panel yang sudah ada. Sengaja tidak diberi gaya sendiri supaya
+   halaman ini ikut perubahan visual admin berikutnya tanpa perlu
+   ikut disesuaikan lagi.
+   =================================================================== */
+.acc-affiliate-directory {
+  margin-bottom: 16px;
+}
+
+/* ===================================================================
+   Pemilih periode laporan.
+
+   Satu baris untuk preset, baris kedua untuk tanggal. Pemisahnya
+   penting: kolom tanggal punya tinggi sendiri dan inputnya butuh ruang,
+   jadi menaruhnya di baris yang sama dengan segmented control akan
+   membuat dua kelompok tinggi berbeda berdampingan.
+   =================================================================== */
+.acc-range-picker {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.acc-range-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.acc-range-fields .acc-field {
+  flex: 0 1 190px;
+  min-width: 150px;
+  margin: 0;
+}
+
+.acc-range-fields .acc-field span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acc-range-fields .acc-primary-link {
+  min-height: 44px;
+}
+
+.acc-range-warning {
+  flex-basis: 100%;
+  margin: 0;
+  color: #e2a25a;
+  font-size: 12px;
+}
+
+@media (max-width: 620px) {
+  /*
+   * Kolom tanggal di layar sempit.
+   *
+   * Tombol preset boleh membungkus sendiri, tapi kolom tanggal TIDAK
+   * boleh menyempit: input tanggal yang terlalu kecil membuat kalendernya
+   * sulit dibaca dan prone salah pilih tanggal - dan salah tanggal di
+   * laporan keuangan berarti angka yang terlihat sahih tapi salah.
+   */
+  .acc-range-fields .acc-field {
+    flex: 1 1 100%;
+  }
+
+  .acc-range-fields .acc-primary-link {
+    flex: 1 1 100%;
+  }
+}
+
+/* ===================================================================
+   Kalender rentang tanggal.
+
+   Grid 7 kolom tanpa gap di dalam satu bulan, supaya rentang yang
+   terpilih terlihat sebagai blok DISC. Dengan gap di setiap sel,
+   rentang terlihat seperti kotak-kotak terpisah dan tidak terbaca
+   sebagai satu kesatuan.
+   =================================================================== */
+.acc-calendar {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(10, 12, 9, .6);
+}
+
+.acc-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.acc-calendar-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acc-calendar-months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.acc-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.acc-cal-nav strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.acc-cal-nav button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #151813;
+  color: #ccd1c6;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.acc-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.acc-cal-head {
+  margin-bottom: 4px;
+}
+
+.acc-cal-head span {
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.acc-cal-grid button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #e3e8de;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.acc-cal-grid button:hover:not([data-outside="true"]) {
+  background: rgba(201, 255, 63, .12);
+}
+
+.acc-cal-grid button[data-outside="true"] {
+  color: #4a5048;
+}
+
+.acc-cal-grid button[data-today="true"] {
+  box-shadow: inset 0 -2px 0 rgba(201, 255, 63, .5);
+}
+
+.acc-cal-grid button.in-range {
+  background: rgba(201, 255, 63, .16);
+  color: var(--lime);
+}
+
+.acc-cal-grid button.edge {
+  background: var(--lime);
+  color: #11130f;
+  font-weight: 800;
+}
+
+.acc-calendar-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.acc-calendar-foot span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acc-calendar-foot .acc-primary-link {
+  min-height: 40px;
+}
+
+/* ===================================================================
+   Panel piutang ritel di laporan arus kas.
+
+   Berdiri sendiri, bukan ditempel di bawah daftar biaya: keduanya punya
+   peran berbeda. Yang satu mengurangi omzet, yang satu menunda uang.
+   =================================================================== */
+.acc-retail-panel {
+  border-color: rgba(226, 138, 58, .24);
+}
+
+/*
+ * Judul panel piutang ritel.
+ *
+ * `.acc-card-head` memakai uppercase 11px dengan letter-spacing lebar.
+ * Untuk catatan kecil seperti "bukan kas masuk" itu terlalu keras: ia
+ * akan terbaca sebagai judul kedua, bukan sebagai penjelasan.
+ *
+ * `align-items: center`, bukan `baseline`. Catatan ini duduk di baris
+ * judul yang besar, dan `baseline` membuatnya turun mengikuti baseline
+ * teks 11px - terlihat meleset ke bawah dari tengah baris.
+ */
+.acc-retail-panel .acc-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.acc-card-head-note {
+  color: #e2a25a;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Pengurang pendapatan dan posisi piutang ritel.
+ *
+ * Dua masalah yang Aturan lama tidak punya, dan keduanya terlihat
+ * langsung di layar:
+ *
+ * 1. `.acc-cost-list` tidak punya padding horizontal sama sekali. Baris
+ *    di dalamnya memakai `padding: 9px 0`, jadi teks menempel ke tepi
+ *    kartu sementara judulnya 16px dari tepi - label dan nomornya
+ *    terlihat mengambang ke luar judulnya sendiri.
+ *
+ * 2. Baris total punya garis bawah dari `.acc-cost-list > div` DAN garis
+ *    atas dari `.acc-cost-total`. Dua garis dengan jarak 6px di
+ *    antaranya terbaca sebagai dua pemisah, bukan satu.
+ *
+ * Font juga 10-12px. Bagian admin lain sudah dinaikkan ke 12px supaya
+ * tidak terlalu kecil di ponsel; daftar ini tertinggal.
+ */
+.acc-cost-list {
+  padding: 4px 16px 10px;
+}
+
+.acc-cost-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.acc-cost-list > div:last-child {
+  border-bottom: 0;
+}
+
+.acc-cost-list span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.acc-cost-list small {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+}
+
+.acc-cost-list strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Baris total.
+ *
+ * `border-bottom` sengaja dimatikan di sini dan bukan diganti `margin`
+ * yang lebih besar: baris ini selalu terakhir, jadi garis bawahnya
+ * hanya akan menggantung di atas ruang kosong. Yang dijaga adalah satu
+ * garis atas, dengan jarak jelas dari baris sebelumnya.
+ */
+.acc-cost-list .acc-cost-total {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  padding-top: 12px;
+}
+
+.acc-cost-list .acc-cost-total span,
+.acc-cost-list .acc-cost-total strong {
+  color: #e3e8de;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  /* Satu bulan per baris. Dua bulan berdampingan di ponsel membuat sel
+     tanggal terlalu kecil untuk diklik dengan tepat - dan salah klik
+     tanggal di laporan keuangan berarti angka yang terlihat sahih. */
+  .acc-calendar-months {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .acc-cal-grid button {
+    min-height: 42px;
   }
 }

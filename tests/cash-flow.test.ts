@@ -120,6 +120,92 @@ test("biaya layanan merchant bukan pendapatan Lacte", () => {
   assert.equal(report.totals.marginPercent, 0);
 });
 
+/**
+ * Order ritel dan arus kas.
+ *
+ * Uang dari order ritel dibayar user ke merchant DI TOKONYA. Uang itu
+ * tidak pernah melewati Lacte saat checkout - Lacte cuma mencatat
+ * piutang, dan baru menerima uang ketika merchant mentransfer lewat
+ * `merchant_payments`.
+ *
+ * Jadi order ritel bukan kas masuk. Menghitungnya sebagai omzet berarti
+ * menyatakan uang yang belum bergerak sebagai yang sudah masuk, dan
+ * membuat Lacte terlihat untung pada periode ketika piutangnya justru
+ * bertambah.
+ */
+
+test("order ritel TIDAK masuk ke omzet kas masuk", () => {
+  const report = buildCashFlowReport({
+    orders: [order({ merchant_id: "m-1", final_price: 100_000, nambah_profit: 20_000 })],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.grossRevenue, 0);
+  assert.equal(report.totals.grossProfit, 0);
+  assert.equal(report.totals.marginPercent, 0);
+  // Tapi modal dan piutang tetap tercatat.
+  assert.equal(report.totals.supplierCost, 80_000);
+  assert.equal(report.totals.merchantReceivable, 100_000);
+  assert.equal(report.totals.merchantOrders, 1);
+});
+
+test("grafik harian ikut aturan yang sama dengan total", () => {
+  /*
+   * Kalau harian masih menjumlahkan order ritel, jumlah batanganya
+   * tidak akan sama dengan kartu omzet - dua laporan yang berbeda di
+   * halaman yang sama.
+   */
+  const report = buildCashFlowReport({
+    orders: [order({ merchant_id: "m-1", final_price: 100_000 })],
+    from: FROM,
+    to: TO,
+  });
+
+  const dayTotal = report.days.reduce((sum, day) => sum + day.grossRevenue, 0);
+  assert.equal(dayTotal, report.totals.grossRevenue);
+  assert.equal(dayTotal, 0);
+});
+
+test("rekap per metode tidak menghitung omzet untuk metode ritel", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({ id: "A", merchant_id: "m-1", payment_method_id: "merchant_retail" }),
+      order({ id: "B", merchant_id: null, payment_method_id: "qris" }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const ritel = report.byMethod.find((m) => m.paymentMethodId === "merchant_retail");
+  const qris = report.byMethod.find((m) => m.paymentMethodId === "qris");
+
+  assert.equal(ritel?.orders, 1);
+  assert.equal(ritel?.revenue, 0);
+  assert.equal(qris?.revenue, 100_000);
+
+  // Jumlah omzet per metode harus sama dengan omzet total.
+  const methodSum = report.byMethod.reduce((sum, m) => sum + m.revenue, 0);
+  assert.equal(methodSum, report.totals.grossRevenue);
+});
+
+test("campuran ritel dan non-retail: hanya non-retil yang jadi omzet", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({ id: "A", merchant_id: "m-1", final_price: 7_100, supplier_cost: 4_247, nambah_profit: 853 }),
+      order({ id: "B", merchant_id: null, final_price: 5_100, supplier_cost: 4_247, nambah_profit: 853 }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.grossRevenue, 5_100);
+  assert.equal(report.totals.orders, 1);
+  // Modal dari KEDUA order: barang keduanya benar-benar dikirim.
+  assert.equal(report.totals.supplierCost, 8_494);
+  assert.equal(report.totals.merchantReceivable, 7_100);
+});
+
 test("omzet order merchant dicatat sebagai piutang, bukan kas masuk", () => {
   const report = buildCashFlowReport({
     orders: [order({ merchant_id: "m-1" })],

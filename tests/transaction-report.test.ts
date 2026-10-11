@@ -54,6 +54,133 @@ test("harga katalog, jual, final, dan supplier tidak dicampur", () => {
   assert.equal(item.supplier_cost, 4_247);
 });
 
+/**
+ * Biaya layanan merchant dan omzet.
+ *
+ * `pricing.ts` menghitung:
+ *
+ *   finalPrice   = loyaltyEligibleSpend + customerPaymentFee + merchantServiceFee
+ *   nambahProfit = finalPrice - merchantServiceFee - supplierCost - ...
+ *
+ * Jadi fee masuk ke `final_price` dan SENGAJA tidak masuk ke
+ * `nambahProfit`. Biaya layanan 100% milik merchant - Lacte tidak
+ * mengambil bagiannya.
+ *
+ * Test di bawah mengunci aturan itu dari dua sisi: fee tidak boleh
+ * masuk omzet, dan fee tetap harus terlihat sebagai angka tersendiri.
+ * Kalau fee hanya diam-diam dikurangi, selisihnya jadi tidak bisa
+ * diperiksa.
+ */
+
+test("biaya layanan merchant TIDAK masuk ke omzet", () => {
+  /*
+   * Order ritel: user bayar 7.100, tapi 2.000 di antaranya adalah biaya
+   * layanan merchant. Lacte hanya menyimpan 5.100 dari angka itu.
+   *
+   * Versi lama menjumlahkan `final_price`, jadi omzet tertanggi 7.100 -
+   * uang yang Lacte terima sambil lalu dan terus zakahkan ke merchant.
+   */
+  const summary = summarizeTransactions([
+    row({
+      final_price: 7_100,
+      service_fee_amount: 2_000,
+      merchant_id: "tokoritel",
+      nambah_profit: 853,
+    }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 5_100);
+  assert.equal(summary.merchantServiceFee, 2_000);
+});
+
+test("fee tetap dilaporkan terpisah, bukan hanya dikurangi diam-diam", () => {
+  const summary = summarizeTransactions([
+    row({ final_price: 7_100, service_fee_amount: 2_000 }),
+    row({ final_price: 5_100, service_fee_amount: null }),
+  ]);
+
+  // 7.100 - 2.000 + 5.100
+  assert.equal(summary.grossRevenue, 10_200);
+  assert.equal(summary.merchantServiceFee, 2_000);
+  // Fee bisa direkonstruksi dari dua angka yang ditampilkan.
+  assert.equal(summary.grossRevenue + summary.merchantServiceFee, 12_200);
+});
+
+test("margin dihitung dari omzet yang sudah dikurangi fee", () => {
+  /*
+   * 853 / 7.100 = 12.01% kalau fee ikut dihitung.
+   * 853 / 5.100 = 16.73% kalau fee dikurangi.
+   *
+   * Selisih 4,7 poin persen ini bukan pembulatan - fee yang dipotong dari
+   * pembagi membuat margin terlihat jauh lebih buruk dari kenyataannya
+   * tepat saat volume ritel naik.
+   */
+  const summary = summarizeTransactions([
+    row({ final_price: 7_100, service_fee_amount: 2_000, nambah_profit: 853 }),
+  ]);
+
+  assert.equal(summary.marginPercent, 16.73);
+});
+
+test("order tanpa merchant tidak terpengaruh", () => {
+  const summary = summarizeTransactions([
+    row({ final_price: 5_100, service_fee_amount: null, merchant_id: null }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 5_100);
+  assert.equal(summary.merchantServiceFee, 0);
+});
+
+test("fee lebih besar dari harga final tidak membuat omzet negatif", () => {
+  /*
+   * Data rusak harus terlihat, bukan menjatuhkan seluruh laporan.
+   * Fee-nya tetap ikut dijumlahkan supaya anomalinya bisa dicari.
+   */
+  const summary = summarizeTransactions([
+    row({ final_price: 1_000, service_fee_amount: 1_500 }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 0);
+  assert.equal(summary.merchantServiceFee, 1_500);
+});
+
+test("order bukan success tidak menambah fee maupun omzet", () => {
+  const summary = summarizeTransactions([
+    row({ status: "failed", final_price: 7_100, service_fee_amount: 2_000 }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 0);
+  assert.equal(summary.merchantServiceFee, 0);
+  assert.equal(summary.excludedCount, 1);
+});
+
+test("CSV punya kolom omzet terpisah dan totalnya berlabel", () => {
+  const rows = [
+    row({ final_price: 7_100, service_fee_amount: 2_000 }),
+    row({ final_price: 5_100, service_fee_amount: null }),
+  ];
+  const csv = transactionsToCsv(rows, summarizeTransactions(rows));
+  const lines = csv.split("\r\n");
+
+  assert.ok(
+    lines[0]!.includes("Biaya Layanan Merchant") &&
+      lines[0]!.includes("Omzet Lacte"),
+    "CSV harus memisahkan fee dan omzet, bukan menggabungnya",
+  );
+
+  // Baris total harus menyebut kolomnya. Angka yang tidak berlabel di
+  // posisi kolom tertentu akan terlihat benar walau artinya sudah berubah.
+  const totalLines = lines.filter((line) => /^(TOTAL|,,,?)/.test(line));
+  assert.ok(
+    totalLines.some((line) => line.includes("Omzet Lacte,10200")),
+    "total omzet harus tertulis eksplisit",
+  );
+  assert.ok(
+    totalLines.some((line) => line.includes("Biaya Layanan Merchant,2000")),
+    "total fee harus tertulis eksplisit",
+  );
+});
+
 test("margin memakai nambah_profit, bukan selisih harga", () => {
   /*
    * final_price - supplier_cost = 5.100 - 4.247 = 853 di kasus ini, jadi
