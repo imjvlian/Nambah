@@ -1,93 +1,59 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
+import {
+  BULAN,
+  HARI,
+  formatKey,
+  formatRangeShort,
+  fromKey,
+  monthMatrix,
+  toKey,
+  todayKey,
+} from "@/lib/admin-calendar";
+import { useDismissOnOutside } from "./useDismissOnOutside";
 
 /**
- * Pemilih rentang tanggal dengan kalender.
+ * Pemilih rentang tanggal, dalam bentuk dropdown.
  *
- * KENAPA BUKAN `<input type="date">`
+ * KENAPA DROPDOWN, BUKAN PANEL INLINE
  *
- * Dua input tanggal bawaan browser terlihat seperti kotak teks
- * kosong yang harus diketik. Mengapa orang tidak tinggal klik ikon
- * kalendernya? Karena di banyak browser - terutama di ponsel - input
- * itu membuka kalender yang isinya melompong dari posisi yang tak
- * terduga, dan di desktop formatnya mengikuti locale sehingga
- * "01/11/2026" bisa berarti 1 November atau 11 Januari.
+ * Versi sebelumnya langsung membuka dua bulan kalender di antara tombol
+ * preset dan grafik. Akibatnya memilih rentang mendorong seluruh isi
+ * laporan ke bawah - dan laporan itu bisa panjang. Operator yang sedang
+ * membaca grafik harus menggulir balik ke atas hanya untuk melihat
+ * kalender, lalu menggulir lagi setelah memilih.
  *
- * Di laporan keuangan, salah membaca tanggal berarti laporan yang
- * terlihat sahih tapi salah. Jadi kalendernya dibuat sendiri: format
- * tanggal selalu terlihat di setiap sel, dan rentang yang dipilih
- * selalu tertulis lengkap di tombolnya.
+ * Sekarang rentang hidup di balik tombol, sama seperti jadwal promo.
+ * Yang berubah bukan hanya bentuknya: kalender dua bulan yang tadinya
+ * hampir selalu terlihat kini hanya muncul saat diminta, sehingga grafik
+ * dan tabelnya tidak melompat.
  *
- * TIGA KEADAAN, BUKAN DUA
+ * KELAS YANG SAMA DENGAN JADWAL PROMO
  *
- * 1. Belum ada tanggal awal - klik pertama menetapkan awal.
- * 2. Sudah ada awal, belum ada akhir - klik kedua menetapkan akhir.
- * 3. Sudah lengkap - klik berikutnya memulai rentang baru dari nol.
+ * Panel, tombol pemicu, dan grid bulan memakai `.acc-dtpicker-*` dan
+ * `.acc-cal-*` - kelas yang sama persis dengan `DateTimePicker`. Jadi
+ * kalender di form promo dan kalender di laporan bukan "mirip": mereka
+ * memakai aturan yang sama, jadi tidak bisa berbeda tanpa disengaja.
  *
- * Tanpa itu, memperbaiki satu tanggal yang keliru jadi ritual: hapus
- * keduanya dulu, baru pilih ulang.
+ * Yang membedakan hanya isinya: rentang menampilkan DUA bulan supaya
+ * awal dan akhir bisa dibaca tanpa menggulir, dan tidak punya pengatur
+ * jam karena laporan selalu dihitung per hari penuh.
  */
 
 export type CalendarRange = { from: string; to: string };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const BULAN = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
-const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-
-/** `YYYY-MM-DD` tanpa pergeseran timezone. */
-function toKey(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 /**
- * Parse `YYYY-MM-DD` sebagai tanggal LOKAL.
+ * Ringkasan singkat untuk tombol pemicu diambil dari
+ * `formatRangeShort` di `@/lib/admin-calendar`.
  *
- * `new Date("2026-01-31")` di-parse sebagai UTC tengah malam, lalu
- * di locale GMT+7 menjadi 31 Januari 08:00 - masih tanggal yang sama,
- * tapi di GMT-5 jadi 30 Januari. Hari yang bergeser satu hari di
- * kalender adalah cara paling cepat membuat orang salah memilih.
+ * Awalnya fungsi ini ditulis di file ini. Test runner tidak bisa memuat
+ * `.tsx`, jadi logikanya tidak bisa diuji di tempat ia hidup - dan
+ * logika yang tak teruji pada teks yang selalu terlihat di laporan
+ * adalah tempat yang salah untuk menaruh logika.
  */
-function fromKey(key: string) {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
-}
-
-/** Deret hari dalam satu bulan, mulai dari hari Minggu. */
-function monthMatrix(year: number, month: number) {
-  const first = new Date(year, month, 1);
-  const start = new Date(first);
-  start.setDate(1 - first.getDay());
-
-  const weeks: Date[][] = [];
-  const cursor = new Date(start);
-  for (let w = 0; w < 6; w++) {
-    const week: Date[] = [];
-    for (let d = 0; d < 7; d++) {
-      week.push(new Date(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    weeks.push(week);
-    // Berhenti setelah minggu yang memuat tanggal 1 bulan berikutnya.
-    if (cursor.getMonth() !== month && w >= 3) break;
-  }
-  return weeks;
-}
-
-function formatKey(key: string) {
-  if (!key) return "-";
-  const date = fromKey(key);
-  if (Number.isNaN(date.getTime())) return "-";
-  return `${date.getDate()} ${BULAN[date.getMonth()]} ${date.getFullYear()}`;
-}
 
 function Month({
   year,
@@ -97,6 +63,7 @@ function Month({
   onPick,
   onPrev,
   onNext,
+  hideNav = false,
 }: {
   year: number;
   month: number;
@@ -105,22 +72,34 @@ function Month({
   onPick: (key: string) => void;
   onPrev: () => void;
   onNext: () => void;
+  /** Bulan kedua tidak punya navigasi sendiri - semuanya di bulan pertama. */
+  hideNav?: boolean;
 }) {
   const weeks = monthMatrix(year, month);
 
   return (
     <div className="acc-cal-month">
-      <div className="acc-cal-nav">
-        <button type="button" onClick={onPrev} aria-label="Bulan sebelumnya">
-          &lt;
-        </button>
-        <strong>
-          {BULAN[month]} {year}
-        </strong>
-        <button type="button" onClick={onNext} aria-label="Bulan berikutnya">
-          &gt;
-        </button>
-      </div>
+      {hideNav ? (
+        <div className="acc-cal-nav">
+          <span />
+          <strong>
+            {BULAN[month]} {year}
+          </strong>
+          <span />
+        </div>
+      ) : (
+        <div className="acc-cal-nav">
+          <button type="button" onClick={onPrev} aria-label="Bulan sebelumnya">
+            &lt;
+          </button>
+          <strong>
+            {BULAN[month]} {year}
+          </strong>
+          <button type="button" onClick={onNext} aria-label="Bulan berikutnya">
+            &gt;
+          </button>
+        </div>
+      )}
 
       <div className="acc-cal-grid acc-cal-head">
         {HARI.map((day) => (
@@ -136,17 +115,15 @@ function Month({
 
             const isStart = key === from;
             const isEnd = key === to;
-            const between =
-              Boolean(from) && Boolean(to) && key > from && key < to;
-            const inRange =
-              Boolean(from) && Boolean(to) && key >= from && key <= to;
+            const between = Boolean(from) && Boolean(to) && key > from && key < to;
+            const inRange = Boolean(from) && Boolean(to) && key >= from && key <= to;
 
             return (
               <button
                 key={key}
                 type="button"
                 data-outside={outside ? "true" : undefined}
-                data-today={key === toKey(new Date()) ? "true" : undefined}
+                data-today={key === todayKey() ? "true" : undefined}
                 className={
                   [
                     isStart || isEnd ? "edge" : "",
@@ -172,23 +149,64 @@ export default function CalendarRangePicker({
   value,
   onApply,
   busy = false,
-  onCancel,
 }: {
   value: CalendarRange;
   onApply: (next: CalendarRange) => void;
   busy?: boolean;
-  onCancel: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(value.from);
   const [to, setTo] = useState(value.to);
 
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const panelId = useId();
   const today = useMemo(() => new Date(), []);
+
+  useDismissOnOutside(open, () => setOpen(false), rootRef);
+
+  /*
+   * Tanggal dipakai ulang dari setiap buka panel.
+   *
+   * Dulu state-nya hanya diisi sekali, saat komponen pertama kali
+   * dirender. Kalau operator menekan "Tutup" lalu memilih preset lain,
+   * panelnya masih menampilkanrentang lama - padahal tombol pemicunya
+   * sudah menuliskan rentang yang baru. Dua angka berbeda untuk hal yang
+   * sama, di layar yang sama.
+   */
+  function openPanel() {
+    setFrom(value.from);
+    setTo(value.to);
+    setOpen(true);
+  }
+
+  function closePanel() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
   const [cursor, setCursor] = useState(() => {
     const base = value.from ? fromKey(value.from) : today;
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
 
   function pick(key: string) {
+    /*
+     * Geser kursor ke bulan yang memuat tanggal yang diklik.
+     *
+     * Tanpa ini, memilih tanggal di bulan kedua tidak mengubah apa pun
+     * yang terlihat - tanggalnya terpilih, tapi kalender tetap
+     * menampilkan dua bulan yang sama seperti sebelumnya. Kalau
+     * operator lalu memilih tanggal kedua di bulan pertama, hasilnya
+     * rentang yang melompati sebulan tanpa ada yang menyadarinya.
+     *
+     * Hanya bulan PERTAMA yang digeser, karena `cursor` mengatur kedua
+     * bulan sekaligus.
+     */
+    const picked = fromKey(key);
+    setCursor(new Date(picked.getFullYear(), picked.getMonth(), 1));
+
     if (!from || (from && to)) {
       // Mulai rentang baru.
       setFrom(key);
@@ -218,65 +236,112 @@ export default function CalendarRangePicker({
   const nights = valid
     ? Math.round((fromKey(to).getTime() - fromKey(from).getTime()) / DAY_MS) + 1
     : 0;
+  const ringkas = formatRangeShort(value.from, value.to);
 
   return (
-    <div className="acc-calendar">
-      <div className="acc-calendar-head">
-        <div>
-          {from || to ? (
-            <>
-              <strong>{formatKey(from)}</strong>
-              <span> &rarr; </span>
-              <strong>{formatKey(to)}</strong>
-              {valid ? <small> ({nights} hari)</small> : null}
-            </>
-          ) : (
-            <strong>Pilih tanggal awal</strong>
-          )}
-        </div>
-        <button type="button" className="acc-ghost-link" onClick={onCancel}>
-          Tutup
-        </button>
-      </div>
+    <div className="acc-field acc-dtpicker acc-range-trigger" ref={rootRef}>
+      <span id={panelId + "-label"}>Rentang tanggal</span>
 
-      <div className="acc-calendar-months">
-        <Month
-          year={cursor.getFullYear()}
-          month={cursor.getMonth()}
-          from={from}
-          to={to}
-          onPick={pick}
-          onPrev={() => shiftMonth(-1)}
-          onNext={() => shiftMonth(1)}
-        />
-        <Month
-          year={secondMonth.getFullYear()}
-          month={secondMonth.getMonth()}
-          from={from}
-          to={to}
-          onPick={pick}
-          onPrev={() => shiftMonth(1)}
-          onNext={() => shiftMonth(1)}
-        />
-      </div>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={"acc-dtpicker-trigger" + (ringkas ? " terisi" : "")}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-labelledby={panelId + "-label"}
+        onClick={() => (open ? closePanel() : openPanel())}
+      >
+        <span>{ringkas || "Pilih rentang tanggal"}</span>
+        <span className="acc-dtpicker-caret" aria-hidden="true" />
+      </button>
 
-      <div className="acc-calendar-foot">
-        <span>
-          {!from
-            ? "Klik tanggal awal."
-            : !to
-              ? `Mulai ${formatKey(from)}. Klik tanggal akhir.`
-              : `${nights} hari dipilih.`}
-        </span>
-        <button
-          type="button"
-          className="acc-primary-link"
-          disabled={!valid || busy}
-          onClick={() => onApply({ from, to })}
+      <small>
+        {valid
+          ? `${nights} hari dipilih.`
+          : "Klik tanggal awal, lalu tanggal akhir."}
+      </small>
+
+      {open ? (
+        <div
+          className="acc-dtpicker-pop acc-dtpicker-pop-wide"
+          role="dialog"
+          aria-label="Pilih rentang tanggal"
         >
-          {busy ? "Memuat..." : "Terapkan rentang"}
-        </button>
-      </div>
+          <div className="acc-calendar-months">
+            <Month
+              year={cursor.getFullYear()}
+              month={cursor.getMonth()}
+              from={from}
+              to={to}
+              onPick={pick}
+              onPrev={() => shiftMonth(-1)}
+              onNext={() => shiftMonth(1)}
+            />
+            <Month
+              year={secondMonth.getFullYear()}
+              month={secondMonth.getMonth()}
+              from={from}
+              to={to}
+              onPick={pick}
+              /*
+               * Bulan kedua tidak punya tombol sendiri.
+               *
+               * Semula ada, dan keduanya memanggil `shiftMonth(1)` - jadi
+               * menekan "<" di bulan kanan tidak mundur, justru maju.
+               * Karena kedua bulan digerakkan oleh satu `cursor`, satu
+               * pasang tombol sudah cukup: menggeser `cursor` bergerak
+               * keduanya, dan dua bulan yang berdampingan selalu
+               * berurutan.
+               */
+              hideNav
+              onPrev={() => shiftMonth(-1)}
+              onNext={() => shiftMonth(1)}
+            />
+          </div>
+
+          <div className="acc-dtpicker-foot">
+            <span>
+              {!from
+                ? "Klik tanggal awal."
+                : !to
+                  ? `Mulai ${formatKey(from)}. Klik tanggal akhir.`
+                  : `${formatKey(from)} → ${formatKey(to)}`}
+            </span>
+
+            <div className="acc-dtpicker-foot-actions">
+              <button
+                type="button"
+                className="acc-ghost-link"
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                }}
+              >
+                Kosongkan
+              </button>
+
+              <button
+                type="button"
+                className="acc-primary-link"
+                disabled={!valid || busy}
+                onClick={() => {
+                  onApply({ from, to });
+                  setOpen(false);
+                }}
+              >
+                {busy ? "Memuat..." : "Terapkan rentang"}
+              </button>
+            </div>
+          </div>
+
+          <div className="acc-dtpicker-foot">
+            <span />
+            <button type="button" className="acc-inline-button" onClick={closePanel}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

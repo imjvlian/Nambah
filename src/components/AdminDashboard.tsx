@@ -540,6 +540,7 @@ import ReportRangePicker, {
   type ReportRangeValue,
 } from "@/components/admin/ReportRangePicker";
 import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
+import DateTimePicker from "@/components/admin/DateTimePicker";
 
 export { NAV, NAV_GROUPS };
 
@@ -1384,11 +1385,34 @@ export default function AdminDashboard() {
    * sedang tampil di layar - dan itu kesalahan yang tidak akan pernah
    * ketahuan karena keduanya terlihat berfungsi.
    */
-  function buildTransactionQuery(extra?: Record<string, string>) {
+  function buildTransactionQuery(
+    extra?: Record<string, string>,
+    rangeArg: ReportRangeValue = txRange,
+  ) {
+    /*
+     * Range-nya dikirim sebagai parameter, bukan dibaca dari state.
+     *
+     * Dulu `buildTransactionQuery` membaca `txRange` langsung dari
+     * closure. Setelah `setTxRange(next)` dipanggil, `txRange` di
+     * closure itu masih nilai LAMA sampai komponen render ulang - jadi
+     * `loadTransactions()` yang langsung dipanggil sesudahnya mengirim
+     * periode yang lama, bukan yang baru dipilih.
+     *
+     * Gejalanya menipu: tombol preset berubah menyala, dan tabelnya
+     * masih menampilkan periode sebelumnya. Tidak ada error, tidak ada
+     * loading yang menggantung. Operator mengira rentangnya terpakai
+     * padahal tidak.
+     *
+     * Arus kas sudah benar sejak awal - `loadCashFlow(next)` meneruskan
+     * range secara eksplisit. Transaksi sekarang mengikuti pola yang
+     * sama.
+     */
     const params = new URLSearchParams();
-  if (txRange.preset) params.set("preset", txRange.preset);
-  if (txRange.from) params.set("from", txRange.from);
-  if (txRange.to) params.set("to", txRange.to);
+    const range = rangeArg;
+
+    if (range.preset) params.set("preset", range.preset);
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
     if (txAppliedQuery.trim()) params.set("q", txAppliedQuery.trim());
     if (txStatus) params.set("status", txStatus);
     if (txPayment) params.set("payment", txPayment);
@@ -1398,10 +1422,14 @@ export default function AdminDashboard() {
     return params.toString();
   }
 
-  async function loadTransactions(override?: { offset?: number }) {
-    const query = buildTransactionQuery({
-      offset: String(override?.offset ?? txOffset),
-    });
+  async function loadTransactions(
+    override?: { offset?: number },
+    rangeArg: ReportRangeValue = txRange,
+  ) {
+    const query = buildTransactionQuery(
+      { offset: String(override?.offset ?? txOffset) },
+      rangeArg,
+    );
     const response = await fetch(`/api/admin/transactions?${query}`, {
       cache: "no-store",
     });
@@ -1429,15 +1457,24 @@ export default function AdminDashboard() {
       const link = document.createElement("a");
       link.href = url;
       /*
-       * Nama file memakai periode yang SEDANG TAMPIL, bukan preset yang
-       * terakhir diklik. Kalau operator melihat rentang 1-31 Januari lalu
-       * mengunduh, file bernama "transaksi_30hari.csv" akan menyesatkan
-       * saat dicari lagi.
-       */
-      const txDataStamp = txReport
-        ? `${txReport.from.slice(0, 10)}_${txReport.to.slice(0, 10)}`
-        : txRange.preset
-          ? `${txRange.preset}hari`
+ * Nama file memakai periode dari state, bukan dari `txReport`.
+ *
+ * `txReport.from` dan `.to` adalah timestamp UTC dari server. Di GMT+7,
+ * rentang yang dimulai 1 Januari pukul 00:00 waktu lokal berarti
+ * 31 Desember 17:00 UTC - jadi `slice(0, 10)` menulis "2025-12-31" ke
+ * nama file, padahal yang ditampilkan di layar adalah 1 Januari.
+ *
+ * Konsekuensinya: operator mengunduh `transaksi_2025-12-31_2026-01-30.csv`
+ * untuk laporan yang isinya 1-30 Januari, lalu membukanya weeks kemudian
+ * dan menyimpang satu hari saat membandingkan denganMutu lain.
+ *
+ * `txRange` juga sudah benar di sini karena unduhan CSV adalah aksi
+ * eksplisit: yang sedang diklik memang periode yang ada di layar.
+ */
+const txDataStamp = txRange.preset
+        ? `${txRange.preset}hari`
+        : txRange.from && txRange.to
+          ? `${txRange.from}_${txRange.to}`
           : "transaksi";
       link.download = `transaksi_${txDataStamp}.csv`;
       document.body.appendChild(link);
@@ -4404,7 +4441,13 @@ export default function AdminDashboard() {
                     onApply={(next) => {
                       setTxRange(next);
                       setTxOffset(0);
-                      void loadTransactions({ offset: 0 }).catch((error) =>
+                      /*
+                       * `next` diteruskan eksplisit. Tanpa itu, yang
+                       * terkirim adalah `txRange` dari render
+                       * sebelumnya, karena `setTxRange` baru berlaku
+                       * setelah render berikutnya.
+                       */
+                      void loadTransactions({ offset: 0 }, next).catch((error) =>
                         setNotice(
                           error instanceof Error
                             ? error.message
@@ -4710,139 +4753,290 @@ export default function AdminDashboard() {
                 title="Buat campaign promo"
                 description="Kode, jenis diskon, kuota, dan jadwal berlaku."
               >
-                <input
-                  placeholder="KODE"
-                  value={promoDraft.code}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      code: event.target.value.toUpperCase(),
-                    }))
-                  }
-                />
-                <input
-                  placeholder="Nama campaign"
-                  value={promoDraft.name}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-                <select
-                  value={promoDraft.type}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      type: event.target.value as "flat" | "percentage",
-                    }))
-                  }
-                >
-                  <option value="flat">Flat</option>
-                  <option value="percentage">Percentage</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Value"
-                  value={promoDraft.value}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      value: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="Min. belanja (Rp)"
-                  title="Minimal pembelian agar promo berlaku"
-                  value={promoDraft.minimumOrder}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      minimumOrder: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="Maks diskon (Rp, opsional)"
-                  title="Batas maksimal potongan untuk promo persen"
-                  value={promoDraft.maxDiscount}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      maxDiscount: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="Kuota total (opsional)"
-                  title="Maksimal pemakaian promo oleh semua pengguna; kosongkan untuk tanpa batas"
-                  value={promoDraft.quota}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      quota: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="Kuota per user (default 1)"
-                  title="Berapa kali satu akun boleh memakai promo ini"
-                  value={promoDraft.quotaPerUser}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      quotaPerUser: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  title="Mulai berlaku (opsional — kosongkan untuk langsung aktif)"
-                  value={promoDraft.startsAt}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      startsAt: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  type="datetime-local"
-                  title="Berakhir (opsional — isi untuk flash sale)"
-                  value={promoDraft.endsAt}
-                  onChange={(event) =>
-                    setPromoDraft((current) => ({
-                      ...current,
-                      endsAt: event.target.value,
-                    }))
-                  }
-                />
-                <button
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => void createPromotion()}
-                >
-                  {busy === "promotion-create" ? "Membuat..." : "Buat promo"}
-                </button>
+                {/*
+                  Sepuluh field, dikelompokkan jadi empat agar operator
+                  bisa mengisi berurutan tanpa membaca semua kolom dulu.
+
+                  Sebelumnya form ini hanya berupa input polos dengan
+                  `placeholder` sebagai satu-satunya penanda. Akibatnya
+                  tiga field praktis kehilangan nama: batas minimum,
+                  batas maksimum, dan kuota total hanya menampilkan
+                  "Rp" atau "opsional" di dalam kotak - dan yang
+                  untuk flash sale sama sekali tidak punya teks, hanya
+                  atribut `title` yang tidak muncul di layar sentuh.
+
+                  Dua field jadwal paling rawan disalahpahami: browser
+                  menampilkan `datetime-local` sebagai "dd/mm/yyyy, --:--"
+                  tanpa keterangan zona waktu, jadi operator tidak tahu
+                  itu waktu lokal atau UTC.
+                */}
+                <div className="acc-form-block">
+                  <span className="acc-form-block-title">Identitas</span>
+                  <div className="testlab-form-grid">
+                    <label className="acc-field">
+                      <span>Kode promo</span>
+                      <input
+                        placeholder="GAJIAN10"
+                        value={promoDraft.code}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            code: event.target.value.toUpperCase(),
+                          }))
+                        }
+                      />
+                      <small>
+                        Diketik pembeli saat checkout. Huruf besar, angka,
+                        - atau _.
+                      </small>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Nama campaign</span>
+                      <input
+                        placeholder="Contoh: Diskon gajian"
+                        value={promoDraft.name}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>Label internal. Tidak tampil ke pembeli.</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="acc-form-block">
+                  <span className="acc-form-block-title">Potongan</span>
+                  <div className="testlab-form-grid">
+                    <label className="acc-field">
+                      <span>Jenis diskon</span>
+                      <select
+                        value={promoDraft.type}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            type: event.target.value as "flat" | "percentage",
+                          }))
+                        }
+                      >
+                        <option value="flat">Potongan tetap (Rp)</option>
+                        <option value="percentage">Potongan persen (%)</option>
+                      </select>
+                      <small>Menentukan cara isi kolom nilai di bawah.</small>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>
+                        {promoDraft.type === "flat"
+                          ? "Potongan (Rp)"
+                          : "Potongan (%)"}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="100"
+                        placeholder={promoDraft.type === "flat" ? "1000" : "5"}
+                        value={promoDraft.value}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            value: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        {promoDraft.type === "flat"
+                          ? "Potongan dikurangkan sekali, berapa pun total belanja."
+                          : "Persen dari total belanja, sebelum batas maksimum di bawah."}
+                      </small>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Minimal belanja (Rp)</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        step="1000"
+                        placeholder="20000"
+                        value={promoDraft.minimumOrder}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            minimumOrder: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        Belanja di bawah nilai ini tidak dapat potongan.
+                        Isi 0 untuk tanpa minimum.
+                      </small>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Maksimum potongan (Rp)</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        step="1000"
+                        placeholder="Tanpa batas"
+                        value={promoDraft.maxDiscount}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            maxDiscount: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        {promoDraft.type === "flat"
+                          ? "Berfungsi sama dengan nilai di atas, jadi boleh dikosongkan."
+                          : "Batas atas potongan. Kosongkan bila diskon persen tidak perlu dibatasi."}
+                      </small>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="acc-form-block">
+                  <span className="acc-form-block-title">Kuota</span>
+                  <div className="testlab-form-grid">
+                    <label className="acc-field">
+                      <span>Kuota total</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder="Tanpa batas"
+                        value={promoDraft.quota}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            quota: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        Batas untuk semua pengguna. Kosongkan untuk tanpa
+                        batas.
+                      </small>
+                    </label>
+
+                    <label className="acc-field">
+                      <span>Kuota per pengguna</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder="1"
+                        value={promoDraft.quotaPerUser}
+                        onChange={(event) =>
+                          setPromoDraft((current) => ({
+                            ...current,
+                            quotaPerUser: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        Berapa kali satu akun boleh memakai promo ini.
+                      </small>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="acc-form-block">
+                  <span className="acc-form-block-title">Jadwal</span>
+                  <div className="testlab-form-grid">
+                    {/*
+                      Dua field jadwal ini dulu `datetime-local` polos.
+
+                      Selain format yang mengikuti locale - "01/11/2026"
+                      bisa berarti 1 November atau 11 Januari - keduanya juga
+                      tidak menjelaskan zona waktunya. Salah baca tidak
+                      ketahuan sampai campaign selesai.
+
+                      Sekarang keduanya lewat `DateTimePicker`, yang memakai
+                      kelas `.acc-cal-*` sama dengan kalender laporan. Jadi
+                      tanggal di form promo dan di laporan keuangan bakal
+                      terlihat identik, dan aturan tanggalnya hanya ditulis
+                      sekali di `@/lib/admin-calendar`.
+
+                      `minDate` di field "Berakhir" sengaja memakai tanggal
+                      mulai TANPA jamnya: kalau tanggal yang sama masih
+                      bisa dipilih, operator bisa membuat promo yang
+                      berakhir sebelum mulai tanpa pernah melihat
+                      peringatannya.
+                    */}
+                    <DateTimePicker
+                      label="Mulai berlaku"
+                      hint="Kosongkan untuk langsung aktif."
+                      value={promoDraft.startsAt}
+                      onChange={(next) =>
+                        setPromoDraft((current) => ({ ...current, startsAt: next }))
+                      }
+                    />
+
+                    <DateTimePicker
+                      label="Berakhir"
+                      hint="Isi untuk flash sale. Kosongkan untuk berjalan terus."
+                      value={promoDraft.endsAt}
+                      minDate={promoDraft.startsAt.slice(0, 10) || undefined}
+                      onChange={(next) =>
+                        setPromoDraft((current) => ({ ...current, endsAt: next }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="acc-action-panel">
+                  <button
+                    type="button"
+                    disabled={
+                      Boolean(busy) ||
+                      promoDraft.code.trim().length < 3 ||
+                      promoDraft.name.trim().length === 0 ||
+                      Number(promoDraft.value) <= 0
+                    }
+                    onClick={() => void createPromotion()}
+                  >
+                    {busy === "promotion-create" ? "Membuat..." : "Buat promo"}
+                  </button>
+                  <small className="acc-action-hint">
+                    Promo baru aktif seketika, kecuali jadwal diisi.
+                  </small>
+                </div>
               </CollapsiblePanel>
 
               <div className="acc-table-card">
-                <div className="acc-receipts-head">
-                  <span>Campaign</span>
-                  <span>Benefit</span>
-                  <span>Quota</span>
-                  <span>Usage</span>
+                {/*
+                  `is-six` wajib di sini, bukan opsional.
+
+                  Tabel ini punya enam kolom, tapi `.acc-receipts-row`
+                  hanya menyediakan lima. Tanpa modifier itu, kolom
+                  "Aksi" tidak punya tempat dan turun ke baris kedua -
+                  tombol Hapus jadi tidak sejajar antarbaris, dan
+                  baris jadi tinggi dua kali lipatnya hanya karena satu
+                  kolom terakhir.
+
+                  Label kolom memakai bahasa Indonesia, bukan istilah
+                  dari nama kolom di database. "Benefit" tidak
+                  dipakai siapa pun di sini, dan "Quota" sudah
+                  ditulis "Kuota" di bagian lain halaman ini.
+                */}
+                <div className="acc-receipts-head is-six">
+                  <span>Kampanye</span>
+                  <span>Potongan</span>
+                  <span>Kuota</span>
+                  <span>Pemakaian</span>
                   <span>Status</span>
                   <span>Aksi</span>
                 </div>
                 {promotionData.promotions.map((promo) => (
-                  <div className="acc-receipts-row" key={promo.code}>
+                  <div className="acc-receipts-row is-six" key={promo.code}>
                     <div>
                       <strong>{promo.code}</strong>
                       <span>{promo.name}</span>
@@ -4865,14 +5059,18 @@ export default function AdminDashboard() {
                     </strong>
                     <span>
                       {promo.quota === null
-                        ? "∞"
+                        ? "Tanpa batas"
                         : `${promo.redeemed + promo.reserved}/${promo.quota}`}
                       {promo.quota !== null &&
                         promo.redeemed + promo.reserved >= promo.quota && (
-                          <b className="acc-status failed" style={{ marginLeft: 6 }}>habis</b>
+                          <b className="acc-status failed acc-inline-chip">Habis</b>
                         )}
                     </span>
-                    <span>{promo.redeemed} used · {promo.reserved} reserved</span>
+                    <span>
+                      {promo.redeemed} terpakai
+                      <br />
+                      {promo.reserved} sedang dipesan
+                    </span>
                     <button
                       type="button"
                       className={`promo-status-toggle ${promo.active ? "is-active" : "is-inactive"}`}
@@ -4882,7 +5080,7 @@ export default function AdminDashboard() {
                       onClick={() => void togglePromotion(promo.code, !promo.active)}
                     >
                       <span className="promo-status-dot" aria-hidden="true" />
-                      {promo.active ? "Active" : "Inactive"}
+                      {promo.active ? "Aktif" : "Nonaktif"}
                     </button>
                     <div className="acc-action-panel">
                       <button

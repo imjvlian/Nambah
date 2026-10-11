@@ -160,12 +160,12 @@ export default function BannerAdminPanel() {
       });
       const body = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(body.error ?? "Display mode gagal diubah.");
+        throw new Error(body.error ?? "Lokasi tampil gagal diubah.");
       }
       await load();
       setNotice(`Banner ${banner.title} kini tampil di: ${DISPLAY_MODE_LABEL[displayMode] ?? displayMode}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Display mode gagal diubah.");
+      setNotice(error instanceof Error ? error.message : "Lokasi tampil gagal diubah.");
     } finally {
       setBusy("");
     }
@@ -233,7 +233,7 @@ export default function BannerAdminPanel() {
         <header className="acc-topbar">
           <div className="acc-topbar-title">
             <small>Admin / Konten</small>
-            <strong>Promo Banners</strong>
+            <strong>Banner Promo</strong>
           </div>
           <div className="acc-topbar-actions">
             <Link href="/admin">← Control Center</Link>
@@ -243,12 +243,12 @@ export default function BannerAdminPanel() {
         <div className="acc-content">
           <section className="acc-hero acc-hero-standalone">
             <div>
-              <span className="acc-eyebrow">Homepage carousel</span>
+              <span className="acc-eyebrow">Carousel beranda</span>
               <h1>Banner promo berjalan, tanpa deploy.</h1>
               <p>
                 Upload gambar 1200×400px (JPG/PNG/WebP, maks 2MB). Banner aktif
                 langsung tampil di beranda; kalau tidak ada banner, beranda
-                menampilkan kartu generic dari promo aktif.
+                menampilkan kartu promo/USP bawaan.
               </p>
             </div>
           </section>
@@ -264,7 +264,7 @@ export default function BannerAdminPanel() {
               <strong>Cloudinary belum dikonfigurasi</strong>
               <span>
                 Isi CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, dan
-                CLOUDINARY_API_SECRET di environment server untuk mengaktifkan upload.
+                CLOUDINARY_API_SECRET di environment server untuk mengaktifkan unggahan.
               </span>
             </div>
           )}
@@ -363,9 +363,25 @@ export default function BannerAdminPanel() {
                 <small>Pop-up muncul sebagai modal sekali per 24 jam per pengunjung.</small>
               </label>
 
-              <label className="acc-field acc-field-checkbox">
+              {/*
+                Checkbox, tapi bentuknya tetap field biasa.
+
+                Versi lama membungkus `<label>` di dalam `<label>`. Itu
+                HTML yang tidak valid: browser akan menutup label luar
+                lebih awal, lalu styling `.acc-field` (grid + gap)
+                berhenti berlaku tepat di field ini - padahal semua
+                field lain di form ini ikut memakainya. Akibatnya satu
+                baris ini terlihat berbeda dari yang di atas dan
+                bawahnya, tanpa alasan yang bisa ditunjuk.
+
+                Sekarang dua `<label>` terpisah: yang luar untuk
+                mengaitkan label teks ke checkbox, yang dalam untuk
+                baris toggle dan teksnya. Pola yang sama dipakai
+                `acc-checkbox-field` di halaman Toko Ritel.
+              */}
+              <label className="acc-field">
                 <span>Teks di atas gambar</span>
-                <label className="acc-toggle-inline">
+                <label className="acc-checkbox-field">
                   <input
                     type="checkbox"
                     checked={draft.showTextOverlay}
@@ -376,11 +392,16 @@ export default function BannerAdminPanel() {
                       }))
                     }
                   />
-                  <span>{draft.showTextOverlay ? "Tampilkan judul & tombol" : "Banner bersih (gambar saja)"}</span>
+                  <span>
+                    {draft.showTextOverlay
+                      ? "Judul & tombol ditampilkan"
+                      : "Banner bersih, gambar saja"}
+                  </span>
                 </label>
                 <small>
-                  Matikan kalau desain sudah memuat teks/CTA di dalam gambar — banner
-                  tampil full-bleed dan seluruh gambar bisa diklik.
+                  Matikan kalau desain sudah memuat teks dan tombol di
+                  dalam gambar — banner tampil penuh dan seluruh gambar
+                  bisa diklik.
                 </small>
               </label>
 
@@ -411,7 +432,7 @@ export default function BannerAdminPanel() {
           </div>
 
           <div className="acc-table-card">
-            <div className="acc-receipts-head">
+            <div className="acc-receipts-head is-banner">
               <span>Banner</span>
               <span>CTA</span>
               <span>Tampil di</span>
@@ -419,20 +440,43 @@ export default function BannerAdminPanel() {
               <span>Aksi</span>
             </div>
             {(payload?.banners ?? []).map((banner) => (
-              <div className="acc-receipts-row" key={banner.id}>
-                <div>
-                  <strong>{banner.title}</strong>
-                  <span>
-                    {banner.showTextOverlay === false && (
-                      <em className="acc-chip-clean">Bersih</em>
-                    )}
-                    {banner.subtitle ?? banner.imageUrl.slice(0, 64) + "…"}
-                  </span>
+              <div className="acc-receipts-row is-banner" key={banner.id}>
+                {/*
+                  Thumbnail, bukan potongan URL.
+
+                  Kolom ini sebelumnya menampilkan 64 karakter pertama
+                  dari `imageUrl` kalau banner tidak punya subjudul. Itu
+                  bukan informasi yang bisa dipakai: cloudinary URL-nya
+                  panjang dan mirip antar banner, jadi operator tidak
+                  bisa memverifikasi banner mana yang ini tanpa membuka
+                  beranda. Karena tugas halaman ini justru memanggil
+                  "banner aktif tampil di beranda", cara paling langsung
+                  untuk memverifikasinya adalah melihat gambarnya.
+                */}
+                <div className="acc-banner-cell">
+                  <img
+                    className="acc-banner-thumb"
+                    src={banner.imageUrl}
+                    alt={banner.title}
+                    loading="lazy"
+                    width={120}
+                    height={40}
+                  />
+                  <div>
+                    <strong>{banner.title}</strong>
+                    <span>
+                      {banner.showTextOverlay === false && (
+                        <em className="acc-chip-clean">Bersih</em>
+                      )}
+                      {banner.subtitle ?? "Tanpa subjudul"}
+                    </span>
+                  </div>
                 </div>
                 <span>{banner.promoCode ?? banner.ctaLabel ?? "-"}</span>
                 <select
                   value={banner.displayMode}
                   disabled={!canManage || Boolean(busy)}
+                  aria-label={`Lokasi tampil banner ${banner.title}`}
                   onChange={(event) => void changeDisplayMode(banner, event.target.value)}
                 >
                   {Object.entries(DISPLAY_MODE_LABEL).map(([value, label]) => (
@@ -442,14 +486,14 @@ export default function BannerAdminPanel() {
                   ))}
                 </select>
                 <span className={"acc-status " + (banner.active ? "active" : "inactive")}>
-                  {banner.active ? "active" : "inactive"}
+                  {banner.active ? "Aktif" : "Nonaktif"}
                 </span>
                 <div className="acc-action-panel">
                   <button
                     type="button"
                     disabled={!canManage || Boolean(busy)}
                     onClick={() => void toggleTextOverlay(banner)}
-                    title="Alihkan antara tampil dengan teks overlay dan banner bersih (gambar saja)"
+                    title="Alihkan antara tampil dengan teks di atas gambar dan banner bersih (gambar saja)"
                   >
                     {busy === "overlay:" + banner.id
                       ? "..."
@@ -480,7 +524,7 @@ export default function BannerAdminPanel() {
             ))}
             {payload && (payload.banners ?? []).length === 0 && (
               <div className="acc-empty">
-                Belum ada banner — beranda menampilkan kartu generic promo/USP.
+                Belum ada banner — beranda menampilkan kartu promo/USP bawaan.
               </div>
             )}
           </div>

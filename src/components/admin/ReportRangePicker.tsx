@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toKey } from "@/lib/admin-calendar";
 import CalendarRangePicker from "@/components/admin/CalendarRangePicker";
 
 /**
@@ -58,26 +59,40 @@ export default function ReportRangePicker({
   label?: string;
 }) {
   const [custom, setCustom] = useState(false);
-  const [from, setFrom] = useState(value.from);
-  const [to, setTo] = useState(value.to);
 
   /*
-   * Angka hari pada preset, untuk mengisi kolom tanggal saat operator
-   * beralih ke mode rentang bebas.
+   * Angka hari pada preset, dipakai untuk mengisi kalender rentang dengan
+   * rentang yang masuk akal begitu mode rentang dibuka.
    *
    * Dihitung dari "hari ini", bukan dari tanggal server. Selisihnya
-   * paling satu hari di sekitar tengah malam, dan keuntungannya kolom
-   * tanggal langsung terisi dengan sesuatu yang masuk akal - yang jauh
-   * lebih berguna daripada kotak kosong.
+   * paling satu hari di sekitar tengah malam, dan keuntungannya kalender
+   * langsung terisi dengan sesuatu yang masuk akal - yang jauh lebih
+   * berguna daripada kalender kosong yang harus diisi dari nol.
    */
   function defaultRangeFor(preset: string) {
     const days = presets.find((p) => p.value === preset)?.value;
     const end = new Date();
     const start = new Date(end);
     start.setDate(end.getDate() - (Number(days || 30) - 1));
+    /*
+     * `toISOString()` yang dipakai sebelumnya mengembalikan UTC, bukan
+     * waktu lokal.
+     *
+     * Di GMT+7, `new Date()` hari ini pukul 02:00 adalah kemarin pukul
+     * 19:00 UTC - jadi `toISOString().slice(0, 10)` mengembalikan
+     * KEMARIN. Preset "hari ini" jadi laporan kemarin, dan preset
+     * "30 hari" kehilangan satu hari di ujungnya.
+     *
+     * Tidak ada error, tidak ada peringatan: angkanya masuk ke query dan
+     * laporan termuat dengan hasil yang terlihat benar.
+     *
+     * `toKey` dari `@/lib/admin-calendar` menulis tanggal waktu lokal,
+     * sama dengan yang dipakai grid kalender di bawah - jadi angka di
+     * tombol preset dan angka di kalender selalu sama.
+     */
     return {
-      from: start.toISOString().slice(0, 10),
-      to: end.toISOString().slice(0, 10),
+      from: toKey(start),
+      to: toKey(end),
     };
   }
 
@@ -93,11 +108,8 @@ export default function ReportRangePicker({
             aria-pressed={activePreset === preset.value}
             className={activePreset === preset.value ? "active" : ""}
             onClick={() => {
-              const filled = defaultRangeFor(preset.value);
               setCustom(false);
-              setFrom(filled.from);
-              setTo(filled.to);
-              onApply({ preset: preset.value, from: filled.from, to: filled.to });
+              onApply({ preset: preset.value, ...defaultRangeFor(preset.value) });
             }}
           >
             {preset.label}
@@ -107,25 +119,38 @@ export default function ReportRangePicker({
           type="button"
           aria-pressed={custom}
           className={custom ? "active" : ""}
-          onClick={() => {
-            setCustom(true);
-            const filled = defaultRangeFor(value.preset);
-            if (!from) setFrom(filled.from);
-            if (!to) setTo(filled.to);
-          }}
+          onClick={() => setCustom((current) => !current)}
         >
           Rentang
         </button>
       </div>
 
-      {custom ? (
-        <CalendarRangePicker
-          value={{ from, to }}
-          busy={busy}
-          onApply={(range) => onApply({ preset: "", ...range })}
-          onCancel={() => setCustom(false)}
-        />
-      ) : null}
+      {/*
+          Kalendernya sekarang sendiri yang menyimpan status buka/tutup,
+          jadi pemanggil tidak perlu memanggil apa pun. Dulu ada `onCancel`
+          yang memanggil `setCustom(false)` - sekarang "Tutup" hanya
+          menutup panel, dan tombol "Rentang" di baris preset tetap menyala.
+
+          Bedanya penting: menutup panel bukan berarti membatalkan pilihan
+          periode. Kalau "Tutup" ikut menonaktifkan mode rentang, operator
+          yang mau melihat lagi tanggal pilihannya harus menekan "Rentang"
+          lagi - dan kolomnya menghilang di antaranya.
+
+          `from`/`to` lokal juga sudah tidak perlu: panel diisi ulang dari
+          `value.from`/`value.to` setiap kali dibuka, jadi satu-satunya
+          sumber kebenaran adalah rentang yang benar-benar sedang dipakai
+          laporan.
+        */}
+        {custom ? (
+          <CalendarRangePicker
+            value={{
+              from: value.preset ? "" : value.from,
+              to: value.preset ? "" : value.to,
+            }}
+            busy={busy}
+            onApply={(range) => onApply({ preset: "", ...range })}
+          />
+        ) : null}
     </div>
   );
 }
