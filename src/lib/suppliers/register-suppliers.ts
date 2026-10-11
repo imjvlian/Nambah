@@ -1,3 +1,4 @@
+import { MelostoreSupplierClient } from "@/lib/suppliers/melostore-client";
 import { DigiflazzSupplierClient } from "@/lib/suppliers/digiflazz-client";
 import { registerSupplier } from "@/lib/suppliers/registry";
 
@@ -20,8 +21,14 @@ import { registerSupplier } from "@/lib/suppliers/registry";
  */
 
 registerSupplier("digiflazz", () => new DigiflazzSupplierClient());
+registerSupplier("melostore", () => new MelostoreSupplierClient());
 
-// Melostore didaftarkan pada Tahap 2, bersama kliennya. Belum ada di
-// sini lebih awal hanya akan membuat `isConfigured()` mengembalikan
-// false tanpa pernah bisa dihitung - dan UI admin akan menampilkan
-// supplier yang kelihatan siap padahal belum punya kredensial.
+/*
+ * Melostore sudah didaftarkan, tapi belum dipilih order.
+ *
+ * Pendaftaran di sini hanya membuat kliennya bisa dipanggil - balance,
+ * katalog, webhook. `orders.supplier_id` masih selalu "digiflazz"
+ * (lihat `src/app/api/orders/route.ts`), jadi memilih Melostore butuh
+ * Tahap 4: sync `supplier_products` dan pemasangan pemilihan supplier
+ * di checkout.
+ */
