@@ -603,11 +603,17 @@ async function backfillInternalSku() {
       continue;
     }
 
-    let sku = generateInternalSku(product.game_id, product.label);
+    /*
+     * Input generator: game dan label. Nominal dan jenis diekstrak dari
+     * label di dalam generator; SKU Digiflazz tidak ikut karena SKU
+     * internal justru harus tidak bergantung padanya.
+     */
+    const input = { gameId: product.game_id, label: product.label };
+    let sku = generateInternalSku(input);
 
     if (sku && dipakai.has(sku)) {
       for (let suffix = 2; suffix < 50; suffix += 1) {
-        const kandidat = internalSkuWithSuffix(product.game_id, product.label, suffix);
+        const kandidat = internalSkuWithSuffix(input, suffix);
         if (kandidat && !dipakai.has(kandidat)) {
           sku = kandidat;
           break;

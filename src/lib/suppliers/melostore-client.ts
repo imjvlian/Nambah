@@ -273,6 +273,13 @@ function toQuote(item: MelostazzPriceItem): SupplierQuote {
   };
 }
 
+export type MelostoreScanOutcome = {
+  items: MelostoreCatalogItem[];
+  pagesTotal: number;
+  pagesFailed: number;
+  /** Pesan per halaman yang gagal, untuk dicatat ke jejak scan. */
+  errors: string[];
+};
 export type MelostoreCatalogItem = {
   sku: string;
   name: string;
@@ -329,6 +336,92 @@ export class MelostoreSupplierClient implements SupplierClient {
    * menarik halaman yang sama selamanya dan menghabiskan rate limit.
    */
   /**
+   * Tarik katalog untuk SCAN: halaman gagal dikumpulkan, bukan melempar.
+   *
+   * `fetchCatalog` melempar pada satu halaman gagal - perilaku yang benar
+   * untuk transaksi, tapi salah untuk scan. Scan yang kehilangan dua
+   * halaman dari empat puluh tetap menghasilkan ribuan SKU sah yang layak
+   * disimpan; membuang semuanya berarti katalog tidak pernah tersinkron
+   * selama supplier sedang bermasalah.
+   *
+   * Konsekuensi yang wajib dipegang pemanggil: hasil dengan
+   * `pagesFailed > 0` adalah scan PARSIAL. SKU tidak boleh ditandai tidak
+   * tersedia berdasarkan hasil parsial, karena yang hilang bisa jadi ada
+   * di halaman yang gagal.
+   */
+  async scanCatalog(): Promise<MelostoreScanOutcome> {
+    const perSku = new Map<string, MelostazzPriceItem>();
+    let cursor: string | null = null;
+    let pages = 0;
+    let pagesFailed = 0;
+    const errors: string[] = [];
+
+    while (pages < MAX_PAGES) {
+      const path: string =
+        `/pricelists?limit=${PAGE_SIZE}` +
+        (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
+
+      let page: MelostazzPriceItem[] | undefined;
+      let nextCursor: string | null = null;
+      let hasMore = false;
+      try {
+        const body = await requestOnce<
+          MelostoreEnvelope<MelostazzPriceItem[]> & {
+            meta?: {
+              pagination?: { next_cursor?: string | null; has_more?: boolean };
+            };
+          }
+        >(path, { method: "GET" });
+        page = body.data;
+        nextCursor = body.meta?.pagination?.next_cursor ?? null;
+        hasMore = body.meta?.pagination?.has_more === true;
+      } catch (error) {
+        pagesFailed += 1;
+        errors.push(
+          `Halaman ${pages + 1}: ` +
+            (error instanceof Error ? error.message : "galat tidak diketahui"),
+        );
+        /*
+         * Halaman yang gagal tidak mengembalikan cursor berikutnya -
+         * melanjutkan berarti mengulang permintaan yang sama. Berhenti di
+         * sini: hasilnya PARSIAL, dan pemanggil wajib memperlakukannya
+         * demikian.
+         */
+        break;
+      }
+
+      if (!Array.isArray(page)) {
+        pagesFailed += 1;
+        errors.push(`Halaman ${pages + 1}: respons tidak berisi daftar SKU.`);
+        break;
+      }
+
+      for (const item of page) {
+        if (typeof item?.sku_code !== "string" || !item.sku_code.trim()) continue;
+        perSku.set(item.sku_code, item);
+      }
+
+      pages += 1;
+
+      if (!hasMore || !nextCursor || nextCursor === cursor) break;
+      cursor = nextCursor;
+    }
+
+    return {
+      items: [...perSku.values()].map((item) => ({
+        sku: item.sku_code,
+        name: item.name ?? "",
+        price: toSupplierAmount(item.price) ?? 0,
+        status: item.status ?? null,
+        categoryName: item.category_name ?? null,
+      })),
+      pagesTotal: pages,
+      pagesFailed,
+      errors,
+    };
+  }
+
+  /**
    * Katalog lengkap dengan nama produk.
    *
    * `fetchQuotes` tidak membawa nama - `SupplierQuote` sengaja tanpa
@@ -367,6 +460,12 @@ export class MelostoreSupplierClient implements SupplierClient {
    * antara dua data yang berbeda.
    */
   private async fetchRawCatalog(): Promise<MelostazzPriceItem[]> {
+    /*
+     * Dedup di sumbernya: katalog Melostore mengembalikan SKU yang sama
+     * di lebih dari satu halaman, dan upsert dengan kunci duplikat ditolak
+     * Postgres. Yang terakhir menang - entri paling akhir paling segar, dan
+     * urutan halaman dijamin maju.
+     */
     const perSku = new Map<string, MelostazzPriceItem>();
     let cursor: string | null = null;
     let pages = 0;

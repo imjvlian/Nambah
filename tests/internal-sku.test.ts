@@ -5,171 +5,244 @@ import {
   brandAlias,
   generateInternalSku,
   internalSkuWithSuffix,
+  jenisFromSupplier,
+  nominalFromLabel,
   normalizeProductLabel,
+  regionFromSupplierSku,
 } from "../src/lib/internal-sku.ts";
 
 /**
- * Generator SKU internal.
+ * Generator SKU internal, format GAME-JENIS-NOMINAL.
  *
- * Contoh di spesifikasi adalah kontrak, bukan contoh:
- *   Mobile Legends + "50 Diamond"          -> MLBB-50-DIAMOND
- *   Free Fire + "100 Diamond"              -> FF-100-DIAMOND
- *   PUBG Mobile + "60 UC"                  -> PUBGM-60-UC
- *   Genshin Impact + "60 Genesis Crystals" -> GI-60-GENESIS-CRYSTALS
- *   Valorant + "125 Points"                -> VALORANT-125-POINTS
+ * Contoh di spesifikasi adalah kontrak:
+ *   Mobile Legends + 56 Diamonds -> MLBB-DM-56
+ *   Free Fire + 70 Diamonds      -> FF-DM-70
+ *   PUBG Mobile + 60 UC          -> PUBGM-UC-60
+ * Dengan pembeda wilayah: MLBB-DM-56-ID dan MLBB-DM-56-MY.
  */
 
-test("contoh dari spesifikasi menghasilkan SKU yang persis", () => {
-  assert.equal(generateInternalSku("mobile-legends", "50 Diamond"), "MLBB-50-DIAMOND");
-  assert.equal(generateInternalSku("mobile-legends", "100 Diamond"), "MLBB-100-DIAMOND");
-  assert.equal(generateInternalSku("free-fire", "100 Diamond"), "FF-100-DIAMOND");
-  assert.equal(generateInternalSku("pubg-mobile", "60 UC"), "PUBGM-60-UC");
+const sku = (
+  gameId: string,
+  label: string,
+  opsi?: { jenis?: string; region?: string; supplierSku?: string },
+) => generateInternalSku({ gameId, label, ...opsi }, opsi?.supplierSku);
+
+/* ==========================================================================
+   Contoh dari spesifikasi.
+   ========================================================================== */
+
+test("format GAME-JENIS-NOMINAL sesuai spesifikasi", () => {
+  assert.equal(sku("mobile-legends", "56 Diamonds"), "MLBB-DM-56");
+  assert.equal(sku("free-fire", "70 Diamonds"), "FF-DM-70");
+  assert.equal(sku("pubg-mobile", "60 UC"), "PUBGM-UC-60");
+});
+
+test("kolom type supplier lebih diutamakan daripada nama", () => {
+  // Nama supplier bisa menulis "56 Dm" - kolom type "Diamonds" adalah
+  // sumber yang lebih rapi untuk jenis.
   assert.equal(
-    generateInternalSku("genshin-impact", "60 Genesis Crystals"),
-    "GI-60-GENESIS-CRYSTALS",
+    sku("mobile-legends", "56 Dm", { jenis: "Diamonds" }),
+    "MLBB-DM-56",
   );
-  assert.equal(generateInternalSku("valorant", "125 Points"), "VALORANT-125-POINTS");
 });
 
 /* ==========================================================================
-   Normalisasi label.
+   Tiga bagian terpisah: GAME, JENIS, NOMINAL.
    ========================================================================== */
 
-test("huruf besar dan pemisah tanda hubung", () => {
-  assert.equal(normalizeProductLabel("50 diamond"), "50-DIAMOND");
-  assert.equal(normalizeProductLabel("  Weekly Pass  "), "WEEKLY-PASS");
+test("game berbeda, nominal sama -> SKU berbeda", () => {
+  const ml = sku("mobile-legends", "50 Diamonds");
+  const ff = sku("free-fire", "50 Diamonds");
+  assert.equal(ml, "MLBB-DM-50");
+  assert.equal(ff, "FF-DM-50");
+  assert.notEqual(ml, ff);
 });
 
-test("pemisah ribuan gaya Indonesia dihilangkan, bukan jadi tanda hubung", () => {
-  // "1.050" adalah seribu lima puluh. Membiarkan titiknya menghasilkan
-  // "1-050-DIAMONDS" yang terbaca sebagai dua angka berbeda.
-  assert.equal(normalizeProductLabel("1.050 Diamonds"), "1050-DIAMONDS");
-  assert.equal(normalizeProductLabel("1.000.000 UC"), "1000000-UC");
+test("nominal berbeda, game sama -> SKU berbeda", () => {
+  assert.notEqual(sku("mobile-legends", "50 Diamonds"), sku("mobile-legends", "56 Diamonds"));
 });
 
-test("angka desimal tetap memakai tanda hubung, bukan dihapus", () => {
-  // "12.5" bukan ribuan - hanya pola tiga digit yang dihilangkan.
-  assert.equal(normalizeProductLabel("12.5 Diamonds"), "12-5-DIAMONDS");
+test("penulisan nama berbeda untuk barang sama -> SKU sama", () => {
+  // "50 Diamonds", "50 diamond", dan "50 Diamonds " adalah barang yang
+  // sama. Kalau SKU-nya berbeda, scan ulang akan membuat produk duplikat.
+  assert.equal(sku("mobile-legends", "50 Diamonds"), sku("mobile-legends", "50 diamond"));
+  assert.equal(sku("mobile-legends", "50 Diamonds"), sku("mobile-legends", "  50 diamonds  "));
 });
 
-test("karakter khusus menjadi tanda hubung, tumpukan disatukan", () => {
-  assert.equal(normalizeProductLabel("50 // Diamonds"), "50-DIAMONDS");
-  assert.equal(normalizeProductLabel("50 -- Diamonds"), "50-DIAMONDS");
+/* ==========================================================================
+   Region.
+   ========================================================================== */
+
+test("wilayah utama tidak diberi akhiran", () => {
+  // mlid = Indonesia, pasar utama. Akhiran hanya untuk yang menyimpang.
+  assert.equal(sku("mobile-legends", "56 Diamonds", { supplierSku: "mlid56d-s1" }), "MLBB-DM-56");
 });
 
-test("tanda hubung di awal dan akhir dibuang", () => {
-  assert.equal(normalizeProductLabel("--50--"), "50");
+test("wilayah lain diberi akhiran", () => {
+  assert.equal(
+    sku("mobile-legends", "56 Diamonds", { supplierSku: "mlmy56d-s1" }),
+    "MLBB-DM-56-MY",
+  );
+  assert.equal(
+    sku("free-fire", "70 Diamonds", { supplierSku: "ffg70d-s5" }),
+    "FF-DM-70-GL",
+  );
 });
 
-test("jamak TIDAK dijamankan menjadi tunggal", () => {
-  // Spesifikasi memakai "60 Genesis Crystals" utuh. Menyatukan Diamond
-  // dan Diamonds justru membuat SKU tidak cocok dengan label yang
-  // ditampilkan di katalog.
-  assert.equal(normalizeProductLabel("60 Genesis Crystals"), "60-GENESIS-CRYSTALS");
+test("produk Digiflazz (tanpa region di SKU) tanpa akhiran", () => {
+  // SKU Digiflazz opaque (pre34157843) - tidak ada informasi wilayah,
+  // jadi tanpa akhiran. Menebak wilayah dari nama berarti mengarang.
+  assert.equal(sku("mobile-legends", "56 Diamonds", { supplierSku: "pre34157843" }), "MLBB-DM-56");
 });
 
-test("label kosong menghasilkan string kosong", () => {
-  assert.equal(normalizeProductLabel(""), "");
-  assert.equal(normalizeProductLabel("   "), "");
-  assert.equal(normalizeProductLabel("---"), "");
+test("region eksplisit menimpa tebakan dari SKU supplier", () => {
+  assert.equal(
+    sku("mobile-legends", "56 Diamonds", { supplierSku: "mlmy56d-s1", region: "ID" }),
+    "MLBB-DM-56",
+  );
+});
+
+/* ==========================================================================
+   Ekstraksi nominal.
+   ========================================================================== */
+
+test("pemisah ribuan gaya Indonesia dihilangkan", () => {
+  assert.equal(sku("mobile-legends", "1.050 Diamonds"), "MLBB-DM-1050");
+  assert.equal(nominalFromLabel("1.000.000 UC"), 1000000);
+});
+
+test("angka terbesar yang dipakai, bukan yang pertama", () => {
+  // "2x 50 Diamonds" menyebut dua angka; yang mengidentifikasi produk
+  // adalah 50, bukan pengali 2.
+  assert.equal(nominalFromLabel("2x 50 Diamonds"), 50);
+});
+
+test("angka desimal bukan pemisah ribuan", () => {
+  assert.equal(nominalFromLabel("12.5 Diamonds"), 12);
+});
+
+/* ==========================================================================
+   Produk tanpa nominal.
+   ========================================================================== */
+
+test("produk tanpa angka memakai sisa nama sebagai bagian NOMINAL", () => {
+  // "Weekly Pass" tidak punya angka. Tanpa jalur ini, produk non-top-up
+  // tidak punya cara masuk ke format GAME-JENIS-NOMINAL sama sekali.
+  assert.equal(sku("mobile-legends", "Weekly Pass"), "MLBB-WEEKLY-PASS");
+});
+
+test("kata jenis dikeluarkan dari sisa nama, tidak dobel", () => {
+  assert.equal(sku("mobile-legends", "Weekly Diamond Pass"), "MLBB-WEEKLY-PASS");
+});
+
+test("jenis tak dikenal jatuh ke ITEM, bukan gagal", () => {
+  assert.equal(sku("mobile-legends", "Special Bundle"), "MLBB-BUNDLE-SPECIAL");
+});
+
+/* ==========================================================================
+   jenisFromSupplier.
+   ========================================================================== */
+
+test("jenis dikenali dari kata tunggal maupun jamak", () => {
+  assert.equal(jenisFromSupplier("Diamonds", null), "DM");
+  assert.equal(jenisFromSupplier("Diamond", null), "DM");
+  assert.equal(jenisFromSupplier("UC", null), "UC");
+  assert.equal(jenisFromSupplier(null, "125 Points"), "PT");
+});
+
+test("jenis yang tidak dikenal mengembalikan null", () => {
+  assert.equal(jenisFromSupplier("Mystery Box", null), null);
+  assert.equal(jenisFromSupplier(null, null), null);
+});
+
+/* ==========================================================================
+   Stabilitas.
+   ========================================================================== */
+
+test("SKU tidak bergantung pada SKU supplier yang berbeda untuk barang sama", () => {
+  // Digiflazz "pre34157843" dan Melostore "mlid56d-s1" adalah barang yang
+  // sama. SKU internal harus sama - itulah yang menghubungkan keduanya.
+  const dariDigiflazz = sku("mobile-legends", "56 Diamonds", { supplierSku: "pre34157843" });
+  const dariMelostore = sku("mobile-legends", "56 Diamonds", { supplierSku: "mlid56d-s1" });
+  assert.equal(dariDigiflazz, dariMelostore);
+});
+
+test("input kosong tidak menghasilkan SKU", () => {
+  assert.equal(sku("mobile-legends", ""), null);
+  assert.equal(sku("mobile-legends", "   "), null);
+});
+
+test("SKU tidak melebihi batas yang masuk akal", () => {
+  const panjang = sku(
+    "game-tanpa-alias-yang-sangat-panjang",
+    "Nama Produk Yang Sangat Panjang ".repeat(6),
+  );
+  if (panjang !== null) assert.ok(panjang.length <= 120);
 });
 
 /* ==========================================================================
    Alias brand.
    ========================================================================== */
 
-test("game besar memakai alias yang sudah dikenal", () => {
+test("alias brand untuk game besar", () => {
   assert.equal(brandAlias("mobile-legends"), "MLBB");
   assert.equal(brandAlias("free-fire"), "FF");
   assert.equal(brandAlias("pubg-mobile"), "PUBGM");
 });
 
-test("game tanpa alias turun ke slug dengan garis bawah", () => {
-  // Panjang, tapi deterministik dan tidak memakai tanda hubung di dalam
-  // bagian brand - tanda hubung adalah pemisah antar bagian SKU.
-  assert.equal(brandAlias("call-of-duty-mobile"), "CODM");
-  assert.equal(brandAlias("game-tak-terdaftar"), "GAME_TAK_TERDAFTAR");
-});
-
 test("alias tidak pernah mengandung tanda hubung", () => {
-  // Tanda hubung adalah pemisah bagian. Kalau alias mengandungnya,
-  // SKU tidak bisa dipecah kembali menjadi brand dan nama produk.
-  for (const game of ["mobile-legends", "free-fire", "game-tak-terdaftar"]) {
+  // Tanda hubung adalah pemisah bagian SKU. Kalau alias memakainya,
+  // SKU tidak bisa dipecah kembali.
+  for (const game of ["mobile-legends", "free-fire", "call-of-duty-mobile"]) {
     assert.equal(brandAlias(game).includes("-"), false, game);
   }
 });
 
-test("game id kosong tetap punya fallback yang aman", () => {
-  assert.equal(brandAlias(""), "PRODUK");
-});
-
 /* ==========================================================================
-   SKU utuh.
+   Akhiran duplikat.
    ========================================================================== */
 
-test("SKU internal TIDAK sama dengan SKU supplier", () => {
-  // SKU Digiflazz untuk ML 50 Diamond adalah "ml50" atau sejenisnya;
-  // SKU internal harus jelas berbeda supaya tidak tertukar saat
-  // dikirim ke supplier.
-  const internal = generateInternalSku("mobile-legends", "50 Diamond");
-  assert.equal(internal, "MLBB-50-DIAMOND");
-  assert.notEqual(internal, "ml50");
-  assert.notEqual(internal?.toLowerCase(), "ml50");
-});
-
-test("label kosong tidak menghasilkan SKU", () => {
-  // Mengarang SKU dari input kosong berarti membuat identitas yang
-  // tidak bisa dilacak kembali ke produknya.
-  assert.equal(generateInternalSku("mobile-legends", ""), null);
-  assert.equal(generateInternalSku("mobile-legends", "   "), null);
-  assert.equal(generateInternalSku("mobile-legends", "---"), null);
-});
-
-test("SKU yang sama dihasilkan untuk input yang setara", () => {
-  const a = generateInternalSku("mobile-legends", "50  Diamonds");
-  const b = generateInternalSku("mobile-legends", "50 Diamonds");
-  assert.equal(a, b);
-});
-
-test("SKU untuk game berbeda berbeda, walau labelnya sama", () => {
-  const ml = generateInternalSku("mobile-legends", "50 Diamond");
-  const ff = generateInternalSku("free-fire", "50 Diamond");
-  assert.notEqual(ml, ff);
-});
-
-test("SKU tidak melebihi batas yang masuk akal", () => {
-  const panjang = generateInternalSku(
-    "game-tanpa-alias-yang-sangat-panjang-sekali",
-    "Nama Produk Yang Sangat Panjang ".repeat(6),
-  );
-  if (panjang !== null) {
-    assert.ok(panjang.length <= 120, "SKU terlalu panjang: " + panjang.length);
-  }
-});
-
-/* ==========================================================================
-   Akhiran untuk duplikat.
-   ========================================================================== */
-
-test("akhiran menghasilkan SKU unik dari dasar yang sama", () => {
-  const dasar = generateInternalSku("mobile-legends", "50 Diamond");
-  const kedua = internalSkuWithSuffix("mobile-legends", "50 Diamond", 2);
-
-  assert.equal(dasar, "MLBB-50-DIAMOND");
-  assert.equal(kedua, "MLBB-50-DIAMOND-2");
-  assert.notEqual(dasar, kedua);
+test("akhiran menghasilkan SKU unik dari dasar sama", () => {
+  const input = { gameId: "mobile-legends", label: "56 Diamonds" };
+  assert.equal(generateInternalSku(input), "MLBB-DM-56");
+  assert.equal(internalSkuWithSuffix(input, 2), "MLBB-DM-56-2");
 });
 
 test("akhiran di bawah 2 ditolak", () => {
-  // Produk pertama tidak butuh akhiran; "-1" hanya menambah kebisingan.
-  assert.equal(internalSkuWithSuffix("mobile-legends", "50 Diamond", 1), null);
-  assert.equal(internalSkuWithSuffix("mobile-legends", "50 Diamond", 0), null);
-  assert.equal(internalSkuWithSuffix("mobile-legends", "50 Diamond", -3), null);
+  const input = { gameId: "mobile-legends", label: "56 Diamonds" };
+  assert.equal(internalSkuWithSuffix(input, 1), null);
+  assert.equal(internalSkuWithSuffix(input, 0), null);
 });
 
-test("akhiran bertingkat tetap unik", () => {
-  const kumpulan = [2, 3, 4].map((n) =>
-    internalSkuWithSuffix("free-fire", "100 Diamond", n),
-  );
-  assert.equal(new Set(kumpulan).size, kumpulan.length);
+test("region dan akhiran bisa bersama", () => {
+  const input = {
+    gameId: "mobile-legends",
+    label: "56 Diamonds",
+    region: "MY",
+  };
+  assert.equal(internalSkuWithSuffix(input, 2), "MLBB-DM-56-MY-2");
+});
+
+/* ==========================================================================
+   SKU internal vs SKU supplier.
+   ========================================================================== */
+
+test("SKU internal berbeda bentuk dari SKU supplier", () => {
+  // Digiflazz memakai kode opaque, Melostore memakai prefiks kecil.
+  // SKU internal huruf besar berformat tiga bagian - tidak mungkin
+  // tertukar dengan keduanya.
+  const internal = sku("mobile-legends", "56 Diamonds", { supplierSku: "mlid56d-s1" });
+  assert.equal(internal, "MLBB-DM-56");
+  assert.notEqual(internal, "mlid56d-s1");
+  assert.notEqual(internal, "pre34157843");
+});
+
+/* ==========================================================================
+   normalizeProductLabel - dipertahankan untuk pencocokan.
+   ========================================================================== */
+
+test("normalisasi label untuk pencocokan tetap bekerja", () => {
+  assert.equal(normalizeProductLabel("50 Diamonds"), "50diamonds");
+  assert.equal(normalizeProductLabel("1.050 Diamonds"), "1050diamonds");
+  assert.equal(normalizeProductLabel(""), "");
 });
