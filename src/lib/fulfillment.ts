@@ -12,6 +12,9 @@ import { openMerchantReceivable } from "@/lib/merchant-receivable";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { consumeDigiflazzTestScenario } from "@/lib/test-lab";
 import { normalizeDigiflazzStatus } from "@/lib/digiflazz-status-policy";
+import "@/lib/suppliers/register-suppliers";
+import { tryGetSupplierClient } from "@/lib/suppliers/registry";
+import type { SupplierClient, SupplierId } from "@/lib/suppliers/types";
 import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
@@ -68,7 +71,22 @@ export type FulfillmentResult = {
   orderId: string;
   requestRef: string;
   status: "disabled" | "pending" | "success" | "failed";
+  /*
+   * `source` tetap union literal, bukan `SupplierId`.
+   *
+   * Nilai `local` dan `digiflazz` sudah dipakai di log, laporan, dan
+   * serialisasi. Melepasnya ke `string` sekarang berarti setiap tempat
+   * yang membacanya harus menangani kemungkinan baru yang belum ada.
+   *
+   * Yang berubah hanya satu: `supplier` TAMBAH sebagai field
+   * terpisah. Field `source` tidak bisa dipakai untuk itu - isinya
+   * sudah dipakai untuk menandai transaksi yang disimulasikan, bukan
+   * untuk menamai supplier. conflate dua hal yang berbeda akan membuat
+   * `simulate` terlihat seperti nama supplier.
+   */
   source: "local" | "digiflazz";
+  /** Id supplier yang mengeksekusi. Kosong untuk jalur lokal. */
+  supplier?: SupplierId;
 };
 
 const FULFILLMENT_MODES = new Set<FulfillmentMode>([
@@ -645,9 +663,255 @@ async function runDigiflazzLive(
   }
 }
 
+type GenericDispatchConfig = {
+  supplierSku: string;
+  customerNo: string;
+  maxPrice: number;
+};
+
+async function getGenericDispatchConfig(
+  order: OrderRow,
+  supplierId: string,
+): Promise<GenericDispatchConfig> {
+  assertLiveFulfillmentSafety();
+
+  /*
+   * SKU dan modal diambil dari `supplier_products`, bukan dari map
+   * hardcoded. Hardcode itu masih dipakai `supplier-pricing.ts` untuk
+   * harga di checkout, tapi harga yang benar-benar dibayar harus selalu
+   * yang tercatat di order.
+   */
+  const [mapping] = await supabaseSelect<{
+    supplier_sku: string | null;
+    supplier_cost: number | string;
+    active: boolean;
+  }>("supplier_products", {
+    select: "supplier_sku,supplier_cost,active",
+    filters: {
+      supplier_id: `eq.${supplierId}`,
+      product_id: `eq.${order.product_id}`,
+      active: "eq.true",
+    },
+    limit: 1,
+  });
+
+  if (!mapping?.supplier_sku || !mapping.active) {
+    throw new Error(
+      `SKU ${supplierId} untuk produk ini belum dipetakan atau sedang tidak aktif.`,
+    );
+  }
+
+  const frozenCost = Number(order.supplier_cost);
+  const currentCost = Number(mapping.supplier_cost);
+  if (!Number.isFinite(frozenCost) || frozenCost <= 0) {
+    throw new Error("Supplier cost snapshot order tidak valid.");
+  }
+  if (!Number.isFinite(currentCost) || currentCost < 0) {
+    throw new Error("Supplier cost mapping tidak valid.");
+  }
+
+  /*
+   * Harga naik setelah checkout diblokir.
+   *
+   * `max_price` yang dikirim ke supplier dibuat sama dengan harga yang
+   * dibayar pembeli. Membiarkan order berjalan saat modal supplier naik
+   * akan membuat margin negatif tanpa ada yang menyadari - dan harga di
+   * nota sudah terlanjur tidak bisa diubah.
+   */
+  if (currentCost > frozenCost) {
+    throw new Error(
+      `Harga ${supplierId} naik setelah checkout. Dispatch diblokir agar margin tidak menjadi negatif.`,
+    );
+  }
+
+  return {
+    supplierSku: mapping.supplier_sku,
+    customerNo: targetForLog(order),
+    maxPrice: frozenCost,
+  };
+}
+
+/**
+ * Eksekusi order lewat kontrak supplier bersama.
+ *
+ * Dipakai hanya untuk supplier yang BUKAN "digiflazz", jadi jalur
+ * produksi yang sudah ada tidak tersentuh.
+ */
+async function fulfillViaSupplierClient(
+  client: SupplierClient,
+  order: OrderRow,
+): Promise<FulfillmentResult> {
+  const mode = getFulfillmentMode();
+  const requestRef = requestRefForOrder(order.id);
+
+  if (mode === "disabled" || mode === "simulate") {
+    /*
+     * Simulasi untuk supplier generik belum diimplementasikan di
+     * Tahap 1. Menolak eksplisit lebih baik daripada menjalankan order
+     * sungguhan ke supplier hanya karena env-nya salah.
+     */
+    throw new Error(
+      `Mode fulfillment "${mode}" belum didukung untuk supplier ${client.id}.`,
+    );
+  }
+
+  const existing = await getSupplierTransaction(requestRef);
+  if (existing?.supplier_transaction_id) {
+    /*
+     * Sudah pernah dikirim. Supplier memakai `requestRef` sebagai
+     * idempotency key, jadi mengirim ulang tidak akan menggandakan top
+     * up - tapi tetap tidak perlu dilakukan.
+     */
+    await markOrderProcessing(order);
+    return {
+      mode,
+      orderId: order.id,
+      requestRef,
+      status: "pending",
+      source: "local",
+      supplier: client.id,
+    };
+  }
+
+  await markOrderProcessing(order);
+
+  const config = await getGenericDispatchConfig(order, client.id);
+  const now = new Date().toISOString();
+
+  await supabaseUpsert<SupplierTransactionRow>(
+    "supplier_transactions",
+    {
+      order_id: order.id,
+      supplier_id: client.id,
+      product_id: order.product_id,
+      request_ref: requestRef,
+      supplier_transaction_id: null,
+      supplier_sku: config.supplierSku,
+      target: config.customerNo,
+      cost: config.maxPrice,
+      status: "pending",
+      message: `queued:${mode}`,
+      serial_number: null,
+      created_at: now,
+      updated_at: now,
+    },
+    { onConflict: "supplier_id,request_ref" },
+  );
+
+  const result = await client.runTransaction({
+    requestRef,
+    sku: config.supplierSku,
+    target: order.target_user_id,
+    zone: order.target_server_id,
+    maxPrice: config.maxPrice,
+    environment: mode === "digiflazz-test" ? "sandbox" : "live",
+  });
+
+  await supabaseUpdate(
+    "supplier_transactions",
+    {
+      supplier_transaction_id: result.transactionId ?? null,
+      supplier_sku: config.supplierSku,
+      target: config.customerNo,
+      cost: result.charged || config.maxPrice,
+      status: result.status,
+      message: `${client.id}: ${result.message}`,
+      serial_number: result.serialNumber,
+      updated_at: now,
+    },
+    { filters: { supplier_id: `eq.${client.id}`, request_ref: `eq.${requestRef}` } },
+  );
+
+  return {
+    mode,
+    orderId: order.id,
+    requestRef,
+    status: result.status,
+    source: "local",
+    supplier: client.id,
+  };
+}
+
+/**
+ * Order yang tidak punya supplier yang bisa dipakai.
+ *
+ * Ditolak eksplisit, bukan dijalankan. Menjalankannya tanpa supplier
+ * berarti top up tidak pernah terkirim, pembeli menunggu, dan tidak ada
+ * yang memberitahu mereka kenapa.
+ */
+async function rejectUnfulfillableOrder(order: OrderRow): Promise<FulfillmentResult> {
+  const now = new Date().toISOString();
+  await supabaseUpdate(
+    "orders",
+    { status: "failed", updated_at: now },
+    { filters: { id: `eq.${order.id}` } },
+  );
+
+  return {
+    mode: getFulfillmentMode(),
+    orderId: order.id,
+    requestRef: requestRefForOrder(order.id),
+    status: "failed",
+    source: "local",
+  };
+}
+
 export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResult> {
   const order = await getOrder(orderId);
   if (!order) throw new Error(`Order ${orderId} tidak ditemukan untuk fulfillment.`);
+  /*
+   * Jalur supplier generik (Tahap 1).
+   *
+   * Order dengan `supplier_id` selain "digiflazz" yang punya klien
+   * terdaftar di registry diteruskan ke `fulfillViaSupplierClient`.
+   * Jalur Digiflazz di bawah tidak diubah satu baris pun.
+   *
+   * Sengaja dikecilkan. Jalur Digiflazz sudah berjalan di produksi dan
+   * tercover test; menyuntingnya sekarang berarti menggabungkan dua
+   * perubahan besar - abstraksi supplier dan perpindahan jalur order -
+   * dalam satu commit. Kalau ada yang rusak, tidak ada yang bisa
+   * memberi tahu bagian mana penyebabnya.
+   *
+   * Order dengan supplier yang belum terkonfigurasi sengaja jatuh ke
+   * bawah, lalu berhenti di guard "supplier tidak valid" yang sudah ada.
+   * Pesannya menyebut Digiflazz, yang akan membingungkan - tapi berhenti
+   * lebih baik daripada mengirim order ke supplier tanpa kredensial.
+   */
+  /*
+   * Order tanpa `supplier_id` ditolak di sini, bukan diteruskan.
+   *
+   * Kalau dibiarkan jatuh ke guard Digiflazz di bawah, error-nya
+   * menyebut Digiflazz - padahal masalahnya bukan Digiflazz, melainkan
+   * order yang dibuat tanpa supplier sama sekali.
+   */
+  if (!order.supplier_id) {
+    return rejectUnfulfillableOrder(order);
+  }
+
+  /*
+   * Jalur supplier generik (Tahap 1).
+   *
+   * Supplier selain Digiflazz yang punya klien terdaftar di registry
+   * diteruskan ke `fulfillViaSupplierClient`. Jalur Digiflazz di bawah
+   * tidak diubah satu baris pun.
+   *
+   * Sengaja dikecilkan. Jalur Digiflazz sudah berjalan di produksi dan
+   * tercover test; menyuntingnya sekarang berarti menggabungkan dua
+   * perubahan besar - abstraksi supplier dan perpindahan jalur order -
+   * dalam satu commit. Kalau ada yang rusak, tidak ada yang bisa
+   * memberi tahu bagian mana penyebabnya.
+   *
+   * Supplier yang terdaftar tapi kredensialnya belum ada sengaja
+   * jatuh ke bawah, lalu berhenti di guard yang sudah ada. Pesannya
+   * menyebut Digiflazz, yang akan membingungkan - tapi berhenti lebih
+   * baik daripada mengirim order ke supplier tanpa kredensial.
+   */
+  if (order.supplier_id !== "digiflazz") {
+    const client = tryGetSupplierClient(order.supplier_id);
+    if (client) {
+      return fulfillViaSupplierClient(client, order);
+    }
+  }
 
   const requestRef = requestRefForOrder(order.id);
   const existing = await getSupplierTransaction(requestRef);
