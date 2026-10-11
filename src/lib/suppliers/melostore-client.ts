@@ -273,6 +273,13 @@ function toQuote(item: MelostazzPriceItem): SupplierQuote {
   };
 }
 
+export type MelostoreCatalogItem = {
+  sku: string;
+  name: string;
+  price: number;
+  status: string | null;
+  categoryName: string | null;
+};
 export class MelostoreSupplierClient implements SupplierClient {
   readonly id = SUPPLIER_ID;
   readonly label = "Melostore";
@@ -321,8 +328,46 @@ export class MelostoreSupplierClient implements SupplierClient {
    * server mengembalikan cursor yang sama, loop tanpa batas akan
    * menarik halaman yang sama selamanya dan menghabiskan rate limit.
    */
+  /**
+   * Katalog lengkap dengan nama produk.
+   *
+   * `fetchQuotes` tidak membawa nama - `SupplierQuote` sengaja tanpa
+   * kolom nama karena selection tidak membutuhkannya. Pemetaan ke
+   * produk Nambah justru BERBASIS nama, jadi di sinilah nama diambil.
+   *
+   * Dipakai panel pemetaan admin; selection tetap memakai `fetchQuotes`.
+   */
+  async fetchCatalog(): Promise<MelostoreCatalogItem[]> {
+    const items = await this.fetchRawCatalog();
+    return items.map((item) => ({
+      sku: item.sku_code,
+      name: item.name ?? "",
+      price: toSupplierAmount(item.price) ?? 0,
+      status: item.status ?? null,
+      categoryName: item.category_name ?? null,
+    }));
+  }
+
   async fetchQuotes(): Promise<SupplierQuote[]> {
-    const quotes: SupplierQuote[] = [];
+    return (await this.fetchRawCatalog()).map(toQuote);
+  }
+
+  /*
+   * Dedup di sini, di sumbernya.
+   *
+   * Katalog Melostore mengembalikan SKU yang sama di lebih dari satu
+   * halaman. Upsert dengan kunci duplikat ditolak Postgres dengan
+   * "ON CONFLICT DO UPDATE command cannot affect row a second time" -
+   * dan gagalnya baru terlihat SETELAH seluruh 10.000 SKU tertarik,
+   * jadi menyaringnya di pemanggil berarti setiap pemanggil harus
+   * ingat melakukannya.
+   *
+   * Yang terakhir menang: entri paling akhir adalah yang paling segar,
+   * dan urutan halaman dijamin maju - jadi ini bukan hasil acak
+   * antara dua data yang berbeda.
+   */
+  private async fetchRawCatalog(): Promise<MelostazzPriceItem[]> {
+    const perSku = new Map<string, MelostazzPriceItem>();
     let cursor: string | null = null;
     let pages = 0;
 
@@ -344,18 +389,19 @@ export class MelostoreSupplierClient implements SupplierClient {
         }
       >(path, { method: "GET" });
 
-      const items: MelostazzPriceItem[] | undefined = body.data;
-      if (!Array.isArray(items)) {
+      const page: MelostazzPriceItem[] | undefined = body.data;
+      if (!Array.isArray(page)) {
         throw new SupplierError(
           SUPPLIER_ID,
           "Respons katalog Melostore tidak berisi daftar SKU.",
         );
       }
 
-      for (const item of items) {
-        if (typeof item?.sku_code === "string" && item.sku_code.trim()) {
-          quotes.push(toQuote(item));
+      for (const item of page) {
+        if (typeof item?.sku_code !== "string" || !item.sku_code.trim()) {
+          continue;
         }
+        perSku.set(item.sku_code, item);
       }
 
       const pagination: { next_cursor?: string | null; has_more?: boolean } | undefined =
@@ -367,7 +413,7 @@ export class MelostoreSupplierClient implements SupplierClient {
       cursor = next;
     }
 
-    return quotes;
+    return [...perSku.values()];
   }
 
   async runTransaction(

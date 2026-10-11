@@ -105,7 +105,16 @@ type DraftProduct = {
   sellingPrice: string;
   referencePrice: string;
   active: boolean;
+  /** SKU Digiflazz. Mapping disimpan di `supplier_products`.
+   *
+   * Bidang ini SENGAJA tetap satu - menggantinya dengan objek berisi
+   * dua supplier akan memaksa seluruh jalur simpan dirombak. Mapping
+   * Melostore disimpan terpisah lewat endpoint pemetaannya, karena
+   * verifikasi keduanya beda sumber data.
+   */
   supplierSku: string;
+  /** SKU Melostore yang dipilih operator, belum tentu tersimpan. */
+  melostoreSku: string;
 };
 
 type OverviewPayload = {
@@ -709,6 +718,17 @@ function draftFromProduct(product: CatalogProduct): DraftProduct {
     referencePrice: String(product.referencePrice),
     active: product.active,
     supplierSku: product.supplier.sku ?? "",
+    /*
+     * Mapping Melostore tidak ikut dimuat di draft: sumbernya endpoint
+     * pemetaan yang berbeda, dan draft ini sudah dibaca `isDraftDirty`
+     * untuk tombol "simpan semua". Mencampur keduanya membuat perubahan
+     * harga dianggap perubahan mapping - dua hal yang berbeda risikonya.
+     *
+     * Dropdown Melostore menyimpan pilihannya di state terpisah dan
+     * menyimpan lewat endpoint pemetaannya sendiri, tepat setelah
+     * operator memilih.
+     */
+    melostoreSku: "",
   };
 }
 
@@ -1016,6 +1036,22 @@ export default function AdminDashboard() {
     endsAt: "",
   });
   const [drafts, setDrafts] = useState<Record<string, DraftProduct>>({});
+  /*
+   * Kandidat SKU dari kedua supplier, dibaca sekali saat section Katalog
+   * dibuka.
+   *
+   * Sumbernya supplier_catalog_items lewat endpoint pemetaan - bukan API
+   * supplier. Katalog Melostore berisi 10.000 SKU dengan tarif 20
+   * permintaan/menit; menarik setiap kali form dibuka akan menghabiskan
+   * jatah itu dan membuat dropdown selalu gagal di jam sibuk.
+   */
+  const [supplierCatalog, setSupplierCatalog] = useState<{
+    digiflazz: Array<{ sku: string; name: string; cost: number }>;
+    melostore: Array<{ sku: string; name: string; cost: number }>;
+    error: string | null;
+  }>({ digiflazz: [], melostore: [], error: null });
+  const [melostorePick, setMelostorePick] = useState<Record<string, string>>({});
+  const [melostoreBusy, setMelostoreBusy] = useState("");
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [mappingFilter, setMappingFilter] = useState("all");
@@ -1763,7 +1799,15 @@ const txDataStamp = txRange.preset
     try {
       await loadOverview();
       if (section === "orders") await loadOrders();
-      if (section === "catalog" || section === "supplier") await loadCatalog();
+      if (section === "catalog" || section === "supplier") {
+        await loadCatalog();
+        /*
+         * Kandidat SKU dimuat bersama katalog, sekali per buka section.
+         * Per-produk saat editor dibuka berarti satu permintaan per
+         * baris - dan daftar SKU ini sama untuk semua produk.
+         */
+        void muatKandidatSupplier();
+      }
       if (section === "receipts") await loadReceipts();
       if (section === "points") await loadPoints();
       if (section === "affiliates") await loadAffiliates();
@@ -2408,6 +2452,62 @@ const txDataStamp = txRange.preset
       ...current,
       [product.id]: draftFromProduct(product),
     }));
+  }
+
+  async function muatKandidatSupplier() {
+    try {
+      const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Kandidat supplier gagal dimuat.");
+      }
+      const data = (await response.json()) as {
+        rows: Array<{ productId: string; mappedSku: string | null; autoSku: string | null }>;
+        supplier: { configured: boolean; catalogSize: number; error: string | null };
+      };
+
+      /*
+       * Kandidat yang sudah tersimpan di database tidak dimuat di sini.
+       * Route pemetaan hanya mengirim ringkasan per produk - daftar SKU
+       * penuh terlalu besar untuk dikirim dua kali. Yang dibutuhkan
+       * editor adalah daftar SKU per supplier untuk dropdown, dan itu
+       * datang dari supplier_catalog_items lewat endpoint yang sama.
+       */
+      const pick: Record<string, string> = {};
+      for (const row of data.rows) {
+        if (row.mappedSku) pick[row.productId] = row.mappedSku;
+        else if (row.autoSku) pick[row.productId] = row.autoSku;
+      }
+      setMelostorePick(pick);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Kandidat supplier gagal dimuat.");
+    }
+  }
+
+  async function simpanMappingMelostore(product: CatalogProduct, sku: string) {
+    setMelostoreBusy(product.id);
+    try {
+      const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: sku ? "apply" : "clear", productId: product.id, sku }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Pemetaan Melostore gagal disimpan.");
+      }
+      setNotice(
+        sku
+          ? `${product.label} dipetakan ke Melostore ${sku}.`
+          : `Pemetaan Melostore untuk ${product.label} dikosongkan.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Pemetaan Melostore gagal disimpan.");
+    } finally {
+      setMelostoreBusy("");
+    }
   }
 
   async function persistProduct(product: CatalogProduct, draft: DraftProduct) {
@@ -3301,6 +3401,75 @@ const txDataStamp = txRange.preset
                                 : formatIDR(product.supplier.cost)}
                             </strong>
                           </div>
+
+                        {/*
+                         * Supplier Mapping - dua dropdown, dua supplier.
+                         *
+                         * Kandidat dibaca dari supplier_catalog_items lewat
+                         * endpoint pemetaan. Bukan dari API supplier: katalog
+                         * Melostore berisi 10.000 SKU dengan tarif 20
+                         * permintaan/menit, dan dua admin yang membuka form
+                         * bersamaan sudah menghabiskan jatahnya.
+                         *
+                         * Dropdown Melostore menyimpan pilihannya lewat
+                         * endpoint pemetaan, bukan lewat persistProduct -
+                         * verifikasi harganya beda sumber, dan mencampur
+                         * keduanya membuat "simpan harga" ikut mengubah
+                         * mapping.
+                         */}
+                        <div className="admin-supplier-fields">
+                          <label>
+                            <span>SKU Digiflazz</span>
+                            <input
+                              value={draft.supplierSku}
+                              placeholder="Belum mapped"
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  supplierSku: event.target.value,
+                                })
+                              }
+                            />
+                            {supplierCatalog.digiflazz.length > 0 ? (
+                              <small>{supplierCatalog.digiflazz.length} SKU di katalog Digiflazz</small>
+                            ) : null}
+                          </label>
+
+                          <label>
+                            <span>SKU Melostore</span>
+                            <select
+                              value={melostorePick[product.id] ?? ""}
+                              disabled={supplierCatalog.melostore.length === 0}
+                              onChange={(event) => {
+                                const sku = event.target.value;
+                                setMelostorePick((current) => ({
+                                  ...current,
+                                  [product.id]: sku,
+                                }));
+                                if (sku) {
+                                  void simpanMappingMelostore(product, sku);
+                                }
+                              }}
+                            >
+                              <option value="">
+                                supplierCatalog.melostore.length === 0
+                                  ? "Katalog Melostore belum tersedia"
+                                  : "Tidak memakai Melostore"
+                              </option>
+                              {supplierCatalog.melostore.map((item) => (
+                                <option key={item.sku} value={item.sku}>
+                                  {item.sku} - {item.name} - {formatIDR(item.cost)}
+                                </option>
+                              ))}
+                            </select>
+                            {melostoreBusy === product.id ? (
+                              <small>Menyimpan...</small>
+                            ) : melostorePick[product.id] ? (
+                              <small>Terpetakan ke Melostore.</small>
+                            ) : (
+                              <small>Kosong berarti hanya Digiflazz.</small>
+                            )}
+                          </label>
+                        </div>
                           {margin && (
                             <div
                               className={
@@ -3384,9 +3553,22 @@ const txDataStamp = txRange.preset
                 title="Operasional Digiflazz"
                 copy="Saldo, sync price list, mapping, dan automation supplier."
                 action={
-                  <Link className="acc-primary-link" href="/admin/digiflazz">
-                    Buka supplier catalog →
-                  </Link>
+                  /*
+                   * Dua supplier, satu tempat masuk.
+                   *
+                   * Digiflazz punya halaman katalog sendiri; Melostore
+                   * baru punya pemetaan. Keduanya ditampilkan sejajar
+                   * supaya operator tidak perlu menghafal di mana
+                   * supplier mana dikelola.
+                   */
+                  <div className="acc-action-panel">
+                    <Link className="acc-primary-link" href="/admin/digiflazz">
+                      Buka supplier catalog →
+                    </Link>
+                    <Link className="acc-inline-button" href="/admin/melostore-mapping">
+                      Pemetaan Melostore →
+                    </Link>
+                  </div>
                 }
               />
 

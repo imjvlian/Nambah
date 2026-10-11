@@ -408,6 +408,7 @@ export default function DigiflazzCatalogBrowserV2() {
         <nav>
           <Link href="/admin">Produk {BRAND.shortName}</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>
+          <Link href="/admin/melostore-mapping">Pemetaan Melostore</Link>
         </nav>
       </header>
 

@@ -5115,3 +5115,113 @@
     flex: 1 1 auto;
   }
 }
+
+/*
+ * Tabel pemetaan Melostore.
+ *
+ * KELAS MODIFIER BARU, BUKAN MEMAKAI GRID BAWAAN
+ *
+ * `.acc-receipts-row` menyisakan 70px untuk kolom keempat - ukuran yang
+ * disetel untuk kolom "Percobaan" di log email, yang isinya satu digit.
+ * Di tabel ini kolom keempat berisi SKU Melostore DAN harganya
+ * ("mlid1412d-s5" + "Rp 404.890"); di 70px itu meluber ke kolom "Aksi"
+ * dan menutup tombolnya.
+ *
+ * Perbaikan yang sama pernah dilakukan untuk tabel banner
+ * (`.is-banner`) dan tabel promo (`.is-six`). Modifier ketiga ini
+ * bedanya hanya lebar kolom - karena tiga tabel ini memakai kelas yang
+ * sama dengan isi yang berbeda.
+ *
+ * REUSE, BUKAN CLASS BARU UNTUK SEMUANYA
+ *
+ * Header, baris, sel, dan pill status tetap memakai `.acc-receipts-*`
+ * dan `.acc-status`. Membuat keluarga kelas baru berarti membangun
+ * ulang pola yang sudah ada dan memisahkan tabel ini dari mobile
+ * behaviour yang sudah dijaga di media query.
+ */
+
+.acc-receipts-head.is-mapping,
+.acc-receipts-row.is-mapping {
+  grid-template-columns:
+    minmax(190px, 1.1fr)
+    minmax(130px, .6fr)
+    minmax(170px, .8fr)
+    minmax(190px, .9fr)
+    minmax(120px, .5fr);
+}
+
+/*
+ * Sel SKU berisi dua baris: SKU dan harganya.
+ *
+ * `min-width: 0` wajib. Tanpa itu, grid track memakai lebar minimum isi -
+ * yaitu panjang SKU terpanjang - dan kolom ini memaksa kolom lain
+ * menyempit melewati batas yang masih bisa dibaca.
+ */
+.acc-receipts-row.is-mapping > div:nth-child(4) {
+  min-width: 0;
+}
+
+.acc-receipts-row.is-mapping > div:nth-child(4) strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-receipts-row.is-mapping > div:nth-child(4) small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/*
+ * Dropdown pemilih SKU.
+ *
+ * `.acc-receipts-row select` sudah ada; di sini hanya diperjelas bahwa
+ * select ini boleh menyusut. Tanpa `min-width: 0`, select dengan teks
+ * opsi terpanjang memaksa kolom melebar dan mendorong kolom lain.
+ */
+.acc-receipts-row.is-mapping select {
+  width: 100%;
+  min-width: 0;
+}
+
+/*
+ * Sel status di kolom ketiga memuat pill DAN keterangan bentrok.
+ *
+ * `.acc-receipts-row > div` sudah memberi grid + gap 3px; yang ditambah
+ * hanya penanda bahwa keterangan ini boleh membungkus - tanpa itu teks
+ * panjang meluber ke kolom SKU.
+ */
+.acc-receipts-row.is-mapping > div:nth-child(3) small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Di ponsel, lima kolom tidak muat. Sisa mengikuti pola tabel lain. */
+@media (max-width: 820px) {
+  .acc-receipts-head.is-mapping {
+    display: none;
+  }
+
+  .acc-receipts-row.is-mapping {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 10px;
+  }
+
+  /* Identitas produk memakai baris penuh. */
+  .acc-receipts-row.is-mapping > div:nth-child(1) {
+    grid-column: 1 / -1;
+  }
+
+  /* Aksi tetap di kanan bawah, sejajar dengan pemilihan SKU. */
+  .acc-receipts-row.is-mapping > div:nth-child(5) {
+    grid-column: 2;
+    margin-bottom: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+}
