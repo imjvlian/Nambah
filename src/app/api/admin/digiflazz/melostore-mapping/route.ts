@@ -303,7 +303,13 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "apply-auto") return applyAutoMappings();
-  if (body.action === "apply") return applyManualMapping(body.productId, body.sku, body.cost);
+  if (body.action === "apply")
+    return applyManualMapping(
+      body.productId,
+      body.sku,
+      body.cost,
+      auth.principal.userId,
+    );
   if (body.action === "clear") return clearMapping(body.productId);
   if (body.action === "backfill-sku") return backfillInternalSku();
 
@@ -314,6 +320,7 @@ async function applyManualMapping(
   productId: string | undefined,
   sku: string | undefined,
   cost: number | undefined,
+  mappedBy: string | null,
 ) {
   if (!productId || !sku) {
     return Response.json(
@@ -409,6 +416,15 @@ async function applyManualMapping(
     supplier_cost: verified.cost,
     active: true,
     last_synced_at: new Date().toISOString(),
+    /*
+     * Metadata pemetaan. Spesifikasi: mapping manual mencatat admin yang
+     * mengonfirmasi dan waktunya. Token legacy tidak membawa identitas
+     * user (userId null) - itu jujur dicatat sebagai null, bukan
+     * diberi nama palsu.
+     */
+    mapped_via: "manual",
+    mapped_by: mappedBy,
+    mapped_at: new Date().toISOString(),
   });
 
   return Response.json({
@@ -526,6 +542,9 @@ async function applyAutoMappings() {
       supplier_cost: hasil.supplierCost,
       active: true,
       last_synced_at: new Date().toISOString(),
+      /* Pemasangan otomatis - hanya untuk kandidat yang pasti tunggal. */
+      mapped_via: "auto",
+      mapped_at: new Date().toISOString(),
     });
     applied += 1;
   }
