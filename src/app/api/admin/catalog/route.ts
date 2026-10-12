@@ -17,6 +17,7 @@ type ProductRow = {
   game_id: string;
   label: string;
   note: string | null;
+  internal_sku: string | null;
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
@@ -25,6 +26,7 @@ type ProductRow = {
 
 type SupplierProductRow = {
   product_id: string;
+  supplier_id: string;
   supplier_sku: string | null;
   supplier_cost: number | string;
   active: boolean;
@@ -52,12 +54,11 @@ export async function GET(request: Request) {
       }),
       supabaseSelectAll<ProductRow>("products", {
         select:
-          "id,game_id,label,note,selling_price,reference_price,active,sort_order",
+          "id,game_id,label,note,internal_sku,selling_price,reference_price,active,sort_order",
         order: "game_id.asc,sort_order.asc,label.asc",
       }),
       supabaseSelectAll<SupplierProductRow>("supplier_products", {
-        select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
-        filters: { supplier_id: "eq.digiflazz" },
+        select: "product_id,supplier_id,supplier_sku,supplier_cost,active,last_synced_at",
         order: "product_id.asc",
       }),
       supabaseSelect<SupplierBalanceRow>("supplier_balances", {
@@ -68,14 +69,34 @@ export async function GET(request: Request) {
     ]);
 
     const gamesById = new Map(games.map((game) => [game.id, game]));
-    const supplierByProduct = new Map(
-      supplierProducts.map((item) => [item.product_id, item]),
+    /*
+     * Peta per supplier, bukan per produk: satu produk boleh punya
+     * mapping Digiflazz DAN Melostore sekaligus. Satu map per produk
+     * membuat keduanya saling menimpa - dan kolom Melostore di tabel
+     * selalu kosong.
+     */
+    const supplierByProductAndSupplier = new Map(
+      supplierProducts.map((item) => [`${item.supplier_id}:${item.product_id}`, item] as const),
     );
 
     const catalog = products.map((product) => {
       const game = gamesById.get(product.game_id);
-      const supplier = supplierByProduct.get(product.id);
-      const mapped = Boolean(supplier?.supplier_sku);
+      const digiflazz = supplierByProductAndSupplier.get(`digiflazz:${product.id}`);
+      const melostore = supplierByProductAndSupplier.get(`melostore:${product.id}`);
+      const mapped = Boolean(digiflazz?.supplier_sku);
+
+      /*
+       * Modal termurah antara supplier yang terpetakan - sama dengan yang
+       * akan dipilih checkout. Margin yang dihitung terhadap satu supplier
+       * saja menyesatkan bila supplier lain lebih murah.
+       */
+      const kandidatModal = [digiflazz, melostore].flatMap((s) =>
+        s && s.supplier_sku && Number(s.supplier_cost) >= 0
+          ? [Number(s.supplier_cost)]
+          : [],
+      );
+      const modalTermurah =
+        kandidatModal.length > 0 ? Math.min(...kandidatModal) : null;
 
       return {
         id: product.id,
@@ -90,17 +111,23 @@ export async function GET(request: Request) {
         }).shortName,
         label: product.label,
         note: product.note,
+        internalSku: product.internal_sku ?? null,
+        melostore: {
+          sku: melostore?.supplier_sku ?? null,
+          cost: melostore ? Number(melostore.supplier_cost) : null,
+        },
+        cheapestCost: modalTermurah,
         sellingPrice: Number(product.selling_price),
         referencePrice: Number(product.reference_price),
         active: product.active,
         sortOrder: Number(product.sort_order),
         supplier: {
           mapped,
-          sku: supplier?.supplier_sku ?? null,
-          cost: supplier ? Number(supplier.supplier_cost) : null,
-          active: Boolean(supplier?.active),
-          lastSyncedAt: supplier?.last_synced_at ?? null,
-          ready: Boolean(mapped && supplier?.active),
+          sku: digiflazz?.supplier_sku ?? null,
+          cost: digiflazz ? Number(digiflazz.supplier_cost) : null,
+          active: Boolean(digiflazz?.active),
+          lastSyncedAt: digiflazz?.last_synced_at ?? null,
+          ready: Boolean(mapped && digiflazz?.active),
         },
       };
     });

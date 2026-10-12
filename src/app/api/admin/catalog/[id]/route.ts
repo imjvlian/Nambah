@@ -10,6 +10,7 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
+  internal_sku: string | null;
 };
 
 type UpdateProductBody = {
@@ -18,6 +19,7 @@ type UpdateProductBody = {
   sellingPrice?: number;
   referencePrice?: number;
   active?: boolean;
+  internalSku?: string | null;
 };
 
 function validMoney(value: unknown) {
@@ -46,7 +48,7 @@ export async function PATCH(
 
   try {
     const [existing] = await supabaseSelect<ProductRow>("products", {
-      select: "id,label,note,selling_price,reference_price,active",
+      select: "id,label,note,internal_sku,selling_price,reference_price,active",
       filters: { id: `eq.${productId}` },
       limit: 1,
     });
@@ -88,6 +90,47 @@ export async function PATCH(
       );
     }
 
+    /*
+     * SKU internal: identitas milik Lacte, dijaga tetap unik oleh index
+     * database. Validasi duplikat dilakukan DI SINI dengan pesan yang
+     * jelas - kalau dibiarkan sampai 23505, operator hanya melihat
+     * "Produk gagal diperbarui" tanpa tahu bahwa penyebabnya SKU
+     * kembar.
+     */
+    let nextInternalSku = existing.internal_sku;
+    if (body.internalSku !== undefined) {
+      const diisi =
+        body.internalSku === null ? null : body.internalSku.trim().toUpperCase();
+      if (diisi === "") {
+        return Response.json(
+          { error: "SKU internal tidak boleh dikosongkan - kosongkan lewat generator saja." },
+          { status: 400 },
+        );
+      }
+      if (diisi && !/^[A-Z0-9_-]{3,120}$/.test(diisi)) {
+        return Response.json(
+          { error: "SKU internal hanya boleh huruf besar, angka, tanda hubung, dan garis bawah (3-120 karakter)." },
+          { status: 400 },
+        );
+      }
+      if (diisi && diisi !== existing.internal_sku) {
+        const bentrok = await supabaseSelect<{ id: string; label: string }>("products", {
+          select: "id,label",
+          filters: { internal_sku: `eq.${diisi}` },
+          limit: 1,
+        });
+        if (bentrok.length > 0) {
+          return Response.json(
+            {
+              error: `SKU internal ${diisi} sudah dipakai produk "${bentrok[0].label}".`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+      nextInternalSku = diisi;
+    }
+
     const [updated] = await supabaseUpdate<ProductRow>(
       "products",
       {
@@ -96,6 +139,7 @@ export async function PATCH(
         selling_price: nextSellingPrice,
         reference_price: nextReferencePrice,
         active: nextActive,
+        internal_sku: nextInternalSku,
         updated_at: new Date().toISOString(),
       },
       { filters: { id: `eq.${productId}` } },
@@ -109,6 +153,7 @@ export async function PATCH(
         sellingPrice: Number(updated?.selling_price ?? nextSellingPrice),
         referencePrice: Number(updated?.reference_price ?? nextReferencePrice),
         active: updated?.active ?? nextActive,
+        internalSku: updated?.internal_sku ?? nextInternalSku,
       },
     });
   } catch (error) {

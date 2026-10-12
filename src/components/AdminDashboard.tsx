@@ -66,6 +66,8 @@ type CatalogProduct = {
   referencePrice: number;
   active: boolean;
   sortOrder: number;
+  /** SKU milik Lacte - dari generator, bukan kode supplier. */
+  internalSku: string | null;
   supplier: {
     mapped: boolean;
     sku: string | null;
@@ -74,6 +76,12 @@ type CatalogProduct = {
     lastSyncedAt: string | null;
     ready: boolean;
   };
+  melostore: {
+    sku: string | null;
+    cost: number | null;
+  };
+  /** Modal termurah antar supplier terpetakan - dasar margin & checkout. */
+  cheapestCost: number | null;
 };
 
 type CatalogPayload = {
@@ -115,6 +123,8 @@ type DraftProduct = {
   supplierSku: string;
   /** SKU Melostore yang dipilih operator, belum tentu tersimpan. */
   melostoreSku: string;
+  /** SKU internal Lacte - diedit manual atau dibuat generator. */
+  internalSku: string;
 };
 
 type OverviewPayload = {
@@ -550,6 +560,11 @@ import ReportRangePicker, {
 } from "@/components/admin/ReportRangePicker";
 import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 import DateTimePicker from "@/components/admin/DateTimePicker";
+import {
+  gabungkanKandidat,
+  urutkanKandidatMelostore,
+} from "@/lib/suppliers/saran-sku";
+import { generateInternalSku } from "@/lib/internal-sku";
 
 export { NAV, NAV_GROUPS };
 
@@ -718,6 +733,7 @@ function draftFromProduct(product: CatalogProduct): DraftProduct {
     referencePrice: String(product.referencePrice),
     active: product.active,
     supplierSku: product.supplier.sku ?? "",
+    internalSku: product.internalSku ?? "",
     /*
      * Mapping Melostore tidak ikut dimuat di draft: sumbernya endpoint
      * pemetaan yang berbeda, dan draft ini sudah dibaca `isDraftDirty`
@@ -743,18 +759,39 @@ function isDraftDirty(product: CatalogProduct, draft: DraftProduct) {
     Number(draft.sellingPrice) !== product.sellingPrice ||
     Number(draft.referencePrice) !== product.referencePrice ||
     draft.active !== product.active ||
-    draft.supplierSku.trim() !== (product.supplier.sku ?? "")
+    draft.supplierSku.trim() !== (product.supplier.sku ?? "") ||
+    draft.internalSku.trim() !== (product.internalSku ?? "")
   );
 }
 
-function marginOf(product: CatalogProduct, sellingPrice: number) {
-  const cost = product.supplier.cost;
+function marginDariModal(
+  cost: number | null,
+  sellingPrice: number,
+): { margin: number; percent: number } | null {
   if (cost === null || !Number.isFinite(sellingPrice) || sellingPrice <= 0) {
     return null;
   }
   const margin = sellingPrice - cost;
   const percent = cost > 0 ? (margin / cost) * 100 : 0;
   return { margin, percent };
+}
+
+function marginOf(product: CatalogProduct, sellingPrice: number) {
+  /*
+   * Dasar margin = modal termurah antar supplier yang terpetakan.
+   * Checkout memilih supplier termurah, jadi margin yang dibaca operator
+   * harus dihitung terhadap supplier yang sama - kalau Melostore lebih
+   * murah dan tetap dihitung dari Digiflazz, margin yang terlihat lebih
+   * besar dari yang benar-benar diperoleh.
+   */
+  const kandidat = [product.supplier.cost, product.melostore.cost].filter(
+    (cost): cost is number =>
+      cost !== null && Number.isFinite(cost) && cost > 0,
+  );
+  return marginDariModal(
+    kandidat.length > 0 ? Math.min(...kandidat) : null,
+    sellingPrice,
+  );
 }
 
 function SectionHead({
@@ -1052,6 +1089,18 @@ export default function AdminDashboard() {
   }>({ digiflazz: [], melostore: [], error: null });
   const [melostorePick, setMelostorePick] = useState<Record<string, string>>({});
   const [melostoreBusy, setMelostoreBusy] = useState("");
+  /*
+   * Katalog produk dirender 25 baris per halaman. Versi lama merender
+   * ribuan baris form sekaligus - halaman menggantung sebelum tombol
+   * pertama bisa diklik.
+   */
+  const [katalogPage, setKatalogPage] = useState(1);
+  /* Pilihan Melostore yang BENAR-BENAR TERSIMPAN, pembeda dari draf. */
+  const [melostoreTersimpan, setMelostoreTersimpan] = useState<
+    Record<string, string | null>
+  >({});
+  const [melostoreCari, setMelostoreCari] = useState<Record<string, string>>({});
+  const [melostoreTerbuka, setMelostoreTerbuka] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [mappingFilter, setMappingFilter] = useState("all");
@@ -2335,6 +2384,22 @@ const txDataStamp = txRange.preset
     );
   }, [catalog, query, gameFilter, mappingFilter, statusFilter, marginFilter, drafts]);
 
+  /*
+   * Halaman aman: filter berubah saat operator ada di halaman 40 bisa
+   * membuat halaman itu kosong - dijepit ke halaman terakhir yang ada,
+   * tanpa efek samping atau render ekstra.
+   */
+  const KATALOG_PER_HALAMAN = 25;
+  const katalogTotalHalaman = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / KATALOG_PER_HALAMAN),
+  );
+  const katalogHalaman = Math.min(katalogPage, katalogTotalHalaman);
+  const katalogBaris = filteredProducts.slice(
+    (katalogHalaman - 1) * KATALOG_PER_HALAMAN,
+    katalogHalaman * KATALOG_PER_HALAMAN,
+  );
+
   const dirtyProductCount = useMemo(() => {
     if (!catalog) return 0;
     return catalog.products.filter((product) => {
@@ -2447,6 +2512,33 @@ const txDataStamp = txRange.preset
     });
   }
 
+  /**
+   * Kembalikan harga jual & coret ke harga saran dari modal supplier
+   * termurah (opsi yang dipilih operator: bukan menyetel harga = modal).
+   *
+   * Dasarnya modal TERMAHURAH - sama dengan yang akan dipilih checkout.
+   * Persen markup memakai panel Saran yang sedang aktif, supaya reset
+   * dan "Terapkan ke terfilter" menghasilkan angka yang sama untuk
+   * produk yang sama.
+   */
+  function resetHargaKeSupplier(product: CatalogProduct) {
+    const cost = product.cheapestCost;
+    if (cost === null || !Number.isFinite(cost) || cost <= 0) {
+      setNotice(
+        `${product.label}: belum ada harga modal supplier untuk reset harga.`,
+      );
+      return;
+    }
+    updateDraft(product.id, {
+      sellingPrice: String(
+        roundTo100(cost * (1 + Number(suggestPercent) / 100)),
+      ),
+      referencePrice: String(
+        roundTo100(cost * (1 + Number(suggestRefPercent) / 100)),
+      ),
+    });
+  }
+
   function resetDraft(product: CatalogProduct) {
     setDrafts((current) => ({
       ...current,
@@ -2466,38 +2558,107 @@ const txDataStamp = txRange.preset
       const data = (await response.json()) as {
         rows: Array<{ productId: string; mappedSku: string | null; autoSku: string | null }>;
         supplier: { configured: boolean; catalogSize: number; error: string | null };
+        options: {
+          digiflazz: Array<{ sku: string; name: string; cost: number }>;
+          melostore: Array<{ sku: string; name: string; cost: number }>;
+        };
       };
 
       /*
-       * Kandidat yang sudah tersimpan di database tidak dimuat di sini.
-       * Route pemetaan hanya mengirim ringkasan per produk - daftar SKU
-       * penuh terlalu besar untuk dikirim dua kali. Yang dibutuhkan
-       * editor adalah daftar SKU per supplier untuk dropdown, dan itu
-       * datang dari supplier_catalog_items lewat endpoint yang sama.
+       * Daftar SKU per supplier diisi dari `options` - katalog yang
+       * ter-cache di supplier_catalog_items. Tanpa ini, state supplierCatalog
+       * tetap kosong dan combobox tidak punya apa pun untuk dicari:
+       * itulah penyebab "SKU Melostore tidak ada di dropdown".
+       */
+      setSupplierCatalog({
+        digiflazz: data.options?.digiflazz ?? [],
+        melostore: data.options?.melostore ?? [],
+        error: data.supplier.error ?? null,
+      });
+
+      /*
+       * Pick diisi dari mapping yang BENAR-BENAR TERSIMPAN saja.
+       * AutoSku adalah SARAN untuk combobox, bukan keadaan database -
+       * memasukkannya ke pick berarti membuka halaman sudah mengubah
+       * mapping begitu operator menekan Simpan.
        */
       const pick: Record<string, string> = {};
+      const tersimpan: Record<string, string | null> = {};
       for (const row of data.rows) {
+        tersimpan[row.productId] = row.mappedSku;
         if (row.mappedSku) pick[row.productId] = row.mappedSku;
-        else if (row.autoSku) pick[row.productId] = row.autoSku;
       }
       setMelostorePick(pick);
+      setMelostoreTersimpan(tersimpan);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Kandidat supplier gagal dimuat.");
+    }
+  }
+
+  /**
+   * Simpan satu baris katalog: produk (label/harga/status) DAN pemetaan
+   * Melostore kalau pilihannya berubah.
+   *
+   * Dua permintaan, karena keduanya beda endpoint dan beda verifikasi -
+   * tapi dibungkus satu fungsi supaya tombol Simpan di baris punya satu
+   * makna: "apa yang saya lihat di baris ini tersimpan semuanya".
+   * Mapping yang tidak berubah tidak dikirim ulang.
+   */
+  async function simpanBarisKatalog(product: CatalogProduct) {
+    const draft = drafts[product.id] ?? draftFromProduct(product);
+    const pick = melostorePick[product.id] ?? "";
+    const tersimpan = melostoreTersimpan[product.id] ?? "";
+
+    const pekerjaan: Array<Promise<void>> = [];
+
+    if (isDraftDirty(product, draft)) {
+      pekerjaan.push(
+        (async () => {
+          await persistProduct(product, draft);
+        })(),
+      );
+    }
+
+    if (pick !== tersimpan) {
+      pekerjaan.push(
+        (async () => {
+          await terapkanMappingMelostore(product, pick);
+          setMelostoreTersimpan((current) => ({
+            ...current,
+            [product.id]: pick || null,
+          }));
+        })(),
+      );
+    }
+
+    if (pekerjaan.length === 0) return;
+
+    setBusy(`save:${product.id}`);
+    try {
+      await Promise.all(pekerjaan);
+      await loadCatalog();
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /** Panggilan API pemetaan Melostore, tanpa busy/notice miliknya. */
+  async function terapkanMappingMelostore(product: CatalogProduct, sku: string) {
+    const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: sku ? "apply" : "clear", productId: product.id, sku }),
+    });
+    const data = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error ?? "Pemetaan Melostore gagal disimpan.");
     }
   }
 
   async function simpanMappingMelostore(product: CatalogProduct, sku: string) {
     setMelostoreBusy(product.id);
     try {
-      const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: sku ? "apply" : "clear", productId: product.id, sku }),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error ?? "Pemetaan Melostore gagal disimpan.");
-      }
+      await terapkanMappingMelostore(product, sku);
       setNotice(
         sku
           ? `${product.label} dipetakan ke Melostore ${sku}.`
@@ -2539,6 +2700,7 @@ const txDataStamp = txRange.preset
           sellingPrice,
           referencePrice,
           active: draft.active,
+          internalSku: draft.internalSku.trim() || null,
         }),
       },
     );
@@ -3219,6 +3381,41 @@ const txDataStamp = txRange.preset
                 hanya yang terlihat. Badge di judul panel membuat "ada
                 yang belum disimpan" terlihat tanpa menggulir ke bawah.
               */}
+              {catalog && (
+                <div className="acc-module-summary">
+                  <article>
+                    <small>Total produk</small>
+                    <strong>{filteredProducts.length}</strong>
+                    <span>dari {catalog.stats.total} terdaftar</span>
+                  </article>
+                  <article>
+                    <small>Aktif</small>
+                    <strong>{filteredProducts.filter((p) => p.active).length}</strong>
+                    <span>{filteredProducts.filter((p) => !p.active).length} draft</span>
+                  </article>
+                  <article>
+                    <small>Tanpa harga modal</small>
+                    <strong>{filteredProducts.filter((p) => p.cheapestCost === null).length}</strong>
+                    <span>tidak bisa dihitung margin</span>
+                  </article>
+                  <article>
+                    <small>Margin rugi</small>
+                    <strong>
+                      {
+                        filteredProducts.filter((p) => {
+                          const info = marginOf(
+                            p,
+                            Number(drafts[p.id]?.sellingPrice ?? p.sellingPrice),
+                          );
+                          return info !== null && info.margin < 0;
+                        }).length
+                      }
+                    </strong>
+                    <span>jual di bawah modal termurah</span>
+                  </article>
+                </div>
+              )}
+
               <CollapsiblePanel
                 title="Alat harga massal"
                 description={`Menyentuh ${filteredProducts.length} produk hasil filter saat ini. Tombol ini mengubah harga semuanya sekaligus.`}
@@ -3286,13 +3483,12 @@ const txDataStamp = txRange.preset
                   <span>Produk</span>
                   <span>Harga ${BRAND.shortName}</span>
                   <span>Digiflazz</span>
-                  <span>Status</span>
-                  <span />
+                  <span>Melostore</span>
+                  <span>Aksi</span>
                 </div>
                 <div className="admin-product-list">
-                  {filteredProducts.map((product) => {
-                    const draft =
-                      drafts[product.id] ?? draftFromProduct(product);
+                  {katalogBaris.map((product) => {
+                    const draft = drafts[product.id] ?? draftFromProduct(product);
                     const saving = busy === `save:${product.id}`;
                     const dirty = isDraftDirty(product, draft);
                     const sellingValue = Number(draft.sellingPrice);
@@ -3309,11 +3505,62 @@ const txDataStamp = txRange.preset
                           "admin-product-row" + (dirty ? " admin-row-dirty" : "")
                         }
                         key={product.id}
-                      >
+                      >                                          {/*
+                         * Tabel produk lima kolom (revamp).
+                         *
+                         * DUA PENYEBAB HALAMAN DULU MENGGANTUNG, keduanya
+                         * hilang di sini:
+                         *
+                         * 1. Ribuan baris form dirender sekaligus. Sekarang
+                         *    25 baris per halaman, sisanya di belakang
+                         *    pagination.
+                         *
+                         * 2. Dropdown Melostore 7.000-an <option> per baris
+                         *    = jutaan node DOM. Sekarang combobox pencarian:
+                         *    kandidat dihitung per produk yang DIBUKA
+                         *    lewat urutkanKandidatMelostore (Cocok + 
+                         *    Mendekati), dan mengetik mencari seluruh
+                         *    katalog dengan maksimal 30 hasil.
+                         *
+                         * Kolom Digiflazz tampil saja - pengubahan
+                         * mappingnya lewat halaman Katalog Digiflazz yang
+                         * punya alur publish sendiri.
+                         */}
                         <div className="admin-product-main">
                           <small>
-                            {product.gameShortName} · {product.id}
+                            {product.gameShortName} · {product.label}
                           </small>
+                          <div className="admin-internal-sku-row">
+                            <input
+                              className="admin-internal-sku-input"
+                              value={draft.internalSku}
+                              placeholder="SKU internal..."
+                              onChange={(event) =>
+                                updateDraft(product.id, {
+                                  internalSku: event.target.value.toUpperCase(),
+                                })
+                              }
+                            />
+                            {!draft.internalSku ? (
+                              <button
+                                type="button"
+                                className="admin-internal-sku-buat"
+                                title="Buat SKU internal otomatis dari game dan nama produk"
+                                disabled={Boolean(busy)}
+                                onClick={() =>
+                                  updateDraft(product.id, {
+                                    internalSku:
+                                      generateInternalSku({
+                                        gameId: product.gameId,
+                                        label: draft.label,
+                                      }) ?? "",
+                                  })
+                                }
+                              >
+                                Buat
+                              </button>
+                            ) : null}
+                          </div>
                           <input
                             className="admin-inline-name"
                             value={draft.label}
@@ -3333,6 +3580,9 @@ const txDataStamp = txRange.preset
                               })
                             }
                           />
+                          {!product.active && (
+                            <span className="admin-draft-badge">Draft</span>
+                          )}
                         </div>
 
                         <div className="admin-price-stack">
@@ -3362,8 +3612,14 @@ const txDataStamp = txRange.preset
                               />
                             </label>
                           </div>
+                          {/*
+                           * Ubah harga cepat: menaikkan harga yang sedang
+                           * diisi sebesar persennya. Persen 5/10/20 sesuai
+                           * permintaan - perilaku sama dengan sebelum
+                           * revamp, hanya daftar persennya yang disesuaikan.
+                           */}
                           <div className="admin-quick-price">
-                            {[2, 5, 10].map((percent) => (
+                            {[5, 10, 20].map((percent) => (
                               <button
                                 key={percent}
                                 type="button"
@@ -3378,84 +3634,6 @@ const txDataStamp = txRange.preset
                               Harga coret lebih kecil dari harga jual.
                             </span>
                           )}
-                        </div>
-
-
-                        {/*
-                         * Supplier Mapping - dua dropdown, dua supplier.
-                         *
-                         * Kandidat dibaca dari supplier_catalog_items lewat
-                         * endpoint pemetaan. Bukan dari API supplier: katalog
-                         * Melostore berisi 10.000 SKU dengan tarif 20
-                         * permintaan/menit, dan dua admin yang membuka form
-                         * bersamaan sudah menghabiskan jatahnya.
-                         *
-                         * Dropdown Melostore menyimpan pilihannya lewat
-                         * endpoint pemetaan, bukan lewat persistProduct -
-                         * verifikasi harganya beda sumber, dan mencampur
-                         * keduanya membuat "simpan harga" ikut mengubah
-                         * mapping.
-                         */}
-                        <div className="admin-supplier-fields">
-                          <label>
-                            <span>SKU Digiflazz</span>
-                            <input
-                              value={draft.supplierSku}
-                              placeholder="Belum mapped"
-                              onChange={(event) =>
-                                updateDraft(product.id, {
-                                  supplierSku: event.target.value,
-                                })
-                              }
-                            />
-                            {supplierCatalog.digiflazz.length > 0 ? (
-                              <small>{supplierCatalog.digiflazz.length} SKU di katalog Digiflazz</small>
-                            ) : null}
-                          </label>
-                          <div className="admin-cost-line">
-                            <span>Modal Digiflazz</span>
-                            <strong>
-                              {product.supplier.cost === null
-                                ? "-"
-                                : formatIDR(product.supplier.cost)}
-                            </strong>
-                          </div>
-
-                          <label>
-                            <span>SKU Melostore</span>
-                            <select
-                              value={melostorePick[product.id] ?? ""}
-                              disabled={supplierCatalog.melostore.length === 0}
-                              onChange={(event) => {
-                                const sku = event.target.value;
-                                setMelostorePick((current) => ({
-                                  ...current,
-                                  [product.id]: sku,
-                                }));
-                                if (sku) {
-                                  void simpanMappingMelostore(product, sku);
-                                }
-                              }}
-                            >
-                              <option value="">
-                                supplierCatalog.melostore.length === 0
-                                  ? "Katalog Melostore belum tersedia"
-                                  : "Tidak memakai Melostore"
-                              </option>
-                              {supplierCatalog.melostore.map((item) => (
-                                <option key={item.sku} value={item.sku}>
-                                  {item.sku} - {item.name} - {formatIDR(item.cost)}
-                                </option>
-                              ))}
-                            </select>
-                            {melostoreBusy === product.id ? (
-                              <small>Menyimpan...</small>
-                            ) : melostorePick[product.id] ? (
-                              <small>Terpetakan ke Melostore.</small>
-                            ) : (
-                              <small>Kosong berarti hanya Digiflazz.</small>
-                            )}
-                          </label>
                           {margin && (
                             <div
                               className={
@@ -3477,22 +3655,220 @@ const txDataStamp = txRange.preset
                           )}
                         </div>
 
-                        <div className="admin-status-stack">
-                          <span
-                            className={`admin-status ${
-                              product.supplier.ready
-                                ? "ready"
-                                : product.supplier.mapped
-                                  ? "warning"
-                                  : "muted"
-                            }`}
-                          >
-                            {product.supplier.ready
-                              ? "Supplier ready"
-                              : product.supplier.mapped
-                                ? "Mapped / unavailable"
-                                : "Unmapped"}
-                          </span>
+                        <div className="admin-supplier-cell">
+                          <small className="admin-supplier-name">Digiflazz</small>
+                          {product.supplier.sku ? (
+                            <>
+                              <code className="admin-sku-supplier">
+                                {product.supplier.sku}
+                              </code>
+                              <strong className="admin-cost-line">
+                                {formatIDR(product.supplier.cost ?? 0)}
+                              </strong>
+                              {marginDariModal(
+                                product.supplier.cost,
+                                sellingValue,
+                              ) ? (
+                                <small className="admin-margin-supplier">
+                                  Margin 
+                                  {(() => {
+                                    const info = marginDariModal(
+                                      product.supplier.cost,
+                                      sellingValue,
+                                    );
+                                    return info === null
+                                      ? "-"
+                                      : `${info.margin >= 0 ? "+" : ""}${formatIDR(info.margin)} (${info.percent.toFixed(1)}%)`;
+                                  })()}
+                                </small>
+                              ) : null}
+                              <small
+                                className={
+                                  product.supplier.ready
+                                    ? "admin-supplier-ready"
+                                    : "admin-supplier-warning"
+                                }
+                              >
+                                {product.supplier.ready
+                                  ? "Siap dijual"
+                                  : "Mapped, supplier tidak aktif"}
+                              </small>
+                            </>
+                          ) : (
+                            <small className="admin-supplier-warning">
+                              Belum dipetakan
+                            </small>
+                          )}
+                        </div>
+
+                        <div className="admin-supplier-cell">
+                          <small className="admin-supplier-name">Melostore</small>
+                          {melostoreTerbuka[product.id] ? (
+                            <div className="admin-sku-combo">
+                              <input
+                                autoFocus
+                                value={melostoreCari[product.id] ?? ""}
+                                placeholder="Cari SKU atau nama..."
+                                onChange={(event) =>
+                                  setMelostoreCari((current) => ({
+                                    ...current,
+                                    [product.id]: event.target.value,
+                                  }))
+                                }
+                              />
+                              <div className="admin-sku-combo-list">
+                                {(() => {
+                                  const teks = (melostoreCari[product.id] ?? "")
+                                    .trim()
+                                    .toLowerCase();
+
+                                  /*
+                                   * Tanpa ketik: saran per produk (Cocok +
+                                   * Mendekati). Dengan ketik: cari katalog
+                                   * penuh, tetap diperingkat.
+                                   */
+                                  const kandidat = teks
+                                    ? supplierCatalog.melostore
+                                        .filter(
+                                          (item) =>
+                                            item.sku.toLowerCase().includes(teks) ||
+                                            item.name.toLowerCase().includes(teks),
+                                        )
+                                        .map((item) => ({
+                                          ...item,
+                                          exact: false,
+                                          sameGame: false,
+                                          sameNominal: false,
+                                          region: null,
+                                        }))
+                                        .slice(0, 30)
+                                    : gabungkanKandidat(
+                                        urutkanKandidatMelostore(
+                                          {
+                                            gameId: product.gameId,
+                                            label: draft.label,
+                                          },
+                                          supplierCatalog.melostore.map(
+                                            (item) => ({
+                                              ...item,
+                                              exact: false,
+                                              sameGame: false,
+                                              sameNominal: false,
+                                              region: null,
+                                            }),
+                                          ),
+                                        ),
+                                      );
+
+                                  if (kandidat.length === 0) {
+                                    return (
+                                      <small className="admin-sku-combo-kosong">
+                                        {teks
+                                          ? "Tidak ada SKU yang cocok dengan pencarian."
+                                          : "Tidak ada kandidat mendekati - ketik untuk mencari manual."}
+                                      </small>
+                                    );
+                                  }
+
+                                  return kandidat.map((item) => (
+                                    <button
+                                      key={item.sku}
+                                      type="button"
+                                      className={
+                                        "admin-sku-combo-item" +
+                                        (item.exact ? " exact" : "")
+                                      }
+                                      onClick={() => {
+                                        updateDraft(product.id, {});
+                                        setMelostorePick((current) => ({
+                                          ...current,
+                                          [product.id]: item.sku,
+                                        }));
+                                        setMelostoreTerbuka((current) => ({
+                                          ...current,
+                                          [product.id]: false,
+                                        }));
+                                        setMelostoreCari((current) => {
+                                          const next = { ...current };
+                                          delete next[product.id];
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      <span className="admin-sku-combo-sku">
+                                        {item.sku}
+                                        {item.region ? ` (${item.region})` : ""}
+                                      </span>
+                                      <span className="admin-sku-combo-nama">
+                                        {item.name} - {formatIDR(item.cost)}
+                                      </span>
+                                    </button>
+                                  ));
+                                })()}
+                                <button
+                                  type="button"
+                                  className="admin-sku-combo-item kosong"
+                                  onClick={() => {
+                                    updateDraft(product.id, {});
+                                    setMelostorePick((current) => ({
+                                      ...current,
+                                      [product.id]: "",
+                                    }));
+                                    setMelostoreTerbuka((current) => ({
+                                      ...current,
+                                      [product.id]: false,
+                                    }));
+                                  }}
+                                >
+                                  <span className="admin-sku-combo-sku">
+                                    Kosongkan
+                                  </span>
+                                  <span className="admin-sku-combo-nama">
+                                    Hanya memakai Digiflazz
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-sku-combo-trigger"
+                              onClick={() =>
+                                setMelostoreTerbuka((current) => ({
+                                  ...current,
+                                  [product.id]: true,
+                                }))
+                              }
+                            >
+                              {melostorePick[product.id]
+                                ? melostorePick[product.id]
+                                : "Pilih SKU Melostore..."}
+                            </button>
+                          )}
+                          {melostorePick[product.id] &&
+                          product.melostore.cost !== null ? (
+                            (() => {
+                              const info = marginDariModal(
+                                product.melostore.cost,
+                                sellingValue,
+                              );
+                              return info === null ? null : (
+                                <small className="admin-margin-supplier">
+                                  Margin 
+                                  {`${info.margin >= 0 ? "+" : ""}${formatIDR(info.margin)} (${info.percent.toFixed(1)}%)`}
+                                </small>
+                              );
+                            })()
+                          ) : null}
+                          {melostorePick[product.id] !==
+                            (melostoreTersimpan[product.id] ?? "") && (
+                            <small className="admin-supplier-warning">
+                              Belum disimpan - tekan Simpan.
+                            </small>
+                          )}
+                        </div>
+
+                        <div className="admin-status-cell">
                           <label className="admin-toggle">
                             <input
                               type="checkbox"
@@ -3503,31 +3879,74 @@ const txDataStamp = txRange.preset
                                 })
                               }
                             />
-                            Aktif
+                            <span>{draft.active ? "Aktif" : "Draft"}</span>
                           </label>
-                          {dirty && (
-                            <button
-                              className="admin-reset-button"
-                              type="button"
-                              onClick={() => resetDraft(product)}
-                            >
-                              Reset
-                            </button>
+                          {draft.active ? (
+                            <small className="admin-supplier-ready">
+                              Terlihat pelanggan
+                            </small>
+                          ) : (
+                            <small className="admin-supplier-warning">
+                              Belum terlihat pelanggan
+                            </small>
                           )}
                         </div>
 
-                        <button
-                          className="admin-save-button"
-                          type="button"
-                          disabled={Boolean(busy) || !dirty}
-                          onClick={() => void saveProduct(product)}
-                        >
-                          {saving ? "Saving..." : "Simpan"}
-                        </button>
+                        <div className="admin-actions-column">
+                          <button
+                            type="button"
+                            className="admin-reset-button"
+                            disabled={
+                              Boolean(busy) || product.cheapestCost === null
+                            }
+                            title="Hitung ulang harga jual & coret dari modal supplier termurah (pakai persen Saran)"
+                            onClick={() => resetHargaKeSupplier(product)}
+                          >
+                            Reset harga
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-reset-button"
+                            disabled={Boolean(busy) || !dirty}
+                            onClick={() => resetDraft(product)}
+                          >
+                            Buang
+                          </button>
+                          <button
+                            className="admin-save-button"
+                            type="button"
+                            disabled={Boolean(busy) || (!dirty && melostorePick[product.id] === (melostoreTersimpan[product.id] ?? ""))}
+                            onClick={() => void simpanBarisKatalog(product)}
+                          >
+                            {saving ? "Saving..." : "Simpan"}
+                          </button>
+                        </div>
                       </article>
                     );
                   })}
                 </div>
+
+                {filteredProducts.length > KATALOG_PER_HALAMAN ? (
+                  <div className="acc-tx-pagination">
+                    <button
+                      type="button"
+                      disabled={katalogHalaman <= 1}
+                      onClick={() => setKatalogPage(katalogHalaman - 1)}
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="acc-tx-pageinfo">
+                      Halaman {katalogHalaman} dari {katalogTotalHalaman} ({filteredProducts.length} produk)
+                    </span>
+                    <button
+                      type="button"
+                      disabled={katalogHalaman >= katalogTotalHalaman}
+                      onClick={() => setKatalogPage(katalogHalaman + 1)}
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </>
           )}

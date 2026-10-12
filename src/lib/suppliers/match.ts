@@ -122,6 +122,21 @@ export function supplierPrefix(sku: string): string | null {
  * Mengembalikan array karena satu game punya beberapa wilayah -
  * `mlid` dan `mlgl` sama-sama Mobile Legends.
  */
+/**
+ * Apakah SKU diawali salah satu prefiks yang diketahui.
+ *
+ * JANGAN mengekstrak prefiks dengan `^[a-z]+` lalu membandingkannya:
+ * ekstraksi itu rakus - "mlidpass-s1" (Weekly Pass, tanpa angka) akan
+ * terbaca berprefiks "mlidpass", yang tidak ada di daftar game mana
+ * pun, dan produk Weekly Pass selalu terlihat "tidak ada kandidat".
+ * Pencocokan startsWith terhadap daftar yang diketahui tidak punya
+ * kelemahan itu, karena "mlidpass-s1" jelas diawali "mlid".
+ */
+export function skuMulaiDenganPrefiks(sku: string, prefiks: readonly string[]): boolean {
+  const s = String(sku ?? "").trim().toLowerCase();
+  return prefiks.some((prefix) => s.startsWith(prefix.toLowerCase()));
+}
+
 export function expectedPrefixes(gameId: string): string[] {
   switch (gameId) {
     case "mobile-legends":
@@ -265,10 +280,7 @@ export function matchProductToSupplier(
     };
   }
 
-  const narrowed = byLabel.filter((q) => {
-    const p = supplierPrefix(q.sku);
-    return p !== null && prefiks.includes(p);
-  });
+  const narrowed = byLabel.filter((q) => skuMulaiDenganPrefiks(q.sku, prefiks));
 
   if (narrowed.length === 0) {
     return {

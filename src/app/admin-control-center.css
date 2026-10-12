@@ -5225,3 +5225,354 @@
     background: none;
   }
 }
+
+/*
+ * Tabel katalog produk (revamp lima kolom).
+ *
+ * PRODUK | HARGA | DIGIFLAZZ | MELOSTORE | AKSI
+ *
+ * Grid lama di admin.css (lima kolom dengan lebar berbeda) tetap dipakai
+ * halaman lain - override di sini hanya untuk kartu katalog, supaya
+ * halaman lain tidak ikut bergeser.
+ *
+ * LEBAR KOLOM DITENTUKAN ISINYA
+ *
+ * - Produk paling lebar: SKU internal + nama (input) + catatan + game.
+ * - Digiflazz/Melostore sejajar: keduanya SKU + harga, dibaca sebagai
+ *   satu pasangan perbandingan.
+ * - Aksi tiga tombol bertumpuk; lebar tetap supaya tombol tidak
+ *   meliuk-lithuk ketika nama produk panjang.
+ */
+
+.admin-catalog-card .admin-table-head,
+.admin-catalog-card .admin-product-row {
+  grid-template-columns:
+    minmax(220px, 1.3fr)
+    minmax(160px, 0.7fr)
+    minmax(160px, 0.75fr)
+    minmax(200px, 0.85fr)
+    96px
+    128px;
+}
+
+/* SKU internal - identitas Lacte, bukan kode supplier. */
+.admin-internal-sku {
+  color: var(--lime, #c9ff3f);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.admin-internal-sku-kosong {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/*
+ * SKU internal EDITABLE di tabel.
+ *
+ * Input monospace + tombol Buat (generator) di sampingnya. Kalau sudah
+ * ada isinya, tombol Buat tidak tampil - SKU yang sudah tersebar di
+ * laporan tidak boleh terganti hanya karena tombolnya masih terlihat.
+ */
+.admin-internal-sku-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-internal-sku-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #0d0f0c;
+  color: var(--lime, #c9ff3f);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.admin-internal-sku-input:focus {
+  border-color: rgba(201, 255, 63, 0.35);
+}
+
+.admin-internal-sku-buat {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(201, 255, 63, 0.3);
+  border-radius: 7px;
+  background: rgba(201, 255, 63, 0.08);
+  color: var(--lime, #c9ff3f);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-internal-sku-buat:hover {
+  background: rgba(201, 255, 63, 0.16);
+}
+
+/* Tanda produk draft - belum terlihat pelanggan. */
+.admin-draft-badge {
+  width: fit-content;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 184, 77, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 184, 77, 0.08);
+  color: #e2a25a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/*
+ * Sel supplier: nama supplier kecil di atas, SKU monospace, harga.
+ * Digiflazz dan Melostore memakai sel yang sama supaya perbandingan
+ * antar supplier terbaca sebagai satu pasangan.
+ */
+.admin-supplier-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-supplier-name {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-sku-supplier {
+  overflow: hidden;
+  color: #d8decf;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-cost-line strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.admin-supplier-ready {
+  color: #9fb36a;
+  font-size: 11px;
+}
+
+.admin-supplier-warning {
+  color: #e2a25a;
+  font-size: 11px;
+}
+
+/* Kolom aksi: tiga tombol bertumpuk, lebar penuh kolom. */
+.admin-actions-column {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-actions-column .admin-save-button,
+.admin-actions-column .admin-reset-button {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.admin-actions-column .admin-reset-button {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #151813;
+  color: #ccd1c6;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-actions-column .admin-reset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Kolom harga: input rapat, margin di bawah. */
+.admin-catalog-card .admin-price-fields {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-catalog-card .admin-price-fields label {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-catalog-card .admin-price-fields label > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-catalog-card .admin-price-fields input {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0d0f0c;
+  color: #e3e8de;
+  font-size: 12px;
+}
+
+/*
+ * Combobox SKU Melostore.
+ *
+ * Kandidat dihitung per produk yang dibuka (Cocok + Mendekati), dan
+ * mengetik mencari seluruh katalog - jadi elemen ini tidak pernah
+ * merender ribuan opsi sekaligus.
+ */
+.admin-sku-combo-trigger {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: #0d0f0c;
+  color: #aab1a5;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sku-combo-trigger:hover {
+  border-color: rgba(201, 255, 63, 0.35);
+  color: #e3e8de;
+}
+
+.admin-sku-combo {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-sku-combo > input {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(201, 255, 63, 0.35);
+  border-radius: 8px;
+  background: #0d0f0c;
+  color: #e3e8de;
+  font-size: 12px;
+}
+
+.admin-sku-combo-list {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0a0c09;
+  padding: 4px;
+}
+
+.admin-sku-combo-item {
+  display: grid;
+  gap: 1px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-sku-combo-item:hover {
+  background: rgba(201, 255, 63, 0.1);
+}
+
+.admin-sku-combo-item.exact {
+  background: rgba(201, 255, 63, 0.14);
+}
+
+.admin-sku-combo-item.exact .admin-sku-combo-sku {
+  color: var(--lime, #c9ff3f);
+}
+
+.admin-sku-combo-item.kosong {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 7px 7px;
+  color: var(--muted);
+}
+
+.admin-sku-combo-sku {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #d8decf;
+}
+
+.admin-sku-combo-nama {
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sku-combo-kosong {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Di ponsel, lima kolom menjadi tumpukan: identitas penuh, sisanya dua kolom. */
+@media (max-width: 860px) {
+  .admin-catalog-card .admin-table-head {
+    display: none;
+  }
+
+  .admin-catalog-card .admin-product-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 12px;
+  }
+
+  .admin-catalog-card .admin-product-row > .admin-product-main {
+    grid-column: 1 / -1;
+  }
+
+  .admin-catalog-card .admin-product-row > .admin-actions-column {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+
+/* Margin per kolom supplier.
+ *
+ * Setiap kolom supplier menampilkan marginnya sendiri terhadap harga
+ * jual yang sedang diisi - Digiflazz dihitung dari modal Digiflazz,
+ * Melostore dari modal Melostore. Margin di kolom harga tetap memakai
+ * modal termurah, karena itulah yang akan dipilih checkout.
+ */
+.admin-margin-supplier {
+  color: #b7beb2;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kolom status: toggle aktif/draft. */
+.admin-status-cell {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
