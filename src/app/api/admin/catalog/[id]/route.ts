@@ -1,5 +1,10 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import { auditAdminAction } from "@/lib/admin-audit";
+import {
+  supabaseDelete,
+  supabaseSelect,
+  supabaseUpdate,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -159,5 +164,113 @@ export async function PATCH(
   } catch (error) {
     console.error("Admin product update failed", error);
     return Response.json({ error: "Produk gagal diperbarui." }, { status: 502 });
+  }
+}
+
+/**
+ * Hapus permanen SATU produk DRAFT beserta pemetaan suppliernya.
+ *
+ * HANYA UNTUK DRAFT (active=false). Produk aktif harus dinonaktifkan
+ * dulu lewat PATCH - tombol hapus sengaja tidak menyediakan jalan
+ * pintu, supaya "hapus permanen" selalu dua langkah yang disengaja.
+ *
+ * Produk dengan riwayat order TIDAK PERNAH boleh dihapus:
+ * orders.product_id tidak ber-cascade dan nota pelanggan merujuk
+ * produk itu. Produk seperti itu ditolak 409 dengan pesan yang
+ * menyuruh menonaktifkan saja.
+ *
+ * Pemetaan supplier_products dihapus lebih dulu - tanpa itu, produk
+ * yang dihapus meninggalkan mapping yatim yang membuat SKU supplier
+ * terlihat "sudah terpakai" padahal produknya sudah tidak ada.
+ */
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = authorizeAdminRequest(request);
+  if (!auth.ok) return auth.response;
+
+  const { id } = await context.params;
+  const productId = id.trim();
+  if (!productId) {
+    return Response.json({ error: "Product ID tidak valid." }, { status: 400 });
+  }
+
+  try {
+    const [existing] = await supabaseSelect<{
+      id: string;
+      label: string;
+      active: boolean;
+      internal_sku: string | null;
+    }>("products", {
+      select: "id,label,active,internal_sku",
+      filters: { id: `eq.${productId}` },
+      limit: 1,
+    });
+
+    if (!existing) {
+      return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+    }
+
+    if (existing.active) {
+      return Response.json(
+        {
+          error:
+            "Hanya produk draft yang bisa dihapus permanen. Nonaktifkan dulu lewat toggle status.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const orders = await supabaseSelect<{ id: string }>("orders", {
+      select: "id",
+      filters: { product_id: `eq.${productId}` },
+      limit: 1,
+    });
+    if (orders.length > 0) {
+      return Response.json(
+        {
+          error:
+            "Produk ini punya riwayat order dan tidak boleh dihapus. " +
+            "Riwayat order merujuk produk ini di nota pelanggan - biarkan sebagai draft.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const mappingsDeleted = await supabaseDelete<{ product_id: string }>(
+      "supplier_products",
+      {
+        filters: { product_id: `eq.${productId}` },
+        prefer: "return=representation",
+      },
+    );
+
+    await supabaseDelete("products", {
+      filters: { id: `eq.${productId}` },
+      prefer: "return=minimal",
+    });
+
+    await auditAdminAction(request, {
+      action: "catalog.product.delete",
+      targetType: "product",
+      targetId: productId,
+      metadata: {
+        label: existing.label,
+        internalSku: existing.internal_sku,
+        mappingsDeleted: mappingsDeleted.length,
+      },
+    });
+
+    return Response.json({
+      ok: true,
+      productId,
+      label: existing.label,
+      mappingsDeleted: mappingsDeleted.length,
+      message: `Produk "${existing.label}" dihapus permanen beserta ${mappingsDeleted.length} pemetaan supplier.`,
+    });
+  } catch (error) {
+    console.error("Admin product delete failed", productId, error);
+    return Response.json({ error: "Produk gagal dihapus." }, { status: 502 });
   }
 }

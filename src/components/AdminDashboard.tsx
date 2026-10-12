@@ -2733,6 +2733,56 @@ const txDataStamp = txRange.preset
     }
   }
 
+  /**
+   * Hapus permanen produk DRAFT beserta pemetaan suppliernya.
+   *
+   * Konfirmasi lewat dialog admin (useConfirm), bukan window.confirm -
+   * aksi ini menghapus baris database secara permanen, dan dialog
+   * menampilkan identitas produk sebelum admin menekan tombolnya.
+   *
+   * Backend menolak produk aktif (harus dinonaktifkan dulu) dan produk
+   * ber riwayat order - pesan penolakannya diteruskan apa adanya supaya
+   * operator tahu kenapa, bukan hanya "gagal".
+   */
+  async function hapusPermanenDraft(product: CatalogProduct) {
+    const draft = drafts[product.id] ?? draftFromProduct(product);
+    const confirmed = await confirm({
+      title: `Hapus permanen "${draft.label}"?`,
+      description:
+        "Produk draft beserta pemetaan supplier Digiflazz/Melostore-nya dihapus dari database. Tidak bisa dibatalkan.",
+      details: [
+        { label: "Produk", value: draft.label },
+        { label: "SKU internal", value: product.internalSku ?? "(belum ada)" },
+      ],
+      confirmLabel: "Hapus permanen",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setBusy(`delete:${product.id}`);
+    try {
+      const response = await fetch(
+        "/api/admin/catalog/" + encodeURIComponent(product.id),
+        { method: "DELETE" },
+      );
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Produk gagal dihapus.");
+      }
+      setNotice(data.message ?? "Produk dihapus permanen.");
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[product.id];
+        return next;
+      });
+      await loadCatalog();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Produk gagal dihapus.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   /** Panggilan API pemetaan Melostore, tanpa busy/notice miliknya. */
   async function terapkanMappingMelostore(product: CatalogProduct, sku: string) {
     const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
@@ -4049,6 +4099,24 @@ const txDataStamp = txRange.preset
                           >
                             {saving ? "Saving..." : "Simpan"}
                           </button>
+                          {/*
+                           * Hapus permanen: hanya untuk produk yang MEMANG
+                           * draft di database (product.active), bukan yang
+                           * baru di-toggle di layar - backend akan menolak
+                           * yang belum tersimpan, dan menampilkan tombol
+                           * untuk produk aktif menggoda salah klik.
+                           */}
+                          {!product.active && (
+                            <button
+                              type="button"
+                              className="admin-delete-button"
+                              disabled={Boolean(busy)}
+                              title="Hapus produk draft ini dari database permanen, beserta pemetaan suppliernya"
+                              onClick={() => void hapusPermanenDraft(product)}
+                            >
+                              {busy === `delete:${product.id}` ? "Menghapus..." : "Hapus permanen"}
+                            </button>
+                          )}
                         </div>
                       </article>
                     );

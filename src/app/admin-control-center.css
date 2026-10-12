@@ -5419,7 +5419,7 @@
   font-size: 11px;
 }
 
-/* Kolom aksi: tiga tombol bertumpuk, lebar penuh kolom. */
+/* Kolom aksi: tombol bertumpuk, lebar penuh kolom. */
 .admin-actions-column {
   display: grid;
   gap: 6px;
@@ -5443,6 +5443,38 @@
 }
 
 .admin-actions-column .admin-reset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * Hapus permanen - hanya tampil untuk produk draft.
+ *
+ * Ghost merah, bukan isi penuh: tiga tombol netral di atasnya, dan
+ * satu-satunya aksi destruktif di kolom ini harus bisa dibedakan
+ * sekilas tanpa menyala lebih terang dari Simpan. Isi penuh muncul
+ * saat hover - niat yang harus dikonfirmasi lewat dialog.
+ */
+.admin-actions-column .admin-delete-button {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(244, 105, 79, 0.4);
+  border-radius: 9px;
+  background: transparent;
+  color: #f4937d;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.admin-actions-column .admin-delete-button:hover:not(:disabled) {
+  background: rgba(244, 105, 79, 0.12);
+  border-color: rgba(244, 105, 79, 0.65);
+}
+
+.admin-actions-column .admin-delete-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
