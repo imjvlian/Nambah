@@ -19,6 +19,7 @@ type CatalogRow = {
   sku: string;
   name: string;
   category: string;
+  brand: string | null;
   type: string;
   cost: number;
   active: boolean;
@@ -27,6 +28,9 @@ type CatalogRow = {
   gameId: string;
   gameName: string;
   gameConfident: boolean;
+  inquiryFormKey: string | null;
+  inquiryFields: Array<{ key: string; name: string; type: string }> | null;
+  inquiryNotice: string | null;
   internalProduct: {
     id: string;
     label: string;
@@ -48,6 +52,7 @@ type CatalogPayload = {
   page: number;
   totalPages: number;
   categories: string[];
+  brands: string[];
   games: Array<{ id: string; name: string }>;
   groups: Record<string, Record<string, GroupCounts>>;
   addedCount: number;
@@ -79,14 +84,15 @@ export default function MelostoreCatalogBrowser() {
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [kategori, setKategori] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [gameFilter, setGameFilter] = useState("");
   const [tersedia, setTersedia] = useState("");
   const [mapping, setMapping] = useState("");
   const [page, setPage] = useState(1);
 
-  // Grup yang dipilih untuk navigasi (kategori + game) - chip di atas tabel
+  // Grup yang dipilih untuk navigasi (kategori + brand) - chip di atas tabel
   const [pilihKategori, setPilihKategori] = useState("");
-  const [pilihGame, setPilihGame] = useState("");
+  const [pilihBrand, setPilihBrand] = useState("");
 
   /*
    * Form tambah per baris: hanya muncul pada baris yang ditekan tombolnya.
@@ -102,6 +108,7 @@ export default function MelostoreCatalogBrowser() {
   async function load(
     nextQuery = query,
     nextKategori = kategori,
+    nextBrand = brandFilter,
     nextGame = gameFilter,
     nextTersedia = tersedia,
     nextMapping = mapping,
@@ -110,6 +117,7 @@ export default function MelostoreCatalogBrowser() {
     const params = new URLSearchParams();
     if (nextQuery) params.set("q", nextQuery);
     if (nextKategori) params.set("kategori", nextKategori);
+    if (nextBrand) params.set("brand", nextBrand);
     if (nextGame) params.set("game", nextGame);
     if (nextTersedia) params.set("tersedia", nextTersedia);
     if (nextMapping) params.set("mapping", nextMapping);
@@ -132,28 +140,28 @@ export default function MelostoreCatalogBrowser() {
   }
 
   useEffect(() => {
-    void load("", "", "", "", "", 1);
+    void load("", "", "", "", "", "", 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pilih kategori dari panel grup -> set filter dan reset page
-  function pilihGrup(kat: string, gm?: string) {
+  // Pilih grup dari panel navigasi (kategori + brand) -> set filter dan reset page
+  function pilihGrup(kat: string, brand?: string) {
     setPilihKategori(kat);
-    setPilihGame(gm ?? "");
+    setPilihBrand(brand ?? "");
     setKategori(kat);
-    setGameFilter(gm ?? "");
+    setBrandFilter(brand ?? "");
     setPage(1);
-    void load(query, kat, gm ?? "", tersedia, mapping, 1);
+    void load(query, kat, brand ?? "", gameFilter, tersedia, mapping, 1);
   }
 
   // Hapus pilihan grup -> kembali ke semua
   function hapusPilihGrup() {
     setPilihKategori("");
-    setPilihGame("");
+    setPilihBrand("");
     setKategori("");
-    setGameFilter("");
+    setBrandFilter("");
     setPage(1);
-    void load(query, "", "", tersedia, mapping, 1);
+    void load(query, "", "", gameFilter, tersedia, mapping, 1);
   }
 
   async function scan() {
@@ -169,7 +177,7 @@ export default function MelostoreCatalogBrowser() {
       if (!response.ok) throw new Error(data.error ?? "Scan gagal.");
       setNotice(data.message ?? "Scan selesai.");
       setPage(1);
-      await load(query, kategori, gameFilter, tersedia, mapping, 1);
+      await load(query, kategori, brandFilter, gameFilter, tersedia, mapping, 1);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Scan gagal.");
     } finally {
@@ -202,7 +210,7 @@ export default function MelostoreCatalogBrowser() {
             : ""),
       );
       setTambah(null);
-      await load(query, kategori, gameFilter, tersedia, mapping, page);
+      await load(query, kategori, brandFilter, gameFilter, tersedia, mapping, page);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Produk gagal ditambahkan.");
     } finally {
@@ -215,7 +223,7 @@ export default function MelostoreCatalogBrowser() {
     const next = queryInput.trim();
     setQuery(next);
     setPage(1);
-    void load(next, kategori, gameFilter, tersedia, mapping, 1);
+    void load(next, kategori, brandFilter, gameFilter, tersedia, mapping, 1);
   }
 
   const infoScan = data?.scan.lastRun ?? null;
@@ -264,35 +272,35 @@ export default function MelostoreCatalogBrowser() {
         </div>
       ) : null}
 
-      {/* Panel navigasi grup: kategori -> game (collapsible, default tertutup) */}
+      {/* Panel navigasi grup: kategori -> brand asli (collapsible, default tertutup) */}
       <CollapsiblePanel
         title="Jelajahi per kategori"
-        description="Klik kategori → game untuk menyaring tabel. Badge: total / tersedia / sudah ditambahkan."
+        description="Klik kategori → brand untuk menyaring tabel. Badge: total / tersedia / sudah ditambahkan."
         defaultOpen={false}
       >
         <div className="acc-catalog-groups">
           {(data?.categories ?? []).map((kat) => {
-            const gameMap = data?.groups?.[kat] ?? {};
+            const brandMap = data?.groups?.[kat] ?? {};
             return (
               <div key={kat} className="acc-group-row">
                 <div className="acc-group-kategori">
                   <strong>{kat}</strong>
                   <span className="acc-group-badge">
-                    {Object.values(gameMap).reduce((a, b) => a + b.total, 0)} SKU
+                    {Object.values(brandMap).reduce((a, b) => a + b.total, 0)} SKU
                   </span>
                 </div>
                 <div className="acc-group-games">
-                  {Object.entries(gameMap)
+                  {Object.entries(brandMap)
                     .sort(([a], [b]) => a.localeCompare(b, "id"))
-                    .map(([gm, counts]) => (
+                    .map(([brand, counts]) => (
                       <button
-                        key={gm}
+                        key={brand}
                         type="button"
-                        className={`acc-group-game-btn ${pilihKategori === kat && pilihGame === gm ? "active" : ""}`}
-                        onClick={() => pilihGrup(kat, gm)}
+                        className={`acc-group-game-btn ${pilihKategori === kat && pilihBrand === brand ? "active" : ""}`}
+                        onClick={() => pilihGrup(kat, brand)}
                         title={`${counts.total} total · ${counts.tersedia} tersedia · ${counts.ditambahkan} ditambahkan`}
                       >
-                        {gm}
+                        {brand}
                         <span className="acc-group-game-count">
                           {counts.ditambahkan > 0 ? `+${counts.ditambahkan}` : ""}
                         </span>
@@ -306,13 +314,13 @@ export default function MelostoreCatalogBrowser() {
       </CollapsiblePanel>
 
       {/* Chip grup aktif */}
-      {(pilihKategori || pilihGame) && (
+      {(pilihKategori || pilihBrand) && (
         <div className="acc-group-chip">
           <span>
-            {pilihKategori}{pilihGame && " › " + pilihGame}
+            {pilihKategori}{pilihBrand ? " \u2192 " + pilihBrand : ""}
           </span>
           <button type="button" onClick={hapusPilihGrup} aria-label="Hapus filter grup">
-            ✕
+            {"\u2717"}
           </button>
         </div>
       )}
@@ -338,13 +346,33 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setKategori(next);
               setPage(1);
-              void load(query, next, gameFilter, tersedia, mapping, 1);
+              void load(query, next, brandFilter, gameFilter, tersedia, mapping, 1);
             }}
           >
             <option value="">Semua kategori</option>
             {(data?.categories ?? []).map((c) => (
               <option key={c} value={c}>
                 {c}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="acc-field">
+          <span>Brand</span>
+          <select
+            value={brandFilter}
+            onChange={(event) => {
+              const next = event.target.value;
+              setBrandFilter(next);
+              setPage(1);
+              void load(query, kategori, next, gameFilter, tersedia, mapping, 1);
+            }}
+          >
+            <option value="">Semua brand</option>
+            {(data?.brands ?? []).map((b) => (
+              <option key={b} value={b}>
+                {b}
               </option>
             ))}
           </select>
@@ -358,7 +386,7 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setGameFilter(next);
               setPage(1);
-              void load(query, kategori, next, tersedia, mapping, 1);
+              void load(query, kategori, brandFilter, next, tersedia, mapping, 1);
             }}
           >
             <option value="">Semua game</option>
@@ -378,7 +406,7 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setTersedia(next);
               setPage(1);
-              void load(query, kategori, gameFilter, next, mapping, 1);
+              void load(query, kategori, brandFilter, gameFilter, next, mapping, 1);
             }}
           >
             <option value="">Semua</option>
@@ -395,7 +423,7 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setMapping(next);
               setPage(1);
-              void load(query, kategori, gameFilter, tersedia, next, 1);
+              void load(query, kategori, brandFilter, gameFilter, tersedia, next, 1);
             }}
           >
             <option value="">Semua</option>
@@ -408,7 +436,7 @@ export default function MelostoreCatalogBrowser() {
       <div className="acc-table-card" style={{ marginTop: 12 }}>
         <div className="acc-receipts-head is-mapping">
           <span>Produk Melostore</span>
-          <span>Game</span>
+          <span>Brand</span>
           <span>Kategori</span>
           <span>Modal</span>
           <span>Status</span>
@@ -424,12 +452,25 @@ export default function MelostoreCatalogBrowser() {
               <div>
                 <strong>{row.name}</strong>
                 <span>{row.sku}</span>
+                {row.inquiryFields && row.inquiryFields.length > 0 ? (
+                  <span className="acc-form-fields">
+                    {row.inquiryFields.map((f) => (
+                      <em key={f.key} title={`Input ${f.name} (kunci: ${f.key})`}>
+                        {f.name}
+                      </em>
+                    ))}
+                  </span>
+                ) : null}
+                {row.inquiryNotice ? (
+                  <small className="acc-form-notice">{row.inquiryNotice}</small>
+                ) : null}
               </div>
               <span className="acc-cell-game">
-                {row.gameName}
-                {!row.gameConfident && row.gameId && (
-                  <small className="acc-game-ambigu">(ambigu)</small>
-                )}
+                {row.brand ?? "Tanpa brand"}
+                <small className="acc-cell-game-sub">
+                  {row.gameName}
+                  {!row.gameConfident && row.gameId ? " (ambigu)" : ""}
+                </small>
               </span>
               <span>{row.category}</span>
               <span>{rupiah(row.cost)}</span>
@@ -532,7 +573,7 @@ export default function MelostoreCatalogBrowser() {
             onClick={() => {
               const next = page - 1;
               setPage(next);
-              void load(query, kategori, gameFilter, tersedia, mapping, next);
+              void load(query, kategori, brandFilter, gameFilter, tersedia, mapping, next);
             }}
           >
             Sebelumnya
@@ -546,7 +587,7 @@ export default function MelostoreCatalogBrowser() {
             onClick={() => {
               const next = page + 1;
               setPage(next);
-              void load(query, kategori, gameFilter, tersedia, mapping, next);
+              void load(query, kategori, brandFilter, gameFilter, tersedia, mapping, next);
             }}
           >
             Berikutnya

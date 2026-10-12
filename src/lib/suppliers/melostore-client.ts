@@ -273,8 +273,28 @@ function toQuote(item: MelostazzPriceItem): SupplierQuote {
   };
 }
 
+export type MelostoreInquiryFormField = {
+  /** Kunci yang dipakai di body transaksi (customer_target, dll). */
+  key: string;
+  /** Label yang dibaca manusia, mis. "Player ID". */
+  name: string;
+  type: string;
+};
+
+export type MelostoreInquiryForm = {
+  fields: MelostoreInquiryFormField[];
+  notice: string | null;
+};
+
 export type MelostoreScanOutcome = {
   items: MelostoreCatalogItem[];
+  /**
+   * Definisi form input pelanggan, kunci = inquiry_form_key.
+   *
+   * Satu form dipakai ratusan SKU - menyimpannya sekali di sini, bukan
+   * per item, menghindari penggandaan payload ribuan kali.
+   */
+  forms: Record<string, MelostoreInquiryForm>;
   pagesTotal: number;
   pagesFailed: number;
   /** Pesan per halaman yang gagal, untuk dicatat ke jejak scan. */
@@ -286,6 +306,10 @@ export type MelostoreCatalogItem = {
   price: number;
   status: string | null;
   categoryName: string | null;
+  /** Nama brand asli dari meta.brands - bukan kategori. */
+  brandName: string | null;
+  /** Kunci form input pelanggan; definisinya ada di forms. */
+  inquiryFormKey: string | null;
 };
 export class MelostoreSupplierClient implements SupplierClient {
   readonly id = SUPPLIER_ID;
@@ -351,6 +375,14 @@ export class MelostoreSupplierClient implements SupplierClient {
    */
   async scanCatalog(): Promise<MelostoreScanOutcome> {
     const perSku = new Map<string, MelostazzPriceItem>();
+    /*
+     * Identitas brand dan definisi form datang di meta respons, bukan di
+     * item. Item hanya membawa brand_id dan inquiry_form_key - tanpa
+     * peta ini, kolom brand cache akan berisi kategori (salah) dan
+     * form tidak pernah diketahui.
+     */
+    const brandNameById = new Map<number, string>();
+    const forms: Record<string, MelostoreInquiryForm> = {};
     let cursor: string | null = null;
     let pages = 0;
     let pagesFailed = 0;
@@ -369,12 +401,52 @@ export class MelostoreSupplierClient implements SupplierClient {
           MelostoreEnvelope<MelostazzPriceItem[]> & {
             meta?: {
               pagination?: { next_cursor?: string | null; has_more?: boolean };
+              brands?: Array<{ id?: number; name?: string }>;
+              inquiry_forms?: Record<
+                string,
+                {
+                  fields?: MelostoreInquiryFormField[];
+                  notice?: string | null;
+                }
+              >;
             };
           }
         >(path, { method: "GET" });
         page = body.data;
         nextCursor = body.meta?.pagination?.next_cursor ?? null;
         hasMore = body.meta?.pagination?.has_more === true;
+
+        for (const brand of body.meta?.brands ?? []) {
+          if (
+            typeof brand?.id === "number" &&
+            typeof brand.name === "string" &&
+            brand.name.trim()
+          ) {
+            brandNameById.set(brand.id, brand.name.trim());
+          }
+        }
+        for (const [key, form] of Object.entries(body.meta?.inquiry_forms ?? {})) {
+          if (form?.fields && form.fields.length > 0) {
+            forms[key] = {
+              fields: form.fields.map((f) => ({
+                key: String(f?.key ?? ""),
+                name: String(f?.name ?? ""),
+                type: String(f?.type ?? "text"),
+              })).filter((f) => f.key),
+              /*
+               * `notice` di dokumen contohnya string|null, tapi data
+               * nyata bisa berupa bentuk lain (objek/array). Coerce hanya
+               * untuk string - bentuk lain tidak boleh membuat seluruh
+               * halaman scan gagal (terbukti: satu notice non-string
+               * menggagalkan scan penuh sebelum perbaikan ini).
+               */
+              notice:
+                typeof form.notice === "string" && form.notice.trim()
+                  ? form.notice.trim()
+                  : null,
+            };
+          }
+        }
       } catch (error) {
         pagesFailed += 1;
         errors.push(
@@ -414,7 +486,13 @@ export class MelostoreSupplierClient implements SupplierClient {
         price: toSupplierAmount(item.price) ?? 0,
         status: item.status ?? null,
         categoryName: item.category_name ?? null,
+        brandName:
+          typeof item.brand_id === "number"
+            ? brandNameById.get(item.brand_id) ?? null
+            : null,
+        inquiryFormKey: item.inquiry_form_key?.trim() || null,
       })),
+      forms,
       pagesTotal: pages,
       pagesFailed,
       errors,
@@ -431,18 +509,24 @@ export class MelostoreSupplierClient implements SupplierClient {
    * Dipakai panel pemetaan admin; selection tetap memakai `fetchQuotes`.
    */
   async fetchCatalog(): Promise<MelostoreCatalogItem[]> {
-    const items = await this.fetchRawCatalog();
+    const { items, brandNameById } = await this.fetchRawCatalog();
     return items.map((item) => ({
       sku: item.sku_code,
       name: item.name ?? "",
       price: toSupplierAmount(item.price) ?? 0,
       status: item.status ?? null,
       categoryName: item.category_name ?? null,
+      brandName:
+        typeof item.brand_id === "number"
+          ? brandNameById.get(item.brand_id) ?? null
+          : null,
+      inquiryFormKey: item.inquiry_form_key?.trim() || null,
     }));
   }
 
   async fetchQuotes(): Promise<SupplierQuote[]> {
-    return (await this.fetchRawCatalog()).map(toQuote);
+    const { items } = await this.fetchRawCatalog();
+    return items.map(toQuote);
   }
 
   /*
@@ -459,7 +543,10 @@ export class MelostoreSupplierClient implements SupplierClient {
    * dan urutan halaman dijamin maju - jadi ini bukan hasil acak
    * antara dua data yang berbeda.
    */
-  private async fetchRawCatalog(): Promise<MelostazzPriceItem[]> {
+  private async fetchRawCatalog(): Promise<{
+    items: MelostazzPriceItem[];
+    brandNameById: Map<number, string>;
+  }> {
     /*
      * Dedup di sumbernya: katalog Melostore mengembalikan SKU yang sama
      * di lebih dari satu halaman, dan upsert dengan kunci duplikat ditolak
@@ -467,6 +554,7 @@ export class MelostoreSupplierClient implements SupplierClient {
      * urutan halaman dijamin maju.
      */
     const perSku = new Map<string, MelostazzPriceItem>();
+    const brandNameById = new Map<number, string>();
     let cursor: string | null = null;
     let pages = 0;
 
@@ -479,11 +567,13 @@ export class MelostoreSupplierClient implements SupplierClient {
         data?: MelostazzPriceItem[];
         meta?: {
           pagination?: { next_cursor?: string | null; has_more?: boolean };
+          brands?: Array<{ id?: number; name?: string }>;
         };
       } = await requestWithRetry<
         MelostoreEnvelope<MelostazzPriceItem[]> & {
           meta?: {
             pagination?: { next_cursor?: string | null; has_more?: boolean };
+            brands?: Array<{ id?: number; name?: string }>;
           };
         }
       >(path, { method: "GET" });
@@ -494,6 +584,16 @@ export class MelostoreSupplierClient implements SupplierClient {
           SUPPLIER_ID,
           "Respons katalog Melostore tidak berisi daftar SKU.",
         );
+      }
+
+      for (const brand of body.meta?.brands ?? []) {
+        if (
+          typeof brand?.id === "number" &&
+          typeof brand.name === "string" &&
+          brand.name.trim()
+        ) {
+          brandNameById.set(brand.id, brand.name.trim());
+        }
       }
 
       for (const item of page) {
@@ -512,7 +612,7 @@ export class MelostoreSupplierClient implements SupplierClient {
       cursor = next;
     }
 
-    return [...perSku.values()];
+    return { items: [...perSku.values()], brandNameById };
   }
 
   async runTransaction(

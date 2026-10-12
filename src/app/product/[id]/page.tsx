@@ -55,7 +55,7 @@ export default async function ProductPage({
     <main className="product-page">
       <SiteHeader className="product-site-header">
         <a className="brand" href="/" aria-label={BRAND.name}>
-          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
+          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
           <span>{BRAND.shortName}</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi produk">

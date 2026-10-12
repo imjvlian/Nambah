@@ -16,7 +16,7 @@ export default function AccountPage() {
     <main className="account-page">
       <SiteHeader className="account-header">
         <a className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
+          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
           <span>{BRAND.shortName}</span>
         </a>
         <nav className="desktop-nav" aria-label="Navigasi akun">

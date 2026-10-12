@@ -24,7 +24,7 @@ export default async function RegisterPage({
     <main className="auth-page">
       <SiteHeader className="auth-header">
         <a className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
+          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
           <span>{BRAND.shortName}</span>
         </a>
         <a className="text-link" href="/">Kembali ke beranda</a>

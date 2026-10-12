@@ -2975,7 +2975,7 @@ const txDataStamp = txRange.preset
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
           <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
+            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
             <span>{BRAND.shortName}</span>
           </Link>
           <span className="admin-kicker">Admin account</span>
@@ -3001,7 +3001,7 @@ const txDataStamp = txRange.preset
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
           <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span>
+            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
             <span>{BRAND.shortName}</span>
           </Link>
           <span className="admin-kicker">Akses ditolak</span>

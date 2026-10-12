@@ -40,6 +40,7 @@ type CatalogItemRow = {
   supplier_cost: number | string;
   buyer_active: boolean;
   last_seen_at: string;
+  inquiry_form_key: string | null;
 };
 
 type MappingRow = {
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = clean(url.searchParams.get("q")).toLowerCase();
   const kategori = clean(url.searchParams.get("kategori"));
+  const brandFilter = clean(url.searchParams.get("brand")); // nama brand asli dari katalog
   const gameFilter = clean(url.searchParams.get("game")); // gameId dari Nambah
   const tersedia = clean(url.searchParams.get("tersedia")); // active | inactive
   const mapping = clean(url.searchParams.get("mapping")); // added | unmapped
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
   const [items, mappings, runs] = await Promise.all([
     supabaseSelectAll<CatalogItemRow>("supplier_catalog_items", {
       select:
-        "supplier_sku,product_name,category,brand,type,supplier_cost,buyer_active,last_seen_at",
+        "supplier_sku,product_name,category,brand,type,supplier_cost,buyer_active,last_seen_at,inquiry_form_key",
       filters: { supplier_id: "eq.melostore" },
       order: "product_name.asc",
     }),
@@ -85,6 +87,34 @@ export async function GET(request: Request) {
     }),
     riwayatScan("melostore", 5),
   ]);
+
+  /*
+   * Definisi form input pelanggan. Kolom mungkin belum ada sebelum
+   * migrasi 046 - dibaca best-effort supaya browser tetap jalan,
+   * hanya chip form yang kosong.
+   */
+  let forms: Record<string, { fields: Array<{ key: string; name: string; type: string }>; notice: string | null }> = {};
+  try {
+    const formRows = await supabaseSelectAll<{
+      form_key: string;
+      fields: Array<{ key: string; name: string; type: string }>;
+      notice: string | null;
+    }>("supplier_inquiry_forms", {
+      select: "form_key,fields,notice",
+      filters: { supplier_id: "eq.melostore" },
+    });
+    for (const row of formRows) {
+      if (row.form_key && Array.isArray(row.fields)) {
+        forms[row.form_key] = { fields: row.fields, notice: row.notice ?? null };
+      }
+    }
+  } catch (error) {
+    console.warn(
+      "Definisi form Melostore tidak terbaca - jalankan migrasi 046 dan scan ulang.",
+      error instanceof Error ? error.message : String(error),
+    );
+    forms = {};
+  }
 
   const mappedBySku = new Map(mappings.map((m) => [m.supplier_sku ?? "", m.product_id] as const));
   const productIds = [...new Set(mappings.map((m) => m.product_id))];
@@ -123,19 +153,26 @@ export async function GET(request: Request) {
     return { ...item, gameId, gameName, gameConfident: confident };
   });
 
-  // Kelompokkan: kategori -> game -> hitungan
+  /*
+   * Kelompokkan: kategori -> BRAND ASLI.
+   *
+   * Brand dari meta.brands katalog (disimpan scan). Data lama hasil
+   * scan sebelum kolom brand diperbaiki berisi brand == kategori;
+   * kelompok seperti itu tetap tampil sebagai satu grup - setelah
+   * scan ulang, brand asli menggantinya.
+   */
   const kategoriUnik = [...new Set(itemsWithGame.map((i) => i.category))].sort((a, b) =>
     a.localeCompare(b, "id"),
   );
   const groups: Record<string, Record<string, { total: number; tersedia: number; ditambahkan: number }>> = {};
   for (const item of itemsWithGame) {
     const kat = item.category;
-    const gm = item.gameName;
+    const brand = item.brand?.trim() || "Tanpa brand";
     if (!groups[kat]) groups[kat] = {};
-    if (!groups[kat][gm]) groups[kat][gm] = { total: 0, tersedia: 0, ditambahkan: 0 };
-    groups[kat][gm].total += 1;
-    if (item.buyer_active) groups[kat][gm].tersedia += 1;
-    if (mappedBySku.has(item.supplier_sku)) groups[kat][gm].ditambahkan += 1;
+    if (!groups[kat][brand]) groups[kat][brand] = { total: 0, tersedia: 0, ditambahkan: 0 };
+    groups[kat][brand].total += 1;
+    if (item.buyer_active) groups[kat][brand].tersedia += 1;
+    if (mappedBySku.has(item.supplier_sku)) groups[kat][brand].ditambahkan += 1;
   }
 
   const tersaring = itemsWithGame.filter((item) => {
@@ -144,6 +181,7 @@ export async function GET(request: Request) {
     }
     if (kategori && item.category !== kategori) return false;
     if (gameFilter && item.gameId !== gameFilter) return false;
+    if (brandFilter && (item.brand?.trim() || "Tanpa brand") !== brandFilter) return false;
     if (tersedia === "active" && !item.buyer_active) return false;
     if (tersedia === "inactive" && item.buyer_active) return false;
 
@@ -160,11 +198,13 @@ export async function GET(request: Request) {
   const rows = halaman.map((item) => {
     const productId = mappedBySku.get(item.supplier_sku) ?? null;
     const internal = productId ? produk.get(productId) ?? null : null;
+    const form = item.inquiry_form_key ? forms[item.inquiry_form_key] ?? null : null;
 
     return {
       sku: item.supplier_sku,
       name: item.product_name,
       category: item.category,
+      brand: item.brand?.trim() || null,
       type: item.type,
       cost: Number(item.supplier_cost),
       active: item.buyer_active,
@@ -173,6 +213,9 @@ export async function GET(request: Request) {
       gameId: item.gameId,
       gameName: item.gameName,
       gameConfident: item.gameConfident,
+      inquiryFormKey: item.inquiry_form_key,
+      inquiryFields: form ? form.fields : null,
+      inquiryNotice: form ? form.notice : null,
       internalProduct: internal
         ? {
             id: internal.id,
@@ -192,6 +235,9 @@ export async function GET(request: Request) {
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     categories: kategoriUnik,
+    brands: [...new Set(items.map((i) => i.brand?.trim() ?? "").filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "id"),
+    ),
     games,
     groups,
     addedCount: mappings.length,

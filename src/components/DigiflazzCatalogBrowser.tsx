@@ -392,7 +392,7 @@ export default function DigiflazzCatalogBrowser() {
   return (
     <main className="supplier-browser-shell">
       <header className="supplier-browser-header">
-        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/nambah-logo.svg" alt="" /></span><span>{BRAND.shortName}</span></Link>
+        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span><span>{BRAND.shortName}</span></Link>
         <nav>
           <Link href="/admin">Produk {BRAND.shortName}</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>

@@ -5753,3 +5753,41 @@
   font-size: 10px;
   font-weight: 600;
 }
+
+/* Nama game (tebakan prefiks) di bawah brand asli - konteks, bukan judul. */
+.acc-cell-game-sub {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/*
+ * Chip field input yang diminta produk (dari inquiry form Melostore).
+ * Supaya operator tahu input apa yang harus dikumpulkan SEBELUM
+ * menambahkan produk - bukan mengetahuinya setelah order gagal.
+ */
+.acc-form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.acc-form-fields em {
+  padding: 1px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #b7beb2;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.acc-form-notice {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}

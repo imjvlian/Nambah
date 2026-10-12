@@ -11,7 +11,7 @@ export type BrandLogoProps = {
   showTagline?: boolean;
   size?: "sm" | "md" | "lg";
 };
-const MARK_SRC = "/logo/nambah-logo.svg";
+const MARK_SRC = "/logo/lacte-logo.svg";
 
 export default function BrandLogo({
   variant = "horizontal",
@@ -27,7 +27,7 @@ export default function BrandLogo({
       src={MARK_SRC}
       alt=""
       width={80}
-      height={59}
+      height={72}
       priority={false}
       unoptimized
       className={`brand-logo__mark ${variant === "mono" ? "brand-logo__mark--mono" : ""}`}

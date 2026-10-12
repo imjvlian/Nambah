@@ -352,7 +352,13 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       supplier_sku: item.sku,
       product_name: item.name || item.sku,
       category: item.categoryName ?? "Melostore",
-      brand: item.categoryName ?? "Melostore",
+      /*
+       * Brand ASLI dari meta.brands - bukan categoryName. Keduanya
+       * pernah diisi nilai sama, sehingga pengelompokan per brand di
+       * browser tidak pernah bisa membedakan "Mobile Legends" (brand)
+       * dari "Game" (kategori).
+       */
+      brand: item.brandName ?? item.categoryName ?? "Melostore",
       type: "Melostore",
       seller_name: "Melostore H2H",
       supplier_cost: item.price,
@@ -364,6 +370,7 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       start_cut_off: null,
       end_cut_off: null,
       description: null,
+      inquiry_form_key: item.inquiryFormKey,
       last_seen_at: now,
     }));
 
@@ -379,6 +386,36 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       await supabaseUpsert("supplier_catalog_items", baris.slice(i, i + UKURAN_BATCH), {
         onConflict: "supplier_id,supplier_sku",
       });
+    }
+
+    /*
+     * Definisi form input pelanggan, satu baris per form.
+     *
+     * Form dipakai ratusan SKU; kolom inquiry_form_key pada item
+     * merujuk ke sini. Kalau tabelnya belum ada (migrasi 046 belum
+     * dijalankan), upsert melempar - ditangkap dan dicatat supaya
+     * scan tetap tersimpan, dan pesannya menyuruh menjalankan migrasi.
+     */
+    let formTersimpan = 0;
+    try {
+      const formRows = Object.entries(hasil.forms).map(([formKey, form]) => ({
+        supplier_id: "melostore",
+        form_key: formKey,
+        fields: form.fields,
+        notice: form.notice,
+        synced_at: now,
+      }));
+      for (let i = 0; i < formRows.length; i += UKURAN_BATCH) {
+        await supabaseUpsert("supplier_inquiry_forms", formRows.slice(i, i + UKURAN_BATCH), {
+          onConflict: "supplier_id,form_key",
+        });
+      }
+      formTersimpan = formRows.length;
+    } catch (error) {
+      console.warn(
+        "Definisi form Melostore gagal disimpan - jalankan migrasi 046.",
+        error instanceof Error ? error.message : String(error),
+      );
     }
 
     /*
@@ -434,12 +471,14 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       updated: berubah,
       unchanged: sama,
       inactive: ditandai,
+      forms: formTersimpan,
       message:
         (statusScan === "partial"
           ? `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
           : "") +
         `${baris.length} SKU, ${baru} baru, ${berubah} diperbarui` +
-        (statusScan === "success" ? `, ${ditandai} ditandai nonaktif.` : "."),
+        (statusScan === "success" ? `, ${ditandai} ditandai nonaktif.` : ".") +
+        (formTersimpan > 0 ? ` ${formTersimpan} form input tersimpan.` : ""),
     });
   } catch (error) {
     const pesan = error instanceof Error ? error.message : "galat tidak diketahui";

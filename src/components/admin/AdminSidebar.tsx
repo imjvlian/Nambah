@@ -546,7 +546,7 @@ export default function AdminSidebar({
       <aside className="acc-sidebar">
         <Link className="acc-brand" href="/admin">
           <span className="brand-mark">
-            <img src="/logo/nambah-logo.svg" alt="" />
+            <img src="/logo/lacte-logo.svg" alt="" />
           </span>
           <span>
             <b>{BRAND.shortName}</b>
