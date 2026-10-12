@@ -1957,6 +1957,24 @@ const txDataStamp = txRange.preset
         ),
       );
     }
+    /*
+     * Kandidat SKU Melostore dimuat saat seksi katalog dibuka, bukan hanya
+     * saat tombol refresh ditekan. Combobox per baris membaca daftar ini;
+     * tanpa muat di sini, pertama kali masuk seksi katalog semua combobox
+     * kosong dan pemetaan tersimpan tampak hilang.
+     *
+     * Guard `melostore.length === 0`: sekali termuat, pindah-pindah seksi
+     * tidak menarik ulang payload 8.000+ SKU.
+     */
+    if (
+      (section === "catalog" || section === "supplier") &&
+      supplierCatalog.melostore.length === 0
+    ) {
+      void muatKandidatSupplier().catch(() => {
+        /* Gagal memuat kandidat bukan alasan menggagalkan seksi katalog -
+         * data tersimpan tetap tampil lewat fallback product.melostore. */
+      });
+    }
     if (section === "affiliates" && !affiliateData) {
       void loadAffiliates().catch((error) =>
         setNotice(
@@ -2029,7 +2047,7 @@ const txDataStamp = txRange.preset
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness]);
+  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness, supplierCatalog]);
 
   function updateDraft(productId: string, patch: Partial<DraftProduct>) {
     setDrafts((current) => ({
@@ -2612,8 +2630,16 @@ const txDataStamp = txRange.preset
    */
   async function simpanBarisKatalog(product: CatalogProduct) {
     const draft = drafts[product.id] ?? draftFromProduct(product);
-    const pick = melostorePick[product.id] ?? "";
-    const tersimpan = melostoreTersimpan[product.id] ?? "";
+    /*
+     * Nilai efektif dengan fallback yang sama dengan tampilan baris:
+     * kalau muatKandidatSupplier belum pernah berjalan, pick/tersimpan
+     * dibaca dari data API katalog - bukan string kosong. Tanpa fallback,
+     * menyimpan baris yang mapping-nya ada akan mengirim "clear" palsu
+     * (pick "" != tersimpan sebenarnya) dan menghapus pemetaan diam-diam.
+     */
+    const pick = melostorePick[product.id] ?? product.melostore.sku ?? "";
+    const tersimpan =
+      melostoreTersimpan[product.id] ?? product.melostore.sku ?? "";
 
     const pekerjaan: Array<Promise<void>> = [];
 
@@ -3505,6 +3531,26 @@ const txDataStamp = txRange.preset
                       Number.isFinite(referenceValue) &&
                       referenceValue < sellingValue;
 
+                    /*
+                     * SKU Melostore yang efektif tampil di baris ini.
+                     *
+                     * `melostorePick` diisi oleh muatKandidatSupplier, yang
+                     * hanya berjalan saat masuk seksi katalog atau klik
+                     * refresh - kalau state itu belum termuat, kolom
+                     * Melostore menampilkan "Pilih SKU..." padahal mapping
+                     * tersimpan ada. API katalog sudah membawa nilai
+                     * tersimpannya (`product.melostore.sku`), jadi itu
+                     * fallback-nya.
+                     *
+                     * `??` dan bukan `||`: pick "" berarti operator memilih
+                     * "Kosongkan" - itu keputusan eksplisit dan TIDAK boleh
+                     * ditimpa nilai tersimpan.
+                     */
+                    const skuTampil =
+                      melostorePick[product.id] ?? product.melostore.sku ?? "";
+                    const skuTersimpan =
+                      melostoreTersimpan[product.id] ?? product.melostore.sku ?? "";
+
                     return (
                       <article
                         className={
@@ -3846,13 +3892,10 @@ const txDataStamp = txRange.preset
                                 }))
                               }
                             >
-                              {melostorePick[product.id]
-                                ? melostorePick[product.id]
-                                : "Pilih SKU Melostore..."}
+                              {skuTampil || "Pilih SKU Melostore..."}
                             </button>
                           )}
-                          {melostorePick[product.id] &&
-                          product.melostore.cost !== null ? (
+                          {skuTampil && product.melostore.cost !== null ? (
                             (() => {
                               const info = marginDariModal(
                                 product.melostore.cost,
@@ -3866,8 +3909,7 @@ const txDataStamp = txRange.preset
                               );
                             })()
                           ) : null}
-                          {melostorePick[product.id] !==
-                            (melostoreTersimpan[product.id] ?? "") && (
+                          {skuTampil !== skuTersimpan && (
                             <small className="admin-supplier-warning">
                               Belum disimpan - tekan Simpan.
                             </small>

@@ -132,12 +132,18 @@ export async function GET(request: Request) {
   }
 
 
+  /*
+   * products dan mapping melewati 1.000 baris - `supabaseSelect` dengan
+   * limit 2000 tetap terpotong di 1.000 oleh PostgREST, sehingga ~400
+   * produk terakhir tidak pernah mendapat baris `rows`. Akibatnya panel
+   * pemetaan dan state pick/tersimpan di dashboard menganggap mereka
+   * tidak terpetakan. `supabaseSelectAll` memaginasi otomatis.
+   */
   const [products, games, existing] = await Promise.all([
-    supabaseSelect<ProductRow>("products", {
+    supabaseSelectAll<ProductRow>("products", {
       select: "id,label,game_id,active",
       filters: { active: "eq.true" },
       order: "label.asc",
-      limit: 2000,
     }),
     supabaseSelect<GameRow>("games", {
       select: "id,name",
@@ -145,10 +151,9 @@ export async function GET(request: Request) {
       order: "name.asc",
       limit: 300,
     }),
-    supabaseSelect<ExistingMapping>("supplier_products", {
+    supabaseSelectAll<ExistingMapping>("supplier_products", {
       select: "product_id,supplier_sku,supplier_cost",
       filters: { supplier_id: "eq.melostore" },
-      limit: 2000,
     }),
   ]);
 
