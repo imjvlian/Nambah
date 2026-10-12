@@ -14,6 +14,8 @@ import {
 import { validateGameAccountTarget } from "@/lib/game-account";
 import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 import { allocateMerchantScanCode } from "@/lib/merchant-confirm";
+import { isFlowTestMode } from "@/lib/flow-test";
+import { pilihSupplierUntukProduk } from "@/lib/suppliers/selection-service";
 import {
   MERCHANT_ORDER_EXPIRY_WINDOW_MS,
   checkMerchantCredit,
@@ -402,6 +404,48 @@ if (isMerchantRetail) {
 
   const access = createOrderAccessCredential();
 
+  /*
+   * Pemilihan supplier: termurah yang saldonya cukup.
+   *
+   * Diputuskan SEBELUM order dibuat, bukan saat eksekusi, supaya
+   * `supplier_cost` yang dibekukan ke order adalah harga supplier yang
+   * benar-benar akan dipakai - nota, laporan margin, dan `max_price`
+   * saat dispatch semuanya membaca angka yang sama.
+   *
+   * Penolakan di sini terjadi SEBELUM pembayaran: "saldo supplier tidak
+   * cukup" adalah jawaban yang sah untuk "produk ini sedang tidak bisa
+   * dibeli", dan biar pembeli tahu sekarang daripada setelah membayar.
+   *
+   * FLOW TEST MODE memakai produk seed tanpa mapping nyata - semua
+   * fulfillment-nya tersimulasi dan tidak pernah sampai ke supplier,
+   * jadi penolakan selection di-skip dan supplier_id dicatat sebagai
+   * digiflazz demi kolomnya yang not null. Di luar flow test mode,
+   * penolakan bersifat mutlak.
+   */
+  const supplierSelection = await pilihSupplierUntukProduk(selectedPackage.id, {
+    abaikanSaldo: isFlowTestMode(),
+  });
+  let supplierTerpilih: { supplierId: string; sku: string; cost: number };
+  if (supplierSelection.ok) {
+    supplierTerpilih = supplierSelection.choice;
+  } else if (isFlowTestMode()) {
+    /*
+     * Produk seed tanpa mapping nyata. `abaikanSaldo` di atas sudah
+     * menutup kasus "mapping ada tapi saldo 0"; yang tersisa di sini
+     * hanyalah produk tanpa mapping sama sekali.
+     */
+    supplierTerpilih = {
+      supplierId: "digiflazz",
+      sku: "-",
+      cost: pricing.supplierCost,
+    };
+  } else {
+    return Response.json(
+      { error: supplierSelection.detail },
+      { status: 409 },
+    );
+  }
+
   // Pembuatan order di bawah ini adalah saga 6 langkah, bukan transaksi: ada
   // panggilan ke Midtrans di tengah-tengahnya, jadi membungkusnya dalam DB
   // transaction tidak mungkin. Kalau proses mati (timeout, cold start, deploy)
@@ -429,14 +473,20 @@ if (isMerchantRetail) {
       target_server_id: account.serverId ?? null,
       promotion_code: pricing.promoCode,
       affiliate_code: pricing.affiliateCode,
-      supplier_id: "digiflazz",
+      supplier_id: supplierTerpilih.supplierId,
       // Status awal berbeda per jalur. `pending_merchant` TIDAK boleh masuk
       // sweeper 30 menit — setelah merchant scan, order sudah irreversible
       // di sisi supplier dan membatalkannya tidak membatalkan top up.
       status: isMerchantRetail ? "pending_merchant" : "pending_payment",
       reference_price: pricing.referencePrice,
       selling_price: pricing.sellingPrice,
-      supplier_cost: pricing.supplierCost,
+      /*
+       * Harga supplier yang BENAR-BENAR DIPILIH, bukan termurah teoritis.
+       * Kalau supplier termurah saldonya tidak cukup, pilihan jatuh ke
+       * yang lebih mahal - dan angka inilah yang dibaca dispatch sebagai
+       * `max_price` serta dicek "harga naik setelah checkout".
+       */
+      supplier_cost: supplierTerpilih.cost,
       customer_payment_fee: pricing.customerPaymentFee,
       merchant_payment_cost: pricing.merchantPaymentCost,
       // Snapshot merchant. Tanpa ini, admin mengubah tarif setelah user

@@ -31,6 +31,7 @@ type ProductRow = {
 
 type SupplierAvailabilityRow = {
   product_id: string;
+  supplier_id: string;
   active: boolean;
   supplier_cost: number | string;
 };
@@ -196,13 +197,21 @@ function isTransientSupabaseJwtError(error: unknown) {
 }
 
 /**
- * Status ketersediaan + modal supplier. Kolom supplier_cost tidak selalu bisa
- * dibaca (kebijakan kolom / RLS), jadi ada fallback tanpa kolom tersebut:
- * katalog tetap jalan, hanya peringkat "Best Deals" yang kosong.
+ * Status ketersediaan + modal supplier untuk SEMUA supplier terdaftar.
+ *
+ * Melostore adalah supplier kedua: produk yang hanya terpetakan ke
+ * Melostore sah untuk dijual, jadi etalase tidak boleh hanya membaca
+ * baris Digiflazz. Satu produk bisa punya baris kedua supplier
+ * sekaligus - keduanya dibaca sekali, lalu agregasinya (aktif dari
+ * mana pun, modal termurah) dihitung di pemanggil.
+ *
+ * Kolom supplier_cost tidak selalu bisa dibaca (kebijakan kolom /
+ * RLS), jadi ada fallback tanpa kolom tersebut: katalog tetap jalan,
+ * hanya peringkat "Best Deals" yang kosong.
  */
 async function fetchSupplierAvailability(): Promise<SupplierAvailabilityRow[]> {
   const filters = {
-    supplier_id: "eq.digiflazz",
+    supplier_id: "in.(digiflazz,melostore)",
     supplier_sku: "not.is.null",
   };
 
@@ -270,29 +279,47 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
 
   const supplierAvailabilityRows = await fetchSupplierAvailability();
 
-  const supplierAvailability = new Map(
-    supplierAvailabilityRows.map((row) => [row.product_id, Boolean(row.active)]),
-  );
-
-  /**
-   * Aturan etalase: produk hanya tampil kalau benar-benar bisa dibeli dari
-   * Digiflazz — punya baris mapping dengan SKU terisi, dan mapping-nya aktif
-   * (SKU masih ada & stoknya tersedia di Digiflazz).
-   *
-   * `?? true` yang lama membuat produk tanpa mapping tetap tampil, lalu gagal
-   * saat fulfillment dengan pesan "SKU belum mapped". Sekarang produk seperti
-   * itu langsung disembunyikan dari etalase.
+  /*
+   * Produk dianggap terbeli kalau ADA mapping aktif dari supplier mana pun.
+   * Baris mapping yang sama produk bisa ada dua (Digiflazz + Melostore) -
+   * `some` menyatukan keduanya: cukup satu yang aktif.
    */
-  function isPurchasableFromSupplier(productId: string) {
-    return supplierAvailability.get(productId) === true;
+  const availabilityByProduct = new Map<string, SupplierAvailabilityRow[]>();
+  for (const row of supplierAvailabilityRows) {
+    const list = availabilityByProduct.get(row.product_id);
+    if (list) list.push(row);
+    else availabilityByProduct.set(row.product_id, [row]);
   }
 
-  // Modal supplier hanya dipakai di server untuk peringkat margin; tidak
-  // pernah ikut ke PublicCatalogResult yang dikirim ke klien.
+  /**
+   * Aturan etalase: produk hanya tampil kalau benar-benar bisa dibeli -
+   * punya baris mapping dengan SKU terisi dari DIGIFLAZZ ATAU MELOSTORE,
+   * dan mapping-nya aktif.
+   *
+   * Versi lama hanya membaca Digiflazz, sehingga produk yang hanya
+   * terpetakan ke Melostore (ditambah admin dari katalog Melostore)
+   * tidak pernah muncul di halaman pembelian meski sudah diaktifkan.
+   *
+   * `?? true` yang lebih lama lagi membuat produk tanpa mapping tetap
+   * tampil lalu gagal saat fulfillment; itu tetap tidak boleh.
+   */
+  function isPurchasableFromSupplier(productId: string) {
+    const rows = availabilityByProduct.get(productId);
+    return (rows ?? []).some((row) => row.active === true);
+  }
+
+  // Modal termurah antar supplier aktif - sama dengan yang akan dihitung
+  // pemilihan supplier di checkout. Hanya dipakai untuk peringkat "Best
+  // Deals" di server; tidak pernah ikut ke bundle pelanggan.
   const supplierCostByProductId = new Map<string, number>();
-  for (const row of supplierAvailabilityRows) {
-    const cost = Number(row.supplier_cost);
-    if (Number.isFinite(cost) && cost > 0) supplierCostByProductId.set(row.product_id, cost);
+  for (const [productId, rows] of availabilityByProduct) {
+    const modal = rows
+      .filter((row) => row.active === true)
+      .flatMap((row) => {
+        const cost = Number(row.supplier_cost);
+        return Number.isFinite(cost) && cost > 0 ? [cost] : [];
+      });
+    if (modal.length > 0) supplierCostByProductId.set(productId, Math.min(...modal));
   }
 
   const popularity = new Map<string, number>();

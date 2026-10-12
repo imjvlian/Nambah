@@ -81,6 +81,7 @@ type ProductRow = {
 };
 
 type SupplierProductRow = {
+  supplier_id: string;
   supplier_cost: number | string;
 };
 
@@ -342,13 +343,13 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
         limit: 1,
       }),
       supabaseSelect<SupplierProductRow>("supplier_products", {
-        select: "supplier_cost",
+        select: "supplier_id,supplier_cost",
         filters: {
-          supplier_id: "eq.digiflazz",
+          supplier_id: "in.(digiflazz,melostore)",
           product_id: `eq.${packageId}`,
           active: "eq.true",
         },
-        limit: 1,
+        limit: 8,
       }),
       supabaseSelect<PaymentMethodRow>("payment_methods", {
         select:
@@ -387,7 +388,22 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
 
     const game = gameRows[0];
     const product = productRows[0];
-    const supplierProduct = supplierRows[0];
+    /*
+     * Modal termurah antar supplier yang terpetakan aktif.
+     *
+     * Pemilihan supplier di order creation memakai aturan yang sama
+     * (termurah yang saldonya cukup); margin minimum dihitung dari
+     * termurah karena itu batas bawah yang mungkin - kalau termurah
+     * saja tidak menutup profit minimum, tidak ada supplier yang bisa.
+     */
+    const biayaValid = supplierRows.flatMap((row) => {
+      const cost = Number(row.supplier_cost);
+      return Number.isFinite(cost) && cost > 0 ? [cost] : [];
+    });
+    const supplierProduct =
+      biayaValid.length > 0
+        ? { supplier_id: "termurah", supplier_cost: Math.min(...biayaValid) as number | string }
+        : undefined;
     const payment = paymentRows[0];
     const pricingRule = pricingRuleRows[0];
 

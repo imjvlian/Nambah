@@ -672,8 +672,21 @@ type GenericDispatchConfig = {
 async function getGenericDispatchConfig(
   order: OrderRow,
   supplierId: string,
+  mode: FulfillmentMode,
 ): Promise<GenericDispatchConfig> {
-  assertLiveFulfillmentSafety();
+  /*
+   * Gerbang "belanjakan saldo nyata" hanya untuk mode live.
+   *
+   * Mode digiflazz-test mengirim `sandbox_mode: true` ke supplier -
+   * transaksi sandbox tidak memotong saldo (terbukti di uji langsung:
+   * empat transaksi sandbox sukses pada akun bersaldo 0). Menuntut ack
+   * SPEND_REAL_* untuk sandbox membuat mode test tidak pernah bisa
+   * menguji jalur supplier kedua, padahal itu persis fungsinya.
+   * Jalur test Digiflazz sendiri tidak lewat gerbang ini.
+   */
+  if (mode === "digiflazz-live") {
+    assertLiveFulfillmentSafety();
+  }
 
   /*
    * SKU dan modal diambil dari `supplier_products`, bukan dari map
@@ -775,7 +788,7 @@ async function fulfillViaSupplierClient(
 
   await markOrderProcessing(order);
 
-  const config = await getGenericDispatchConfig(order, client.id);
+  const config = await getGenericDispatchConfig(order, client.id, mode);
   const now = new Date().toISOString();
 
   await supabaseUpsert<SupplierTransactionRow>(
