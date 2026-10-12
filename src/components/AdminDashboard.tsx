@@ -570,6 +570,7 @@ import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 import DateTimePicker from "@/components/admin/DateTimePicker";
 import {
   gabungkanKandidat,
+  gameCocokUntukProduk,
   urutkanKandidatMelostore,
 } from "@/lib/suppliers/saran-sku";
 import { generateInternalSku } from "@/lib/internal-sku";
@@ -1092,7 +1093,12 @@ export default function AdminDashboard() {
    */
   const [supplierCatalog, setSupplierCatalog] = useState<{
     digiflazz: Array<{ sku: string; name: string; cost: number }>;
-    melostore: Array<{ sku: string; name: string; cost: number }>;
+    melostore: Array<{
+      sku: string;
+      name: string;
+      cost: number;
+      brand: string | null;
+    }>;
     error: string | null;
   }>({ digiflazz: [], melostore: [], error: null });
   const [melostorePick, setMelostorePick] = useState<Record<string, string>>({});
@@ -2637,7 +2643,12 @@ const txDataStamp = txRange.preset
         supplier: { configured: boolean; catalogSize: number; error: string | null };
         options: {
           digiflazz: Array<{ sku: string; name: string; cost: number }>;
-          melostore: Array<{ sku: string; name: string; cost: number }>;
+          melostore: Array<{
+            sku: string;
+            name: string;
+            cost: number;
+            brand: string | null;
+          }>;
         };
       };
 
@@ -3906,12 +3917,31 @@ const txDataStamp = txRange.preset
                                     .toLowerCase();
 
                                   /*
+                                   * Identitas game produk ini baris - dipakai
+                                   * saran DAN hasil ketik, supaya SKU game lain
+                                   * tidak pernah ditawarkan lewat jalur mana pun.
+                                   */
+                                  const identitasProduk = {
+                                    gameId: product.gameId,
+                                    gameName: product.gameName,
+                                    gameShortName: product.gameShortName,
+                                    label: draft.label,
+                                  };
+
+                                  /*
                                    * Tanpa ketik: saran per produk (Cocok +
-                                   * Mendekati). Dengan ketik: cari katalog
-                                   * penuh, tetap diperingkat.
+                                   * Mendekati) - nominal sama dan game sama
+                                   * (prefiks, atau brand untuk game tanpa
+                                   * prefiks). Dengan ketik: cari katalog
+                                   * penuh TETAPI tetap disaring game yang sama -
+                                   * pencarian manual bukan pintu masuk barang
+                                   * game salah.
                                    */
                                   const kandidat = teks
                                     ? supplierCatalog.melostore
+                                        .filter((item) =>
+                                          gameCocokUntukProduk(identitasProduk, item),
+                                        )
                                         .filter(
                                           (item) =>
                                             item.sku.toLowerCase().includes(teks) ||
@@ -3927,10 +3957,7 @@ const txDataStamp = txRange.preset
                                         .slice(0, 30)
                                     : gabungkanKandidat(
                                         urutkanKandidatMelostore(
-                                          {
-                                            gameId: product.gameId,
-                                            label: draft.label,
-                                          },
+                                          identitasProduk,
                                           supplierCatalog.melostore.map(
                                             (item) => ({
                                               ...item,
@@ -3947,8 +3974,8 @@ const txDataStamp = txRange.preset
                                     return (
                                       <small className="admin-sku-combo-kosong">
                                         {teks
-                                          ? "Tidak ada SKU yang cocok dengan pencarian."
-                                          : "Tidak ada kandidat mendekati - ketik untuk mencari manual."}
+                                          ? "Tidak ada SKU game ini yang cocok dengan pencarian."
+                                          : "Tidak ada kandidat nominal sama untuk game ini - ketik untuk mencari manual."}
                                       </small>
                                     );
                                   }

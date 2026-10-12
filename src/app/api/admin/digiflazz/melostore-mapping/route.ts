@@ -68,14 +68,15 @@ type GameOptions = {
  * salah satunya berarti tiga tempat dengan tarif 20 permintaan/menit.
  */
 async function bacaKatalogMelostore(): Promise<
-  Array<{ sku: string; name: string; price: number }>
+  Array<{ sku: string; name: string; price: number; brand: string | null }>
 > {
   const cache = await supabaseSelectAll<{
     supplier_sku: string;
     product_name: string;
     supplier_cost: number | string;
+    brand: string | null;
   }>("supplier_catalog_items", {
-    select: "supplier_sku,product_name,supplier_cost",
+    select: "supplier_sku,product_name,supplier_cost,brand",
     filters: { supplier_id: "eq.melostore", buyer_active: "eq.true" },
     order: "product_name.asc",
   });
@@ -84,6 +85,7 @@ async function bacaKatalogMelostore(): Promise<
     sku: baris.supplier_sku,
     name: baris.product_name,
     price: Number(baris.supplier_cost),
+    brand: baris.brand?.trim() || null,
   }));
 }
 export async function GET(request: Request) {
@@ -116,7 +118,12 @@ export async function GET(request: Request) {
    * diam-diam menarik API dan berharap tidak kena 429.
    */
   const client = new MelostoreSupplierClient();
-  let meloCatalog: Array<{ sku: string; name: string; price: number }> = [];
+  let meloCatalog: Array<{
+    sku: string;
+    name: string;
+    price: number;
+    brand: string | null;
+  }> = [];
   let meloError: string | null = null;
 
   {
@@ -271,6 +278,7 @@ export async function GET(request: Request) {
       sku: s.sku,
       name: s.name,
       cost: s.price,
+      brand: s.brand,
     })),
   };
 
@@ -690,18 +698,20 @@ async function backfillInternalSku() {
  * ALUR:
  * 1. Baca katalog Melostore yang aktif dari cache (`supplier_catalog_items`).
  * 2. Untuk tiap item:
- *    - Tentukan gameId dari prefiks SKU (gameDariPrefiksSku).
- *    - Skip kalau prefiks tidak dikenal / game tidak eligible / ambigu FF/FFMAX.
+ *    - Tentukan gameId: prefiks SKU dulu (gameDariPrefiksSku), lalu
+ *      brand sebagai cadangan untuk SKU tanpa prefiks dikenal.
+ *    - Skip kalau identitas tidak dikenal / ambigu FF/FFMAX.
  *    - Bangun SKU internal: generateInternalSku({gameId, label: nama, supplierSku}).
  *      Region otomatis dari prefiks (mlid → tidak ada suffix, mlgl → -GL, dll).
  *    - Cari produk dengan internal_sku SAMA PERSIS (unique index menjamin tunggal).
  *    - Skip kalau sudah ada mapping Melostore untuk produk itu.
  * 3. Insert supplier_products (supplier_id=melostore) dengan mapped_via="internal-sku".
- * 4. Kembalikan ringkasan: terpasang / dilewati (sudah terpetakan / tak dikenal / ambigu / tak ada produk / game tidak eligible).
+ * 4. Kembalikan ringkasan: terpasang / dilewati (sudah terpetakan / identitas tidak dikenal / ambigu / tak ada produk).
  */
 async function mergeByInternalSku(mappedBy: string | null) {
-  const { gameDariPrefiksSku, isGameEligible } = await import("@/lib/suppliers/match");
+  const { gameDariPrefiksSku } = await import("@/lib/suppliers/match");
   const { generateInternalSku, internalSkuWithSuffix } = await import("@/lib/internal-sku");
+  const { cariGameCocok } = await import("@/lib/game-defaults");
 
   /*
    * Katalog Melostore 8.000+ baris - melebihi batas satu respons PostgREST.
@@ -709,14 +719,18 @@ async function mergeByInternalSku(mappedBy: string | null) {
    * (terbukti di uji nyata: hanya 1.000 dari 8.138 SKU yang diproses),
    * jadi pemakaian yang benar adalah `supabaseSelectAll` yang membagi
    * halaman otomatis.
+   *
+   * `brand` ikut dibaca: identitas game untuk SKU yang prefiksnya tidak
+   * dikenal (mis. "rgc..." -> "Roblox (IDR)" -> game roblox-idr).
    */
   const meloItems = await supabaseSelectAll<{
     supplier_sku: string;
     product_name: string;
     supplier_cost: number | string;
     buyer_active: boolean;
+    brand: string | null;
   }>("supplier_catalog_items", {
-    select: "supplier_sku,product_name,supplier_cost,buyer_active",
+    select: "supplier_sku,product_name,supplier_cost,buyer_active,brand",
     filters: { supplier_id: "eq.melostore", buyer_active: "eq.true" },
   });
 
@@ -745,11 +759,23 @@ async function mergeByInternalSku(mappedBy: string | null) {
     if (p.internal_sku) internalSkuToProduct.set(p.internal_sku, p.id);
   }
 
+  /*
+   * Daftar game untuk derivasi identitas dari brand. Semua game dibaca
+   * (bukan hanya yang aktif): produk draft di game nonaktif tetap sah
+   * digabung - pasangannya baru terlihat begitu game diaktifkan.
+   */
+  const semuaGame = await supabaseSelectAll<{
+    id: string;
+    name: string;
+    short_name: string;
+  }>("games", {
+    select: "id,name,short_name",
+  });
+
   const now = new Date().toISOString();
   let terpasang = 0;
   let dilewatiSudahAda = 0;
-  let dilewatiPrefiksTidakDikenal = 0;
-  let dilewatiGameTidakEligible = 0;
+  let dilewatiIdentitasTidakDikenal = 0;
   let dilewatiAmbigu = 0;
   let dilewatiBundel = 0;
   let dilewatiTakAdaProduk = 0;
@@ -773,17 +799,33 @@ async function mergeByInternalSku(mappedBy: string | null) {
       continue;
     }
 
-    const { gameId, confident } = gameDariPrefiksSku(sku);
+    /*
+     * IDENTITAS GAME: prefiks dulu, brand sebagai cadangan.
+     *
+     * Prefiks lebih kuat (region-aware, tanpa tebakan nama). Brand
+     * dipakai hanya kalau prefiks tidak dikenal - SKU "rgc..." tidak
+     * punya prefiks dikenal, tapi brand-nya "Roblox (IDR)" cocok dengan
+     * game roblox-idr lewat slug/nama/short_name (cariGameCocok).
+     *
+     * TIDAK ADA allowlist game: pencocokan SKU internal menuntut
+     * identitas GAME-JENIS-NOMINAL sama persis, jadi "game sama dan
+     * nominal sama" sudah terjamin by construction - allowlist lama
+     * justru memblokir game yang prefiksnya dikenal (zepeto, aov, cod).
+     */
+    let { gameId, confident } = gameDariPrefiksSku(sku);
+    if (!gameId && item.brand?.trim()) {
+      const cocok = cariGameCocok(item.brand.trim(), semuaGame);
+      if (cocok) {
+        gameId = cocok.id;
+        confident = true;
+      }
+    }
     if (!gameId) {
-      dilewatiPrefiksTidakDikenal += 1;
+      dilewatiIdentitasTidakDikenal += 1;
       continue;
     }
     if (!confident) {
       dilewatiAmbigu += 1;
-      continue;
-    }
-    if (!isGameEligible(gameId)) {
-      dilewatiGameTidakEligible += 1;
       continue;
     }
 
@@ -854,8 +896,7 @@ async function mergeByInternalSku(mappedBy: string | null) {
     terpasang,
     dilewati: {
       sudahAda: dilewatiSudahAda,
-      prefiksTidakDikenal: dilewatiPrefiksTidakDikenal,
-      gameTidakEligible: dilewatiGameTidakEligible,
+      identitasTidakDikenal: dilewatiIdentitasTidakDikenal,
       ambigu: dilewatiAmbigu,
       bundel: dilewatiBundel,
       takAdaProduk: dilewatiTakAdaProduk,
@@ -863,8 +904,7 @@ async function mergeByInternalSku(mappedBy: string | null) {
     totalDiproses: meloItems.length,
     message:
       `${terpasang} pemetaan dipasang. ` +
-      `Dilewati: ${dilewatiSudahAda} sudah terpetakan, ${dilewatiPrefiksTidakDikenal} prefiks tidak dikenal, ` +
-      `${dilewatiGameTidakEligible} game tidak eligible, ${dilewatiAmbigu} ambigu FF/FFMAX, ` +
+      `Dilewati: ${dilewatiSudahAda} sudah terpetakan, ${dilewatiIdentitasTidakDikenal} identitas game tidak dikenal, ${dilewatiAmbigu} ambigu FF/FFMAX, ` +
       `${dilewatiBundel} bundel/FTU (petakan manual bila dijual), ` +
       `${dilewatiTakAdaProduk} tidak ada produk dengan SKU internal cocok.`,
     errors: errors.length > 0 ? errors.slice(0, 10) : undefined,

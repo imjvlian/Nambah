@@ -31,6 +31,7 @@ import {
   normalizeLabel,
   skuMulaiDenganPrefiks,
 } from "@/lib/suppliers/match";
+import { normalizeText } from "@/lib/game-defaults";
 import { nominalFromLabel } from "@/lib/internal-sku";
 
 
@@ -49,7 +50,7 @@ export type KandidatMelostore = {
 };
 
 /**
- * Input katalog yang diterima: cukup tiga field ini. Pemanggil dari
+ * Input katalog yang diterima: cukup field ini. Pemanggil dari
  * database tidak punya `stock`/`supplierId` milik SupplierQuote, dan
  * fungsi ini memang hanya menerima katalog Melostore.
  */
@@ -57,11 +58,20 @@ export type KandidatSkuMelostore = {
   sku: string;
   name: string;
   cost: number;
+  /**
+   * Brand asli dari katalog supplier - identitas game untuk SKU yang
+   * prefiksnya tidak dikenal (mis. "rgc..." -> "Roblox (IDR)").
+   * Opsional supaya pemanggil lama tetap sah.
+   */
+  brand?: string | null;
 };
 
 export type KandidatProduk = {
   gameId: string;
   label: string;
+  /** Nama game Nambah - identitas brand untuk game tanpa prefiks. */
+  gameName?: string;
+  gameShortName?: string;
 };
 
 export type KandidatTerperingkat = {
@@ -101,6 +111,43 @@ function regionKandidat(sku: string): string | null {
 }
 
 /**
+ * Apakah kandidat SKU ini milik game yang sama dengan produk.
+ *
+ * DUA JALUR IDENTITAS, urut kekuatan:
+ *
+ * 1. PREFIKS SKU - untuk game yang dikenal daftar prefiksnya
+ *    (mobile-legends, free-fire, ...). Jalur ini region-aware: varian
+ *    wilayah (mlmy/ffg/...) tetap terbaca sebagai game yang sama dan
+ *    ditandai regionnya oleh pemanggil.
+ *
+ * 2. BRAND - hanya untuk game TANPA prefiks dikenal. Game hasil
+ *    "buat otomatis dari brand" (roblox-idr, mongil-star-dive, ...)
+ *    tidak punya prefiks sama sekali; satu-satunya identitasnya adalah
+ *    nama, dan katalog supplier menyebutnya lewat brand. Perbandingan
+ *    STRICT tanpa mengupas tanda kurung: "Free Fire (Global)" tidak
+ *    akan pernah menyusup ke game "Free Fire" lewat jalur ini, karena
+ *    jalur brand hanya aktif saat game TIDAK punya prefiks.
+ */
+export function gameCocokUntukProduk(
+  produk: KandidatProduk,
+  kandidat: { sku: string; brand?: string | null },
+): boolean {
+  const prefiks = expectedPrefixes(produk.gameId);
+  if (prefiks.length > 0) {
+    return skuMulaiDenganPrefiks(kandidat.sku, prefiks);
+  }
+
+  const brand = String(kandidat.brand ?? "").trim();
+  if (!brand) return false;
+
+  const targetBrand = normalizeText(brand);
+  for (const nama of [produk.gameName, produk.gameShortName]) {
+    if (nama && normalizeText(nama) === targetBrand) return true;
+  }
+  return false;
+}
+
+/**
  * Peringkatkan katalog Melostore untuk satu produk.
  *
  * `quotes` adalah katalog Melostore utuh (7.000-an SKU) - dipindai satu
@@ -113,7 +160,6 @@ export function urutkanKandidatMelostore(
 ): KandidatTerperingkat {
   const target = normalizeLabel(produk.label);
   const nominalProduk = nominalFromLabel(produk.label);
-  const prefiks = expectedPrefixes(produk.gameId);
 
   const tepat: KandidatMelostore[] = [];
   const mendekati: KandidatMelostore[] = [];
@@ -123,7 +169,7 @@ export function urutkanKandidatMelostore(
 
     const nama = normalizeLabel(quote.name);
     const samaNama = nama === target;
-    const sameGame = skuMulaiDenganPrefiks(quote.sku, prefiks);
+    const sameGame = gameCocokUntukProduk(produk, quote);
     const nominalItem = nominalFromLabel(quote.name);
     const sameNominal =
       nominalProduk !== null &&
@@ -131,7 +177,7 @@ export function urutkanKandidatMelostore(
       nominalProduk === nominalItem;
 
     /*
-     * COCOK menuntut DUA bukti: nama sama persis DAN prefiks game sama.
+     * COCOK menuntut DUA bukti: nama sama persis DAN game sama.
      * Nama saja tidak cukup - 57 label identik dipakai lebih dari satu
      * game, dan "50 Diamonds" Free Fire sama persis dengan "50 Diamonds"
      * Mobile Legends. Menampilkan item game salah sebagai COCOK akan
