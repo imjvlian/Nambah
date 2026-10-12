@@ -721,6 +721,51 @@
   letter-spacing: -.04em;
 }
 
+/*
+ * Dua kotak saldo bertumpuk di hero overview.
+ *
+ * Grid, bukan flex: kedua kotak harus selebar kolom 310px hero dan
+ * tingginya mengikuti isi masing-masing. `align-items: end` di hero
+ * membuat stack menempel ke bawah baris, sejajar dengan baseline judul.
+ */
+.acc-balance-stack {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+/*
+ * Varian compact untuk kotak saldo kedua (supplier pembanding).
+ *
+ * Font dan padding mengecil supaya dua kotak tetap muat di kolom hero
+ * tanpa mendorong tinggi baris - Digiflazz tetap yang paling menonjol
+ * karena itu sumber utama.
+ */
+.acc-balance.is-compact {
+  padding: 13px 16px;
+  border-radius: 14px;
+}
+
+.acc-balance.is-compact strong {
+  margin: 5px 0 4px;
+  font-size: 16px;
+  letter-spacing: -.02em;
+}
+
+.acc-balance.is-compact small,
+.acc-balance.is-compact span {
+  font-size: 11px;
+}
+
+/* "Belum disinkron" bukan angka - redupkan supaya tidak terbaca
+   sebagai saldo kosong. */
+.acc-balance .acc-balance-empty {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
 .acc-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -97,6 +97,7 @@ export async function GET(request: Request) {
       recentOrders,
       successfulToday,
       balanceRows,
+      melostoreBalanceRows,
       ordersToday,
       successToday,
       pendingPayment,
@@ -126,6 +127,11 @@ export async function GET(request: Request) {
       supabaseSelect<BalanceRow>("supplier_balances", {
         select: "balance,reserved_balance,checked_at",
         filters: { supplier_id: "eq.digiflazz" },
+        limit: 1,
+      }),
+      supabaseSelect<BalanceRow>("supplier_balances", {
+        select: "balance,reserved_balance,checked_at",
+        filters: { supplier_id: "eq.melostore" },
         limit: 1,
       }),
       safeCount("orders", "id", { created_at: `gte.${todayIso}` }),
@@ -191,6 +197,16 @@ export async function GET(request: Request) {
         reservedBalance,
         availableBalance: Math.max(0, balanceValue - reservedBalance),
         balanceCheckedAt: balance?.checked_at ?? null,
+        /*
+         * Saldo Melostore: null kalau barisnya belum ada - artinya belum
+         * pernah disinkron. Itu berbeda dari 0 (saldo nol yang benar-benar
+         * terbaca), dan UI menampilkan "Belum disinkron" untuk null.
+         */
+        melostoreBalance:
+          melostoreBalanceRows.length > 0
+            ? Number(melostoreBalanceRows[0].balance ?? 0)
+            : null,
+        melostoreCheckedAt: melostoreBalanceRows[0]?.checked_at ?? null,
       },
       recentOrders: recentOrders.map((order) => ({
         id: order.id,

@@ -47,26 +47,32 @@ export async function GET(request: Request) {
     // products & supplier_products melewati 1000 baris. Kalau terpotong, mapping
     // untuk produk di baris 1001+ tidak terbaca sehingga produk yang sudah
     // ter-map ikut terhitung "unmapped" di panel katalog.
-    const [games, products, supplierProducts, balanceRows] = await Promise.all([
-      supabaseSelectAll<GameRow>("games", {
-        select: "id,name,short_name,active,sort_order",
-        order: "sort_order.asc,name.asc",
-      }),
-      supabaseSelectAll<ProductRow>("products", {
-        select:
-          "id,game_id,label,note,internal_sku,selling_price,reference_price,active,sort_order",
-        order: "game_id.asc,sort_order.asc,label.asc",
-      }),
-      supabaseSelectAll<SupplierProductRow>("supplier_products", {
-        select: "product_id,supplier_id,supplier_sku,supplier_cost,active,last_synced_at",
-        order: "product_id.asc",
-      }),
-      supabaseSelect<SupplierBalanceRow>("supplier_balances", {
-        select: "balance,reserved_balance,checked_at",
-        filters: { supplier_id: "eq.digiflazz" },
-        limit: 1,
-      }),
-    ]);
+    const [games, products, supplierProducts, balanceRows, melostoreBalanceRows] =
+      await Promise.all([
+        supabaseSelectAll<GameRow>("games", {
+          select: "id,name,short_name,active,sort_order",
+          order: "sort_order.asc,name.asc",
+        }),
+        supabaseSelectAll<ProductRow>("products", {
+          select:
+            "id,game_id,label,note,internal_sku,selling_price,reference_price,active,sort_order",
+          order: "game_id.asc,sort_order.asc,label.asc",
+        }),
+        supabaseSelectAll<SupplierProductRow>("supplier_products", {
+          select: "product_id,supplier_id,supplier_sku,supplier_cost,active,last_synced_at",
+          order: "product_id.asc",
+        }),
+        supabaseSelect<SupplierBalanceRow>("supplier_balances", {
+          select: "balance,reserved_balance,checked_at",
+          filters: { supplier_id: "eq.digiflazz" },
+          limit: 1,
+        }),
+        supabaseSelect<SupplierBalanceRow>("supplier_balances", {
+          select: "balance,reserved_balance,checked_at",
+          filters: { supplier_id: "eq.melostore" },
+          limit: 1,
+        }),
+      ]);
 
     const gamesById = new Map(games.map((game) => [game.id, game]));
     /*
@@ -149,6 +155,16 @@ export async function GET(request: Request) {
         reservedBalance,
         availableBalance: Math.max(0, balanceValue - reservedBalance),
         checkedAt: balance?.checked_at ?? null,
+        /*
+         * Saldo Melostore - null berarti belum pernah disinkron, bukan
+         * saldo nol. UI menampilkan "Belum disinkron" untuk null.
+         */
+        melostore: melostoreBalanceRows.length
+          ? {
+              availableBalance: Number(melostoreBalanceRows[0].balance ?? 0),
+              checkedAt: melostoreBalanceRows[0].checked_at ?? null,
+            }
+          : null,
       },
       games: games.map((game) => ({
         id: game.id,

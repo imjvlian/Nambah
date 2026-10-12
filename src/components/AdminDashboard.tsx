@@ -97,6 +97,11 @@ type CatalogPayload = {
     reservedBalance: number;
     availableBalance: number;
     checkedAt: string | null;
+    /** Saldo Melostore - null berarti belum pernah disinkron. */
+    melostore: {
+      availableBalance: number;
+      checkedAt: string | null;
+    } | null;
   };
   games: Array<{
     id: string;
@@ -148,6 +153,9 @@ type OverviewPayload = {
     reservedBalance: number;
     availableBalance: number;
     balanceCheckedAt: string | null;
+    /** Saldo Melostore - null berarti belum pernah disinkron. */
+    melostoreBalance: number | null;
+    melostoreCheckedAt: string | null;
   };
   recentOrders: AdminOrder[];
   system: {
@@ -2295,6 +2303,57 @@ const txDataStamp = txRange.preset
     }
   }
 
+  /*
+   * Perbarui saldo Melostore lewat aksi "balance" yang sudah ada di
+   * route sinkronisasi Melostore - sama dengan tombol "Perbarui saldo"
+   * di panel pemetaan. Setelah tersimpan, katalog dan overview dimuat
+   * ulang supaya angka baru langsung tampil di kedua seksi.
+   */
+  async function perbaruiSaldoMelostore() {
+    setBusy("melostore-balance");
+    setNotice("");
+    setActionState("melostore-balance", {
+      status: "running",
+      message: "Menghubungi Melostore...",
+    });
+    try {
+      const response = await fetch("/api/admin/digiflazz/melostore-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "balance" }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        balance?: number;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Saldo Melostore gagal diperbarui.");
+      }
+
+      await Promise.all([loadCatalog(), loadOverview()]);
+      const message = `${formatIDR(result.balance ?? 0)} tersedia.`;
+      setNotice(`Saldo Melostore diperbarui: ${message}`);
+      setActionState("melostore-balance", {
+        status: "ok",
+        message,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Saldo Melostore gagal diperbarui.";
+      setNotice(message);
+      setActionState("melostore-balance", {
+        status: "error",
+        message,
+        at: new Date().toISOString(),
+      });
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function testTelegram() {
     setBusy("telegram");
     setNotice("");
@@ -3044,12 +3103,34 @@ const txDataStamp = txRange.preset
                     sistem tanpa membuka database satu per satu.
                   </p>
                 </div>
-                <div className="acc-balance">
-                  <small>Saldo Digiflazz tersedia</small>
-                  <strong>{formatIDR(overview.finance.availableBalance)}</strong>
-                  <span>
-                    Update {formatTime(overview.finance.balanceCheckedAt)}
-                  </span>
+                <div className="acc-balance-stack">
+                  <div className="acc-balance">
+                    <small>Saldo Digiflazz tersedia</small>
+                    <strong>{formatIDR(overview.finance.availableBalance)}</strong>
+                    <span>
+                      Update {formatTime(overview.finance.balanceCheckedAt)}
+                    </span>
+                  </div>
+                  {/*
+                   * Kotak kedua: supplier pembanding. Null berarti saldo
+                   * Melostore belum pernah ditarik - ditulis terus terang,
+                   * bukan "Rp 0" yang terlihat seperti saldo kosong.
+                   */}
+                  <div className="acc-balance is-compact">
+                    <small>Saldo Melostore</small>
+                    {overview.finance.melostoreBalance !== null ? (
+                      <>
+                        <strong>{formatIDR(overview.finance.melostoreBalance)}</strong>
+                        <span>
+                          Update {formatTime(overview.finance.melostoreCheckedAt)}
+                        </span>
+                      </>
+                    ) : (
+                      <strong className="acc-balance-empty">
+                        Belum disinkron
+                      </strong>
+                    )}
+                  </div>
                 </div>
               </section>
 
@@ -4025,11 +4106,30 @@ const txDataStamp = txRange.preset
                 }
               />
 
-              <div className="acc-metrics acc-metrics-three">
+              <div className="acc-metrics">
                 <article>
-                  <small>Saldo tersedia</small>
+                  <small>Saldo Digiflazz</small>
                   <strong>{formatIDR(catalog.balance.availableBalance)}</strong>
                   <span>{formatTime(catalog.balance.checkedAt)}</span>
+                </article>
+                {/*
+                 * Supplier pembanding punya saldonya sendiri. Null bukan
+                 * nol: baris supplier_balances belum ada karena "Perbarui
+                 * saldo" belum pernah dijalankan.
+                 */}
+                <article>
+                  <small>Saldo Melostore</small>
+                  {catalog.balance.melostore ? (
+                    <>
+                      <strong>{formatIDR(catalog.balance.melostore.availableBalance)}</strong>
+                      <span>{formatTime(catalog.balance.melostore.checkedAt)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Belum disinkron</strong>
+                      <span>Tekan "Perbarui saldo Melostore"</span>
+                    </>
+                  )}
                 </article>
                 <article>
                   <small>Siap dijual</small>
@@ -4051,6 +4151,14 @@ const txDataStamp = txRange.preset
                   busy={busy}
                   state={actionStates.balance}
                   onClick={() => void checkBalance()}
+                />
+                <SupplierActionButton
+                  action="melostore-balance"
+                  label="Perbarui saldo Melostore"
+                  busyLabel="Memeriksa saldo Melostore..."
+                  busy={busy}
+                  state={actionStates["melostore-balance"]}
+                  onClick={() => void perbaruiSaldoMelostore()}
                 />
                 <SupplierActionButton
                   action="sync"
