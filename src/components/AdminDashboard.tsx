@@ -1855,7 +1855,7 @@ const txDataStamp = txRange.preset
          * Per-produk saat editor dibuka berarti satu permintaan per
          * baris - dan daftar SKU ini sama untuk semua produk.
          */
-        void muatKandidatSupplier();
+        await muatKandidatSupplier();
       }
       if (section === "receipts") await loadReceipts();
       if (section === "points") await loadPoints();
@@ -2590,6 +2590,12 @@ const txDataStamp = txRange.preset
       }
       setMelostorePick(pick);
       setMelostoreTersimpan(tersimpan);
+      /* Katalog supplier diisi dari options (sudah di-cache di DB) */
+      setSupplierCatalog({
+        digiflazz: data.options?.digiflazz ?? [],
+        melostore: data.options?.melostore ?? [],
+        error: data.supplier?.error ?? null,
+      });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Kandidat supplier gagal dimuat.");
     }

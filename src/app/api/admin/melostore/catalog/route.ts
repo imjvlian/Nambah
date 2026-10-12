@@ -5,6 +5,7 @@ import {
   internalSkuWithSuffix,
   normalizeProductLabel,
 } from "@/lib/internal-sku";
+import { gameDariPrefiksSku, isGameEligible } from "@/lib/suppliers/match";
 import { riwayatScan } from "@/lib/suppliers/scan-runs";
 
 export const runtime = "nodejs";
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = clean(url.searchParams.get("q")).toLowerCase();
   const kategori = clean(url.searchParams.get("kategori"));
+  const gameFilter = clean(url.searchParams.get("game")); // gameId dari Nambah
   const tersedia = clean(url.searchParams.get("tersedia")); // active | inactive
   const mapping = clean(url.searchParams.get("mapping")); // added | unmapped
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
@@ -104,22 +106,44 @@ export async function GET(request: Request) {
     for (const row of rows) produk.set(row.id, row);
   }
 
-  const kategoriUnik = [...new Set(items.map((i) => i.category))].sort((a, b) =>
-    a.localeCompare(b, "id"),
-  );
-
+  // Game Nambah aktif untuk dropdown filter
   const games = await supabaseSelect<{ id: string; name: string }>("games", {
     select: "id,name",
     filters: { active: "eq.true" },
     order: "name.asc",
     limit: 300,
   });
+  const gameById = new Map(games.map((g) => [g.id, g.name]));
 
-  const tersaring = items.filter((item) => {
+  // Bangun informasi game per item + kelompokkan untuk navigasi grup
+  type ItemWithGame = CatalogItemRow & { gameId: string; gameName: string; gameConfident: boolean };
+  const itemsWithGame: ItemWithGame[] = items.map((item) => {
+    const { gameId, confident } = gameDariPrefiksSku(item.supplier_sku);
+    const gameName = gameId ? (gameById.get(gameId) ?? gameId) : "Tidak dikenal";
+    return { ...item, gameId, gameName, gameConfident: confident };
+  });
+
+  // Kelompokkan: kategori -> game -> hitungan
+  const kategoriUnik = [...new Set(itemsWithGame.map((i) => i.category))].sort((a, b) =>
+    a.localeCompare(b, "id"),
+  );
+  const groups: Record<string, Record<string, { total: number; tersedia: number; ditambahkan: number }>> = {};
+  for (const item of itemsWithGame) {
+    const kat = item.category;
+    const gm = item.gameName;
+    if (!groups[kat]) groups[kat] = {};
+    if (!groups[kat][gm]) groups[kat][gm] = { total: 0, tersedia: 0, ditambahkan: 0 };
+    groups[kat][gm].total += 1;
+    if (item.buyer_active) groups[kat][gm].tersedia += 1;
+    if (mappedBySku.has(item.supplier_sku)) groups[kat][gm].ditambahkan += 1;
+  }
+
+  const tersaring = itemsWithGame.filter((item) => {
     if (q && !item.product_name.toLowerCase().includes(q) && !item.supplier_sku.toLowerCase().includes(q)) {
       return false;
     }
     if (kategori && item.category !== kategori) return false;
+    if (gameFilter && item.gameId !== gameFilter) return false;
     if (tersedia === "active" && !item.buyer_active) return false;
     if (tersedia === "inactive" && item.buyer_active) return false;
 
@@ -146,6 +170,9 @@ export async function GET(request: Request) {
       active: item.buyer_active,
       lastSeenAt: item.last_seen_at,
       added: Boolean(productId),
+      gameId: item.gameId,
+      gameName: item.gameName,
+      gameConfident: item.gameConfident,
       internalProduct: internal
         ? {
             id: internal.id,
@@ -166,6 +193,7 @@ export async function GET(request: Request) {
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     categories: kategoriUnik,
     games,
+    groups,
     addedCount: mappings.length,
     scan: {
       lastRun: runs[0]

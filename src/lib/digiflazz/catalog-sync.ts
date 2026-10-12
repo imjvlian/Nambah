@@ -7,10 +7,12 @@ import {
   type GameRow,
   type SupplierCatalogItem,
 } from "@/lib/digiflazz/product-identity";
+import { skuInternalBebas } from "@/lib/internal-sku";
 import {
   supabaseDelete,
   supabaseInsert,
   supabaseSelectAll,
+  supabaseSelect,
   supabaseUpdate,
   supabaseUpsert,
 } from "@/lib/supabase/server";
@@ -54,6 +56,7 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
+  internal_sku: string | null;
 };
 
 export type CatalogSyncSummary = {
@@ -65,6 +68,8 @@ export type CatalogSyncSummary = {
   mappingsCreated: number;
   costsRefreshed: number;
   pricesRaised: number;
+  /** Produk lama yang diisi SKU internal-nya oleh sinkron ini. */
+  internalSkusFilled: number;
   deactivatedMissingSku: number;
   productsRemoved: number;
   productsHidden: number;
@@ -194,7 +199,7 @@ export async function planCatalogSync(input?: {
 
   const [products, mappings, games, pricingRules] = await Promise.all([
     supabaseSelectAll<ProductRow>("products", {
-      select: "id,game_id,label,selling_price,reference_price,active",
+      select: "id,game_id,label,selling_price,reference_price,active,internal_sku",
     }),
     supabaseSelectAll<MappingRow>("supplier_products", {
       select: "product_id,supplier_sku,supplier_cost,active",
@@ -217,6 +222,13 @@ export async function planCatalogSync(input?: {
     if (mapping.supplier_sku) mappingBySku.set(mapping.supplier_sku, mapping);
   }
 
+  // Kumpulkan SKU internal yang sudah dipakai oleh produk EXISTING (termasuk
+  // yang sudah punya internal_sku) supaya produk baru tidak pernah menimpa.
+  const internalSkuTerpakai = new Set<string>();
+  for (const p of products) {
+    if (p.internal_sku) internalSkuTerpakai.add(p.internal_sku);
+  }
+
   const knownGames = [...games];
   const gameIdsToActivate = new Set<string>();
 
@@ -227,6 +239,12 @@ export async function planCatalogSync(input?: {
   const newGames: Array<Record<string, unknown>> = [];
   const costUpdates: Array<Record<string, unknown>> = [];
   const priceUpdates: Array<Record<string, unknown>> = [];
+  /*
+   * Produk lama yang belum punya SKU internal - diisi saat sync supaya
+   * satu tombol sinkron menutup semua produk Digiflazz, tanpa operator
+   * harus mengingat tombol backfill terpisah.
+   */
+  const skuUpdates: Array<{ id: string; internal_sku: string }> = [];
   const gamesToActivate = new Set<string>();
 
   for (const item of catalogItems) {
@@ -266,6 +284,26 @@ export async function planCatalogSync(input?: {
       if (!existingProduct.active) {
         priceUpdates.push({ id: existingProduct.id, active: true, updated_at: now });
       }
+
+      /*
+       * Produk lama tanpa SKU internal: isi sekarang. Set `internalSkuTerpakai`
+       * dipakai bersama dengan produk baru, jadi bentrok antar batch dalam
+       * satu run juga tertutup - unik dijamin index database untuk run lain.
+       */
+      if (!existingProduct.internal_sku) {
+        const input = {
+          gameId: existingProduct.game_id,
+          label: existingProduct.label,
+          jenis: item.type,
+          supplierSku: item.supplier_sku,
+        };
+        const bebas = skuInternalBebas(input, internalSkuTerpakai);
+        if (bebas) {
+          skuUpdates.push({ id: existingProduct.id, internal_sku: bebas });
+          internalSkuTerpakai.add(bebas);
+        }
+      }
+
       continue;
     }
 
@@ -295,6 +333,21 @@ export async function planCatalogSync(input?: {
     gamesToActivate.add(game.id);
 
     const price = minimumSellingPrice(cost, minimumProfit);
+
+    // Bangun SKU internal untuk produk baru, dengan penanganan bentrok.
+    // Generator TIDAK pernah menimpa SKU yang sudah ada — bentrok = suffix.
+    const internalSku = skuInternalBebas(
+      {
+        gameId: game.id,
+        label: cleanProductLabel(item.product_name, item.brand),
+        jenis: item.type,
+        supplierSku: item.supplier_sku,
+      },
+      internalSkuTerpakai,
+      item.supplier_sku,
+    );
+    if (internalSku) internalSkuTerpakai.add(internalSku);
+
     newProducts.push({
       id: productId,
       game_id: game.id,
@@ -303,6 +356,7 @@ export async function planCatalogSync(input?: {
       selling_price: price,
       reference_price: price,
       active: true,
+      internal_sku: internalSku,
       sort_order: Math.min(2_000_000_000, Math.max(0, Math.round(cost))),
       created_at: now,
       updated_at: now,
@@ -359,6 +413,7 @@ export async function planCatalogSync(input?: {
     mappingsCreated: newMappings.length,
     costsRefreshed: costUpdates.length,
     pricesRaised: priceUpdates.length,
+    internalSkusFilled: skuUpdates.length,
     deactivatedMissingSku: orphanMappings.length,
     productsRemoved: productsToDelete.length,
     productsHidden: productsToDeactivateOnly.length,
@@ -457,6 +512,29 @@ export async function planCatalogSync(input?: {
     } catch (error) {
       summary.failures.push(
         `hapus produk tanpa SKU (${product.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /*
+   * Isi SKU internal produk lama yang belum punya.
+   *
+   * Filter `internal_sku: "is.null"` menjaga idempotensi terhadap run
+   * lain yang bersamaan: kalau dua sync berjalan beriringan dan keduanya
+   * menghitung SKU yang sama untuk produk yang sama, unique index yang
+   * memutuskan - dan update yang kalah tidak mengubah apa pun karena
+   * kolomnya sudah tidak null lagi.
+   */
+  for (const row of skuUpdates) {
+    try {
+      await supabaseUpdate(
+        "products",
+        { internal_sku: row.internal_sku, updated_at: now },
+        { filters: { id: `eq.${row.id}`, internal_sku: "is.null" } },
+      );
+    } catch (error) {
+      summary.failures.push(
+        `SKU internal produk ${row.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

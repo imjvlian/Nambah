@@ -230,6 +230,36 @@ export default function MelostoreMappingPanel() {
     }
   }
 
+  /*
+   * Gabungkan via jalur SKU internal - pemasangan berbasis identitas,
+   * bukan tebakan label.
+   *
+   * Beda dengan "Pasang otomatis": pencocokan label menyatakan ambigu
+   * untuk SKU regional bernama sama dan tidak memasang keduanya; jalur
+   * SKU internal memisahkan wilayah lewat akhiran region (mlid56d ->
+   * MLBB-DM-56, mlgl56d -> MLBB-DM-56-GL), jadi pasangan Indonesia
+   * terpasang dan varian global dibiarkan tidak terpetakan dengan sadar.
+   */
+  async function gabungkanViaSkuInternal() {
+    setBusy("merge-internal-sku");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/digiflazz/melostore-mapping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "merge-internal-sku" }),
+      });
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(data.error ?? "Penggabungan gagal.");
+      setNotice(data.message ?? "Penggabungan selesai.");
+      await load(query, gameFilter);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Penggabungan gagal.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function isiSkuInternal() {
     setBusy("internal-sku");
     setNotice("");
@@ -501,19 +531,29 @@ export default function MelostoreMappingPanel() {
                 >
                   {busy === "internal-sku" ? "Mengisi..." : "Isi SKU internal"}
                 </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busy) || !payload?.supplier.configured}
+                  onClick={() => void gabungkanViaSkuInternal()}
+                >
+                  {busy === "merge-internal-sku" ? "Menggabungkan..." : "Gabungkan via SKU internal"}
+                </button>
               </div>
             </div>
 
             <div className="acc-card-head-note">
               <small>
-                Urutan yang benar: "Cache katalog" dulu, lalu "Pasang
-                otomatis". Dropdown di editor produk membaca cache, bukan
-                API - tarif katalog Melostore hanya 20 permintaan/menit.
-                "Sinkron harga" hanya memperbarui pemetaan yang sudah ada.
-                "Pasang otomatis" hanya memasang pasangan yang benar-benar
-                pasti - yang ambigu dilewati dan dilaporkan jumlahnya, bukan
-                ditebak. "Isi SKU internal" mengisi produk yang belum punya,
-                dan tidak pernah mengubah SKU yang sudah ada.
+                Urutan yang benar: "Cache katalog" dulu, lalu pastikan produk
+                sudah punya SKU internal (sinkron Digiflazz mengisinya
+                otomatis; "Isi SKU internal" untuk sisa yang terlewat), baru
+                "Gabungkan via SKU internal". Dropdown di editor produk
+                membaca cache, bukan API - tarif katalog Melostore hanya 20
+                permintaan/menit. "Sinkron harga" hanya memperbarui pemetaan
+                yang sudah ada. "Pasang otomatis" memakai pencocokan label -
+                pasangan regional bernama sama dianggap ambigu dan dilewati;
+                "Gabungkan via SKU internal" memakai identitas produk, jadi
+                pasangan Indonesia (tanpa akhiran) terpasang dan varian
+                wilayah lain dibiarkan tidak terpetakan dengan sadar.
               </small>
             </div>
           </div>

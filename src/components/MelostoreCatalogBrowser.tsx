@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 
 /**
  * Browser katalog Melostore.
@@ -23,6 +24,9 @@ type CatalogRow = {
   active: boolean;
   lastSeenAt: string;
   added: boolean;
+  gameId: string;
+  gameName: string;
+  gameConfident: boolean;
   internalProduct: {
     id: string;
     label: string;
@@ -32,6 +36,12 @@ type CatalogRow = {
   } | null;
 };
 
+type GroupCounts = {
+  total: number;
+  tersedia: number;
+  ditambahkan: number;
+};
+
 type CatalogPayload = {
   rows: CatalogRow[];
   total: number;
@@ -39,6 +49,7 @@ type CatalogPayload = {
   totalPages: number;
   categories: string[];
   games: Array<{ id: string; name: string }>;
+  groups: Record<string, Record<string, GroupCounts>>;
   addedCount: number;
   scan: {
     lastRun: {
@@ -55,30 +66,6 @@ type CatalogPayload = {
   };
 };
 
-/**
- * Tebakan game dari prefiks SKU Melostore.
- *
- * `confident: false` berarti prefiksnya ambigu - Free Fire dan Free Fire
- * Max memakai prefiks yang sama, dan Nambah punya keduanya. Menebak di
- * sini berarti draft dibuat untuk game yang salah; kalau ragu, biarkan
- * operator memilih.
- */
-function tebakGame(sku: string): { gameId: string; confident: boolean } {
-  const s = sku.toLowerCase();
-  if (s.startsWith("ml")) return { gameId: "mobile-legends", confident: true };
-  if (s.startsWith("hok")) return { gameId: "honor-of-kings", confident: true };
-  if (s.startsWith("pubgm")) return { gameId: "pubg-mobile", confident: true };
-  if (s.startsWith("val")) return { gameId: "valorant", confident: true };
-  if (s.startsWith("zep")) return { gameId: "zepeto", confident: true };
-  if (s.startsWith("aov")) return { gameId: "arena-of-valor", confident: true };
-  if (s.startsWith("cod")) return { gameId: "call-of-duty-mobile", confident: true };
-  if (s.startsWith("ff")) return { gameId: "free-fire", confident: false };
-  if (s.startsWith("gi") || s.startsWith("ys")) {
-    return { gameId: "genshin-impact", confident: false };
-  }
-  return { gameId: "", confident: false };
-}
-
 function rupiah(value: number) {
   return "Rp " + Math.round(value).toLocaleString("id-ID");
 }
@@ -92,9 +79,14 @@ export default function MelostoreCatalogBrowser() {
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [kategori, setKategori] = useState("");
+  const [gameFilter, setGameFilter] = useState("");
   const [tersedia, setTersedia] = useState("");
   const [mapping, setMapping] = useState("");
   const [page, setPage] = useState(1);
+
+  // Grup yang dipilih untuk navigasi (kategori + game) - chip di atas tabel
+  const [pilihKategori, setPilihKategori] = useState("");
+  const [pilihGame, setPilihGame] = useState("");
 
   /*
    * Form tambah per baris: hanya muncul pada baris yang ditekan tombolnya.
@@ -110,6 +102,7 @@ export default function MelostoreCatalogBrowser() {
   async function load(
     nextQuery = query,
     nextKategori = kategori,
+    nextGame = gameFilter,
     nextTersedia = tersedia,
     nextMapping = mapping,
     nextPage = page,
@@ -117,6 +110,7 @@ export default function MelostoreCatalogBrowser() {
     const params = new URLSearchParams();
     if (nextQuery) params.set("q", nextQuery);
     if (nextKategori) params.set("kategori", nextKategori);
+    if (nextGame) params.set("game", nextGame);
     if (nextTersedia) params.set("tersedia", nextTersedia);
     if (nextMapping) params.set("mapping", nextMapping);
     params.set("page", String(nextPage));
@@ -138,9 +132,29 @@ export default function MelostoreCatalogBrowser() {
   }
 
   useEffect(() => {
-    void load("", "", "", "", 1);
+    void load("", "", "", "", "", 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pilih kategori dari panel grup -> set filter dan reset page
+  function pilihGrup(kat: string, gm?: string) {
+    setPilihKategori(kat);
+    setPilihGame(gm ?? "");
+    setKategori(kat);
+    setGameFilter(gm ?? "");
+    setPage(1);
+    void load(query, kat, gm ?? "", tersedia, mapping, 1);
+  }
+
+  // Hapus pilihan grup -> kembali ke semua
+  function hapusPilihGrup() {
+    setPilihKategori("");
+    setPilihGame("");
+    setKategori("");
+    setGameFilter("");
+    setPage(1);
+    void load(query, "", "", tersedia, mapping, 1);
+  }
 
   async function scan() {
     setBusy("scan");
@@ -155,7 +169,7 @@ export default function MelostoreCatalogBrowser() {
       if (!response.ok) throw new Error(data.error ?? "Scan gagal.");
       setNotice(data.message ?? "Scan selesai.");
       setPage(1);
-      await load(query, kategori, tersedia, mapping, 1);
+      await load(query, kategori, gameFilter, tersedia, mapping, 1);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Scan gagal.");
     } finally {
@@ -188,7 +202,7 @@ export default function MelostoreCatalogBrowser() {
             : ""),
       );
       setTambah(null);
-      await load(query, kategori, tersedia, mapping, page);
+      await load(query, kategori, gameFilter, tersedia, mapping, page);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Produk gagal ditambahkan.");
     } finally {
@@ -201,7 +215,7 @@ export default function MelostoreCatalogBrowser() {
     const next = queryInput.trim();
     setQuery(next);
     setPage(1);
-    void load(next, kategori, tersedia, mapping, 1);
+    void load(next, kategori, gameFilter, tersedia, mapping, 1);
   }
 
   const infoScan = data?.scan.lastRun ?? null;
@@ -250,6 +264,59 @@ export default function MelostoreCatalogBrowser() {
         </div>
       ) : null}
 
+      {/* Panel navigasi grup: kategori -> game (collapsible, default tertutup) */}
+      <CollapsiblePanel
+        title="Jelajahi per kategori"
+        description="Klik kategori → game untuk menyaring tabel. Badge: total / tersedia / sudah ditambahkan."
+        defaultOpen={false}
+      >
+        <div className="acc-catalog-groups">
+          {(data?.categories ?? []).map((kat) => {
+            const gameMap = data?.groups?.[kat] ?? {};
+            return (
+              <div key={kat} className="acc-group-row">
+                <div className="acc-group-kategori">
+                  <strong>{kat}</strong>
+                  <span className="acc-group-badge">
+                    {Object.values(gameMap).reduce((a, b) => a + b.total, 0)} SKU
+                  </span>
+                </div>
+                <div className="acc-group-games">
+                  {Object.entries(gameMap)
+                    .sort(([a], [b]) => a.localeCompare(b, "id"))
+                    .map(([gm, counts]) => (
+                      <button
+                        key={gm}
+                        type="button"
+                        className={`acc-group-game-btn ${pilihKategori === kat && pilihGame === gm ? "active" : ""}`}
+                        onClick={() => pilihGrup(kat, gm)}
+                        title={`${counts.total} total · ${counts.tersedia} tersedia · ${counts.ditambahkan} ditambahkan`}
+                      >
+                        {gm}
+                        <span className="acc-group-game-count">
+                          {counts.ditambahkan > 0 ? `+${counts.ditambahkan}` : ""}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CollapsiblePanel>
+
+      {/* Chip grup aktif */}
+      {(pilihKategori || pilihGame) && (
+        <div className="acc-group-chip">
+          <span>
+            {pilihKategori}{pilihGame && " › " + pilihGame}
+          </span>
+          <button type="button" onClick={hapusPilihGrup} aria-label="Hapus filter grup">
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="acc-filterbar">
         <label className="acc-field acc-tx-search">
           <span>Cari nama atau SKU</span>
@@ -271,13 +338,33 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setKategori(next);
               setPage(1);
-              void load(query, next, tersedia, mapping, 1);
+              void load(query, next, gameFilter, tersedia, mapping, 1);
             }}
           >
             <option value="">Semua kategori</option>
             {(data?.categories ?? []).map((c) => (
               <option key={c} value={c}>
                 {c}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="acc-field">
+          <span>Game</span>
+          <select
+            value={gameFilter}
+            onChange={(event) => {
+              const next = event.target.value;
+              setGameFilter(next);
+              setPage(1);
+              void load(query, kategori, next, tersedia, mapping, 1);
+            }}
+          >
+            <option value="">Semua game</option>
+            {(data?.games ?? []).map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
               </option>
             ))}
           </select>
@@ -291,7 +378,7 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setTersedia(next);
               setPage(1);
-              void load(query, kategori, next, mapping, 1);
+              void load(query, kategori, gameFilter, next, mapping, 1);
             }}
           >
             <option value="">Semua</option>
@@ -308,7 +395,7 @@ export default function MelostoreCatalogBrowser() {
               const next = event.target.value;
               setMapping(next);
               setPage(1);
-              void load(query, kategori, tersedia, next, 1);
+              void load(query, kategori, gameFilter, tersedia, next, 1);
             }}
           >
             <option value="">Semua</option>
@@ -321,6 +408,7 @@ export default function MelostoreCatalogBrowser() {
       <div className="acc-table-card" style={{ marginTop: 12 }}>
         <div className="acc-receipts-head is-mapping">
           <span>Produk Melostore</span>
+          <span>Game</span>
           <span>Kategori</span>
           <span>Modal</span>
           <span>Status</span>
@@ -328,7 +416,7 @@ export default function MelostoreCatalogBrowser() {
         </div>
 
         {(data?.rows ?? []).map((row) => {
-          const tebakan = tebakGame(row.sku);
+          // Gunakan info game dari server (sudah dihitung di API) - tidak perlu tebakGame client-side
           const sedangTambah = tambah?.sku === row.sku;
 
           return (
@@ -337,6 +425,12 @@ export default function MelostoreCatalogBrowser() {
                 <strong>{row.name}</strong>
                 <span>{row.sku}</span>
               </div>
+              <span className="acc-cell-game">
+                {row.gameName}
+                {!row.gameConfident && row.gameId && (
+                  <small className="acc-game-ambigu">(ambigu)</small>
+                )}
+              </span>
               <span>{row.category}</span>
               <span>{rupiah(row.cost)}</span>
 
@@ -407,12 +501,12 @@ export default function MelostoreCatalogBrowser() {
                     onClick={() =>
                       setTambah({
                         sku: row.sku,
-                        gameId: tebakan.gameId,
+                        gameId: row.gameId,
                         label: row.name,
                       })
                     }
                     title={
-                      tebakan.confident
+                      row.gameConfident
                         ? "Tambahkan sebagai draft internal"
                         : "Game tidak bisa dipastikan dari SKU - pilih manual"
                     }
@@ -438,7 +532,7 @@ export default function MelostoreCatalogBrowser() {
             onClick={() => {
               const next = page - 1;
               setPage(next);
-              void load(query, kategori, tersedia, mapping, next);
+              void load(query, kategori, gameFilter, tersedia, mapping, next);
             }}
           >
             Sebelumnya
@@ -452,7 +546,7 @@ export default function MelostoreCatalogBrowser() {
             onClick={() => {
               const next = page + 1;
               setPage(next);
-              void load(query, kategori, tersedia, mapping, next);
+              void load(query, kategori, gameFilter, tersedia, mapping, next);
             }}
           >
             Berikutnya

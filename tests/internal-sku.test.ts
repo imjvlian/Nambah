@@ -9,6 +9,7 @@ import {
   nominalFromLabel,
   normalizeProductLabel,
   regionFromSupplierSku,
+  skuInternalBebas,
 } from "../src/lib/internal-sku.ts";
 
 /**
@@ -100,6 +101,37 @@ test("region eksplisit menimpa tebakan dari SKU supplier", () => {
     sku("mobile-legends", "56 Diamonds", { supplierSku: "mlmy56d-s1", region: "ID" }),
     "MLBB-DM-56",
   );
+});
+
+/* ==========================================================================
+   Region dari prefiks RAKUS vs STARTS WITH - regresi bug FTU Malaysia.
+
+   Ekstraksi `^([a-z]+)` membaca "mlmyfr100d-s2" sebagai prefiks "mlmyfr"
+   yang tidak ada di daftar - wilayah lenyap, SKU turunan kehilangan
+   akhiran -MY, dan FTU Malaysia cocok ke produk diamond reguler
+   Indonesia. Terbukti di uji nyata: 7 pemetaan salah terpasang.
+   ========================================================================== */
+
+test("prefiks dengan huruf lanjutan tetap terbaca region (mlmyfr...)", () => {
+  assert.equal(regionFromSupplierSku("mlmyfr100d-s2"), "MY");
+  assert.equal(regionFromSupplierSku("mlphftu100d-s12"), "PH");
+  assert.equal(regionFromSupplierSku("ffgevent70d-s3"), "GL");
+});
+
+test("SKU FTU Malaysia membawa akhiran -MY, bukan menyamar sebagai Indonesia", () => {
+  // Regresi langsung dari kasus nyata: tanpa akhiran, item ini cocok ke
+  // produk "50 Diamond" Indonesia yang sama sekali bukan barangnya.
+  assert.equal(
+    sku("mobile-legends", "First Top Up 50+Bonus Diamonds (Malaysia)", {
+      supplierSku: "mlmyfr100d-s2",
+    }),
+    "MLBB-DM-50-MY",
+  );
+});
+
+test("prefiks terpanjang diperiksa lebih dulu (pubgmgl bukan pubgm)", () => {
+  assert.equal(regionFromSupplierSku("pubgmgl60uc-s1"), "GL");
+  assert.equal(regionFromSupplierSku("pubgmid60uc-s1"), null);
 });
 
 /* ==========================================================================
@@ -245,4 +277,58 @@ test("normalisasi label untuk pencocokan tetap bekerja", () => {
   assert.equal(normalizeProductLabel("50 Diamonds"), "50diamonds");
   assert.equal(normalizeProductLabel("1.050 Diamonds"), "1050diamonds");
   assert.equal(normalizeProductLabel(""), "");
+});
+
+/* ==========================================================================
+   skuInternalBebas - SKU pertama yang masih bebas dari bentrok.
+   ========================================================================== */
+
+test("SKU dasar dipakai kalau belum ada yang memakai", () => {
+  const hasil = skuInternalBebas(
+    { gameId: "mobile-legends", label: "56 Diamonds" },
+    new Set(),
+  );
+  assert.equal(hasil, "MLBB-DM-56");
+});
+
+test("bentrok dengan SKU dasar menghasilkan akhiran -2", () => {
+  const hasil = skuInternalBebas(
+    { gameId: "mobile-legends", label: "56 Diamonds" },
+    new Set(["MLBB-DM-56"]),
+  );
+  assert.equal(hasil, "MLBB-DM-56-2");
+});
+
+test("bentrok berantai melompat ke akhiran berikutnya yang bebas", () => {
+  const hasil = skuInternalBebas(
+    { gameId: "mobile-legends", label: "56 Diamonds" },
+    new Set(["MLBB-DM-56", "MLBB-DM-56-2", "MLBB-DM-56-3"]),
+  );
+  assert.equal(hasil, "MLBB-DM-56-4");
+});
+
+test("48 akhiran penuh mengembalikan null, bukan SKU bentrok", () => {
+  const dipakai = new Set(["MLBB-DM-56"]);
+  for (let suffix = 2; suffix < 50; suffix += 1) {
+    dipakai.add(`MLBB-DM-56-${suffix}`);
+  }
+  const hasil = skuInternalBebas(
+    { gameId: "mobile-legends", label: "56 Diamonds" },
+    dipakai,
+  );
+  assert.equal(hasil, null);
+});
+
+test("label kosong mengembalikan null tanpa menyentuh daftar", () => {
+  const hasil = skuInternalBebas({ gameId: "mobile-legends", label: "  " }, new Set());
+  assert.equal(hasil, null);
+});
+
+test("wilayah ikut membedakan SKU dasar sebelum akhiran dipakai", () => {
+  // mlgl -> region GL, jadi SKU dasarnya sendiri berbeda dari varian ID.
+  const hasilGl = skuInternalBebas(
+    { gameId: "mobile-legends", label: "56 Diamonds", supplierSku: "mlgl56d-s1" },
+    new Set(["MLBB-DM-56"]),
+  );
+  assert.equal(hasilGl, "MLBB-DM-56-GL");
 });

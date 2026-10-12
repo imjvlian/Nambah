@@ -7,6 +7,7 @@ import {
   supabaseUpsert,
 } from "@/lib/supabase/server";
 import { BRAND } from "@/lib/brand";
+import { generateInternalSku, internalSkuWithSuffix } from "@/lib/internal-sku";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
+  internal_sku: string | null;
 };
 
 type GameRow = {
@@ -155,6 +157,48 @@ function makeGameDefaults(item: SupplierCatalogRow) {
   };
 }
 
+/**
+ * SKU internal bebas untuk satu item katalog Digiflazz.
+ *
+ * Pemeriksaan bentrok lewat database, bukan Set di memori, karena publish
+ * diproses satu item per permintaan - tidak ada batch yang bisa dihitung
+ * di muka. Generator dan aturan akhiran tetap dari `internal-sku.ts`;
+ * yang async di sini hanya jawaban "sudah dipakai produk lain atau belum".
+ *
+ * `kecualiProductId`: produk yang SEDANG diproses tidak dihitung bentrok
+ * dengan dirinya sendiri - misalnya publish ulang produk yang sudah
+ * ber-SKU internal.
+ */
+async function skuInternalUntukItem(
+  item: SupplierCatalogRow,
+  gameId: string,
+  label: string,
+  kecualiProductId?: string,
+): Promise<string | null> {
+  const input = { gameId, label, jenis: item.type };
+  const dasar = generateInternalSku(input, item.supplier_sku);
+  if (!dasar) return null;
+
+  const bentrok = async (sku: string): Promise<boolean> => {
+    const baris = await supabaseSelect<{ id: string }>("products", {
+      select: "id",
+      filters: { internal_sku: `eq.${sku}` },
+      limit: 1,
+    });
+    return baris.length > 0 && baris[0].id !== kecualiProductId;
+  };
+
+  if (!(await bentrok(dasar))) return dasar;
+
+  for (let suffix = 2; suffix < 50; suffix += 1) {
+    const kandidat = internalSkuWithSuffix(input, suffix, item.supplier_sku);
+    if (!kandidat) break;
+    if (!(await bentrok(kandidat))) return kandidat;
+  }
+
+  return null;
+}
+
 function parsePublicationRequest(value: unknown): PublicationRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new PublicationError("Item publish katalog tidak valid.");
@@ -243,7 +287,7 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
 
   if (existingMapping) {
     const [product] = await supabaseSelect<ProductRow>("products", {
-      select: "id,game_id,label,selling_price,reference_price,active",
+      select: "id,game_id,label,selling_price,reference_price,active,internal_sku",
       filters: { id: `eq.${existingMapping.product_id}` },
       limit: 1,
     });
@@ -255,6 +299,22 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
     const nextSellingPrice = Math.max(Number(product.selling_price), minimumSellingPrice);
     const nextReferencePrice = Math.max(Number(product.reference_price), nextSellingPrice);
 
+    /*
+     * Publish ulang produk lama: SKU internal yang kosong ikut diisi,
+     * karena cabang ini yang paling sering dijalankan operator untuk
+     * produk yang sudah pernah dipublish sebelum fitur SKU internal.
+     */
+    let isiInternalSku: Record<string, unknown> = {};
+    if (!product.internal_sku) {
+      const sku = await skuInternalUntukItem(
+        item,
+        product.game_id,
+        product.label,
+        product.id,
+      );
+      if (sku) isiInternalSku = { internal_sku: sku };
+    }
+
     await Promise.all([
       supabaseUpdate(
         "products",
@@ -263,6 +323,7 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
           selling_price: nextSellingPrice,
           reference_price: nextReferencePrice,
           updated_at: now,
+          ...isiInternalSku,
         },
         { filters: { id: `eq.${product.id}` } },
       ),
@@ -337,26 +398,53 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
 
   const productId = makeProductId(item.supplier_sku);
   const [existingProduct] = await supabaseSelect<ProductRow>("products", {
-    select: "id,game_id,label,selling_price,reference_price,active",
+    select: "id,game_id,label,selling_price,reference_price,active,internal_sku",
     filters: { id: `eq.${productId}` },
     limit: 1,
   });
 
   if (!existingProduct) {
+    /*
+     * SKU internal dibuat saat produk lahir - bukan lewat backfill
+     * terpisah. Alur centang-then-publish inilah yang dipakai operator
+     * untuk menambah produk dari katalog Digiflazz, jadi tanpa ini
+     * mayoritas produk baru tetap tanpa SKU internal dan merge
+     * Melostore tidak pernah menemukannya.
+     */
+    const label = cleanProductLabel(item.product_name, item.brand);
+    const internalSku = await skuInternalUntukItem(item, game.id, label);
+
     await supabaseInsert("products", {
       id: productId,
       game_id: game.id,
-      label: cleanProductLabel(item.product_name, item.brand),
+      label,
       note: item.type && item.type !== "-" ? item.type : null,
       selling_price: minimumSellingPrice,
       reference_price: minimumSellingPrice,
       active: true,
+      internal_sku: internalSku,
       sort_order: Math.min(2_000_000_000, Math.max(0, Math.round(supplierCost))),
       created_at: now,
       updated_at: now,
     });
   } else {
     const nextSellingPrice = Math.max(Number(existingProduct.selling_price), minimumSellingPrice);
+    /*
+     * Produk lama yang belum punya SKU internal diisi DI SINI, bukan
+     * hanya di jalur sync - dua jalur ini berdiri sendiri, dan operator
+     * yang hanya memakai publish tidak pernah menjalankan sync.
+     */
+    const isiInternalSku: Record<string, unknown> = {};
+    if (!existingProduct.internal_sku) {
+      const sku = await skuInternalUntukItem(
+        item,
+        existingProduct.game_id,
+        existingProduct.label,
+        existingProduct.id,
+      );
+      if (sku) isiInternalSku.internal_sku = sku;
+    }
+
     await supabaseUpdate(
       "products",
       {
@@ -364,6 +452,7 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
         selling_price: nextSellingPrice,
         reference_price: Math.max(Number(existingProduct.reference_price), nextSellingPrice),
         updated_at: now,
+        ...isiInternalSku,
       },
       { filters: { id: `eq.${productId}` } },
     );

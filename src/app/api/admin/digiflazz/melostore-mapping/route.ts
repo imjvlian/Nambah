@@ -312,6 +312,7 @@ export async function POST(request: Request) {
     );
   if (body.action === "clear") return clearMapping(body.productId);
   if (body.action === "backfill-sku") return backfillInternalSku();
+  if (body.action === "merge-internal-sku") return mergeByInternalSku(auth.principal.userId);
 
   return Response.json({ error: "Aksi tidak dikenal." }, { status: 400 });
 }
@@ -675,5 +676,192 @@ async function backfillInternalSku() {
     message:
       `${dibuat} SKU internal dibuat, ${dilewati} sudah punya dan dilewati.` +
         (duplikat.length > 0 ? ` ${duplikat.length} produk memakai akhiran karena labelnya sama.` : ""),
+  });
+}
+
+/**
+ * Gabungkan produk Melostore ke produk Nambah lewat jalur SKU internal.
+ *
+ * ALUR:
+ * 1. Baca katalog Melostore yang aktif dari cache (`supplier_catalog_items`).
+ * 2. Untuk tiap item:
+ *    - Tentukan gameId dari prefiks SKU (gameDariPrefiksSku).
+ *    - Skip kalau prefiks tidak dikenal / game tidak eligible / ambigu FF/FFMAX.
+ *    - Bangun SKU internal: generateInternalSku({gameId, label: nama, supplierSku}).
+ *      Region otomatis dari prefiks (mlid → tidak ada suffix, mlgl → -GL, dll).
+ *    - Cari produk dengan internal_sku SAMA PERSIS (unique index menjamin tunggal).
+ *    - Skip kalau sudah ada mapping Melostore untuk produk itu.
+ * 3. Insert supplier_products (supplier_id=melostore) dengan mapped_via="internal-sku".
+ * 4. Kembalikan ringkasan: terpasang / dilewati (sudah terpetakan / tak dikenal / ambigu / tak ada produk / game tidak eligible).
+ */
+async function mergeByInternalSku(mappedBy: string | null) {
+  const { gameDariPrefiksSku, isGameEligible } = await import("@/lib/suppliers/match");
+  const { generateInternalSku, internalSkuWithSuffix } = await import("@/lib/internal-sku");
+
+  /*
+   * Katalog Melostore 8.000+ baris - melebihi batas satu respons PostgREST.
+   * `supabaseSelect` dengan limit besar tetap terpotong di 1.000 baris
+   * (terbukti di uji nyata: hanya 1.000 dari 8.138 SKU yang diproses),
+   * jadi pemakaian yang benar adalah `supabaseSelectAll` yang membagi
+   * halaman otomatis.
+   */
+  const meloItems = await supabaseSelectAll<{
+    supplier_sku: string;
+    product_name: string;
+    supplier_cost: number | string;
+    buyer_active: boolean;
+  }>("supplier_catalog_items", {
+    select: "supplier_sku,product_name,supplier_cost,buyer_active",
+    filters: { supplier_id: "eq.melostore", buyer_active: "eq.true" },
+  });
+
+  if (meloItems.length === 0) {
+    return Response.json(
+      { error: "Katalog Melostore kosong. Jalankan scan katalog dulu." },
+      { status: 409 },
+    );
+  }
+
+  // 2. Mapping Melostore yang sudah ada (supaya skip yang sudah terpetakan)
+  const existingMappings = await supabaseSelectAll<{ product_id: string; supplier_sku: string }>(
+    "supplier_products",
+    { select: "product_id,supplier_sku", filters: { supplier_id: "eq.melostore" } },
+  );
+  const mappedProductIds = new Set(existingMappings.map((m) => m.product_id));
+  const mappedSupplierSkus = new Set(existingMappings.map((m) => m.supplier_sku).filter(Boolean));
+
+  // 3. Produk dengan internal_sku untuk lookup cepat
+  const productsWithInternalSku = await supabaseSelectAll<{ id: string; internal_sku: string }>(
+    "products",
+    { select: "id,internal_sku", filters: { internal_sku: "not.is.null" } },
+  );
+  const internalSkuToProduct = new Map<string, string>();
+  for (const p of productsWithInternalSku) {
+    if (p.internal_sku) internalSkuToProduct.set(p.internal_sku, p.id);
+  }
+
+  const now = new Date().toISOString();
+  let terpasang = 0;
+  let dilewatiSudahAda = 0;
+  let dilewatiPrefiksTidakDikenal = 0;
+  let dilewatiGameTidakEligible = 0;
+  let dilewatiAmbigu = 0;
+  let dilewatiBundel = 0;
+  let dilewatiTakAdaProduk = 0;
+  const errors: string[] = [];
+
+  /*
+   * TERMURAH DULU: kalau beberapa SKU Melostore menurunkan SKU internal
+   * yang sama (mlid50d-s1 dan mlid50d-s5, misalnya), yang dipasang adalah
+   * yang termurah - bukan yang kebetulan datang lebih dulu dari database.
+   * Melostore adalah supplier pembanding; memasang yang mahal berarti
+   * checkout tidak pernah memilihnya.
+   */
+  const berurut = [...meloItems].sort(
+    (a, b) => Number(a.supplier_cost) - Number(b.supplier_cost),
+  );
+
+  for (const item of berurut) {
+    const sku = item.supplier_sku;
+    if (!sku || mappedSupplierSkus.has(sku)) {
+      if (mappedSupplierSkus.has(sku)) dilewatiSudahAda += 1;
+      continue;
+    }
+
+    const { gameId, confident } = gameDariPrefiksSku(sku);
+    if (!gameId) {
+      dilewatiPrefiksTidakDikenal += 1;
+      continue;
+    }
+    if (!confident) {
+      dilewatiAmbigu += 1;
+      continue;
+    }
+    if (!isGameEligible(gameId)) {
+      dilewatiGameTidakEligible += 1;
+      continue;
+    }
+
+    /*
+     * BUNDEL / FIRST TOP UP tidak dipetakan otomatis.
+     *
+     * "First Top Up 50+Bonus Diamonds" menurunkan SKU internal yang sama
+     * dengan "50 Diamond" biasa - nominal terbesar pada labelnya 50 -
+     * padahal keduanya barang yang berbeda. Tanpa guard ini, FTU (yang
+     * harganya lebih tinggi dari diamond biasa) terpasang ke produk
+     * reguler, dan top up member baru bisa terkirim ke varian yang salah.
+     * Operator tetap bisa memetakan FTU manual lewat panel pemetaan.
+     */
+    if (/(first\s+(top\s*up|recharge)|ftu|bonus)/i.test(item.product_name ?? "")) {
+      dilewatiBundel += 1;
+      continue;
+    }
+
+    // Bangun SKU internal dari sisi Melostore
+    const internalInput = {
+      gameId,
+      label: item.product_name,
+      supplierSku: sku,
+    };
+    let internalSku = generateInternalSku(internalInput);
+    if (!internalSku) {
+      dilewatiTakAdaProduk += 1;
+      continue;
+    }
+
+    // Cari produk dengan internal SKU yang sama
+    const productId = internalSkuToProduct.get(internalSku);
+    if (!productId) {
+      dilewatiTakAdaProduk += 1;
+      continue;
+    }
+
+    // Skip kalau produk ini sudah punya mapping Melostore (meski SKU lain)
+    if (mappedProductIds.has(productId)) {
+      dilewatiSudahAda += 1;
+      continue;
+    }
+
+    // Insert mapping
+    try {
+      await supabaseInsert("supplier_products", {
+        supplier_id: "melostore",
+        product_id: productId,
+        supplier_sku: sku,
+        supplier_cost: Number(item.supplier_cost),
+        active: true,
+        last_synced_at: now,
+        mapped_via: "internal-sku",
+        mapped_by: mappedBy,
+        mapped_at: now,
+      });
+      mappedProductIds.add(productId);
+      mappedSupplierSkus.add(sku);
+      terpasang += 1;
+    } catch (error) {
+      const pesan = error instanceof Error ? error.message : "galat tidak diketahui";
+      errors.push(`${sku} -> ${internalSku}: ${pesan}`);
+    }
+  }
+
+  return Response.json({
+    ok: true,
+    terpasang,
+    dilewati: {
+      sudahAda: dilewatiSudahAda,
+      prefiksTidakDikenal: dilewatiPrefiksTidakDikenal,
+      gameTidakEligible: dilewatiGameTidakEligible,
+      ambigu: dilewatiAmbigu,
+      bundel: dilewatiBundel,
+      takAdaProduk: dilewatiTakAdaProduk,
+    },
+    totalDiproses: meloItems.length,
+    message:
+      `${terpasang} pemetaan dipasang. ` +
+      `Dilewati: ${dilewatiSudahAda} sudah terpetakan, ${dilewatiPrefiksTidakDikenal} prefiks tidak dikenal, ` +
+      `${dilewatiGameTidakEligible} game tidak eligible, ${dilewatiAmbigu} ambigu FF/FFMAX, ` +
+      `${dilewatiBundel} bundel/FTU (petakan manual bila dijual), ` +
+      `${dilewatiTakAdaProduk} tidak ada produk dengan SKU internal cocok.`,
+    errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
   });
 }

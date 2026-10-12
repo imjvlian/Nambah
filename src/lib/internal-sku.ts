@@ -118,15 +118,33 @@ const REGION_DEFAULT = "ID";
 
 /** Wilayah dari SKU supplier, atau null kalau tidak terbaca. */
 export function regionFromSupplierSku(sku: string): string | null {
-  const m = /^([a-z]+)/i.exec(String(sku ?? "").trim());
-  if (!m) return null;
-  const prefix = m[1].toLowerCase();
+  const s = String(sku ?? "").trim().toLowerCase();
 
   // Prefiks yang eksplisit menyebut Indonesia tidak butuh akhiran.
-  if (/^(mlid|ffid|pubgmid)/.test(prefix)) return null;
+  if (/^(mlid|ffid|pubgmid)/.test(s)) return null;
 
-  const region = REGION_BY_PREFIX[prefix];
-  if (region && region !== REGION_DEFAULT) return region;
+  /*
+   * STARTS WITH PREFIKS YANG DIKETAHUI, bukan ekstraksi `^([a-z]+)`.
+   *
+   * Ekstraksi rakus membaca "mlmyfr100d-s2" sebagai prefiks "mlmyfr" -
+   * yang tidak ada di daftar mana pun - sehingga wilayahnya lenyap dan
+   * SKU turunan kehilangan akhiran -MY. Akibatnya SKU First Top Up
+   * Malaysia cocok ke produk diamond biasa Indonesia (terbukti di uji
+   * nyata: 7 pemetaan salah terpasang sebelum perbaikan ini).
+   *
+   * Prefiks terpanjang diperiksa lebih dulu supaya prefiks yang merupakan
+   * awalan prefiks lain (pubgmgl vs pubgm) tidak terbaca lebih pendek.
+   */
+  const prefiksRegional = Object.keys(REGION_BY_PREFIX).sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const prefiks of prefiksRegional) {
+    if (s.startsWith(prefiks)) {
+      const region = REGION_BY_PREFIX[prefiks];
+      if (region && region !== REGION_DEFAULT) return region;
+      return null;
+    }
+  }
   return null;
 }
 
@@ -270,6 +288,40 @@ export function internalSkuWithSuffix(
   if (!dasar) return null;
 
   return `${dasar}-${suffix}`;
+}
+
+/**
+ * SKU internal pertama yang masih bebas, atau null.
+ *
+ * Satu-satunya cara pemanggil mendapat SKU yang AMAN dipasang ke produk
+ * baru tanpa menimpa yang lama: mulai dari SKU dasar, lalu akhiran 2..49
+ * sampai ketemu yang tidak ada di daftar `dipakai`.
+ *
+ * `dipakai` bisa berupa Set di memori (sync yang menghitung batch) atau
+ * pemeriksaan database (publish satu-per-satu) - asal jawab "true kalau
+ * SKU ini sudah dipegang produk lain".
+ *
+ * Pemanggil WAJIB menambahkan hasilnya ke `dipakai` sendiri - fungsi ini
+ * murni dan tidak menyimpan apa pun, supaya bisa diuji tanpa I/O.
+ */
+export function skuInternalBebas(
+  input: InternalSkuInput,
+  dipakai: { has: (sku: string) => boolean },
+  supplierSku?: string,
+): string | null {
+  const dasar = generateInternalSku(input, supplierSku);
+  if (!dasar) return null;
+  if (!dipakai.has(dasar)) return dasar;
+
+  for (let suffix = 2; suffix < 50; suffix += 1) {
+    const kandidat = internalSkuWithSuffix(input, suffix, supplierSku);
+    if (!kandidat) break;
+    if (!dipakai.has(kandidat)) return kandidat;
+  }
+
+  // 48 akhiran habis tanpa slot bebas - nyaris mustahil, tapi null lebih
+  // jujur daripada memasang SKU yang bentrok.
+  return null;
 }
 
 /**

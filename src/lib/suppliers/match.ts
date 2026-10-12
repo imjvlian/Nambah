@@ -159,6 +159,42 @@ export function expectedPrefixes(gameId: string): string[] {
 }
 
 /**
+ * Game Nambah dari prefiks SKU Melostore (peta balik `expectedPrefixes`).
+ *
+ * Digunakan oleh:
+ * - `merge-internal-sku`: turunkan SKU internal dari sisi Melostore
+ * - Browser katalog Melostore: kelompokkan per game di server
+ *
+ * Mengembalikan `{ gameId, confident }`:
+ * - `confident: true`  → prefiks unik untuk satu game (mlid, hok, pubgm, val, dll)
+ * - `confident: false` → prefiks ambigu (ff → free-fire ATAU free-fire-max)
+ * - `gameId: ""`       → prefiks tidak dikenal
+ */
+export function gameDariPrefiksSku(sku: string): { gameId: string; confident: boolean } {
+  const s = String(sku ?? "").trim().toLowerCase();
+
+  // Urutan penting: cek prefiks panjang dulu supaya "pubgmgl" tidak terbaca "pubg"
+  const daftar: Array<{ prefixes: string[]; gameId: string; confident: boolean }> = [
+    { prefixes: ["mlid", "mlmy", "mlph", "mlbr", "mlgl", "mlus"], gameId: "mobile-legends", confident: true },
+    { prefixes: ["hok", "hoking", "hokglobal"], gameId: "honor-of-kings", confident: true },
+    { prefixes: ["pubgmgl", "pubgmi"], gameId: "pubg-mobile", confident: true },
+    { prefixes: ["pubg", "pubgm"], gameId: "pubg-mobile", confident: true },
+    { prefixes: ["val", "valorant"], gameId: "valorant", confident: true },
+    { prefixes: ["zep"], gameId: "zepeto", confident: true },
+    { prefixes: ["aov"], gameId: "arena-of-valor", confident: true },
+    { prefixes: ["cod"], gameId: "call-of-duty-mobile", confident: true },
+    { prefixes: ["genshin", "ys", "gi"], gameId: "genshin-impact", confident: true },
+    // ff/ffid/ffg dipakai free-fire DAN free-fire-max → ambigu
+    { prefixes: ["ff", "ffid", "ffg"], gameId: "free-fire", confident: false },
+  ];
+
+  for (const { prefixes, gameId, confident } of daftar) {
+    if (prefixes.some((p) => s.startsWith(p))) return { gameId, confident };
+  }
+  return { gameId: "", confident: false };
+}
+
+/**
  * Apakah game ini boleh punya supplier kedua.
  *
  * Dipisah dari `expectedPrefixes` supaya alasan produk ini tidak
