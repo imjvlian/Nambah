@@ -502,13 +502,21 @@ export default function MelostoreCatalogBrowser() {
                           setTambah({ ...tambah, gameId: event.target.value })
                         }
                       >
-                        <option value="">Pilih game...</option>
+                        <option value="auto">
+                          Buat otomatis: {row.brand ?? "(brand kosong)"}
+                        </option>
+                        <option value="">Pilih game yang sudah ada...</option>
                         {(data?.games ?? []).map((g) => (
                           <option key={g.id} value={g.id}>
                             {g.name}
                           </option>
                         ))}
                       </select>
+                      {tambah.gameId === "auto" && (
+                        <small className="acc-form-notice">
+                          {"Game dicari dari brand \"" + (row.brand ?? "") + "\"; bila belum ada, dibuat baru dengan pengaturan dari form input produk ini."}
+                        </small>
+                      )}
                     </label>
                     <label>
                       <span>Nama produk</span>
@@ -542,14 +550,16 @@ export default function MelostoreCatalogBrowser() {
                     onClick={() =>
                       setTambah({
                         sku: row.sku,
-                        gameId: row.gameId,
+                        // Prefiks jelas -> game tebakan; tidak -> brand asli
+                        // (bisa membuat game baru otomatis di server).
+                        gameId: row.gameConfident ? row.gameId : "auto",
                         label: row.name,
                       })
                     }
                     title={
                       row.gameConfident
                         ? "Tambahkan sebagai draft internal"
-                        : "Game tidak bisa dipastikan dari SKU - pilih manual"
+                        : "Game dari brand asli - dibuat otomatis bila belum ada"
                     }
                   >
                     Tambahkan Produk

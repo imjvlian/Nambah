@@ -6,6 +6,11 @@ import {
   normalizeProductLabel,
 } from "@/lib/internal-sku";
 import { gameDariPrefiksSku, isGameEligible } from "@/lib/suppliers/match";
+import {
+  buatGameBaruDefaults,
+  cariGameCocok,
+  type FieldForm,
+} from "@/lib/game-defaults";
 import { riwayatScan } from "@/lib/suppliers/scan-runs";
 
 export const runtime = "nodejs";
@@ -320,7 +325,7 @@ export async function POST(request: Request) {
   // 2. Data katalog untuk nama, modal, dan validasi.
   const itemRows = await supabaseSelect<CatalogItemRow>("supplier_catalog_items", {
     select:
-      "supplier_sku,product_name,category,brand,type,supplier_cost,buyer_active",
+      "supplier_sku,product_name,category,brand,type,supplier_cost,buyer_active,inquiry_form_key",
     filters: { supplier_id: "eq.melostore", supplier_sku: `eq.${sku}` },
     limit: 1,
   });
@@ -332,21 +337,109 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3. Game wajib dipilih - katalog Melostore tidak membawa game Nambah.
+  /*
+   * 3. Menentukan game.
+   *
+   * Dua cara: pilih id yang sudah ada (dropdown), atau "auto" - game
+   * dicari/dibuat dari BRAND ASLI baris katalog. Sebelum brand asli
+   * tersimpan (scan sebelum migrasi 046), "auto" tidak punya dasar
+   * data; sekarang brand + inquiry form tersimpan, jadi game baru bisa
+   * dibuat dengan requires_server yang disimpulkan dari form, bukan
+   * dari tebakan nama.
+   */
   const gameId = clean(body.gameId ?? null);
   if (!gameId) {
     return Response.json(
-      { error: "Game wajib dipilih - katalog Melostore tidak menyebut game Nambah." },
+      { error: "Game wajib dipilih - pilih dari daftar atau \u201cbuat otomatis dari brand\u201d." },
       { status: 400 },
     );
   }
 
-  const gameRows = await supabaseSelect<{ id: string; name: string }>("games", {
-    select: "id,name",
-    filters: { id: `eq.${gameId}`, active: "eq.true" },
-    limit: 1,
-  });
-  const game = gameRows[0];
+  let game: { id: string; name: string } | null = null;
+  let gameBaruDibuat: { id: string; name: string } | null = null;
+
+  if (gameId === "auto") {
+    const semuaGame = await supabaseSelect<{
+      id: string;
+      name: string;
+      short_name: string;
+    }>("games", {
+      select: "id,name,short_name",
+      filters: { active: "eq.true" },
+      order: "name.asc",
+      limit: 1000,
+    });
+
+    const cocok = cariGameCocok(item.brand ?? "", semuaGame);
+    if (cocok) {
+      game = cocok;
+    } else {
+      let fieldsForm: FieldForm[] | null = null;
+      if (item.inquiry_form_key) {
+        const formRows = await supabaseSelect<{
+          fields: FieldForm[] | null;
+        }>("supplier_inquiry_forms", {
+          select: "fields",
+          filters: {
+            supplier_id: "eq.melostore",
+            form_key: `eq.${item.inquiry_form_key}`,
+          },
+          limit: 1,
+        });
+        fieldsForm = formRows[0]?.fields ?? null;
+      }
+
+      const defaults = buatGameBaruDefaults({
+        brand: item.brand ?? "",
+        kategoriKatalog: item.category,
+        fieldsForm,
+        fallbackId: item.supplier_sku,
+      });
+      if (!defaults) {
+        return Response.json(
+          {
+            error:
+              "Brand baris katalog kosong - tidak bisa membuat game otomatis. Pilih game manual.",
+          },
+          { status: 422 },
+        );
+      }
+
+      const nowBaru = new Date().toISOString();
+      const [created] = await supabaseInsert<{ id: string; name: string }>("games", {
+        id: defaults.id,
+        name: defaults.name,
+        short_name: defaults.shortName,
+        category: defaults.category,
+        accent: defaults.accent,
+        initials: defaults.initials,
+        requires_server: defaults.requiresServer,
+        // Belum diverifikasi - readiness menandainya blocker, itu memang
+        // keadaan yang benar untuk game yang baru ditemukan.
+        fulfillment_target_template: defaults.fulfillmentTargetTemplate,
+        active: true,
+        sort_order: 1000,
+        created_at: nowBaru,
+        updated_at: nowBaru,
+      });
+      if (!created) {
+        return Response.json(
+          { error: `Game ${defaults.name} gagal dibuat.` },
+          { status: 502 },
+        );
+      }
+      game = created;
+      gameBaruDibuat = created;
+    }
+  } else {
+    const gameRows = await supabaseSelect<{ id: string; name: string }>("games", {
+      select: "id,name",
+      filters: { id: `eq.${gameId}`, active: "eq.true" },
+      limit: 1,
+    });
+    game = gameRows[0] ?? null;
+  }
+
   if (!game) {
     return Response.json({ error: "Game tidak ditemukan atau tidak aktif." }, { status: 422 });
   }
@@ -354,7 +447,7 @@ export async function POST(request: Request) {
   const label = clean(body.label ?? null) || item.product_name;
 
   // 4. Kandidat Digiflazz dievaluasi SEKARANG, sebelum apa pun dibuat.
-  const evaluasi = await kandidatDigiflazz(gameId, game.name, label);
+  const evaluasi = await kandidatDigiflazz(game.id, game.name, label);
 
   /*
    * Produk setara dari sisi Digiflazz: kandidat yang SKU-nya SUDAH
@@ -416,7 +509,13 @@ export async function POST(request: Request) {
       }))[0] ?? null;
   } else {
     // 5. SKU internal dari generator, dengan akhiran kalau bentrok.
-    const input = { gameId, label, jenis: item.type, supplierSku: sku };
+    /*
+     * game.id, bukan gameId mentah: pilihan "auto" berarti variabel
+     * gameId berisi literal "auto", dan generator akan menganggapnya
+     * nama game (SKU internal "AUTO-..." - terbukti di uji nyata
+     * sebelum perbaikan ini).
+     */
+    const input = { gameId: game.id, label, jenis: item.type, supplierSku: sku };
 
     internalSku = generateInternalSku(input, sku);
     if (!internalSku) {
@@ -453,7 +552,7 @@ export async function POST(request: Request) {
 
     const inserted = await supabaseInsert<ProductRow>("products", {
       id: productId,
-      game_id: gameId,
+      game_id: game.id,
       label,
       internal_sku: internalSku,
       selling_price: 0,
@@ -503,6 +602,7 @@ export async function POST(request: Request) {
     ok: true,
     alreadyAdded: false,
     reusedEquivalent: Boolean(produkSetaraId),
+    gameBaruDibuat,
     product: {
       id: productId,
       label,
@@ -515,12 +615,16 @@ export async function POST(request: Request) {
       candidates: evaluasi.candidates,
       reason: evaluasi.reason,
     },
-    message: dibuatBaru
-      ? `Produk draft dibuat: ${label} (${internalSku}).` +
-        (autoMappedSku
-          ? ` Kandidat Digiflazz ${autoMappedSku} dipetakan otomatis.`
-          : " Tidak ada kandidat Digiflazz yang pasti - periksa daftar kandidat.")
-      : `Produk setara sudah ada (${internalSku ?? productId}) - sisi Melostore dipetakan ke produk itu, tanpa membuat duplikat.`,
+    message:
+      (gameBaruDibuat
+        ? `Game baru dibuat: ${gameBaruDibuat.name} (${gameBaruDibuat.id}). `
+        : "") +
+      (dibuatBaru
+        ? `Produk draft dibuat: ${label} (${internalSku}).` +
+          (autoMappedSku
+            ? ` Kandidat Digiflazz ${autoMappedSku} dipetakan otomatis.`
+            : " Tidak ada kandidat Digiflazz yang pasti - periksa daftar kandidat.")
+        : `Produk setara sudah ada (${internalSku ?? productId}) - sisi Melostore dipetakan ke produk itu, tanpa membuat duplikat.`),
   });
 }
 
