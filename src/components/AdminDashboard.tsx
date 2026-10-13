@@ -5229,7 +5229,7 @@ const txDataStamp = txRange.preset
                       <div className="acc-card-head">
                         <span>Uang keluar</span>
                         <small className="acc-card-head-note">
-                          transfer ke partner
+                          pencairan komisi afiliasi
                         </small>
                       </div>
                       <div className="acc-cost-list">
@@ -5554,9 +5554,9 @@ const txDataStamp = txRange.preset
                                 !row.receivable_paid_at ? (
                                   <small
                                     className="admin-supplier-warning"
-                                    title="Uang order ini masih di merchant - masuk omzet setelah transfer dilunasi"
+                                    title="Uang order ini masih di tangan merchant - belum masuk omzet sampai transfer merchant dicatat"
                                   >
-                                    Piutang
+                                    Belum dibayar merchant
                                   </small>
                                 ) : null}
                               </td>
