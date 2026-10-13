@@ -36,7 +36,21 @@ export type NominalSortable = {
  * setuju, kalau tidak, urutan di layar tidak sama dengan identitas.
  */
 export function extractNominalAmount(label: string): number | null {
-  const bersih = label.replace(/(?<=\d)\.(?=\d{3}\b)/g, "");
+  /*
+   * BUANG PENGALI "Nx" SEBELUM EKSTRAKSI.
+   *
+   * "Weekly Diamond Pass 2x": "2x" berarti 2 PASANG pass, bukan
+   * nominal 2. Tanpa dibuang, max(2) = 2 — dan WDP 2x mengalahkan
+   * "4 Diamond + Starlight Member" (nominal 4) di urutan, padahal
+   * WDP bukan nominal dan harus tampil setelah item nominal.
+   *
+   * "2x 50 Diamonds" TIDAK rusak: setelah "2x" dibuang, tinggal
+   * "50" — yang memang nominalnya. Pengali dan nominal adalah dua
+   * hal berbeda di label yang sama, dan hanya nominal yang
+   * menentukan urutan.
+   */
+  const tanpaPengali = label.replace(/\b\d+\s*x\b/gi, " ");
+  const bersih = tanpaPengali.replace(/(?<=\d)\.(?=\d{3}\b)/g, "");
 
   /*
    * Cari "A + B" - angka dipisah tanda plus, spasi opsional.

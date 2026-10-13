@@ -37,6 +37,19 @@ test("extractNominalAmount: max semua angka, bukan yang pertama", () => {
   assert.equal(extractNominalAmount("3x 100 Lattices"), 100);
 });
 
+test("extractNominalAmount: pengali Nx dibuang, bukan nominal", () => {
+  /*
+   * "Weekly Diamond Pass 2x": "2x" berarti 2 pasang, bukan nominal 2.
+   * Setelah "2x" dibuang, tidak ada angka → null → sort by price,
+   * SETELAH item nominal seperti "4 Diamond + Starlight Member".
+   */
+  assert.equal(extractNominalAmount("Weekly Diamond Pass 2x"), null);
+  assert.equal(extractNominalAmount("Weekly Diamond Pass 3x"), null);
+  assert.equal(extractNominalAmount("Weekly Diamond Pass"), null);
+  // "2x 50 Diamonds" tetap benar: pengali dibuang, nominal 50 tinggal.
+  assert.equal(extractNominalAmount("2x 50 Diamonds"), 50);
+});
+
 test("sortNominalItems: jumlah kecil di atas, tanpa jumlah di belakang by harga", () => {
   const items = [
     { label: "172 Diamonds", sellingPrice: 42000 },
