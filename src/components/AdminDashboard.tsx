@@ -5171,7 +5171,7 @@ const txDataStamp = txRange.preset
                      * menjelaskan perannya.
                      */}
                     <div className="acc-table-card">
-                      <div className="acc-card-head">
+                      <div className="acc-card-head acc-cashflow-note-head">
                         Pengurang pendapatan
                       </div>
                       <div className="acc-cost-list">
@@ -5226,7 +5226,7 @@ const txDataStamp = txRange.preset
                      * memotong komisi yang sama dua kali.
                      */}
                     <div className="acc-table-card">
-                      <div className="acc-card-head">
+                      <div className="acc-card-head acc-cashflow-note-head">
                         <span>Uang keluar</span>
                         <small className="acc-card-head-note">
                           pencairan komisi afiliasi
@@ -5553,7 +5553,7 @@ const txDataStamp = txRange.preset
                                 row.status === "success" &&
                                 !row.receivable_paid_at ? (
                                   <small
-                                    className="admin-supplier-warning"
+                                    className="tx-unpaid-badge"
                                     title="Uang order ini masih di tangan merchant - belum masuk omzet sampai transfer merchant dicatat"
                                   >
                                     Belum dibayar merchant

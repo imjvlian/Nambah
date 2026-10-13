@@ -5396,6 +5396,69 @@
   font-size: 11px;
 }
 
+/*
+ * Kartu "Uang keluar" dan "Pengurang pendapatan":
+ * head flex supaya judul di kiri, catatan di kanan.
+ *
+ * `.acc-card-head` bawaan TIDAK flex - catatan menumpuk inline
+ * setelah judul tanpa alignment, dan di layar sempit note-nya wrap
+ * ke bawah judul yang menyulitkan membaca. Pola yang sama sudah
+ * terbukti di `.acc-retail-panel .acc-card-head`.
+ */
+.acc-cashflow-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/*
+ * Badge "Belum dibayar merchant" di tabel laporan transaksi.
+ *
+ * Bukan sekadar teks orange: ini STATUS yang menandai order ritel
+ * yang omzetnya belum dihitung. Tanpa pill, angka order dan status
+ * di sel yang sama membuat badge ini terlihat seperti teks yatim
+ * yang menempel tanpa jarak.
+ */
+.tx-unpaid-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border: 1px solid rgba(226, 162, 90, 0.35);
+  border-radius: 999px;
+  background: rgba(226, 162, 90, 0.08);
+  color: #e2a25a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/*
+ * Badge "Belum dibayar merchant" di tabel laporan transaksi.
+ *
+ * Bukan sekadar teks orange: ini STATUS yang menandai order ritel
+ * yang omzetnya belum dihitung. Tanpa pill, angka order dan status
+ * di sel yang sama membuat badge ini terlihat seperti teks yatim
+ * yang menempel tanpa jarak.
+ */
+.tx-unpaid-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border: 1px solid rgba(226, 162, 90, 0.35);
+  border-radius: 999px;
+  background: rgba(226, 162, 90, 0.08);
+  color: #e2a25a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 /* Kolom aksi: tombol bertumpuk, lebar penuh kolom. */
 .admin-actions-column {
   display: grid;
