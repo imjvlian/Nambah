@@ -153,6 +153,39 @@ test("angka desimal bukan pemisah ribuan", () => {
   assert.equal(nominalFromLabel("12.5 Diamonds"), 12);
 });
 
+test("A + B dijumlahkan, bukan max - identitas via total", () => {
+  /*
+   * Melostore "40 + 4 Diamonds" dan Digiflazz "44 Diamonds" adalah
+   * barang yang sama: 40 dasar + 4 bonus = 44 total. Melostore
+   * memakai jumlah itu di SKU code-nya (mlus44d). Kalau kita pakai
+   * max (40), merge tidak akan pernah menemukan "44 Diamonds".
+   */
+  assert.equal(nominalFromLabel("40 + 4 Diamonds"), 44);
+  assert.equal(nominalFromLabel("78+8 Diamond"), 86);
+  assert.equal(nominalFromLabel("3099 + 589 Diamonds"), 3688);
+  assert.equal(nominalFromLabel("300+30 Genesis Crystals"), 330);
+  assert.equal(nominalFromLabel("9.760+2.200 Genesis Crystals"), 11960);
+});
+
+test("A + B di dalam kurung: jumlah sama dengan total di label", () => {
+  // "11 Diamonds (10 + 1 Bonus)": total 11 sudah tertulis.
+  // Plus ditemukan dulu: 10+1=11 - konsisten dengan max=11.
+  assert.equal(nominalFromLabel("11 Diamonds (10 + 1 Bonus)"), 11);
+  assert.equal(nominalFromLabel("56 Diamonds (51 + 5 Bonus)"), 56);
+});
+
+test("A + B: hasilnya menurunkan SKU yang cocok dengan total", () => {
+  // "78+8" dan "86" menghasilkan SKU yang SAMA:
+  assert.equal(
+    sku("mobile-legends", "78+8 Diamond"),
+    sku("mobile-legends", "86 Diamond"),
+  );
+  assert.equal(
+    sku("mobile-legends", "78+8 Diamond"),
+    "MLBB-DM-86",
+  );
+});
+
 /* ==========================================================================
    Produk tanpa nominal.
    ========================================================================== */

@@ -15,10 +15,34 @@ export type NominalSortable = {
   sellingPrice: number;
 };
 
+/**
+ * Nominal untuk sorting di halaman pembelian.
+ *
+ * ATURAN "A + B": jumlah, bukan angka pertama.
+ *
+ * "40 + 4 Diamonds" harus tampil di posisi 44 (jumlah), bukan 40
+ * (angka pertama) - kalau tidak, urutannya salah relatif ke "44
+ * Diamonds" yang memang ada di katalog. Melostore memakai jumlah itu
+ * di SKU code (mlus44d), dan pembeli berpikir dalam total yang
+ * diterima.
+ *
+ * Tanpa "+": angka pertama (perilaku lama).
+ */
 export function extractNominalAmount(label: string): number | null {
-  const match = label.match(/\d{1,3}(?:\.\d{3})+|\d+/);
+  const bersih = label.replace(/(?<=\d)\.(?=\d{3}\b)/g, "");
+
+  const plus = bersih.match(/(\d[\d,]*)\s*\+\s*(\d[\d,]*)/);
+  if (plus) {
+    const a = Number(plus[1]!.replace(/,/g, ""));
+    const b = Number(plus[2]!.replace(/,/g, ""));
+    if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+      return a + b;
+    }
+  }
+
+  const match = bersih.match(/\d{1,3}(?:\.\d{3})+|\d+/);
   if (!match) return null;
-  const value = Number(match[0].replace(/\./g, ""));
+  const value = Number(match[0].replace(/\./g, "").replace(/,/g, ""));
   return Number.isFinite(value) ? value : null;
 }
 

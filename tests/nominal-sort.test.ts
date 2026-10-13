@@ -7,11 +7,15 @@ import {
   sortNominalItems,
 } from "../src/lib/nominal-sort.ts";
 
-test("extractNominalAmount: angka pertama, titik = ribuan", () => {
+test("extractNominalAmount: A + B = jumlah, titik = ribuan", () => {
   assert.equal(extractNominalAmount("86 Diamonds"), 86);
   assert.equal(extractNominalAmount("5 Diamond"), 5);
   assert.equal(extractNominalAmount("60 UC"), 60);
-  assert.equal(extractNominalAmount("300 + 30 Crystals"), 300);
+  // "A + B" dijumlahkan: 300+30 = 330, bukan 300.
+  assert.equal(extractNominalAmount("300 + 30 Crystals"), 330);
+  assert.equal(extractNominalAmount("40 + 4 Diamonds"), 44);
+  assert.equal(extractNominalAmount("78+8 Diamond"), 86);
+  assert.equal(extractNominalAmount("3099 + 589 Diamonds"), 3688);
   assert.equal(extractNominalAmount("1.980 Monochrome"), 1980);
   assert.equal(extractNominalAmount("2.180 Lattices"), 2180);
   assert.equal(extractNominalAmount("Steam Wallet Code Rp 100.000"), 100000);

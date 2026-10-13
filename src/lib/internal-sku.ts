@@ -167,14 +167,30 @@ export function jenisFromSupplier(
 }
 
 /**
- * Nominal dari nama produk: angka terbesar yang jelas menyatakan jumlah.
+ * Nominal dari nama produk.
  *
- * "1.050 Diamonds" adalah seribu lima puluh - pemisah ribuan dihilangkan
- * lebih dulu, kalau tidak angkanya terbaca "1" dan "050" terpisah.
+ * ATURAN "A + B": JUMLAH, bukan max.
  *
- * Diambil dari ANGKA TERBESAR, bukan yang pertama: "2x 50 Diamonds"
- * menyebut dua angka, dan yang mengidentifikasi produk adalah 50, bukan
- * 2. "Weekly Pass" tidak punya nominal sama sekali - dan itu bukan
+ * "40 + 4 Diamonds" berarti 40 dasar + 4 bonus = 44 total. Melostore
+ * memakai jumlah itu di SKU code-nya sendiri (mlus44d), dan Digiflazz
+ * menyebut produk yang sama sebagai "44 Diamonds" - kalau kita pakai
+ * max (40), dua barang yang sama menghasilkan identitas berbeda dan
+ * merge tidak akan pernah menemukannya.
+ *
+ * Tanpa "+": ANGKA TERBESAR.
+ *
+ * "2x 50 Diamonds" menyebut dua angka tanpa "+", dan yang
+ * mengidentifikasi produk adalah 50, bukan 2. "1.050 Diamonds" adalah
+ * seribu lima puluh - pemisah ribuan dihilangkan lebih dulu, kalau
+ * tidak angkanya terbaca "1" dan "050" terpisah.
+ *
+ * "11 Diamonds (10 + 1 Bonus)": total 11 sudah TERTULIS sebelum
+ * tanda kurung. Pola "+" ditemukan lebih dulu (10+1=11) dan hasilnya
+ * sama - kalau kedua angka di dalam kurung konsisten dengan total,
+ * tidak ada perbedaan. Yang penting: pola "+" TIDAK diabaikan hanya
+ * karena ada angka lain di label.
+ *
+ * "Weekly Pass" tidak punya nominal sama sekali - dan itu bukan
  * kegagalan.
  */
 export function nominalFromLabel(
@@ -183,6 +199,22 @@ export function nominalFromLabel(
   if (typeof label !== "string") return null;
 
   const bersih = label.replace(/(?<=\d)\.(?=\d{3}\b)/g, "");
+
+  /*
+   * Cari "A + B" - angka dipisah tanda plus, spasi opsional.
+   * Hanya pasangan PERTAMA yang diambil: "50 + 5 + 3" jarang ada,
+   * dan mengambil lebih dari satu "+" membuat hasil bergantung
+   * pada urutan parsing yang tidak bisa ditebak.
+   */
+  const plus = bersih.match(/(\d[\d,]*)\s*\+\s*(\d[\d,]*)/);
+  if (plus) {
+    const a = Number(plus[1]!.replace(/,/g, ""));
+    const b = Number(plus[2]!.replace(/,/g, ""));
+    if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) {
+      return a + b;
+    }
+  }
+
   const angka = [...bersih.matchAll(/\d[\d,]*/g)]
     .map((m) => Number(m[0].replace(/,/g, "")))
     .filter((n) => Number.isFinite(n));
