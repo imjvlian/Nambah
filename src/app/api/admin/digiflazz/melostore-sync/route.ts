@@ -8,6 +8,7 @@ import {
 import {
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectAll,
   supabaseUpdate,
   supabaseUpsert,
 } from "@/lib/supabase/server";
@@ -150,14 +151,18 @@ async function syncBalance(client: MelostoreSupplierClient) {
 }
 
 async function syncCatalogCosts(client: MelostoreSupplierClient) {
-  const existing = await supabaseSelect<{
+  /*
+   * supabaseSelectAll: mapping bisa melewati 1.000 baris, dan PostgREST
+   * memotong `supabaseSelect` di sana apa pun limit-nya. Yang terpotong
+   * di sini diam-diam berhenti disegarkan harganya.
+   */
+  const existing = await supabaseSelectAll<{
     product_id: string;
     supplier_sku: string | null;
     supplier_cost: number | string;
   }>("supplier_products", {
     select: "product_id,supplier_sku,supplier_cost",
     filters: { supplier_id: "eq.melostore" },
-    limit: 2000,
   });
 
   if (existing.length === 0) {
@@ -327,15 +332,21 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
      * kondisi yang sedang ada. Dihitung setelahnya berarti membandingkan
      * dengan dasar yang sudah berubah - semuanya akan terlihat "tidak
      * berubah".
+     *
+     * WAJIB supabaseSelectAll: katalog 9.138 baris, dan PostgREST
+     * memotong respons di 1.000 baris apa pun limit-nya. Terpotongnya
+     * query ini membuat statistik scan salah (ribuan "baru" padahal
+     * hanya beda kolom) DAN loop penandaan nonaktif di bawah hanya
+     * menjangkau 1.000 baris pertama - item di luar itu yang sudah
+     * dihapus supplier tidak pernah ditandai mati.
      */
-    const lama = await supabaseSelect<{
+    const lama = await supabaseSelectAll<{
       supplier_sku: string;
       supplier_cost: number | string;
       buyer_active: boolean;
     }>("supplier_catalog_items", {
       select: "supplier_sku,supplier_cost,buyer_active",
       filters: { supplier_id: "eq.melostore" },
-      limit: 20000,
     });
 
     const sebelumnya = new Map(
@@ -423,6 +434,8 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
      * jadi SKU yang "hilang" bisa jadi ada di halaman yang gagal.
      */
     let ditandai = 0;
+    let mappingDipatikan = 0;
+    let mappingDiaktifkan = 0;
     const statusScan: "success" | "partial" =
       hasil.pagesFailed > 0 ? "partial" : "success";
 
@@ -442,6 +455,83 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
         );
         ditandai += 1;
       }
+
+      /*
+       * SINKRONISASI HIDUP-MATI MAPPING (audit T2).
+       *
+       * Baris `supplier_products` adalah yang dibaca etalase dan
+       * dispatch - kalau SKU-nya sudah dihapus/dijeda Melostore tapi
+       * mapping tetap active=true, produk tetap tampil dan gagal
+       * SETELAH pembeli membayar. Scan katalog hanya menandai item
+       * cache; sebelum blok ini, mapping tidak pernah mengikutinya
+       * (terbukti: mapping rgciid100800io-s7 bertahan aktif pada SKU
+       * yang sudah nonaktif).
+       *
+       * Cermin perilaku sync Digiflazz (mapping.active =
+       * skuAvailable): SKU aktif -> mapping aktif; SKU hilang/dijeda
+       * -> mapping mati. Tidak ada jalur admin yang menonaktifkan
+       * mapping Melostore secara manual (yang ada hanya hapus), jadi
+       * pengaktifan kembali tidak pernah menimpa keputusan operator.
+       *
+       * Hanya saat sukses penuh - dasarnya adalah himpunan SKU lengkap
+       * dari scan, dan scan parsial tidak bisa membedakan "hilang"
+       * dari "ada di halaman yang gagal".
+       */
+      const skuAktif = new Set(
+        hasil.items
+          .filter((item) => item.status === "active")
+          .map((item) => item.sku),
+      );
+
+      const mappings = await supabaseSelectAll<{
+        product_id: string;
+        supplier_sku: string | null;
+        active: boolean;
+      }>("supplier_products", {
+        select: "product_id,supplier_sku,active",
+        filters: { supplier_id: "eq.melostore" },
+      });
+
+      const patikan: string[] = [];
+      const aktifkan: string[] = [];
+      for (const mapping of mappings) {
+        const sku = mapping.supplier_sku?.trim();
+        if (!sku) continue;
+        const seharusnyaAktif = skuAktif.has(sku);
+        if (seharusnyaAktif && !mapping.active) aktifkan.push(sku);
+        else if (!seharusnyaAktif && mapping.active) patikan.push(sku);
+      }
+
+      const UKURAN_FILTER = 100;
+      const filterIn = (skus: string[]) =>
+        `in.(${skus.map((s) => `"${s}"`).join(",")})`;
+
+      for (let i = 0; i < patikan.length; i += UKURAN_FILTER) {
+        await supabaseUpdate(
+          "supplier_products",
+          { active: false, last_synced_at: now, updated_at: now },
+          {
+            filters: {
+              supplier_id: "eq.melostore",
+              supplier_sku: filterIn(patikan.slice(i, i + UKURAN_FILTER)),
+            },
+          },
+        );
+      }
+      for (let i = 0; i < aktifkan.length; i += UKURAN_FILTER) {
+        await supabaseUpdate(
+          "supplier_products",
+          { active: true, last_synced_at: now, updated_at: now },
+          {
+            filters: {
+              supplier_id: "eq.melostore",
+              supplier_sku: filterIn(aktifkan.slice(i, i + UKURAN_FILTER)),
+            },
+          },
+        );
+      }
+      mappingDipatikan = patikan.length;
+      mappingDiaktifkan = aktifkan.length;
     }
 
     await tutupScanRun(
@@ -472,13 +562,19 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       unchanged: sama,
       inactive: ditandai,
       forms: formTersimpan,
+      mappingsDeactivated: mappingDipatikan,
+      mappingsActivated: mappingDiaktifkan,
       message:
         (statusScan === "partial"
           ? `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
           : "") +
         `${baris.length} SKU, ${baru} baru, ${berubah} diperbarui` +
         (statusScan === "success" ? `, ${ditandai} ditandai nonaktif.` : ".") +
-        (formTersimpan > 0 ? ` ${formTersimpan} form input tersimpan.` : ""),
+        (formTersimpan > 0 ? ` ${formTersimpan} form input tersimpan.` : "") +
+        (statusScan === "success" &&
+        mappingDipatikan + mappingDiaktifkan > 0
+          ? ` Mapping: ${mappingDipatikan} dipatikan, ${mappingDiaktifkan} diaktifkan kembali.`
+          : ""),
     });
   } catch (error) {
     const pesan = error instanceof Error ? error.message : "galat tidak diketahui";

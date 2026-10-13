@@ -187,7 +187,13 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const auth = authorizeAdminRequest(request);
+  /*
+   * superadminOnly - sama dengan bulk DELETE /catalog/unmapped.
+   * Penghapusan permanen adalah aksi tertinggi di katalog; membuat
+   * versi per-produknya lebih longgar dari versi massalnya hanya
+   * menyediakan pintu bypass yang tidak disengaja.
+   */
+  const auth = authorizeAdminRequest(request, { superadminOnly: true });
   if (!auth.ok) return auth.response;
 
   const { id } = await context.params;
