@@ -7,7 +7,7 @@ import {
   sortNominalItems,
 } from "../src/lib/nominal-sort.ts";
 
-test("extractNominalAmount: A + B = jumlah, titik = ribuan", () => {
+test("extractNominalAmount: A + B = jumlah, max bila tanpa plus, titik = ribuan", () => {
   assert.equal(extractNominalAmount("86 Diamonds"), 86);
   assert.equal(extractNominalAmount("5 Diamond"), 5);
   assert.equal(extractNominalAmount("60 UC"), 60);
@@ -21,6 +21,20 @@ test("extractNominalAmount: A + B = jumlah, titik = ribuan", () => {
   assert.equal(extractNominalAmount("Steam Wallet Code Rp 100.000"), 100000);
   assert.equal(extractNominalAmount("Weekly Diamond Pass"), null);
   assert.equal(extractNominalAmount("Blessing of the Welkin Moon"), null);
+});
+
+test("extractNominalAmount: max semua angka, bukan yang pertama", () => {
+  /*
+   * Nama game dengan angka (AU2) adalah kebisingan, bukan nominal.
+   * "AU2 60 Diamonds": "2" dari AU2 < "60" yang sebenarnya.
+   * Tanpa max, semua produk AU2 menggerombol di posisi 2.
+   */
+  assert.equal(extractNominalAmount("AU2 60 Diamonds"), 60);
+  assert.equal(extractNominalAmount("AU2 120 Diamonds"), 120);
+  assert.equal(extractNominalAmount("AU2 1.300 Diamonds"), 1300);
+  // Pengali "2x" bukan nominal - 50 adalah.
+  assert.equal(extractNominalAmount("2x 50 Diamonds"), 50);
+  assert.equal(extractNominalAmount("3x 100 Lattices"), 100);
 });
 
 test("sortNominalItems: jumlah kecil di atas, tanpa jumlah di belakang by harga", () => {

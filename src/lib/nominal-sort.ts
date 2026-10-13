@@ -26,11 +26,22 @@ export type NominalSortable = {
  * di SKU code (mlus44d), dan pembeli berpikir dalam total yang
  * diterima.
  *
- * Tanpa "+": angka pertama (perilaku lama).
+ * Tanpa "+": ANGKA TERBESAR, bukan yang pertama.
+ *
+ * "AU2 60 Diamonds" - "2" dari nama game AU2 adalah kebisingan,
+ * bukan nominal. Mengambil angka pertama (2) membuat semua produk
+ * AU2 menggerombol di posisi 2. Yang mengidentifikasi produk adalah
+ * 60, dan itu angka TERBESAR di label. Sama dengan aturan
+ * `nominalFromLabel` untuk SKU internal - dua fungsi ini harus
+ * setuju, kalau tidak, urutan di layar tidak sama dengan identitas.
  */
 export function extractNominalAmount(label: string): number | null {
   const bersih = label.replace(/(?<=\d)\.(?=\d{3}\b)/g, "");
 
+  /*
+   * Cari "A + B" - angka dipisah tanda plus, spasi opsional.
+   * Hanya pasangan PERTAMA yang diambil.
+   */
   const plus = bersih.match(/(\d[\d,]*)\s*\+\s*(\d[\d,]*)/);
   if (plus) {
     const a = Number(plus[1]!.replace(/,/g, ""));
@@ -40,10 +51,19 @@ export function extractNominalAmount(label: string): number | null {
     }
   }
 
-  const match = bersih.match(/\d{1,3}(?:\.\d{3})+|\d+/);
-  if (!match) return null;
-  const value = Number(match[0].replace(/\./g, "").replace(/,/g, ""));
-  return Number.isFinite(value) ? value : null;
+  /*
+   * ANGKA TERBESAR dari SEMUA angka di label.
+   *
+   * Bukan yang pertama: "AU2 60 Diamonds" punya "2" dari nama game,
+   * dan mengambil itu membuat semua produk AU2 sort di posisi 2.
+   * "2x 50 Diamonds" juga - pengali 2 bukan nominalnya.
+   */
+  const angka = [...bersih.matchAll(/\d[\d,]*/g)]
+    .map((m) => Number(m[0].replace(/,/g, "")))
+    .filter((n) => Number.isFinite(n));
+
+  if (angka.length === 0) return null;
+  return Math.max(...angka);
 }
 
 export function compareNominalItems<T extends NominalSortable>(a: T, b: T) {
