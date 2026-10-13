@@ -68,6 +68,21 @@ export type MerchantPaymentRow = {
   created_at: string;
 };
 
+/**
+ * Pencairan komisi afiliasi yang sudah LUNAS.
+ *
+ * Titik hitung `paid_at` - saat transfer benar-benar dikirim dan
+ * reference-nya dicatat. Bukan `processed_at` (ACC): uang yang sudah
+ * disetujui tapi belum ditransfer masih ada di rekening Lacte, dan
+ * menghitungnya sebagai keluar membuat saldo laporan lebih kecil dari
+ * kenyataan.
+ */
+export type AffiliateWithdrawalRow = {
+  id: number;
+  amount: number | string;
+  paid_at: string;
+};
+
 /** Satu titik harian pada grafik. */
 export type CashFlowDay = {
   /** `YYYY-MM-DD` dalam UTC. */
@@ -82,6 +97,8 @@ export type CashFlowDay = {
   profit: number;
   /** Uang masuk dari transfer merchant pada hari itu. */
   merchantSettled: number;
+  /** Uang keluar pencairan afiliasi (lunas) pada hari itu. */
+  affiliatePaidOut: number;
 };
 
 export type CashFlowTotals = {
@@ -121,6 +138,16 @@ export type CashFlowTotals = {
   /** Sisa piutang merchant yang belum dibayar. */
   merchantOutstanding: number;
   failedOrders: number;
+  /**
+   * Uang keluar: pencairan komisi afiliasi yang LUNAS dalam periode.
+   *
+   * Komisinya sendiri sudah tercatat sebagai pengurang pendapatan
+   * (`affiliateCommission`) saat order sukses; angka ini adalah uang
+   * NYATA yang keluar dari rekening Lacte ke rekening partner.
+   */
+  affiliatePaidOut: number;
+  /** Jumlah pencairan lunas dalam periode. */
+  affiliatePaidCount: number;
 };
 
 export type CashFlowByMethod = {
@@ -137,6 +164,14 @@ export type CashFlowReport = {
   days: CashFlowDay[];
   totals: CashFlowTotals;
   byMethod: CashFlowByMethod[];
+  /**
+   * Pencairan yang sudah di-ACC tapi BELUM ditransfer - angka titik
+   * waktu (bukan dalam rentang), pelengkap info supaya operator tahu
+   * komitmen yang menggantung, bukan uang yang sudah keluar.
+   */
+  affiliateApprovedPending: number;
+  /** Jumlah pencairan yang menunggu transfer (approved, belum lunas). */
+  affiliateApprovedPendingCount: number;
 };
 
 function num(value: unknown) {
@@ -166,11 +201,12 @@ export function dayKey(iso: string) {
 export function buildCashFlowReport(input: {
   orders: CashFlowOrder[];
   merchantPayments?: MerchantPaymentRow[];
+  affiliateWithdrawals?: AffiliateWithdrawalRow[];
   from: Date;
   to: Date;
   now?: number;
 }): CashFlowReport {
-  const { orders, merchantPayments = [], from, to } = input;
+  const { orders, merchantPayments = [], affiliateWithdrawals = [], from, to } = input;
   const fromMs = from.getTime();
   const toMs = to.getTime();
 
@@ -191,6 +227,8 @@ export function buildCashFlowReport(input: {
     merchantSettled: 0,
     merchantOutstanding: 0,
     failedOrders: 0,
+    affiliatePaidOut: 0,
+    affiliatePaidCount: 0,
   };
 
   const withinRange = (iso: string | null) => {
@@ -257,6 +295,7 @@ export function buildCashFlowReport(input: {
         supplierCost: 0,
         profit: 0,
         merchantSettled: 0,
+        affiliatePaidOut: 0,
       };
       /*
        * Grafik harian harus ikut aturan yang sama dengan total. Kalau
@@ -310,8 +349,39 @@ export function buildCashFlowReport(input: {
         supplierCost: 0,
         profit: 0,
         merchantSettled: 0,
+        affiliatePaidOut: 0,
       };
       day.merchantSettled += num(payment.amount);
+      days.set(key, day);
+    }
+  }
+
+  /*
+   * Pencairan afiliasi LUNAS: uang keluar nyata.
+   *
+   * Dibucket per `paid_at` (bukan `requested_at`) karena itu momen
+   * uang meninggalkan rekening. ACC yang belum ditransfer tidak masuk
+   * sini - dia dilaporkan sebagai komitmen yang menggantung lewat
+   * `affiliateApprovedPending`.
+   */
+  for (const withdrawal of affiliateWithdrawals) {
+    if (!withinRange(withdrawal.paid_at)) continue;
+    const amount = num(withdrawal.amount);
+    totals.affiliatePaidOut += amount;
+    totals.affiliatePaidCount += 1;
+
+    const key = dayKey(withdrawal.paid_at);
+    if (key) {
+      const day = days.get(key) ?? {
+        date: key,
+        orders: 0,
+        grossRevenue: 0,
+        supplierCost: 0,
+        profit: 0,
+        merchantSettled: 0,
+        affiliatePaidOut: 0,
+      };
+      day.affiliatePaidOut += amount;
       days.set(key, day);
     }
   }
@@ -340,6 +410,7 @@ export function buildCashFlowReport(input: {
         supplierCost: 0,
         profit: 0,
         merchantSettled: 0,
+        affiliatePaidOut: 0,
       });
     }
     cursor.setTime(cursor.getTime() + DAY_MS);
@@ -353,6 +424,14 @@ export function buildCashFlowReport(input: {
     byMethod: [...methodTotals.values()].sort(
       (left, right) => right.revenue - left.revenue,
     ),
+    /*
+     * Diisi lapisan pengambil data, bukan dihitung di sini: angka
+     * titik waktu (semua pencairan yang sedang approved), tidak
+     * terikat rentang laporan. Nol untuk pemanggil yang tidak
+     * menyediakannya (test modul murni).
+     */
+    affiliateApprovedPending: 0,
+    affiliateApprovedPendingCount: 0,
   };
 }
 
@@ -376,6 +455,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
     "Biaya Supplier",
     "Margin",
     "Transfer Merchant",
+    "Pencairan Afiliasi",
   ];
 
   const escape = (value: string | number) => {
@@ -391,6 +471,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       day.supplierCost,
       day.profit,
       day.merchantSettled,
+      day.affiliatePaidOut,
     ]
       .map(escape)
       .join(","),
@@ -406,6 +487,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       totals.supplierCost,
       totals.grossProfit,
       totals.merchantSettled,
+      totals.affiliatePaidOut,
     ]
       .map(escape)
       .join(","),

@@ -430,6 +430,7 @@ type CashFlowPayload = {
     supplierCost: number;
     profit: number;
     merchantSettled: number;
+    affiliatePaidOut: number;
   }>;
   totals: {
     orders: number;
@@ -445,6 +446,8 @@ type CashFlowPayload = {
     merchantSettled: number;
     merchantOutstanding: number;
     failedOrders: number;
+    affiliatePaidOut: number;
+    affiliatePaidCount: number;
   };
   byMethod: Array<{
     paymentMethodId: string;
@@ -453,6 +456,9 @@ type CashFlowPayload = {
     supplierCost: number;
     profit: number;
   }>;
+  /** Pencairan di-ACC tapi belum ditransfer - angka titik waktu. */
+  affiliateApprovedPending: number;
+  affiliateApprovedPendingCount: number;
 };
 
 /**
@@ -479,6 +485,8 @@ type TransactionReportPayload = {
     profit: number;
     marginPercent: number;
     excludedCount: number;
+    merchantUnpaidCount: number;
+    merchantUnpaidRevenue: number;
   };
   rows: Array<{
     id: string;
@@ -495,6 +503,7 @@ type TransactionReportPayload = {
     merchant_id: string | null;
     service_fee_amount: number | null;
     target_user_id: string | null;
+    receivable_paid_at: string | null;
   }>;
 };
 
@@ -5178,6 +5187,57 @@ const txDataStamp = txRange.preset
                     </div>
 
                     {/*
+                     * Uang keluar nyata dari rekening Lacte.
+                     *
+                     * Komisi afiliasi di kartu "Pengurang pendapatan"
+                     * adalah BEBAN yang sudah terjadi saat order sukses;
+                     * karti ini adalah uang yang benar-benar
+                     * MINDAH ke rekening partner - dicatat saat
+                     * pencairan ditandai lunas, bukan saat di-ACC,
+                     * karena ACC yang belum ditransfer masih uang
+                     * Lacte.
+                     */}
+                    <div className="acc-table-card">
+                      <div className="acc-card-head">
+                        <span>Uang keluar</span>
+                        <small className="acc-card-head-note">
+                          transfer ke partner
+                        </small>
+                      </div>
+                      <div className="acc-cost-list">
+                        <div>
+                          <span>
+                            Pencairan komisi afiliasi (
+                            {cashFlowData.totals.affiliatePaidCount} lunas)
+                          </span>
+                          <strong>
+                            {formatIDR(cashFlowData.totals.affiliatePaidOut)}
+                          </strong>
+                        </div>
+                        {cashFlowData.affiliateApprovedPending > 0 ? (
+                          <div>
+                            <span>
+                              Di-ACC, belum ditransfer (
+                              {cashFlowData.affiliateApprovedPendingCount}
+                              pencairan) - belum keluar
+                            </span>
+                            <strong>
+                              {formatIDR(
+                                cashFlowData.affiliateApprovedPending,
+                              )}
+                            </strong>
+                          </div>
+                        ) : null}
+                        <div className="acc-cost-total">
+                          <span>Total keluar periode ini</span>
+                          <strong>
+                            {formatIDR(cashFlowData.totals.affiliatePaidOut)}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/*
                      * Piutang toko ritel.
                      *
                      * Dulu ini kotak kecil di bawah "Rincian biaya",
@@ -5389,9 +5449,11 @@ const txDataStamp = txRange.preset
                       <small>Transaksi</small>
                       <strong>{txReport.summary.count}</strong>
                       <span>
-                        {txReport.summary.excludedCount > 0
-                          ? `${txReport.summary.excludedCount} tidak dihitung`
-                          : "Semua selesai"}
+                        {txReport.summary.merchantUnpaidCount > 0
+                          ? `${txReport.summary.merchantUnpaidCount} ritel belum dibayar`
+                          : txReport.summary.excludedCount > 0
+                            ? `${txReport.summary.excludedCount} tidak dihitung`
+                            : "Semua selesai"}
                       </span>
                     </article>
                     <article>
@@ -5400,9 +5462,11 @@ const txDataStamp = txRange.preset
                         {formatIDR(txReport.summary.grossRevenue)}
                       </strong>
                       <span>
-                        {txReport.summary.merchantServiceFee > 0
-                          ? `sudah dikurangi biaya layanan merchant ${formatIDR(txReport.summary.merchantServiceFee)}`
-                          : "harga final dikurangi biaya layanan merchant"}
+                        {txReport.summary.merchantUnpaidRevenue > 0
+                          ? `${formatIDR(txReport.summary.merchantUnpaidRevenue)} ritel menunggu transfer merchant - belum dihitung`
+                          : txReport.summary.merchantServiceFee > 0
+                            ? `sudah dikurangi biaya layanan merchant ${formatIDR(txReport.summary.merchantServiceFee)}`
+                            : "harga final dikurangi biaya layanan merchant"}
                       </span>
                     </article>
                     <article>
@@ -5449,6 +5513,16 @@ const txDataStamp = txRange.preset
                                 <strong>{row.id}</strong>
                                 <br />
                                 <small>{row.status}</small>
+                                {row.merchant_id &&
+                                row.status === "success" &&
+                                !row.receivable_paid_at ? (
+                                  <small
+                                    className="admin-supplier-warning"
+                                    title="Uang order ini masih di merchant - masuk omzet setelah transfer dilunasi"
+                                  >
+                                    Piutang
+                                  </small>
+                                ) : null}
                               </td>
                               <td data-label="Waktu">
                                 {formatTime(row.created_at)}

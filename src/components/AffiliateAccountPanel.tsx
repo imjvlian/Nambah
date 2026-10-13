@@ -12,6 +12,8 @@ type AffiliateData = {
     commissionRate: number;
     status: string;
     pending: number;
+    /** Komisi sudah jadi, tapi masih dalam masa tunggu 3 hari. */
+    maturing: number;
     available: number;
     reserved: number;
     withdrawn: number;
@@ -192,11 +194,15 @@ export default function AffiliateAccountPanel() {
 
       <div className="account-points-stats">
         <article>
-          <small>Menunggu</small>
+          <small>Menunggu order</small>
           <strong>{formatIDR(affiliate.pending)}</strong>
         </article>
+        <article title="Komisi sudah jadi, tapi baru bisa dicairkan 3 hari setelah order sukses.">
+          <small>Masa tunggu 3 hari</small>
+          <strong>{formatIDR(affiliate.maturing ?? 0)}</strong>
+        </article>
         <article>
-          <small>Tersedia</small>
+          <small>Bisa dicairkan</small>
           <strong>{formatIDR(affiliate.available)}</strong>
         </article>
         <article>
@@ -208,6 +214,13 @@ export default function AffiliateAccountPanel() {
           <strong>{formatIDR(affiliate.withdrawn)}</strong>
         </article>
       </div>
+
+      {affiliate.maturing > 0 ? (
+        <p className="account-affiliate-link-warning">
+          Komisi baru bisa dicairkan 3 hari setelah order sukses -
+          {formatIDR(affiliate.maturing)} sedang dalam masa tunggu itu.
+        </p>
+      ) : null}
 
       <div className="account-profile-form">
         <label>

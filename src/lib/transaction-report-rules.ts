@@ -71,6 +71,15 @@ export type TransactionRow = {
   merchant_id: string | null;
   service_fee_amount: number | string | null;
   target_user_id: string | null;
+  /**
+   * Kapan piutang merchant untuk order ini LUNAS.
+   *
+   * Null = uangnya belum pernah diterima Lacte (order ritel yang
+   * transfer merchant-nya belum menutupnya lewat FIFO). Order ritel
+   * begini TIDAK masuk omzet - menghitung piutang sebagai omzet sama
+   * sahnya dengan menghitung uang yang belum pernah bergerak.
+   */
+  receivable_paid_at: string | null;
 };
 
 export type TransactionFilters = {
@@ -89,6 +98,11 @@ export type TransactionSummary = {
    *
    * Bukan `final_price` mentah - lihat catatan definisi harga di atas
    * file ini.
+   *
+   * ORDER RITEL HANYA DIHITUNG SETELAH PIUTANGNYA LUNAS
+   * (`receivable_paid_at` terisi). Sebelum itu, uangnya masih di tangan
+   * merchant - omzetnya belum pernah sampai ke Lacte, dan menulisnya
+   * sebagai omzet membuat laporan mengaku punya uang yang belum diterima.
    */
   grossRevenue: number;
   /**
@@ -104,6 +118,17 @@ export type TransactionSummary = {
   marginPercent: number;
   /** Order yang tidak `success` dan tidak ikut dihitung sebagai pendapatan. */
   excludedCount: number;
+  /** Order ritel sukses yang piutangnya BELUM dibayar merchant. */
+  merchantUnpaidCount: number;
+  /**
+   * Nominal ritel yang menunggu pembayaran merchant.
+   *
+   * `final_price - service_fee` dari order-order di
+   * `merchantUnpaidCount` - angka yang kelak masuk omzet begitu
+   * merchant mentransfer, supaya operator tahu apa yang "hilang"
+   * dari omzet bulan ini bukan lenyap, hanya tertunda.
+   */
+  merchantUnpaidRevenue: number;
 };
 
 export type TransactionReport = {
@@ -192,6 +217,8 @@ export function summarizeTransactions(
   let supplierCost = 0;
   let profit = 0;
   let excludedCount = 0;
+  let merchantUnpaidCount = 0;
+  let merchantUnpaidRevenue = 0;
 
   for (const row of rows) {
     if (row.status !== "success") {
@@ -201,6 +228,31 @@ export function summarizeTransactions(
 
     const finalPrice = num(row.final_price);
     const serviceFee = num(row.service_fee_amount);
+
+    /*
+     * MODAL SUPPLIER DIHITUNG UNTUK SEMUA order sukses, ritel atau
+     * bukan. Barangnya sudah dikirim supplier dan uangnya keluar dari
+     * saldo supplier saat itu - menunggu merchant mentransfer tidak
+     * membuat biayanya belum keluar. Ini aturan yang sama dengan
+     * laporan arus kas.
+     */
+    supplierCost += num(row.supplier_cost);
+
+    /*
+     * ORDER RITEL YANG PIUTANGNYA BELUM DIBAYAR: uangnya masih di
+     * tangan merchant. Bukan omzet hari ini - masuk
+     * `merchantUnpaidRevenue` supaya operator melihat angka yang
+     * tertunda, bukan hilang.
+     *
+     * Yang SUDAH dibayar (`receivable_paid_at` terisi lewat alokasi
+     * FIFO saat transfer dicatat) dihitung normal seperti order
+     * non-ritel.
+     */
+    if (row.merchant_id && !row.receivable_paid_at) {
+      merchantUnpaidCount += 1;
+      merchantUnpaidRevenue += Math.max(0, finalPrice - serviceFee);
+      continue;
+    }
 
     merchantServiceFee += serviceFee;
 
@@ -212,7 +264,6 @@ export function summarizeTransactions(
      * terlihat, dan fee-nya tetap ikut dijumlahkan di atas.
      */
     grossRevenue += Math.max(0, finalPrice - serviceFee);
-    supplierCost += num(row.supplier_cost);
     profit += num(row.nambah_profit);
   }
 
@@ -225,6 +276,8 @@ export function summarizeTransactions(
     marginPercent:
       grossRevenue > 0 ? Math.round((profit / grossRevenue) * 10000) / 100 : 0,
     excludedCount,
+    merchantUnpaidCount,
+    merchantUnpaidRevenue,
   };
 }
 
@@ -300,6 +353,7 @@ export function transactionsToCsv(
     "Harga Jual",
     "Harga Final",
     "Biaya Layanan Merchant",
+    "Lunas Merchant",
     "Omzet Lacte",
     "Harga Supplier",
     "Margin Lacte",
@@ -313,8 +367,19 @@ export function transactionsToCsv(
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
 
-  const body = rows.map((row) =>
-    [
+  /*
+   * Omzet dan margin per baris mengikuti ATURAN RINGKASAN, bukan data
+   * mentah: order ritel yang piutangnya belum dibayar ditulis 0. Tanpa
+   * ini, menjumlahkan kolom "Omzet Lacte" di Excel tidak akan sama
+   * dengan baris TOTAL - dan selisihnya tidak menjelaskan dirinya.
+   * Kolom "Lunas Merchant" menandai kenapa: tanggal pelunasan, atau
+   * kosong untuk piutang yang masih menggantung.
+   */
+  const body = rows.map((row) => {
+    const unpaidRetail =
+      row.status === "success" && row.merchant_id && !row.receivable_paid_at;
+
+    return [
       row.id,
       row.created_at,
       row.status,
@@ -326,16 +391,23 @@ export function transactionsToCsv(
       num(row.selling_price),
       num(row.final_price),
       num(row.service_fee_amount),
-      Math.max(0, num(row.final_price) - num(row.service_fee_amount)),
+      row.receivable_paid_at
+        ? row.receivable_paid_at.slice(0, 10)
+        : row.merchant_id
+          ? "belum"
+          : "-",
+      unpaidRetail
+        ? 0
+        : Math.max(0, num(row.final_price) - num(row.service_fee_amount)),
       num(row.supplier_cost),
-      num(row.nambah_profit),
+      unpaidRetail ? 0 : num(row.nambah_profit),
       num(row.promotion_discount),
       num(row.affiliate_commission),
       num(row.points_discount),
     ]
       .map(escape)
-      .join(","),
-  );
+      .join(",");
+  });
 
   const lines = [header.map(escape).join(","), ...body];
 
@@ -350,7 +422,7 @@ export function transactionsToCsv(
      */
     lines.push("");
     lines.push(
-      ["TOTAL", "", "", "", "", "", "", "", "", "", "", ""].join(","),
+      ["TOTAL", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].join(","),
     );
     lines.push(["", "", "Omzet Lacte", summary.grossRevenue].join(","));
     lines.push(
@@ -359,6 +431,16 @@ export function transactionsToCsv(
     lines.push(["", "", "Harga Supplier", summary.supplierCost].join(","));
     lines.push(["", "", "Margin Lacte", summary.profit].join(","));
     lines.push(["", "", "Margin (%)", summary.marginPercent].join(","));
+    if (summary.merchantUnpaidCount > 0) {
+      lines.push(
+        [
+          "",
+          "",
+          `Ritel belum dibayar (${summary.merchantUnpaidCount} order)`,
+          summary.merchantUnpaidRevenue,
+        ].join(","),
+      );
+    }
   }
 
   return `\uFEFF${lines.join("\r\n")}\r\n`;

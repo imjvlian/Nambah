@@ -43,6 +43,8 @@ type WithdrawalPayload = {
 
 type AffiliateStats = {
   available: number;
+  /** Komisi sudah jadi, masih dalam masa tunggu 3 hari. */
+  maturing: number;
   reserved: number;
   withdrawn: number;
 };
@@ -86,6 +88,7 @@ export default function AffiliateAdminPanel() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
   const [stats, setStats] = useState<AffiliateStats>({
     available: 0,
+    maturing: 0,
     reserved: 0,
     withdrawn: 0,
   });
@@ -142,6 +145,7 @@ export default function AffiliateAdminPanel() {
     setWithdrawals(withdrawalData.withdrawals ?? []);
     setStats({
       available: affiliateData.stats?.available ?? 0,
+      maturing: affiliateData.stats?.maturing ?? 0,
       reserved: affiliateData.stats?.reserved ?? 0,
       withdrawn: affiliateData.stats?.withdrawn ?? 0,
     });
@@ -287,21 +291,27 @@ export default function AffiliateAdminPanel() {
             angka "superadmin" di antara nominal rupiah membuat orang salah
             baca.
           */}
+          {/*
+            Empat angka. "Masa tunggu 3 hari" wajib tampil di sini:
+            kalau hanya "Siap dicairkan" yang terlihat, komisi yang
+            sedang menunggu terkesan hilang - padahal dia akan masuk
+            otomatis begitu lewat 3 hari sejak order sukses.
+          */}
           <div className="acc-metrics acc-metrics-three">
             <article>
               <small>Siap dicairkan</small>
               <strong>{formatIDR(stats.available)}</strong>
-              <span>belum dialokasikan ke request</span>
+              <span>lewat masa 3 hari, belum dialokasikan</span>
+            </article>
+            <article>
+              <small>Masa tunggu 3 hari</small>
+              <strong>{formatIDR(stats.maturing ?? 0)}</strong>
+              <span>komisi baru, belum bisa dicairkan</span>
             </article>
             <article>
               <small>Sedang diproses</small>
               <strong>{formatIDR(stats.reserved)}</strong>
               <span>{activeCount} request aktif</span>
-            </article>
-            <article>
-              <small>Sudah dibayar</small>
-              <strong>{formatIDR(stats.withdrawn)}</strong>
-              <span>pencairan selesai</span>
             </article>
           </div>
 

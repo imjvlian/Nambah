@@ -138,20 +138,39 @@ export async function GET(request: Request) {
       }
     }
 
+    /*
+     * ATURAN MASA 3 HARI - sama dengan dua RPC di migrasi 047:
+     * komisi 'available' hanya bisa dicairkan setelah
+     * coalesce(available_at, created_at) <= now - 3 hari.
+     *
+     * Kalau aturan ini tidak ikut, panel admin menampilkan "available"
+     * yang lebih besar dari yang benar-benar bisa dicairkan - dan
+     * operator tidak bisa menjelaskan kenapa permintaan partner
+     * ditolak padahal angkanya kelihatan cukup.
+     */
+    const holdCutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    const commissionMatured = (row: CommissionRow) =>
+      Date.parse(row.available_at ?? row.created_at) <= holdCutoff;
+
     const totals = commissions.reduce(
       (acc, row) => {
         const amount = Number(row.amount);
         if (row.status === "pending") acc.pending += amount;
         if (row.status === "cancelled") acc.cancelled += amount;
         if (row.status === "available") {
-          acc.available += Math.max(
+          const unallocated = Math.max(
             0,
             amount - (allocatedByCommission.get(row.id) ?? 0),
           );
+          if (commissionMatured(row)) {
+            acc.available += unallocated;
+          } else {
+            acc.maturing += unallocated;
+          }
         }
         return acc;
       },
-      { pending: 0, available: 0, cancelled: 0 },
+      { pending: 0, available: 0, maturing: 0, cancelled: 0 },
     );
 
     const withdrawn = withdrawals
@@ -163,6 +182,7 @@ export async function GET(request: Request) {
         affiliates: affiliates.length,
         active: affiliates.filter((row) => row.status === "active").length,
         pending: totals.pending,
+        maturing: totals.maturing,
         available: totals.available,
         reserved,
         withdrawn,

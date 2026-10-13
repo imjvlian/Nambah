@@ -14,6 +14,8 @@ type AffiliateSummary = {
     commissionRate: number | string;
     status: string;
     pending: number | string;
+    /** Komisi sudah jadi tapi belum lewat masa tunggu 3 hari. */
+    maturing: number | string;
     available: number | string;
     reserved: number | string;
     withdrawn: number | string;
@@ -71,6 +73,7 @@ export async function GET(request: Request) {
           ...summary.affiliate,
           commissionRate: Number(summary.affiliate.commissionRate),
           pending: Number(summary.affiliate.pending),
+          maturing: Number(summary.affiliate.maturing ?? 0),
           available: Number(summary.affiliate.available),
           reserved: Number(summary.affiliate.reserved),
           withdrawn: Number(summary.affiliate.withdrawn),

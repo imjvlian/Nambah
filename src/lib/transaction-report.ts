@@ -42,6 +42,7 @@ type OrderRow = Omit<
   game: { name: string | null; short_name: string | null } | null;
   product: { label: string | null } | null;
   payment: { name: string | null } | null;
+  receivable_paid_at: string | null;
 };
 
 /**
@@ -68,6 +69,7 @@ function toTransactionRow(row: OrderRow): TransactionRow {
     service_fee_amount: row.service_fee_amount,
     target_user_id: row.target_user_id,
     payment_id: row.payment_method_id,
+    receivable_paid_at: row.receivable_paid_at,
     gameName: row.game
       ? gameDisplayName(
           row.game_id,
@@ -82,7 +84,7 @@ function toTransactionRow(row: OrderRow): TransactionRow {
 const SELECT_COLUMNS =
   "id,game_id,created_at,status,payment_method_id,reference_price,selling_price,final_price," +
   "supplier_cost,nambah_profit,promotion_discount,affiliate_commission," +
-  "points_discount,merchant_id,service_fee_amount,target_user_id," +
+  "points_discount,merchant_id,service_fee_amount,target_user_id,receivable_paid_at," +
   "game:games(name,short_name),product:products(label),payment:payment_methods(name)";
 
 export type TransactionReportResult = TransactionReport & {

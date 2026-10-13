@@ -316,6 +316,78 @@ test("margin nol tidak menghasilkan NaN", () => {
   assert.equal(report.totals.grossRevenue, 0);
 });
 
+/* ==========================================================================
+   Pencairan komisi afiliasi - uang keluar nyata.
+   ========================================================================== */
+
+test("pencairan LUNAS tercatat sebagai uang keluar di hari paid_at", () => {
+  const report = buildCashFlowReport({
+    orders: [order()],
+    affiliateWithdrawals: [
+      { id: 1, amount: 50_000, paid_at: "2026-10-02T14:00:00.000Z" },
+      { id: 2, amount: 30_000, paid_at: "2026-10-03T09:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.affiliatePaidOut, 80_000);
+  assert.equal(report.totals.affiliatePaidCount, 2);
+  // Bucket harian mengikuti paid_at, bukan tanggal request.
+  const hari2 = report.days.find((d) => d.date === "2026-10-02");
+  const hari3 = report.days.find((d) => d.date === "2026-10-03");
+  assert.equal(hari2?.affiliatePaidOut, 50_000);
+  assert.equal(hari3?.affiliatePaidOut, 30_000);
+});
+
+test("pencairan di luar rentang tidak tercatat", () => {
+  const report = buildCashFlowReport({
+    orders: [],
+    affiliateWithdrawals: [
+      { id: 1, amount: 50_000, paid_at: "2026-09-15T14:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.affiliatePaidOut, 0);
+  assert.equal(report.totals.affiliatePaidCount, 0);
+});
+
+test("kolom omzet tidak tersentuh oleh pencairan", () => {
+  // Pencairan adalah uang keluar, bukan pengurang omzet: komisinya
+  // sudah tercatat di affiliateCommission saat order sukses.
+  const report = buildCashFlowReport({
+    orders: [order()],
+    affiliateWithdrawals: [
+      { id: 1, amount: 50_000, paid_at: "2026-10-02T14:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.grossRevenue, 100_000);
+  assert.equal(report.totals.grossProfit, 20_000);
+});
+
+test("CSV memuat kolom Pencairan Afiliasi di harian dan total", () => {
+  const report = buildCashFlowReport({
+    orders: [order()],
+    affiliateWithdrawals: [
+      { id: 1, amount: 50_000, paid_at: "2026-10-02T14:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const csv = cashFlowReportToCsv(report);
+  assert.ok(csv.includes("Pencairan Afiliasi"));
+  // Baris harian 2026-10-02 membawa 50000 di kolom terakhir.
+  assert.ok(/2026-10-02,1,100000,80000,20000,0,50000/.test(csv));
+  // Baris TOTAL berlabel juga membawanya.
+  assert.ok(/TOTAL,1,100000,80000,20000,0,50000/.test(csv));
+});
+
 test("order tanpa metode pembayaran tidak membuat crash", () => {
   const report = buildCashFlowReport({
     orders: [order({ payment_method_id: null })],

@@ -39,6 +39,7 @@ function row(over: Partial<TransactionRow> = {}): TransactionRow {
     merchant_id: null,
     service_fee_amount: null,
     target_user_id: "user-1",
+    receivable_paid_at: null,
     ...over,
   };
 }
@@ -74,8 +75,9 @@ test("harga katalog, jual, final, dan supplier tidak dicampur", () => {
 
 test("biaya layanan merchant TIDAK masuk ke omzet", () => {
   /*
-   * Order ritel: user bayar 7.100, tapi 2.000 di antaranya adalah biaya
-   * layanan merchant. Lacte hanya menyimpan 5.100 dari angka itu.
+   * Order ritel yang piutangnya SUDAH dibayar merchant: user bayar
+   * 7.100, tapi 2.000 di antaranya adalah biaya layanan merchant.
+   * Lacte hanya menyimpan 5.100 dari angka itu.
    *
    * Versi lama menjumlahkan `final_price`, jadi omzet tertanggi 7.100 -
    * uang yang Lacte terima sambil lalu dan terus zakahkan ke merchant.
@@ -85,12 +87,62 @@ test("biaya layanan merchant TIDAK masuk ke omzet", () => {
       final_price: 7_100,
       service_fee_amount: 2_000,
       merchant_id: "tokoritel",
+      receivable_paid_at: "2026-10-04T08:00:00.000Z",
       nambah_profit: 853,
     }),
   ]);
 
   assert.equal(summary.grossRevenue, 5_100);
   assert.equal(summary.merchantServiceFee, 2_000);
+});
+
+test("ritel yang piutangnya BELUM dibayar tidak masuk omzet", () => {
+  /*
+   * Order ritel yang sama, tapi transfer merchant belum datang.
+   * Omzetnya belum pernah sampai ke Lacte - menghitungnya berarti
+   * mengaku punya uang yang masih di tangan orang lain.
+   */
+  const summary = summarizeTransactions([
+    row({
+      final_price: 7_100,
+      service_fee_amount: 2_000,
+      merchant_id: "tokoritel",
+      receivable_paid_at: null,
+      nambah_profit: 853,
+      supplier_cost: 4_000,
+    }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 0);
+  assert.equal(summary.profit, 0);
+  assert.equal(summary.merchantUnpaidCount, 1);
+  assert.equal(summary.merchantUnpaidRevenue, 5_100);
+  // Modal supplier tetap keluar: barangnya sudah dikirim supplier.
+  assert.equal(summary.supplierCost, 4_000);
+});
+
+test("ritel belum lunas tidak menutup omzet order lain di periode sama", () => {
+  const summary = summarizeTransactions([
+    row({ final_price: 7_100, service_fee_amount: 2_000, merchant_id: "toko" }),
+    row({ final_price: 5_100, service_fee_amount: null }),
+  ]);
+
+  // Hanya order non-ritel yang dihitung; yang ritel masuk daftar tunggu.
+  assert.equal(summary.grossRevenue, 5_100);
+  assert.equal(summary.merchantUnpaidCount, 1);
+  assert.equal(summary.merchantUnpaidRevenue, 5_100);
+});
+
+test("order non-ritel tidak butuh receivable_paid_at", () => {
+  // QRIS/Midtrans: uang masuk langsung lewat gateway - kolom
+  // receivable_paid_at tidak pernah diisi dan tidak boleh
+  // menghalangi omzet.
+  const summary = summarizeTransactions([
+    row({ final_price: 5_100, service_fee_amount: null, merchant_id: null }),
+  ]);
+
+  assert.equal(summary.grossRevenue, 5_100);
+  assert.equal(summary.merchantUnpaidCount, 0);
 });
 
 test("fee tetap dilaporkan terpisah, bukan hanya dikurangi diam-diam", () => {
