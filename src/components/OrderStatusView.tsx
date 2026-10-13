@@ -705,14 +705,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               </span>
             </div>
 
-            /*
-             * QR + kode pindai kasir.
-             *
-             * HANYA untuk order ritel yang masih menunggu scan. Setelah
-             * kasir memindai, kode ini tidak berguna lagi - dan menampilkannya
-             * lagi bisa membuat pelanggan atau kasir mencoba memindai order
-             * yang sudah jalan, lalu bingung kenapa ditolak.
-             */
+            {/* QR + kode pindai kasir. Hanya untuk order ritel yang masih
+                menunggu scan; kode ditutup setelah kasir memindai. */}
             {order?.merchantScanCode &&
             payment.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID &&
             liveStatus === "pending_merchant" ? (

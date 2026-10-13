@@ -1293,7 +1293,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       Best Deals
                       <span className="nominal-section-spark" aria-hidden="true">✦</span>
                     </strong>
-                    <small>Lima nominal dengan margin rupiah tertinggi untuk {selectedGame.name}.</small>
+                    <small>Nominal unggulan dan paling dicari untuk {selectedGame.name}.</small>
                   </div>
                   <span>{bestDealItems.length} pilihan</span>
                 </div>

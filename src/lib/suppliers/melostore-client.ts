@@ -709,10 +709,18 @@ export class MelostoreSupplierClient implements SupplierClient {
     const { webhookSecret } = getConfig();
     if (!webhookSecret || !signatureHeader) return false;
 
+    /*
+     * Menerima bentuk yang umum dipakai gateway/operator. Beberapa
+     * pengirim menyertakan awalan `sha256=` (mirip webhook GitHub) atau
+     * membatasi nilainya dengan spasi. Menghapus awalan dulu supaya
+     * perbandingan panjang tetap konsisten dengan hex hasil HMAC.
+     */
+    const actual = signatureHeader.trim().replace(/^sha256\s*[:=]\s*/i, "");
+    if (!actual) return false;
+
     const expected = createHmac("sha256", webhookSecret)
       .update(rawBody)
       .digest("hex");
-    const actual = signatureHeader.trim();
 
     const expectedBuffer = Buffer.from(expected, "utf8");
     const actualBuffer = Buffer.from(actual, "utf8");

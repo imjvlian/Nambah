@@ -37,9 +37,25 @@ const client = new MelostoreSupplierClient();
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
-  const signature = request.headers.get("x-h2h-signature");
+  /*
+   * Beberapa penyedia callback bisa menamai header signature secara
+   * berbeda. Uji seluruh kandidat sebelum menolak, tetapi kumpulkan
+   * hanya nilainya, bukan kuncinya, supaya log ringan dan aman.
+   */
+  const signature =
+    request.headers.get("x-h2h-signature") ??
+    request.headers.get("x-h2h-signature-256") ??
+    request.headers.get("x-hub-signature-256") ??
+    request.headers.get("x-signature");
 
-  if (!client.verifyWebhook(rawBody, signature)) {
+  const validSignature = client.verifyWebhook(rawBody, signature);
+  if (!validSignature) {
+    console.error("Webhook Melostore: tanda tangan tidak valid", {
+      hasSignature: Boolean(signature),
+      signatureLength: signature?.trim().length ?? 0,
+      contentType: request.headers.get("content-type"),
+      userAgent: request.headers.get("user-agent"),
+    });
     return Response.json(
       { error: "Tanda tangan webhook tidak valid." },
       { status: 401 },
