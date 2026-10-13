@@ -24,6 +24,15 @@ type GameRow = {
 
 type CleanupBody = {
   dryRun?: boolean;
+  /**
+   * Sekalian nonaktifkan produk AKTIF yang tidak punya mapping aktif
+   * dari supplier mana pun (SKU-nya mati di semua supplier).
+   *
+   * Tanpa flag ini produk begitu hanya dilaporkan - perilaku lama.
+   * Dua langkah disengaja: lihat daftarnya (preview) dulu, baru
+   * putuskan menyembunyikan.
+   */
+  includeUnavailable?: boolean;
 };
 
 function chunk<T>(items: T[], size: number) {
@@ -47,6 +56,7 @@ export async function POST(request: Request) {
   }
 
   const dryRun = body.dryRun !== false;
+  const includeUnavailable = body.includeUnavailable === true;
 
   try {
     // products & supplier_products melewati 1000 baris. Kalau dipotong, produk
@@ -59,7 +69,7 @@ export async function POST(request: Request) {
       }),
       supabaseSelectAll<SupplierProductRow>("supplier_products", {
         select: "product_id,supplier_sku,active",
-        filters: { supplier_id: "eq.digiflazz" },
+        filters: { supplier_id: "in.(digiflazz,melostore)" },
       }),
       supabaseSelectAll<GameRow>("games", {
         select: "id,name,active",
@@ -67,26 +77,32 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    // Produk dianggap "punya" kalau ada mapping Digiflazz dengan SKU terisi.
+    // Mapping dari KEDUA supplier - produk Melostore-saja adalah sah, bukan orphan.
     const mappedProductIds = new Set(
       supplierProducts
         .filter((row) => Boolean(row.supplier_sku?.trim()))
         .map((row) => row.product_id),
     );
-    // Mapping ada tapi SKU-nya tidak aktif di Digiflazz (habis stok / dihapus).
-    const inactiveMappingProductIds = new Set(
+    // Punya mapping aktif dari supplier mana pun = masih bisa dibeli.
+    const activeMappingProductIds = new Set(
       supplierProducts
-        .filter((row) => Boolean(row.supplier_sku?.trim()) && row.active === false)
+        .filter((row) => Boolean(row.supplier_sku?.trim()) && row.active === true)
         .map((row) => row.product_id),
     );
 
     const orphanProducts = products.filter((product) => !mappedProductIds.has(product.id));
     const activeOrphans = orphanProducts.filter((product) => product.active);
-    // Sudah ter-mapping tapi SKU-nya mati: produknya sah, hanya sementara
-    // tidak bisa dibeli. Tidak dinonaktifkan, tapi dilaporkan supaya terlihat.
-    const unavailableProducts = products.filter((product) =>
-      inactiveMappingProductIds.has(product.id),
+    /*
+     * "Mati": terpetakan, tapi SEMUA mapping-nya nonaktif - SKU-nya
+     * sudah dihapus/dijeda di semua supplier. Etalase sudah
+     * menyembunyikannya; di panel admin barisnya masih "aktif" dan
+     * menutupi produk yang benar-benar hidup.
+     */
+    const unavailableProducts = products.filter(
+      (product) =>
+        mappedProductIds.has(product.id) && !activeMappingProductIds.has(product.id),
     );
+    const activeUnavailable = unavailableProducts.filter((product) => product.active);
     const activeMappedByGame = new Set(
       products
         .filter((product) => product.active && mappedProductIds.has(product.id))
@@ -111,6 +127,26 @@ export async function POST(request: Request) {
         );
       }
 
+      /*
+       * Nonaktifkan produk mati - hanya saat diminta sengaja
+       * (includeUnavailable). Reversibel: kalau SKU supplier hidup
+       * kembali, sinkron Digiflazz maupun sinkron mapping Melostore
+       * mengaktifkan ulang produk itu otomatis.
+       */
+      if (includeUnavailable) {
+        for (const batch of chunk(activeUnavailable, 25)) {
+          await Promise.all(
+            batch.map((product) =>
+              supabaseUpdate(
+                "products",
+                { active: false, updated_at: now },
+                { filters: { id: `eq.${product.id}` } },
+              ),
+            ),
+          );
+        }
+      }
+
       for (const batch of chunk(gamesToDisable, 25)) {
         await Promise.all(
           batch.map((game) =>
@@ -132,6 +168,9 @@ export async function POST(request: Request) {
         alreadyHidden: orphanProducts.length - activeOrphans.length,
         gamesToDisable: gamesToDisable.length,
         unavailableProducts: unavailableProducts.length,
+        activeUnavailable: activeUnavailable.length,
+        unavailableDeactivated:
+          !dryRun && includeUnavailable ? activeUnavailable.length : 0,
       },
       preview: {
         products: orphanProducts.slice(0, 20).map((product) => ({
@@ -144,6 +183,7 @@ export async function POST(request: Request) {
           id: product.id,
           gameId: product.game_id,
           label: product.label,
+          active: product.active,
         })),
         games: gamesToDisable.slice(0, 20).map((game) => ({
           id: game.id,

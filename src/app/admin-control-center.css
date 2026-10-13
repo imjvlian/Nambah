@@ -2969,14 +2969,6 @@
    Kontrol periode memakai tombol segmented, bukan `<select>`: hanya
    empat pilihan, dan periode aktif harus terlihat tanpa membuka daftar.
    =================================================================== */
-.acc-cashflow-controls {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
 .acc-segmented {
   display: inline-flex;
   gap: 4px;
@@ -3007,11 +2999,6 @@
   background: rgba(201, 255, 63, 0.12);
   border-color: rgba(201, 255, 63, 0.28);
   color: var(--text);
-}
-
-.acc-cashflow-range {
-  color: var(--muted);
-  font-size: 11px;
 }
 
 /* Grafik batang. Baris batang memakai `align-items: flex-end` supaya
@@ -3058,36 +3045,12 @@
  * Aturan lengkap untuk daftar ini ada di bagian bawah file, bersama
  * panel piutang ritel yang memakai kelas yang sama.
 .acc-cost-list > div,
-.acc-receivable-box > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-}
-
 .acc-cost-list > div:last-child {
   border-bottom: 0;
 }
 
 /* Posisi piutang merchant dipisah dari rincian biaya karena ini bukan
    biaya - ini posisi utang yang belum tertagih. */
-.acc-receivable-box {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px solid rgba(201, 255, 63, 0.16);
-  border-radius: 12px;
-  background: rgba(201, 255, 63, 0.04);
-}
-
-.acc-receivable-head {
-  display: block !important;
-  padding-bottom: 6px !important;
-  border-bottom: 0 !important;
-  font-size: 12px;
-}
-
 @media (max-width: 620px) {
   /* Target sentuh tombol periode ikut 44px, dan segmented control
      memakai lebar penuh agar tidak terjepit di layar sempit. */
@@ -4740,6 +4703,20 @@
 
   .acc-cal-grid button {
     min-height: 42px;
+  }
+
+  /*
+   * Input di dalam collapsible 16px di ponsel.
+   *
+   * iOS Safari me-zoom seluruh halaman saat input ber-fokus dan
+   * font-nya < 16px. Form panjang (buat toko, campaign promo) hidup
+   * di dalam collapsible - setiap fokus membuat halaman melompat dan
+   * operator kehilangan posisi.
+   */
+  .acc-collapsible-body input,
+  .acc-collapsible-body select,
+  .acc-collapsible-body textarea {
+    font-size: 16px;
   }
 }
 

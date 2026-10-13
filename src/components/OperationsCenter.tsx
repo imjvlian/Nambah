@@ -138,11 +138,11 @@ export default function OperationsCenter() {
 
               <div className="ops-balance-summary">
                 <div>
-                  <span>Supplier balance</span>
+                  <span>Saldo supplier</span>
                   <b>{data?.supplierBalance ? formatIDR(data.supplierBalance.balance) : "—"}</b>
                 </div>
                 <div>
-                  <span>Reserved</span>
+                  <span>Direservasi</span>
                   <b>{data?.supplierBalance ? formatIDR(data.supplierBalance.reservedBalance) : "—"}</b>
                 </div>
               </div>

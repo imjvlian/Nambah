@@ -146,6 +146,10 @@ export const DOC_GROUPS: DocGroup[] = [
             term: "Order tidak dihitung",
             text: "Order berstatus batal atau gagal tetap muncul di daftar, tapi tidak menambah omzet karena uangnya tidak pernah masuk. Jumlahnya terlihat di bawah kartu Transaksi.",
           },
+          {
+            term: "Piutang (ritel belum dibayar)",
+            text: "Order dari toko ritel yang uangnya belum ditransfer merchant ditandai Piutang dan TIDAK masuk omzet sampai pelunasannya dicatat di halaman Toko Ritel. Nominalnya tampil sebagai \"ritel menunggu transfer merchant\" supaya jelas angkanya tertunda, bukan lenyap.",
+          },
         ],
       },
     ],
@@ -165,11 +169,20 @@ export const DOC_GROUPS: DocGroup[] = [
           "Ubah harga jual di sini. Harga modalnya mengikuti supplier dan tidak diubah manual.",
           "Produk nonaktif disembunyikan dari katalog publik tanpa dihapus, jadi riwayatnya tetap ada.",
           "Simpan sekali klik untuk semua perubahan sekaligus.",
+          "Produk draft (tidak aktif) punya tombol Hapus permanen: menghapus produk, pemetaan supplier-nya, dan hanya boleh untuk produk tanpa riwayat order.",
         ],
         notes: [
           {
             label: "Harga jual tidak boleh di bawah modal",
             text: "Sistem akan menolak harga yang membuat margin negatif, dan live dispatch diblokir kalau harga supplier naik setelah checkout. Menurunkan harga tanpa memperhitungkan biaya supplier berarti menanggung rugi.",
+          },
+          {
+            label: "SKU internal adalah identitas Lacte",
+            text: "Setiap produk punya SKU internal format GAME-JENIS-NOMINAL (mis. MLBB-DM-56) yang dibuat otomatis saat produk lahir dan bisa diperbaiki di tabel. Pemetaan Melostore otomatis mencocokkan identitas ini - nominal sama saja tidak cukup, game-nya juga harus sama.",
+          },
+          {
+            label: "Pemilihan supplier otomatis",
+            text: "Saat pembeli membayar, sistem memilih supplier termurah yang saldonya cukup dan membekukan harganya ke order. Kolom Digiflazz dan Melostore di tabel menunjukkan pilihan itu; yang tidak punya pasangan Melostore tetap memakai Digiflazz.",
           },
         ],
       },
@@ -193,11 +206,12 @@ export const DOC_GROUPS: DocGroup[] = [
         section: "supplier",
         title: "Supplier",
         summary:
-          "Saldo supplier, status fulfillment, dan pemulihannya kalau order nyangkut.",
+          "Saldo kedua supplier, status fulfillment, dan pemulihannya kalau order nyangkut.",
         steps: [
-          "Pantau saldo supplier di sini. Saldo rendah akan memblokir order baru.",
+          "Pantau saldo Digiflazz dan Melostore di sini. Saldo rendah akan memblokir order baru - produk yang hanya dijual Melostore ditolak sebelum pembayaran kalau saldo Melostore kurang.",
+          "Tombol Perbarui saldo Melostore menarik saldo terbaru dari supplier. Scan katalog menyegarkan 9.000+ SKU sekaligus.",
+          "Scan katalog Melostore otomatis mengikuti dengan penggabungan: pasangan yang identitasnya cocok (game dan nominal sama) terpasang sendiri, dan mapping yang SKU-nya sudah mati di supplier dinonaktifkan ikut katalog.",
           "Kalau ada order yang nyangkut di status diproses, tombol pemulihkan akan mengambil status terbaru dari supplier.",
-          "Gunakan filter tanggal saat menelusuri riwayat order supplier.",
         ],
         notes: [
           {
@@ -207,6 +221,10 @@ export const DOC_GROUPS: DocGroup[] = [
           {
             label: "Pemulihan bukan Kirim Ulang",
             text: "Tombol pemulihkan hanya membaca status yang sudah ada di supplier. Order yang benar-benar gagal perlu dicatat manual sebagai gagal supaya bisa di-refund ke user.",
+          },
+          {
+            label: "Scan parsial tidak pernah menonaktifkan",
+            text: "Scan katalog Melostore yang kehilangan halaman (rate limit) ditandai PARSIAL dan tidak menonaktifkan apa pun - SKU yang \"hilang\" bisa jadi ada di halaman yang gagal. Ulangi scan beberapa menit kemudian.",
           },
         ],
       },
@@ -222,10 +240,11 @@ export const DOC_GROUPS: DocGroup[] = [
         section: "cashflow",
         title: "Arus Kas",
         summary:
-          "Rekap omzet, biaya supplier, margin, dan uang yang masuk dari toko ritel.",
+          "Rekap omzet, biaya supplier, margin, uang masuk dari toko ritel, dan uang keluar ke partner.",
         steps: [
           "Pilih periode, lalu baca kartu ringkasan dan grafik batang omzet harian.",
           "Baris Transfer Merchant menunjukkan uang yang benar-benar diterima dari merchant.",
+          "Kartu Uang keluar mencatat pencairan komisi afiliasi yang sudah LUNAS - yang baru di-ACC tapi belum ditransfer tampil sebagai info, bukan keluar.",
           "Unduh CSV untuk menganalisis sendiri di spreadsheet.",
         ],
         notes: [
@@ -236,6 +255,10 @@ export const DOC_GROUPS: DocGroup[] = [
           {
             label: "Omzet ritel adalah piutang, bukan kas masuk",
             text: "Order dari toko ritel menghasilkan piutang, bukan uang yang sudah diterima. Uang baru masuk Lacte saat merchant transfer dan dicatat di halaman Toko Ritel. Menghitungnya sebagai kas masuk akan menganggap piutang sebagai uang.",
+          },
+          {
+            label: "Pencairan dihitung saat lunas, bukan saat di-ACC",
+            text: "Menyetujui pencairan hanya mengalokasikan dananya - transfer masih dilakukan di luar sistem. Uang baru dianggap keluar setelah ditandai lunas dengan reference transfer; kalau dihitung saat ACC, saldo laporan lebih kecil dari rekening yang sebenarnya.",
           },
         ],
       },
@@ -339,6 +362,10 @@ export const DOC_GROUPS: DocGroup[] = [
           {
             label: "Kenapa Pencairan Afiliasi terpisah",
             text: "Kirim link dan menambah kode ada di halaman Afiliasi. Halaman Pencairan hanya untuk antrean uang keluar: setujui, transfer di luar sistem, lalu tandai lunas. Dulu keduanya bercampur di satu halaman, jadi membuat mitra harus lewat halaman yang namanya soal pencairan.",
+          },
+          {
+            label: "Komisi baru bisa dicairkan 3 hari setelah order sukses",
+            text: "Komisi masuk masa tunggu 3 hari sebelum masuk \"Siap dicairkan\" - jendela ini menutup risiko order di-refund setelah komisinya terkirim. Selama menunggu, nominalnya terlihat di kartu \"Masa tunggu 3 hari\" di panel mitra dan di halaman pencairan; setelah lewat, pindah sendiri ke siap dicairkan tanpa perlu apa pun.",
           },
           {
             label: "Kode tanpa pemilik tidak bisa dipakai",

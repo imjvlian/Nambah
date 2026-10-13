@@ -4366,7 +4366,7 @@ const txDataStamp = txRange.preset
               <SectionHead
                 eyebrow="Loyalitas"
                 title="Lacte Points"
-                copy="Outstanding liability, reservation, FIFO lots, expiry, dan immutable ledger points."
+                copy="Outstanding liability, reservasi, lots FIFO, expiry, dan ledger points."
                 action={
                   <button
                     className="acc-primary-link"
@@ -4374,7 +4374,7 @@ const txDataStamp = txRange.preset
                     disabled={Boolean(busy)}
                     onClick={() => void runPointsExpiry()}
                   >
-                    {busy === "points-expiry" ? "Expiring..." : "Run expiry"}
+                    {busy === "points-expiry" ? "Memproses..." : "Jalankan expiry"}
                   </button>
                 }
               />
@@ -4386,19 +4386,19 @@ const txDataStamp = txRange.preset
                   <span>≈ {formatIDR(pointsData.stats.outstanding * pointsData.rules.pointValueIdr)}</span>
                 </article>
                 <article>
-                  <small>Available</small>
+                  <small>Tersedia</small>
                   <strong>{pointsData.stats.available.toLocaleString("id-ID")} pts</strong>
                   <span>{pointsData.stats.accounts} akun loyalty</span>
                 </article>
                 <article>
-                  <small>Reserved</small>
+                  <small>Direservasi</small>
                   <strong>{pointsData.stats.reserved.toLocaleString("id-ID")} pts</strong>
                   <span>Checkout belum final</span>
                 </article>
                 <article>
-                  <small>Lifetime redeemed</small>
+                  <small>Total ditukar</small>
                   <strong>{pointsData.stats.lifetimeRedeemed.toLocaleString("id-ID")} pts</strong>
-                  <span>Dari {pointsData.stats.lifetimeEarned.toLocaleString("id-ID")} earned</span>
+                  <span>Dari {pointsData.stats.lifetimeEarned.toLocaleString("id-ID")} terkumpul</span>
                 </article>
               </div>
 
@@ -4406,16 +4406,16 @@ const txDataStamp = txRange.preset
                 <span>1 pt / {formatIDR(pointsData.rules.earnEveryIdr)}</span>
                 <span>1 pt = {formatIDR(pointsData.rules.pointValueIdr)}</span>
                 <span>Min. {pointsData.rules.minimumRedeem} pts</span>
-                <span>Step {pointsData.rules.redeemStep} pts</span>
-                <span>Max {Math.round(pointsData.rules.maxRedeemRate * 100)}% subtotal</span>
+                <span>Kelipatan {pointsData.rules.redeemStep} pts</span>
+                <span>Maks {Math.round(pointsData.rules.maxRedeemRate * 100)}% subtotal</span>
               </div>
 
               <div className="acc-grid-two acc-points-grid">
                 <div className="acc-table-card">
                   <div className="acc-points-head">
                     <span>User</span>
-                    <span>Available</span>
-                    <span>Reserved</span>
+                    <span>Tersedia</span>
+                    <span>Direservasi</span>
                   </div>
                   {pointsData.accounts.slice(0, 20).map((account) => (
                     <div className="acc-points-row" key={account.userId}>

@@ -59,9 +59,18 @@ type CleanupResult = {
     activeOrphans: number;
     alreadyHidden: number;
     gamesToDisable: number;
+    unavailableProducts: number;
+    activeUnavailable: number;
+    unavailableDeactivated: number;
   };
   preview: {
     products: Array<{
+      id: string;
+      gameId: string;
+      label: string;
+      active: boolean;
+    }>;
+    unavailable: Array<{
       id: string;
       gameId: string;
       label: string;
@@ -247,7 +256,10 @@ export default function AdminCatalogTools() {
       setCleanupResult(data);
       if (dryRun) {
         setNotice(
-          `Ditemukan ${data.summary.orphanProducts} produk tanpa mapping; ${data.summary.activeOrphans} masih aktif dan ${data.summary.gamesToDisable} game akan menjadi kosong.`,
+          `Ditemukan ${data.summary.orphanProducts} produk tanpa mapping; ${data.summary.activeOrphans} masih aktif dan ${data.summary.gamesToDisable} game akan menjadi kosong.` +
+            (data.summary.activeUnavailable > 0
+              ? ` Terdeteksi ${data.summary.activeUnavailable} produk "aktif" yang SKU-nya mati di semua supplier - gunakan tombol "Nonaktifkan produk mati".`
+              : ""),
         );
       } else {
         await loadCatalog();
@@ -257,6 +269,62 @@ export default function AdminCatalogTools() {
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Clean katalog gagal.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /**
+   * Nonaktifkan produk "aktif" yang SKU-nya mati di semua supplier.
+   *
+   * Terpisah dari clean orphan: produk-produk ini PERNAH sah dijual
+   * (punya mapping), hanya supplier-nya yang berhenti - menyembunyikan
+   * mereka bersama orphan akan menyembunyikan dua keadaan berbeda
+   * dengan satu angka yang tidak menjelaskan.
+   */
+  async function runDeactivateUnavailable(dryRun: boolean) {
+    if (!dryRun) {
+      const count = cleanupResult?.summary.activeUnavailable ?? 0;
+      if (count === 0) {
+        setNotice("Tidak ada produk mati yang perlu dinonaktifkan.");
+        return;
+      }
+      const confirmed = await confirm({
+        title: `Nonaktifkan ${count} produk mati?`,
+        description:
+          "Produk ini sudah tidak bisa dibeli (SKU-nya nonaktif di semua supplier) tapi masih tampil \"aktif\" di panel. Menonaktifkan hanya merapikan panel - kalau SKU supplier hidup kembali, sinkron mengaktifkan ulang otomatis.",
+        confirmLabel: "Nonaktifkan produk mati",
+      });
+      if (!confirmed) return;
+    }
+
+    setBusy(dryRun ? "deactivate-preview" : "deactivate-apply");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/admin/catalog/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun, includeUnavailable: true }),
+      });
+      const data = (await response.json()) as CleanupResult & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Pembersihan produk mati gagal.");
+
+      setCleanupResult(data);
+      if (dryRun) {
+        setNotice(
+          data.summary.activeUnavailable > 0
+            ? `${data.summary.activeUnavailable} produk "aktif" dengan SKU mati di semua supplier terdeteksi - siap dinonaktifkan.`
+            : "Tidak ada produk mati - semua produk aktif punya supplier yang hidup.",
+        );
+      } else {
+        await loadCatalog();
+        setNotice(
+          `${data.summary.unavailableDeactivated} produk mati dinonaktifkan; ${data.summary.activeOrphans} orphan ikut disembunyikan.`,
+        );
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Pembersihan produk mati gagal.");
     } finally {
       setBusy("");
     }
@@ -448,6 +516,7 @@ export default function AdminCatalogTools() {
             <div className="admin-tool-preview cleanup-preview">
               <div><small>Orphan</small><strong>{cleanupResult.summary.orphanProducts}</strong></div>
               <div><small>Masih aktif</small><strong>{cleanupResult.summary.activeOrphans}</strong></div>
+              <div><small>Produk mati</small><strong>{cleanupResult.summary.activeUnavailable ?? 0}</strong></div>
               <div><small>Game kosong</small><strong>{cleanupResult.summary.gamesToDisable}</strong></div>
             </div>
           )}
@@ -488,6 +557,20 @@ export default function AdminCatalogTools() {
             </button>
             <button className="danger" type="button" onClick={() => void runCleanup(false)} disabled={Boolean(busy)}>
               {busy === "cleanup-apply" ? "Cleaning..." : "Clean unmapped"}
+            </button>
+          </div>
+
+          <div className="admin-tool-actions cleanup-actions">
+            <button type="button" onClick={() => void runDeactivateUnavailable(true)} disabled={Boolean(busy)}>
+              {busy === "deactivate-preview" ? "Mengecek..." : "Cek produk mati"}
+            </button>
+            <button
+              className="danger"
+              type="button"
+              onClick={() => void runDeactivateUnavailable(false)}
+              disabled={Boolean(busy) || (cleanupResult?.summary.activeUnavailable ?? 0) === 0}
+            >
+              {busy === "deactivate-apply" ? "Menonaktifkan..." : "Nonaktifkan produk mati"}
             </button>
           </div>
 

@@ -384,7 +384,7 @@ export default function AffiliatePerformancePanel() {
             <div className="acc-table-card">
               <div className="acc-affiliate-head">
                 <span>Kode</span>
-                <span>Rate</span>
+                <span>Komisi %</span>
                 <span>Klik</span>
                 <span>Pesanan</span>
                 <span>Konversi</span>

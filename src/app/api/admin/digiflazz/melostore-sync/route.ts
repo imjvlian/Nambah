@@ -1,5 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { authorizeCronRequest } from "@/lib/cron-api";
 import { MelostoreSupplierClient } from "@/lib/suppliers/melostore-client";
+import { mergeMelostoreViaInternalSku } from "@/lib/suppliers/merge-internal-sku";
 import {
   bukaScanRun,
   riwayatScan,
@@ -43,6 +45,24 @@ export const runtime = "nodejs";
  * parsial, gagal, atau masih berjalan - beserta jumlah dan waktunya.
  */
 export async function GET(request: Request) {
+  /*
+   * MODE MAINTENANCE untuk scheduler (`?maintenance=1` + CRON_SECRET).
+   *
+   * Satu endpoint, dua gerbang: admin memakai sesi/token admin dan
+   * mendapat riwayat scan; scheduler memakai CRON_SECRET dan mendapat
+   * pekerjaan yang harus dijalankan berkala. Menumpuknya di satu route
+   * bukan kosmetik - logika maintenance butuh fungsi-fungsi yang sudah
+   * hidup di file ini (scan+cache+merge, tulis saldo), dan memindahkan
+   * semuanya ke route cron berarti salin-tempel 300 baris yang sudah
+   * tervalidasi.
+   */
+  const url = new URL(request.url);
+  if (url.searchParams.get("maintenance") === "1") {
+    const cron = authorizeCronRequest(request);
+    if (!cron.ok) return cron.response;
+    return jalankanMaintenance();
+  }
+
   const auth = await authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
@@ -67,6 +87,79 @@ export async function GET(request: Request) {
     lastSuccessAt:
       runs.find((run) => run.status === "success")?.finished_at ?? null,
   });
+}
+
+/** Batas usia scan sebelum dianggap basi dan perlu diulang scheduler. */
+const SCAN_STALE_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * Pekerjaan berkala Melostore untuk scheduler.
+ *
+ * 1. Saldo selalu disegarkan (satu permintaan /profile - murah).
+ * 2. Scan katalog hanya kalau scan sukses terakhir sudah lebih dari
+ *    20 jam - katalog berbagi batas 20 permintaan/menit dengan semua
+ *    endpoint katalog lain, dan scan penuh memakai 20 halaman; scan
+ *    per-detik akan menghabiskan jatah itu sendiri.
+ * 3. Auto-merge ikut otomatis di dalam scan saat sukses penuh.
+ *
+ * Semua langkah best-effort: kegagalan satu langkah tidak menggagalkan
+ * sisanya, dan setiap langkah melaporkkan galatnya sendiri.
+ */
+async function jalankanMaintenance() {
+  const client = new MelostoreSupplierClient();
+  const hasil: {
+    balance: { ok: boolean; balance?: number; error?: string };
+    scan: { dijalankan: boolean; alasan?: string; status?: string; autoMergeTerpasang?: number; error?: string };
+  } = {
+    balance: { ok: false },
+    scan: { dijalankan: false },
+  };
+
+  if (client.isConfigured()) {
+    try {
+      const profile = await tulisSaldoMelostore(client);
+      hasil.balance = { ok: true, balance: profile.balance };
+    } catch (error) {
+      hasil.balance = {
+        ok: false,
+        error: error instanceof Error ? error.message : "galat tidak diketahui",
+      };
+    }
+  } else {
+    hasil.balance = { ok: false, error: "Kredensial Melostore belum diisi." };
+  }
+
+  const runs = await riwayatScan("melostore", 1);
+  const lastSuccess = runs.find((run) => run.status === "success")?.finished_at ?? null;
+  const usia = lastSuccess ? Date.now() - Date.parse(lastSuccess) : Infinity;
+  if (usia < SCAN_STALE_MS) {
+    hasil.scan = {
+      dijalankan: false,
+      alasan: `Scan terakhir masih segar (${Math.round(usia / 3_600_000)} jam lalu).`,
+    };
+  } else {
+    try {
+      const response = await cacheMelostoreCatalog(client, "cron");
+      const body = (await response.json()) as {
+        scan?: { status?: string };
+        autoMerge?: { terpasang?: number } | null;
+        error?: string;
+      };
+      hasil.scan = {
+        dijalankan: true,
+        status: body.scan?.status ?? (body.error ? "error" : "unknown"),
+        autoMergeTerpasang: body.autoMerge?.terpasang ?? 0,
+        error: body.error,
+      };
+    } catch (error) {
+      hasil.scan = {
+        dijalankan: true,
+        error: error instanceof Error ? error.message : "galat tidak diketahui",
+      };
+    }
+  }
+
+  return Response.json({ maintenance: hasil });
 }
 
 export async function POST(request: Request) {
@@ -96,31 +189,18 @@ export async function POST(request: Request) {
   return Response.json({ error: "Aksi tidak dikenal." }, { status: 400 });
 }
 
-async function syncBalance(client: MelostoreSupplierClient) {
-  let profile;
-  try {
-    profile = await client.fetchProfile();
-  } catch (error) {
-    return Response.json(
-      {
-        error:
-          "Gagal membaca saldo: " +
-          (error instanceof Error ? error.message : "tidak diketahui"),
-      },
-      { status: 502 },
-    );
-  }
+/**
+ * Tulis saldo Melostore terbaru ke supplier_balances, kembalikan profil.
+ *
+ * `reserved_balance` TIDAK ditulis: saldo yang sedang dikunci order lain
+ * bukan milik sinkronisasi - menyalin balance sambil men-zero-kan
+ * reserved akan membuat selection melihat supplier bisa dipakai lagi
+ * padahal order yang berjalan masih menyimpan uangnya.
+ */
+async function tulisSaldoMelostore(client: MelostoreSupplierClient) {
+  const profile = await client.fetchProfile();
 
   const now = new Date().toISOString();
-
-  /*
-   * `reserved_balance` TIDAK ditulis.
-   *
-   * Saldo yang sedang dikunci order lain bukan milik sinkronisasi.
-   * Menyalin `balance` sambil menyiapkan `reserved_balance` ke nol akan
-   * membuat selection melihat supplier bisa dipakai lagi, sementara
-   * order yang sudah berjalan masih menyimpan uangnya.
-   */
   const existing = await supabaseSelect<{ supplier_id: string }>(
     "supplier_balances",
     { select: "supplier_id", filters: { supplier_id: "eq.melostore" }, limit: 1 },
@@ -139,6 +219,24 @@ async function syncBalance(client: MelostoreSupplierClient) {
       reserved_balance: 0,
       checked_at: now,
     });
+  }
+
+  return profile;
+}
+
+async function syncBalance(client: MelostoreSupplierClient) {
+  let profile;
+  try {
+    profile = await tulisSaldoMelostore(client);
+  } catch (error) {
+    return Response.json(
+      {
+        error:
+          "Gagal membaca saldo: " +
+          (error instanceof Error ? error.message : "tidak diketahui"),
+      },
+      { status: 502 },
+    );
   }
 
   return Response.json({
@@ -549,6 +647,27 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       statusScan === "partial" ? hasil.errors.join(" | ") : undefined,
     );
 
+    /*
+     * AUTO-MERGE setelah scan sukses penuh.
+     *
+     * Pemetaan via SKU internal idempoten dan hanya terpasang pada
+     * identitas yang cocok persis - menjalankannya otomatis setelah
+     * scan berarti hasil scan langsung terpakai tanpa menunggu operator
+     * menekan tombol gabung. Gagalnya merge TIDAK menggagalkan scan:
+     * katalog sudah tersimpan, dan merge bisa dijalankan manual.
+     */
+    let autoMerge: Awaited<ReturnType<typeof mergeMelostoreViaInternalSku>> | null = null;
+    if (statusScan === "success") {
+      try {
+        autoMerge = await mergeMelostoreViaInternalSku(triggeredBy);
+      } catch (error) {
+        console.warn(
+          "Auto-merge setelah scan gagal (katalog tetap tersimpan):",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
     return Response.json({
       ok: true,
       scan: {
@@ -564,6 +683,7 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       forms: formTersimpan,
       mappingsDeactivated: mappingDipatikan,
       mappingsActivated: mappingDiaktifkan,
+      autoMerge,
       message:
         (statusScan === "partial"
           ? `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
@@ -574,6 +694,9 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
         (statusScan === "success" &&
         mappingDipatikan + mappingDiaktifkan > 0
           ? ` Mapping: ${mappingDipatikan} dipatikan, ${mappingDiaktifkan} diaktifkan kembali.`
+          : "") +
+        (autoMerge && autoMerge.terpasang > 0
+          ? ` Auto-merge: ${autoMerge.terpasang} pemetaan baru terpasang.`
           : ""),
     });
   } catch (error) {
