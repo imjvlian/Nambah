@@ -5043,6 +5043,29 @@ const txDataStamp = txRange.preset
                 </article>
               </div>
 
+              {/*
+               * Laba bersih = Margin Lacte.
+               *
+               * Satu-satunya jawaban yang dicari operator: "berapa
+               * laba bersihku setelah semua?" Angka ini sama dengan
+               * Margin Lacte karena margin SUDAH dikurangi diskon,
+               * komisi afiliasi, biaya payment gateway, dan points.
+               * Uang keluar pencairan afiliasi TIDAK dikurangkan lagi
+               * - komisinya sudah terhitung di sini sejak order sukses.
+               */}
+              <div className="acc-metrics acc-metrics-three">
+                <article>
+                  <small>Laba bersih setelah semua</small>
+                  <strong>
+                    {formatIDR(cashFlowData?.totals.grossProfit ?? 0)}
+                  </strong>
+                  <span>
+                    sudah termasuk diskon, komisi afiliasi, dan biaya
+                    gateway - pencairan afiliasi tidak mengurangi lagi
+                  </span>
+                </article>
+              </div>
+
               <div className="acc-metrics acc-metrics-three">
                 <article>
                   <small>Piutang toko ritel</small>
@@ -5159,7 +5182,13 @@ const txDataStamp = txRange.preset
                           </strong>
                         </div>
                         <div>
-                          <span>Komisi affiliate</span>
+                          <span>
+                            Komisi affiliate{" "}
+                            <small className="acc-form-notice">
+                              (terjadi saat order sukses; margin Lacte di atas
+                              sudah dikurangi angka ini)
+                            </small>
+                          </span>
                           <strong>
                             {formatIDR(
                               cashFlowData.totals.affiliateCommission,
@@ -5189,13 +5218,12 @@ const txDataStamp = txRange.preset
                     {/*
                      * Uang keluar nyata dari rekening Lacte.
                      *
-                     * Komisi afiliasi di kartu "Pengurang pendapatan"
-                     * adalah BEBAN yang sudah terjadi saat order sukses;
-                     * karti ini adalah uang yang benar-benar
-                     * MINDAH ke rekening partner - dicatat saat
-                     * pencairan ditandai lunas, bukan saat di-ACC,
-                     * karena ACC yang belum ditransfer masih uang
-                     * Lacte.
+                     * PENTING: angka ini TIDAK boleh dikurangkan lagi
+                     * dari margin. Komisinya sudah terhitung sebagai
+                     * pengurang pendapatan saat order sukses; pencairan
+                     * hanyalah pemindahan kas dari beban yang sudah
+                     * tercatat. Mengurangkannya lagi dari margin berarti
+                     * memotong komisi yang sama dua kali.
                      */}
                     <div className="acc-table-card">
                       <div className="acc-card-head">
@@ -5233,6 +5261,14 @@ const txDataStamp = txRange.preset
                           <strong>
                             {formatIDR(cashFlowData.totals.affiliatePaidOut)}
                           </strong>
+                        </div>
+                        <div>
+                          <small className="acc-form-notice">
+                            Angka ini adalah kas yang pindah ke rekening
+                            partner - komisinya sudah terhitung sebagai
+                            pengurang di margin Lacte. Jangan kurangkan
+                            lagi dari margin, itu double-count.
+                          </small>
                         </div>
                       </div>
                     </div>
