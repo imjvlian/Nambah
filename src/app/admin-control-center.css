@@ -704,6 +704,50 @@
   padding: 34px 0 80px;
 }
 
+/*
+ * Ritme vertikal halaman admin.
+ *
+ * SEBELUM: jarak antar kartu datang dari `margin-bottom` yang SETIAP
+ * komponen declare sendiri - `.acc-hero` 18px, `.acc-metrics` 18px,
+ * `.acc-grid-two` 12px, dan `.acc-table-card` tidak punya sama sekali.
+ * Akibatnya dua kartu tabel bersentuhan (jarak 0) sementara dua kartu lain
+ * berjarak 18px, tanpa alasan yang bisa dijelaskan ke pembaca.
+ *
+ * SEKARANG: satu angka untuk semua. `.acc-content` menjadi kolom flex
+ * dengan `gap` tunggal, jadi jarak antar kartu berasal dari satu tempat
+ * dan tidak bisa lagi berbeda antar komponen.
+ *
+ * `margin-bottom` milik komponen sendiri sengaja diturunkan ke `0` -
+ * kalau tidak, gap dan margin milik komponen akan menjadi jarak ganda yang
+ * tidak terkontrol.
+ */
+.acc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acc-content > .acc-hero,
+.acc-content > .acc-metrics,
+.acc-content > .acc-grid-two,
+.acc-content > .acc-table-card,
+.acc-content > .acc-panel,
+.acc-content > .acc-warning-card,
+.acc-content > .acc-empty,
+.acc-content > .acc-global-notice,
+.acc-content > .acc-section-head,
+.acc-content > .acc-roadmap-grid,
+.acc-content > .acc-order-list,
+.acc-content > .acc-automation-shell {
+  margin-bottom: 0;
+}
+
+/*
+ * `margin-bottom: 0` di atas berlaku untuk anak LANGSUNG `.acc-content`.
+ * Kartu di dalam `.acc-grid-two` adalah cucu, jadi tidak ikut - jarak
+ * antar kartu di dalam grid tetap milik `gap` grid itu sendiri.
+ */
+
 .acc-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;
@@ -2443,6 +2487,25 @@
   white-space: nowrap;
 }
 
+/*
+ * Tabel dengan header panjang (mis. "Masuk: pelunasan toko").
+ *
+ * `white-space: nowrap` bawaan membuat delapan header Bahasa Indonesia
+ * itu melebihi lebar kartu, jadi tabel tergulir horizontal hanya untuk
+ * membaca judul kolom - dan kolom kedua sudah terpotong sebelum sempat
+ * dibaca. Untuk tabel seperti ini header dibiarkan membungkus: dua
+ * baris pendek lebih terbaca daripada satu baris yang terpotong.
+ */
+.acc-table-money th {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+/* Isi sel membungkus di titik yang wajar, bukan di tengah kata. */
+.acc-table-money td {
+  line-height: 1.45;
+}
+
 .acc-table td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,.045);
@@ -2512,13 +2575,19 @@
   text-align: right;
 }
 
-/* Kepala tabel menempel saat tabel digulir. Di tabel kas harian yang
-  kolomnya banyak, menggulir vertikal membuat nama kolom hilang dan angka
-  jadi tidak punya konteks. */
+/*
+ * Kepala tabel dibuat TIDAK tembus pandang.
+ *
+ * Bukan `position: sticky`: `.acc-table-scroll` memakai `overflow-x: auto`,
+ * dan di CSS itu membuat `overflow-y` ikut menjadi scroll container - jadi
+ * `sticky` akan menempel ke dalam wadah itu, bukan ke viewport, dan tidak
+ * pernah benar-benar bekerja. Aturan yang tidak bisa bekerja lebih buruk
+ * daripada tidak ada, karena terlihat seperti sudah diurus.
+ *
+ * Yang tetap dilakukan: latar opaque, supaya zebra baris tidak pernah
+ * terlihat menembus kepala kolom.
+ */
 .acc-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   background: #121410;
 }
 

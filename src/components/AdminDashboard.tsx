@@ -5223,7 +5223,7 @@ const txDataStamp = txRange.preset
                    * langsung ke merchant dan tak pernah melewati Lacte.
                    */}
                   <div className="acc-table-card">
-                    <div className="acc-card-head">
+                    <div className="acc-card-head acc-cashflow-note-head">
                       <span>Catatan kas harian</span>
                       <small className="acc-card-head-note">
                         uang masuk dan keluar per hari
