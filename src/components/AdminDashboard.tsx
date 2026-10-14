@@ -148,7 +148,10 @@ type OverviewPayload = {
     receiptSending: number | null;
   };
   finance: {
-    gmvToday: number;
+    /** Omzet Lacte hari ini. Sudah dikurangi fee toko; ritel yang belum dibayar tidak ikut. */
+    revenueToday: number;
+    /** Nominal ritel yang top up-nya sudah terkirim tapi uangnya belum masuk. */
+    retailReceivableToday: number;
     supplierBalance: number;
     reservedBalance: number;
     availableBalance: number;
@@ -3322,9 +3325,18 @@ const txDataStamp = txRange.preset
                   <span>{numberOrDash(overview.stats.successToday)} berhasil</span>
                 </article>
                 <article>
-                  <small>GMV hari ini</small>
-                  <strong>{formatIDR(overview.finance.gmvToday)}</strong>
-                  <span>dari order berstatus berhasil</span>
+                  <small>Omzet hari ini</small>
+                  <strong>
+                    {formatIDR(overview.finance.revenueToday)}
+                  </strong>
+                  {overview.finance.retailReceivableToday > 0 ? (
+                    <span>
+                      + {formatIDR(overview.finance.retailReceivableToday)}{" "}
+                      ditunggu dari toko ritel
+                    </span>
+                  ) : (
+                    <span>dari order berstatus berhasil</span>
+                  )}
                 </article>
                 <article>
                   <small>Sedang diproses</small>

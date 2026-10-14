@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { isTestLabEnabled } from "@/lib/test-lab-access";
+
 import {
   IconAffiliates,
   IconBook,
@@ -344,8 +346,8 @@ export const ADMIN_TOOLS: Array<{
   },
   {
     href: "/admin/test-lab",
-    label: "Staging Test Lab",
-    hint: "Uji alur end-to-end",
+    label: "Laboratorium Uji",
+    hint: "Uji alur supplier tanpa uang sungguhan",
     group: "Alat",
     Icon: IconFlask,
   },
@@ -396,6 +398,14 @@ export default function AdminSidebar({
    * bisa diuji dan dirender tanpa Provider.
    */
   const currentPath = activeHref ?? pathname;
+
+  /*
+   * Alat uji fulfilment disembunyikan dari sidebar di build produksi.
+   *
+   * Nilainya diambil saat render, bukan saat modul dimuat, supaya keputusan
+   * ini ikut berubah kalau env-nya berubah tanpa perlu restart.
+   */
+  const testLabEnabled = isTestLabEnabled();
 
   const [open, setOpen] = useState(false);
   /*
@@ -556,8 +566,20 @@ export default function AdminSidebar({
 
         <nav className="acc-nav" aria-label="Navigasi admin">
           {ADMIN_NAV_GROUPS.map((group) => {
+            /*
+             * Alat uji fulfilment difilter, bukan disembunyikan lewat CSS.
+             *
+             * Di build produksi sidebar tidak boleh menampilkan entri "Staging
+             * Test Lab": halamannya sudah redirect kalau diakses langsung, tapi
+             * menampilkan pintasan ke halaman yang menolaknya hanya membiarkan
+             * bahwa alatnya ada. Keduanya harus hilang.
+             */
             const items = ADMIN_NAV.filter((item) => item.group === group);
-            const tools = ADMIN_TOOLS.filter((tool) => tool.group === group);
+            const tools = ADMIN_TOOLS.filter(
+              (tool) =>
+                tool.group === group &&
+                !(tool.href === "/admin/test-lab" && !testLabEnabled),
+            );
 
             if (items.length === 0 && tools.length === 0) return null;
 

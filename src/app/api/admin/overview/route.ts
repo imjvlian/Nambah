@@ -9,6 +9,7 @@ import {
   supabaseSelectPage,
 } from "@/lib/supabase/server";
 import { BRAND } from "@/lib/brand";
+import { merchantReceivableAmount } from "@/lib/merchant-retail-rules";
 
 export const runtime = "nodejs";
 
@@ -116,8 +117,28 @@ export async function GET(request: Request) {
         order: "created_at.desc",
         limit: 10,
       }),
-      supabaseSelect<{ final_price: number | string }>("orders", {
-        select: "final_price",
+      supabaseSelect<{
+        final_price: number | string;
+        service_fee_amount: number | string | null;
+        merchant_id: string | null;
+        receivable_paid_at: string | null;
+      }>("orders", {
+        /*
+         * Empat kolom, bukan satu.
+         *
+         * Versi lama hanya mengambil `final_price`, dan itu menghitung dua
+         * hal yang bukan milik Lacte:
+         *
+         * 1. `final_price` sudah memuat `merchantServiceFee` - biaya layanan
+         *    yang dibayar pengguna LANGSUNG ke merchant di tokonya.
+         * 2. Order ritel yang piutangnya belum dibayar ikut dihitung, padahal
+         *    uangnya masih di tangan toko.
+         *
+         * Definisi yang sama sudah dipakai laporan Arus Kas. Kalau kartu ini
+         * memakai definisi lain, dua angka "omzet" di aplikasi yang sama akan
+         * berbeda - dan yang salah akan dipercaya.
+         */
+        select: "final_price,service_fee_amount,merchant_id,receivable_paid_at",
         filters: {
           status: "eq.success",
           created_at: `gte.${todayIso}`,
@@ -189,8 +210,35 @@ export async function GET(request: Request) {
         receiptSending,
       },
       finance: {
-        gmvToday: successfulToday.reduce(
-          (sum, row) => sum + Number(row.final_price || 0),
+        /*
+         * Omzet Lacte hari ini - bukan GMV.
+         *
+         * Dua-duanya sengaja TIDAK dihitung di sini: menggabungkan
+         * `final_price` mentah akan memasukkan biaya layanan merchant, dan
+         * order ritel yang belum dibayar toko akan dihitung seolah uangnya
+         * sudah masuk.
+         */
+        revenueToday: successfulToday.reduce(
+          (sum, row) => sum + merchantReceivableAmount({
+            finalPrice: row.final_price,
+            serviceFee: row.service_fee_amount,
+          }),
+          0,
+        ),
+        /*
+         * Order ritel yang top up-nya sudah dikirim tapi uangnya masih di
+         * tangan toko. Dipisahkan supaya "Omzet hari ini" yang kecil tidak
+         * disalahbangkan sebagai hari sepi - dan supaya operator tahu ada
+         * uang yang sudah dikirim tapi belum tertagih.
+         */
+        retailReceivableToday: successfulToday.reduce(
+          (sum, row) =>
+            row.merchant_id && !row.receivable_paid_at
+              ? sum + merchantReceivableAmount({
+                  finalPrice: row.final_price,
+                  serviceFee: row.service_fee_amount,
+                })
+              : sum,
           0,
         ),
         supplierBalance: balanceValue,

@@ -8,19 +8,42 @@ import {
   isTestLabScenario,
   isTestLabScope,
 } from "@/lib/test-lab-policy";
+import {
+  TEST_LAB_DISABLED_MESSAGE,
+  isTestLabEnabled,
+} from "@/lib/test-lab-access";
 
 export const runtime = "nodejs";
+
+/**
+ * Route ini mengubah perilaku fulfilment supplier - membuat order berikutnya
+ * gagal atau menggantung dengan sengaja. Di build produksi itu tidak boleh
+ * bisa dipanggil sama sekali, bukan sekadar disembunyikan dari UI: UI bisa
+ * dibuka lewat fetch langsung, dan sidebar yang hilang tidak melindungi
+ * endpoint dari request langsung.
+ */
+function refuseWhenDisabled() {
+  if (isTestLabEnabled()) return null;
+
+  return Response.json({ error: TEST_LAB_DISABLED_MESSAGE }, { status: 404 });
+}
 
 export async function GET(request: Request) {
   const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
+
+  const refused = refuseWhenDisabled();
+  if (refused) return refused;
 
   try {
     return Response.json({ testLab: await getDigiflazzTestLabState() });
   } catch (error) {
     console.error("Admin Test Lab GET failed", error);
     return Response.json(
-      { error: "Test Lab tidak dapat dimuat. Pastikan migration 019 sudah diterapkan." },
+      {
+        error:
+          "Laboratorium uji tidak dapat dimuat. Pastikan migration 019 sudah diterapkan.",
+      },
       { status: 502 },
     );
   }
@@ -30,6 +53,9 @@ export async function PATCH(request: Request) {
   const auth = authorizeAdminRequest(request);
   if (!auth.ok) return auth.response;
 
+  const refused = refuseWhenDisabled();
+  if (refused) return refused;
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const scenario = body.scenario;
@@ -37,7 +63,7 @@ export async function PATCH(request: Request) {
 
     if (!isTestLabScenario(scenario) || !isTestLabScope(scope)) {
       return Response.json(
-        { error: "Scenario atau scope Test Lab tidak valid." },
+        { error: "Skenario atau cakupan laboratorium uji tidak valid." },
         { status: 400 },
       );
     }
