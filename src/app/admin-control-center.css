@@ -727,25 +727,17 @@
   gap: 16px;
 }
 
-.acc-content > .acc-hero,
-.acc-content > .acc-metrics,
-.acc-content > .acc-grid-two,
-.acc-content > .acc-table-card,
-.acc-content > .acc-panel,
-.acc-content > .acc-warning-card,
-.acc-content > .acc-empty,
-.acc-content > .acc-global-notice,
-.acc-content > .acc-section-head,
-.acc-content > .acc-roadmap-grid,
-.acc-content > .acc-order-list,
-.acc-content > .acc-automation-shell {
-  margin-bottom: 0;
-}
-
 /*
- * `margin-bottom: 0` di atas berlaku untuk anak LANGSUNG `.acc-content`.
- * Kartu di dalam `.acc-grid-two` adalah cucu, jadi tidak ikut - jarak
- * antar kartu di dalam grid tetap milik `gap` grid itu sendiri.
+ * Penutup ritme vertikal ada di AKHIR file ini, bukan di sini.
+ *
+ * Alasannya specificity: aturan lain memakai selector satu kelas
+ * (`.acc-metrics { margin-bottom: 18px }`), dan `> *` punya specificity yang
+ * sama - jadi yang menang adalah yang letaknya paling akhir.
+ *
+ * Daftar kelas yang lebih lengkap tetap bisa ditulis di sini, tapi selalu
+ * akan ketinggalan. `.acc-range-picker` sudah pernah membuktikan hal itu:
+ * `margin-bottom: 16px` sendiri, jadi filter periode mendapat 16px dari `gap`
+ * DAN 16px dari margin-nya, dan terlihat dua kali lebih tinggi.
  */
 
 .acc-hero {
@@ -3221,6 +3213,7 @@
  *
  * Aturan lengkap untuk daftar ini ada di bagian bawah file, bersama
  * panel piutang ritel yang memakai kelas yang sama.
+ */
 .acc-cost-list > div,
 .acc-cost-list > div:last-child {
   border-bottom: 0;
@@ -5164,7 +5157,6 @@
    supaya tanggal awal dan akhir bisa dibaca tanpa menggulir.
    ========================================================================== */
 /*
-/*
  * Pemilih rentang di baris filter laporan.
  *
  * MASALAH YANG DIPERBAIKI: TANGGAL RENTANG TERPOTONG
@@ -6114,4 +6106,29 @@
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, .03);
   font-weight: 800;
+}
+
+
+/*
+ * ==========================================================================
+ * Ritme vertikal - PENUTUP.
+ * ==========================================================================
+ *
+ * Ditulis DI AKHIR file ini dengan sengaja, dan itu soal specificity.
+ *
+ * Aturan lain di file ini memakai selector satu kelas, misalnya
+ * `.acc-metrics { margin-bottom: 18px }`. Selector `> *` punya specificity
+ * yang sama - jadi aturan yang menang adalah yang letaknya paling akhir.
+ * Menaruh aturan ini di bagian layout akan dikalahkan `.acc-metrics`, dan
+ * hasilnya: halaman kembali berantakan tanpa ada yang terlihat salah di diff.
+ *
+ * Cakupannya anak LANGSUNG `.acc-content` saja. Kartu di dalam
+ * `.acc-grid-two` adalah cucu, jadi jarak antar kartu di dalam grid itu
+ * tetap milik `gap` milik grid itu sendiri.
+ *
+ * `gap` tidak menambah ruang setelah anak terakhir, jadi `margin-bottom: 0`
+ * pada anak terakhir tidak meninggalkan celah kosong yang menganga.
+ */
+.acc-content > * {
+  margin-bottom: 0;
 }
