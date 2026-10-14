@@ -4729,7 +4729,7 @@ const txDataStamp = txRange.preset
                       </button>
                       <button
                         type="button"
-                        className="acc-ghost-link"
+                        className="acc-inline-button"
                         onClick={() => setMerchantPaymentForm(null)}
                       >
                         Batal
@@ -4867,7 +4867,7 @@ const txDataStamp = txRange.preset
                     </button>
                     {merchantForm?.id ? (
                       <button
-                        className="acc-ghost-link"
+                        className="acc-inline-button"
                         type="button"
                         onClick={() => setMerchantForm(null)}
                       >
