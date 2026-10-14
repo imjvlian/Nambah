@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import BannerAdminPanel from "@/components/BannerAdminPanel";
 import { BRAND } from "@/lib/brand";
+import { requireAdminPageScope } from "@/lib/admin-page-guard";
 
 export const metadata: Metadata = {
-  title: `Promo Banners — ${BRAND.name} Admin`,
+  title: `Banner Promo — ${BRAND.name}`,
   description: "Kelola banner promo carousel beranda.",
 };
 
 export const dynamic = "force-dynamic";
 
-export default function BannerAdminPage() {
+export default async function BannerAdminPage() {
+  await requireAdminPageScope("pertumbuhan");
+
   return <BannerAdminPanel />;
 }

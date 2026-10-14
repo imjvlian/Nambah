@@ -53,15 +53,32 @@ type AdminSectionState = {
    * untuk membersihkan konteks saat dashboard turun.
    */
   setSection: (section: AdminSectionId | null) => void;
+  /**
+   * Role admin yang sedang bekerja, ditulis dashboard setelah session
+   * terbaca.
+   *
+   * Sidebar perlu ini untuk menyembunyikan grup yang tidak boleh dibuka.
+   * Nilainya TIDAK di-set di provider: yang mengetahuinya hanya dashboard,
+   * dan menebaknya di sini akan membuat sidebar menampilkan menu penuh
+   * selama session masih dimuat - persis kebalikan dari yang diinginkan.
+   *
+   * String kosong berarti "belum diketahui", dan `canAccessScope` memperlakukannya
+   * sebagai tidak punya akses apa pun.
+   */
+  role: string;
+  setRole: (role: string) => void;
 };
 
 const AdminSectionContext = createContext<AdminSectionState>({
   section: null,
   setSection: () => {},
+  role: "",
+  setRole: () => {},
 });
 
 export function AdminSectionProvider({ children }: { children: ReactNode }) {
   const [section, setSection] = useState<AdminSectionId | null>(null);
+  const [role, setRole] = useState("");
 
   // Stabil identitasnya supaya sidebar tidak ikut render ulang setiap
   // kali provider membuat fungsi baru.
@@ -69,8 +86,12 @@ export function AdminSectionProvider({ children }: { children: ReactNode }) {
     (next: AdminSectionId | null) => setSection(next),
     [],
   );
+  const publishRole = useCallback((next: string) => setRole(next), []);
 
-  const value = useMemo(() => ({ section, setSection: set }), [section, set]);
+  const value = useMemo(
+    () => ({ section, setSection: set, role, setRole: publishRole }),
+    [section, set, role, publishRole],
+  );
 
   return (
     <AdminSectionContext.Provider value={value}>

@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { canAccessRoute } from "@/lib/admin-scope";
+
 export const ADMIN_SESSION_COOKIE = "nambah_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 2 * 60 * 60;
 
@@ -174,6 +176,29 @@ export function authorizeAdminRequest(
     return {
       ok: false as const,
       response: Response.json({ error: "Superadmin access required." }, { status: 403 }),
+    };
+  }
+
+  /*
+   * Pembatasan grup kerja.
+   *
+   * Peta route ada di `ROUTE_SCOPE` dan dibaca dari pathname request, bukan
+   * dari argumen di setiap route. Alasannya jumlah route admin cukup banyak
+   * sampai satu baris yang lupa di 38 tempat akan benar-benar terjadi - dan
+   * satu baris lupa itu berarti endpoint yang harus tertutup jadi terbuka.
+   *
+   * Arah kegagalan dipilih yang aman: route yang TIDAK ada di peta menolak
+   * role admin. Jadi route baru yang belum dipetakan tidak pernah
+   * membuka data secara tidak sengaja; paling buruk operator superadmin
+   * yang menemukan endpoint barunya masih perlu satu entri peta.
+   */
+  if (!canAccessRoute(principal.role, new URL(request.url).pathname)) {
+    return {
+      ok: false as const,
+      response: Response.json(
+        { error: "Bagian ini tidak tersedia untuk akun admin." },
+        { status: 403 },
+      ),
     };
   }
 

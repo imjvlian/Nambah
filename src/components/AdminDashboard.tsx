@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatIDR, suggestPriceFromCost } from "@/lib/pricing";
 import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
@@ -15,6 +15,11 @@ import {
   canManageAdmins,
   wouldRemoveLastSuperadmin,
 } from "@/lib/admin-access-rules";
+import {
+  canAccessScope,
+  firstAllowedSection,
+  SECTION_SCOPE,
+} from "@/lib/admin-scope";
 import { BRAND } from "@/lib/brand";
 
 type AdminSection =
@@ -1024,7 +1029,8 @@ export default function AdminDashboard() {
    * `setSection` yang sama. Tidak ada lagi yang bisa tidak sinkron karena
    * hanya ada satu nilai.
    */
-  const { section: activeSection, setSection } = useAdminSection();
+  const { section: activeSection, setSection, role: contextRole, setRole } =
+    useAdminSection();
   const section: AdminSection = activeSection ?? "overview";
 
   /*
@@ -1049,6 +1055,7 @@ export default function AdminDashboard() {
    */
   useEffect(() => {
     if (activeSection !== null) return;
+    if (!contextRole) return;
 
     const requested = new URLSearchParams(window.location.search).get(
       "seksi",
@@ -1057,10 +1064,30 @@ export default function AdminDashboard() {
       ? NAV.find((item) => item.id === requested)
       : undefined;
 
-    // Tanpa query yang cocok, tetap diisi dengan Ringkasan supaya tidak
-    // ada render pertama tanpa section.
-    setSection(match?.id ?? "overview");
-  }, [activeSection, setSection]);
+    /*
+     * Section awal harus section yang BOLEH dibuka.
+     *
+     * Tanpa pemeriksaan ini, admin yang mendapat tautan `?seksi=users`
+     * akan mendarat di section yang endpointnya menolak - operator melihat
+     * error 403 tanpa penjelasan. Menolak deep-link yang tidak diizinkan
+     * lebih baik daripada memuat halaman yang pasti gagal.
+     */
+    const sectionAllowed = (id: string) =>
+      canAccessScope(contextRole, SECTION_SCOPE[id] ?? "sistem");
+
+    const pilihan =
+      match && sectionAllowed(match.id)
+        ? match.id
+        : firstAllowedSection(
+            contextRole,
+            NAV.map((item) => item.id),
+            (id) => SECTION_SCOPE[id] ?? "sistem",
+          );
+
+    // Tanpa query yang cocok, tetap diisi supaya tidak ada render
+    // pertama tanpa section.
+    if (pilihan) setSection(pilihan);
+  }, [activeSection, setSection, contextRole]);
 
   /*
    * Saat dashboard tidak ada di layar, tidak boleh ada section yang
@@ -1076,7 +1103,19 @@ export default function AdminDashboard() {
    */
   useEffect(() => () => setSection(null), []);
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
-  const [adminRole, setAdminRole] = useState("");
+  const [adminRole, setAdminRoleState] = useState("");
+  /*
+   * Role hanya bisa diketahui setelah session terbaca, tapi sidebar sudah
+   * ter-render lebih dulu - jadi dashboard yang memublikasikannya ke
+   * konteks. Sidebar membaca dari sana, tidak pernah menebaknya sendiri.
+   */
+  const setAdminRole = useCallback(
+    (next: string) => {
+      setAdminRoleState(next);
+      setRole(next);
+    },
+    [setRole],
+  );
   const [overview, setOverview] = useState<OverviewPayload | null>(null);
   const [catalog, setCatalog] = useState<CatalogPayload | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -2088,9 +2127,30 @@ const txDataStamp = txRange.preset
         }
 
         setAdminUser(data.user ?? null);
-        setAdminRole(data.role ?? "admin");
+        const role = data.role ?? "admin";
+        setAdminRole(role);
 
-        await Promise.all([loadOverview(), loadCatalog()]);
+        /*
+         * Muat HANYA yang boleh diakses role ini.
+         *
+         * Versi lama selalu memanggil overview dan catalog. begitu role
+         * dibatasi, panggilan itu berhenti dengan 403 - dan karena seluruh
+         * pemuatan dibungkus satu try/catch, satu 403 menjatuhkan
+         * `authState` ke "guest". Akibatnya admin melihat halaman login,
+         * bukan dashboard-nya. Itu alias, bukan error.
+         *
+         * Kegagalan pemuatan data juga tidak boleh menjatuhkan seluruh
+         * dashboard. Pola di bawah dipisah supaya satu endpoint yang
+         * sedang bermasalah tidak menutup semua halaman.
+         */
+        const muatan = [loadOverview(), loadCatalog()].map((promise) =>
+          promise.catch((error) => {
+            console.error("Dashboard initial load failed", error);
+            return null;
+          }),
+        );
+        await Promise.all(muatan);
+
         if (mounted) setAuthState("ready");
       } catch (error) {
         if (mounted) {

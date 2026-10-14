@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { isTestLabEnabled } from "@/lib/test-lab-access";
+import { canAccessScope, groupScopeFor } from "@/lib/admin-scope";
 
 import {
   IconAffiliates,
@@ -389,7 +390,7 @@ export default function AdminSidebar({
   activeHref: string;
 }) {
   const pathname = usePathname();
-  const { section: activeSection, setSection: selectSection } =
+  const { section: activeSection, setSection: selectSection, role } =
     useAdminSection();
 
   /*
@@ -574,6 +575,24 @@ export default function AdminSidebar({
              * menampilkan pintasan ke halaman yang menolaknya hanya membiarkan
              * bahwa alatnya ada. Keduanya harus hilang.
              */
+            /*
+             * Grup yang tidak boleh dibuka role ini disembunyikan utuh,
+             * bukan hanya butirnya. Kalau grup "Sistem" masih muncul dengan
+             * isinya dikosongkan, operator akan mengira ada bagian yang
+             * belum dimuat - dan grup kosong juga merusak hitungan baris
+             * per grup yang dipakai sidebar.
+             *
+             * `role` kosong selama session belum terbaca, dan itu berarti
+             * tidak ada yang ditampilkan. Menampilkan menu penuh dulu lalu
+             * menghapusnya beberapa saat kemudian terlihat seperti glitch;
+             * kosong sampai role diketahui jauh lebih tenang.
+             */
+            const groupScope = groupScopeFor(group);
+            const groupAllowed =
+              groupScope === null || canAccessScope(role, groupScope);
+
+            if (!groupAllowed) return null;
+
             const items = ADMIN_NAV.filter((item) => item.group === group);
             const tools = ADMIN_TOOLS.filter(
               (tool) =>

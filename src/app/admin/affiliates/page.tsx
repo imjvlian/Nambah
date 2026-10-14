@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AffiliateAdminPanel from "@/components/AffiliateAdminPanel";
 import { BRAND } from "@/lib/brand";
+import { requireAdminPageScope } from "@/lib/admin-page-guard";
 
 export const metadata: Metadata = {
   title: `Pusat Pencairan Mitra - ${BRAND.name}`,
@@ -9,6 +10,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function AffiliateAdminPage() {
+export default async function AffiliateAdminPage() {
+  await requireAdminPageScope("keuangan");
+
   return <AffiliateAdminPanel />;
 }
