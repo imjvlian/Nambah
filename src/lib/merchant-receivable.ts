@@ -6,6 +6,7 @@ import {
   type MerchantReceivableSummary,
 } from "@/lib/merchant-receivable-types";
 import { classifyReceivables } from "@/lib/merchant-receivable-rules";
+import { merchantReceivableAmount } from "@/lib/merchant-retail-rules";
 
 /**
  * Piutang merchant: dari order yang baru saja sukses sampai merchant transfer.
@@ -81,7 +82,18 @@ export async function getMerchantReceivables(
 
   const summary = classifyReceivables(
     rows.map((row) => ({
-      final_price: Number(row.final_price) || 0,
+      /*
+       * `final_price` di sini berarti PIUTANG Lacte, bukan harga yang
+       * dibayar pengguna. Kolom `service_fee_amount` sengaja di-SELECT tapi
+       * tidak pernah dipakai - dan itu bug: fee layanan sudah termasuk di
+       * dalam `final_price`, jadi menjumlahkannya mentah berarti cron ini
+       * mengirim alert "piutang lewat tenggat" untuk uang yang bukan milik
+       * Lacte.
+       */
+      final_price: merchantReceivableAmount({
+        finalPrice: row.final_price,
+        serviceFee: row.service_fee_amount,
+      }),
       receivable_due_at: row.receivable_due_at,
     })),
   );

@@ -30,6 +30,8 @@
  *    yang sudah diterima.
  */
 
+import { merchantReceivableAmount } from "@/lib/merchant-retail-rules";
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Status order yang menghasilkan uang benar-benar diterima Lacte. */
@@ -51,6 +53,14 @@ export type CashFlowOrder = {
   referral_discount: number | string;
   merchant_id: string | null;
   service_fee_amount: number | string | null;
+  /**
+   * Potongan payment gateway yang ditanggung Lacte.
+   *
+   * Sudah dipotong dari `nambah_profit` di `pricing.ts`, jadi kalau tidak
+   * ditampilkan sebagai "uang keluar" operator akan melihat margin yang
+   * terlalu kecil tanpa bisa mencari ke mana selisihnya pergi.
+   */
+  merchant_payment_cost: number | string | null;
   created_at: string;
 };
 
@@ -99,6 +109,24 @@ export type CashFlowDay = {
   merchantSettled: number;
   /** Uang keluar pencairan afiliasi (lunas) pada hari itu. */
   affiliatePaidOut: number;
+  /** Biaya payment gateway yang terpakai order success hari itu. */
+  gatewayFee: number;
+  /**
+   * Total uang yang benar-benar MASUK ke rekening Lacte hari itu.
+   *
+   * Dua sumber saja: pembayaran langsung order non-retel, dan pelunasan
+   * transfer dari toko ritel. Order ritel sendiri TIDAK di sini - uangnya
+   * dibayar di tokonya dan baru masuk saat `merchantSettled` tercatat.
+   */
+  cashIn: number;
+  /**
+   * Total uang yang benar-benar KELUAR dari rekening Lacte hari itu.
+   *
+   * Modal supplier + pencairan afiliasi lunas + biaya gateway.
+   */
+  cashOut: number;
+  /** `cashIn - cashOut`. Boleh negatif - itu berarti kas keluar lebih. */
+  netCash: number;
 };
 
 export type CashFlowTotals = {
@@ -148,6 +176,14 @@ export type CashFlowTotals = {
   affiliatePaidOut: number;
   /** Jumlah pencairan lunas dalam periode. */
   affiliatePaidCount: number;
+  /** Total biaya payment gateway yang terpakai di periode ini. */
+  gatewayFee: number;
+  /** Total kas masuk periode: pembayaran langsung + pelunasan ritel. */
+  cashIn: number;
+  /** Total kas keluar periode: modal supplier + pencairan afiliasi + fee gateway. */
+  cashOut: number;
+  /** `cashIn - cashOut`. Boleh negatif. */
+  netCash: number;
 };
 
 export type CashFlowByMethod = {
@@ -184,6 +220,65 @@ export function dayKey(iso: string) {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return null;
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Titik harian kosong.
+ *
+ * Satu-satunya cara membuat bucket baru. Versi sebelumnya menyalin literal
+ * objek di lima tempat, dan setiap kolom baru berisiko hilang dari salah
+ * satu salinan - `merchantSettled` sudah pernah begitu, dan bucket yang
+ * lupa dibuat ulang diam-diam mengembalikan objek dengan angka `undefined`.
+ */
+function emptyDay(date: string): CashFlowDay {
+  return {
+    date,
+    orders: 0,
+    grossRevenue: 0,
+    supplierCost: 0,
+    profit: 0,
+    merchantSettled: 0,
+    affiliatePaidOut: 0,
+    gatewayFee: 0,
+    cashIn: 0,
+    cashOut: 0,
+    netCash: 0,
+  };
+}
+
+/**
+ * Bucket harian, dibuat kalau belum ada.
+ *
+ * Mengembalikan objek yang SUDAH di-register di `days` - bukan salinan.
+ * Tanpa ini, `day.x += 1` pada hasil fungsi ini menambah angka ke objek
+ * sementara, dan Map tetap menyimpan bucket lama yang tidak pernah berubah.
+ */
+function dayBucket(days: Map<string, CashFlowDay>, key: string) {
+  const existing = days.get(key);
+  if (existing) return existing;
+
+  const created = emptyDay(key);
+  days.set(key, created);
+  return created;
+}
+
+/**
+ * Cash masuk, cash keluar, dan selisihnya untuk satu titik harian.
+ *
+ * Dihitung ulang setiap kali ada yang berubah, bukan dijumlahkan manual per
+ * kolom. Kalau `cashOut` dijumlahkan terpisah dari `supplierCost` +
+ * `affiliatePaidOut` + `gatewayFee`, satu kolom yang lupa ikut dihitung akan
+ * membuat "Selisih" terlihat benar padahal tidak.
+ *
+ * `cashIn` HANYA dua sumber: pembayaran langsung dan pelunasan ritel. Order
+ * ritel tidak masuk karena uangnya dibayar di toko dan baru sampai lewat
+ * pelunasan. Biaya layanan toko tidak masuk ke kolom mana pun - uangnya tak
+ * pernah melewati Lacte.
+ */
+function recomputeCash(day: CashFlowDay) {
+  day.cashIn = day.grossRevenue + day.merchantSettled;
+  day.cashOut = day.supplierCost + day.affiliatePaidOut + day.gatewayFee;
+  day.netCash = day.cashIn - day.cashOut;
 }
 
 /**
@@ -229,6 +324,10 @@ export function buildCashFlowReport(input: {
     failedOrders: 0,
     affiliatePaidOut: 0,
     affiliatePaidCount: 0,
+    gatewayFee: 0,
+    cashIn: 0,
+    cashOut: 0,
+    netCash: 0,
   };
 
   const withinRange = (iso: string | null) => {
@@ -273,7 +372,18 @@ export function buildCashFlowReport(input: {
        * diteruskan ke merchant.
        */
       totals.merchantOrders += 1;
-      totals.merchantReceivable += revenue;
+      /*
+       * Piutang ritel memakai `final_price` DIKURANGI biaya layanan toko.
+       *
+       * `final_price` sudah memuat `merchantServiceFee`, dan fee itu dibayar
+       * pengguna langsung ke merchant - tidak pernah melewati Lacte. Memakainya
+       * sebagai piutang membuat kartu "Posisi piutang toko ritel" di halaman
+       * ini lebih besar daripada angka yang sama di halaman Toko ritel.
+       */
+      totals.merchantReceivable += merchantReceivableAmount({
+        finalPrice: revenue,
+        serviceFee: order.service_fee_amount,
+      });
       totals.merchantServiceFee += num(order.service_fee_amount);
     } else {
       totals.orders += 1;
@@ -288,19 +398,11 @@ export function buildCashFlowReport(input: {
 
     const key = dayKey(order.created_at);
     if (key) {
-      const day = days.get(key) ?? {
-        date: key,
-        orders: 0,
-        grossRevenue: 0,
-        supplierCost: 0,
-        profit: 0,
-        merchantSettled: 0,
-        affiliatePaidOut: 0,
-      };
+      const day = dayBucket(days, key);
       /*
        * Grafik harian harus ikut aturan yang sama dengan total. Kalau
        * harian masih menjumlahkan order ritel, jumlah batanganya tidak
-       * akan sama dengan kartu omzet - dan operator akan-finding dua
+       * akan sama dengan kartu omzet - dan operator akan menemukan dua
        * laporan yang berbeda di halaman yang sama.
        */
       if (!isMerchant) {
@@ -309,7 +411,8 @@ export function buildCashFlowReport(input: {
         day.profit += profit;
       }
       day.supplierCost += supplierCost;
-      days.set(key, day);
+      day.gatewayFee += num(order.merchant_payment_cost);
+      recomputeCash(day);
     }
 
     const methodId = order.payment_method_id ?? "unknown";
@@ -342,17 +445,9 @@ export function buildCashFlowReport(input: {
 
     const key = dayKey(payment.created_at);
     if (key) {
-      const day = days.get(key) ?? {
-        date: key,
-        orders: 0,
-        grossRevenue: 0,
-        supplierCost: 0,
-        profit: 0,
-        merchantSettled: 0,
-        affiliatePaidOut: 0,
-      };
+      const day = dayBucket(days, key);
       day.merchantSettled += num(payment.amount);
-      days.set(key, day);
+      recomputeCash(day);
     }
   }
 
@@ -372,17 +467,9 @@ export function buildCashFlowReport(input: {
 
     const key = dayKey(withdrawal.paid_at);
     if (key) {
-      const day = days.get(key) ?? {
-        date: key,
-        orders: 0,
-        grossRevenue: 0,
-        supplierCost: 0,
-        profit: 0,
-        merchantSettled: 0,
-        affiliatePaidOut: 0,
-      };
+      const day = dayBucket(days, key);
       day.affiliatePaidOut += amount;
-      days.set(key, day);
+      recomputeCash(day);
     }
   }
 
@@ -393,6 +480,21 @@ export function buildCashFlowReport(input: {
   totals.merchantOutstanding = totals.merchantReceivable - totals.merchantSettled;
 
   /*
+   * Total kas dihitung dari BARIS HARIAN, bukan dijumlahkan ulang dari
+   * totals di atas.
+   *
+   * Alasannya: `grossRevenue` dan `merchantSettled` sudah ada di sini, tapi
+   * menjadikannya dua daftar terpisah berarti "uang masuk" punya definisi
+   * sendiri yang harus dijagaManual. Kalau salah satu tempat lupa, kartu
+   * TOTAL dan penjumlahan kolom tabel akan berbeda - dan kolom "Selisih"
+   * yang justru paling dipercaya akan jadi tempat kesalahan itu bersembunyi.
+   */
+  for (const day of days.values()) totals.gatewayFee += day.gatewayFee;
+  totals.cashIn = totals.grossRevenue + totals.merchantSettled;
+  totals.cashOut = totals.supplierCost + totals.affiliatePaidOut + totals.gatewayFee;
+  totals.netCash = totals.cashIn - totals.cashOut;
+
+  /*
    * Isi hari yang tanpa order dengan nol, supaya grafik tidak salah
    * menyiratkan ada order pada hari yang sebenarnya kosong. Grafik yang
    * hanya memuat hari bertransaksi akan terlihat lebih "!ramai" daripada
@@ -401,18 +503,7 @@ export function buildCashFlowReport(input: {
   const cursor = new Date(fromMs);
   cursor.setUTCHours(0, 0, 0, 0);
   while (cursor.getTime() <= toMs) {
-    const key = cursor.toISOString().slice(0, 10);
-    if (!days.has(key)) {
-      days.set(key, {
-        date: key,
-        orders: 0,
-        grossRevenue: 0,
-        supplierCost: 0,
-        profit: 0,
-        merchantSettled: 0,
-        affiliatePaidOut: 0,
-      });
-    }
+    dayBucket(days, cursor.toISOString().slice(0, 10));
     cursor.setTime(cursor.getTime() + DAY_MS);
   }
 
@@ -456,6 +547,10 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
     "Margin",
     "Transfer Merchant",
     "Pencairan Afiliasi",
+    "Fee Gateway",
+    "Uang Masuk",
+    "Uang Keluar",
+    "Selisih",
   ];
 
   const escape = (value: string | number) => {
@@ -472,6 +567,10 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       day.profit,
       day.merchantSettled,
       day.affiliatePaidOut,
+      day.gatewayFee,
+      day.cashIn,
+      day.cashOut,
+      day.netCash,
     ]
       .map(escape)
       .join(","),
@@ -488,6 +587,10 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       totals.grossProfit,
       totals.merchantSettled,
       totals.affiliatePaidOut,
+      totals.gatewayFee,
+      totals.cashIn,
+      totals.cashOut,
+      totals.netCash,
     ]
       .map(escape)
       .join(","),

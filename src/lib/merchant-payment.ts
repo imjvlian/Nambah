@@ -6,6 +6,7 @@ import {
   type PayableInvoice,
 } from "@/lib/merchant-payment-rules";
 import { syncMerchantBalance } from "@/lib/merchant-retail";
+import { merchantReceivableAmount } from "@/lib/merchant-retail-rules";
 import {
   supabaseInsert,
   supabaseSelect,
@@ -72,10 +73,11 @@ async function getPayableInvoices(
   const rows = await supabaseSelect<{
     id: string;
     final_price: number | string;
+    service_fee_amount: number | string | null;
     receivable_due_at: string | null;
     created_at: string;
   }>("orders", {
-    select: "id,final_price,receivable_due_at,created_at",
+    select: "id,final_price,service_fee_amount,receivable_due_at,created_at",
     filters: {
       merchant_id: `eq.${merchantId}`,
       status: "eq.success",
@@ -85,9 +87,23 @@ async function getPayableInvoices(
     limit: 1000,
   });
 
+  /*
+   * Tagihan per order = `final_price` dikurangi biaya layanan toko.
+   *
+   * Ini angka yang akan dibandingkan dengan uang yang benar-benar ditransfer
+   * merchant, jadi harus sama persis dengan yang dipakai `getOutstandingReceivable`.
+   *
+   * Kalau di sini `final_price` mentah sementara piutang yang ditampilkan
+   * memakai nilai bersih, transfer yang BENAR justru selalu terlihat kurang,
+   * order tidak pernah ditandai lunas, dan piutang terus bertambah padahal
+   * uangnya sudah masuk.
+   */
   return rows.map((row) => ({
     orderId: row.id,
-    finalPrice: Number(row.final_price) || 0,
+    finalPrice: merchantReceivableAmount({
+      finalPrice: row.final_price,
+      serviceFee: row.service_fee_amount,
+    }),
     receivableDueAt: row.receivable_due_at,
     createdAt: row.created_at,
   }));

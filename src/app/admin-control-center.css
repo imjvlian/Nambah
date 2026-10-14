@@ -5918,3 +5918,37 @@
   font-size: 10px;
   line-height: 1.45;
 }
+
+/*
+ * Penjelasan di bawah tabel arus kas harian.
+ *
+ * `.acc-form-notice` (10px) terlalu kecil untuk paragraf yang harus dibaca
+ * operator untuk memahami angka "Selisih". Ini versi tabel: lebih besar,
+ * ada jarak dari tabel, dan warnanya sedikit lebih terang supaya terbaca
+ * sebagai penjelasan - bukan sebagai metadata yang boleh dilewati.
+ */
+.acc-table-note {
+  display: block;
+  margin: 10px 16px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* Warna Selisih harian di tabel kas. */
+.acc-net-positive {
+  color: #9fd48a;
+  font-weight: 800;
+}
+
+.acc-net-negative {
+  color: #e0aaaa;
+  font-weight: 800;
+}
+
+/* Baris TOTAL harus terlihat berbeda dari data, bukan baris biasa. */
+.acc-table tfoot td {
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, .03);
+  font-weight: 800;
+}

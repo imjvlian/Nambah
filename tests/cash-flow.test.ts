@@ -34,6 +34,7 @@ function order(over: Partial<CashFlowOrder> = {}): CashFlowOrder {
     referral_discount: 0,
     merchant_id: null,
     service_fee_amount: null,
+    merchant_payment_cost: null,
     created_at: "2026-10-02T10:00:00.000Z",
     ...over,
   };
@@ -440,4 +441,226 @@ test("CSV mengutip nilai yang mengandung koma", () => {
   });
   const csv = cashFlowReportToCsv(report);
   assert.ok(csv.includes('"a,b"'));
+});
+
+/* ==========================================================================
+   Piutang ritel dan biaya layanan toko.
+
+   `final_price` sudah memuat `merchantServiceFee`, dan fee itu dibayar
+   pengguna LANGSUNG ke merchant - tidak pernah melewati Lacte. Jadi fee
+   bukan piutang Lacte. Memakainya sebagai piutang membuat merchant
+   ditagih biaya layanan tokonya sendiri.
+   ========================================================================== */
+
+test("piutang ritel dikurangi biaya layanan toko", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({
+        merchant_id: "m-1",
+        final_price: 7_100,
+        service_fee_amount: 2_000,
+        nambah_profit: 853,
+      }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  // 7.100 - 2.000, bukan 7.100.
+  assert.equal(report.totals.merchantReceivable, 5_100);
+  // Fee tetap dilacak supaya bisa dicocokkan dengan yang diteruskan.
+  assert.equal(report.totals.merchantServiceFee, 2_000);
+});
+
+test("order ritel tanpa fee tidak berubah", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({ merchant_id: "m-1", final_price: 5_100, service_fee_amount: 0 }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.merchantReceivable, 5_100);
+});
+
+/* ==========================================================================
+   Catatan kas harian: masuk dari mana, keluar untuk apa.
+   ========================================================================== */
+
+test("kas harian: masuk hanya dari pembayaran langsung + pelunasan ritel", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({ id: "biasa", final_price: 100_000, supplier_cost: 80_000 }),
+      // Order ritel TIDAK boleh dihitung sebagai kas masuk: uangnya
+      // dibayar di toko dan baru masuk lewat pelunasan.
+      order({
+        id: "ritel",
+        merchant_id: "m-1",
+        final_price: 50_000,
+        service_fee_amount: 5_000,
+        supplier_cost: 40_000,
+        created_at: "2026-10-02T11:00:00.000Z",
+      }),
+    ],
+    merchantPayments: [
+      { merchant_id: "m-1", amount: 50_000, created_at: "2026-10-02T12:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const day = report.days.find((d) => d.date === "2026-10-02");
+  // 100.000 pembayaran langsung + 50.000 pelunasan ritel.
+  assert.equal(day?.cashIn, 150_000);
+  // Modal kedua order keluar di hari yang sama: 80.000 + 40.000.
+  assert.equal(day?.cashOut, 120_000);
+  assert.equal(day?.netCash, 30_000);
+});
+
+test("kas harian: pencairan afiliasi keluar di hari paid_at", () => {
+  const report = buildCashFlowReport({
+    orders: [order({ final_price: 100_000, supplier_cost: 80_000 })],
+    affiliateWithdrawals: [
+      { id: 1, amount: 30_000, paid_at: "2026-10-02T14:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const day = report.days.find((d) => d.date === "2026-10-02");
+  assert.equal(day?.cashOut, 80_000 + 30_000);
+  assert.equal(day?.cashIn, 100_000);
+  assert.equal(day?.netCash, -10_000);
+});
+
+test("fee gateway dihitung sebagai uang keluar", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({
+        final_price: 100_000,
+        supplier_cost: 80_000,
+        merchant_payment_cost: 3_000,
+      }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const day = report.days.find((d) => d.date === "2026-10-02");
+  assert.equal(day?.gatewayFee, 3_000);
+  assert.equal(day?.cashOut, 83_000);
+});
+
+test("biaya layanan toko tidak masuk sebagai kas masuk maupun keluar", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({
+        merchant_id: "m-1",
+        final_price: 43_100,
+        service_fee_amount: 3_000,
+        supplier_cost: 32_600,
+      }),
+    ],
+    merchantPayments: [
+      { merchant_id: "m-1", amount: 40_100, created_at: "2026-10-02T12:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const day = report.days.find((d) => d.date === "2026-10-02");
+  // Pelunasan yang dicatat 40.100 (tanpa fee) adalah satu-satunya kas masuk.
+  assert.equal(day?.cashIn, 40_100);
+  // Fee 3.000 tidak boleh muncul sebagai kas keluar - uangnya bukan milik Lacte.
+  assert.equal(day?.cashOut, 32_600);
+  assert.equal(day?.netCash, 7_500);
+});
+
+test("hari tanpa transaksi tetap punya kas masuk dan keluar nol", () => {
+  const report = buildCashFlowReport({ orders: [], from: FROM, to: TO });
+
+  for (const day of report.days) {
+    assert.equal(day.cashIn, 0);
+    assert.equal(day.cashOut, 0);
+    assert.equal(day.netCash, 0);
+  }
+});
+
+test("total kas sama dengan penjumlahan baris harian", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({ id: "a", created_at: "2026-10-01T08:00:00.000Z", final_price: 100_000, supplier_cost: 80_000, merchant_payment_cost: 1_000 }),
+      order({ id: "b", created_at: "2026-10-03T08:00:00.000Z", final_price: 60_000, supplier_cost: 50_000 }),
+    ],
+    merchantPayments: [
+      { merchant_id: "m-1", amount: 25_000, created_at: "2026-10-02T10:00:00.000Z" },
+    ],
+    affiliateWithdrawals: [
+      { id: 1, amount: 10_000, paid_at: "2026-10-02T10:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const dayIn = report.days.reduce((sum, day) => sum + day.cashIn, 0);
+  const dayOut = report.days.reduce((sum, day) => sum + day.cashOut, 0);
+  const dayNet = report.days.reduce((sum, day) => sum + day.netCash, 0);
+
+  // Kolom TOTAL harus bisa direkonsiliasi dengan menjumlahkan tabelnya.
+  // Kalau tidak, kartu TOTAL dan penjumlahan kolom akan berbeda.
+  assert.equal(report.totals.cashIn, dayIn);
+  assert.equal(report.totals.cashOut, dayOut);
+  assert.equal(report.totals.netCash, dayNet);
+  assert.equal(report.totals.cashIn, 160_000 + 25_000);
+  assert.equal(report.totals.cashOut, 130_000 + 10_000 + 1_000);
+});
+
+test("bucket harian tetap mencatat hari yang sama walau transaksi berurutan", () => {
+  /*
+   * Regresi untuk bug bucket: kalau bucket baru dibuat dengan menyalin
+   * objek dan `days.set` tidak dipanggil untuk hari yang sudah ada,
+   * penambahan kedua pada hari yang sama akan hilang.
+   */
+  const report = buildCashFlowReport({
+    orders: [
+      order({ id: "a", created_at: "2026-10-02T08:00:00.000Z", final_price: 10_000 }),
+      order({ id: "b", created_at: "2026-10-02T09:00:00.000Z", final_price: 20_000 }),
+      order({ id: "c", created_at: "2026-10-02T10:00:00.000Z", final_price: 30_000 }),
+    ],
+    merchantPayments: [
+      { merchant_id: "m-1", amount: 5_000, created_at: "2026-10-02T11:00:00.000Z" },
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const day = report.days.find((d) => d.date === "2026-10-02");
+  assert.equal(day?.orders, 3);
+  assert.equal(day?.grossRevenue, 60_000);
+  assert.equal(day?.merchantSettled, 5_000);
+  assert.equal(day?.cashIn, 65_000);
+});
+
+test("CSV harian memuat kolom masuk, keluar, dan selisih", () => {
+  const report = buildCashFlowReport({
+    orders: [
+      order({
+        final_price: 100_000,
+        supplier_cost: 80_000,
+        merchant_payment_cost: 2_000,
+      }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  const csv = cashFlowReportToCsv(report);
+  assert.ok(csv.includes("Uang Masuk"));
+  assert.ok(csv.includes("Uang Keluar"));
+  assert.ok(csv.includes("Selisih"));
+  assert.ok(csv.includes("Fee Gateway"));
+  // 100.000 masuk; 80.000 + 2.000 keluar; sisih 18.000.
+  assert.ok(/2026-10-02,1,100000,80000,20000,0,0,2000,100000,82000,18000/.test(csv));
+  assert.ok(/TOTAL,1,100000,80000,20000,0,0,2000,100000,82000,18000/.test(csv));
 });

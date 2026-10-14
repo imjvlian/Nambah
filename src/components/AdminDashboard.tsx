@@ -431,6 +431,10 @@ type CashFlowPayload = {
     profit: number;
     merchantSettled: number;
     affiliatePaidOut: number;
+    gatewayFee: number;
+    cashIn: number;
+    cashOut: number;
+    netCash: number;
   }>;
   totals: {
     orders: number;
@@ -448,6 +452,10 @@ type CashFlowPayload = {
     failedOrders: number;
     affiliatePaidOut: number;
     affiliatePaidCount: number;
+    gatewayFee: number;
+    cashIn: number;
+    cashOut: number;
+    netCash: number;
   };
   byMethod: Array<{
     paymentMethodId: string;
@@ -690,6 +698,29 @@ function formatTime(value: string | null | undefined) {
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
+  }).format(date);
+}
+
+/**
+ * Label tanggal untuk baris harian arus kas.
+ *
+ * Bucket harian memakai kunci `YYYY-MM-DD` hasil `toISOString()` di server,
+ * jadi string itu sudah MEWAKILI tengah malam UTC - bukan jam dinding.
+ * `new Date("2026-10-14")` akan mem-parse-nya sebagai tengah malam
+ * LOKAL, dan di server yang timezone-nya bukan UTC tanggalnya bisa geser
+ * sehari. Karena itu offset nol ditulis secara eksplisit, lalu diformat
+ * dengan `timeZone: UTC` supaya hasilnya tidak ikut timezone browser
+ * operator.
+ */
+function formatWibDayLabel(dayKey: string) {
+  const date = new Date(`${dayKey}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return dayKey;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   }).format(date);
 }
 
@@ -3032,6 +3063,34 @@ const txDataStamp = txRange.preset
     return items;
   }, [overview]);
 
+  /*
+   * Baris "Catatan kas harian" hanya memuat hari yang ada geraknya.
+   *
+   * Grafik memang butuh semua hari - hari kosong penting agar grafik tidak
+   * menyiratkan ada transaksi. Tabel berbeda: 30 hari kosong akan berubah
+   * menjadi 30 baris nol yang tidak dibaca siapa pun, dan hari yang benar
+   * ada isinya terdorong ke bawah.
+   *
+   * Baris TOTAL tetap mencakup seluruh periode, jadi menyembunyikan hari
+   * sepi tidak mengubah angka mana pun - dan jumlah yang disembunyikan
+   * disebut supaya operator tahu tabelnya tidak lengkap dengan sendirinya.
+   */
+  const cashFlowDaysDescending = (cashFlowData?.days ?? [])
+    .filter(
+      (day) =>
+        day.orders > 0 ||
+        day.grossRevenue > 0 ||
+        day.merchantSettled > 0 ||
+        day.supplierCost > 0 ||
+        day.affiliatePaidOut > 0 ||
+        day.gatewayFee > 0,
+    )
+    .slice()
+    .sort((left, right) => right.date.localeCompare(left.date));
+
+  const hiddenCashFlowDayCount =
+    (cashFlowData?.days.length ?? 0) - cashFlowDaysDescending.length;
+
   if (authState === "loading") {
     return (
       <main className="admin-shell">
@@ -5112,6 +5171,140 @@ const txDataStamp = txRange.preset
                       days={cashFlowData.days}
                       profit={cashFlowData.totals.grossProfit}
                     />
+                  </div>
+
+                  {/*
+                   * Catatan kas harian.
+                   *
+                   * Chart di atas cuma menunjukkan satu angka (omzet). Untuk
+                   * "¿uang masuk hari ini dari mana, uang keluar untuk apa"
+                   * chart itu tidak menjawab apa pun - jadi tabel ini yang
+                   * memuat jawabannya, dengan setiap kolomnamed setelah
+                   * sumber dan tujuannya.
+                   *
+                   * Kolom dikelompokkan dua: yang MEMASUK dari rekening, dan
+                   * yang KELUAR dari rekening. Biaya layanan toko tidak ada
+                   * di kolom mana pun karena uangnya dibayar pengguna
+                   * langsung ke merchant dan tak pernah melewati Lacte.
+                   */}
+                  <div className="acc-table-card">
+                    <div className="acc-card-head">
+                      <span>Catatan kas harian</span>
+                      <small className="acc-card-head-note">
+                        uang masuk dan keluar per hari
+                      </small>
+                    </div>
+
+                    <div className="acc-table-scroll">
+                      <table className="acc-table">
+                        <thead>
+                          <tr>
+                            <th>Tanggal</th>
+                            <th>Pesanan</th>
+                            <th>Masuk: pembayaran</th>
+                            <th>Masuk: pelunasan toko</th>
+                            <th>Keluar: modal supplier</th>
+                            <th>Keluar: pencairan</th>
+                            <th>Keluar: fee gateway</th>
+                            <th>Selisih</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cashFlowDaysDescending.map((day) => (
+                            <tr key={day.date}>
+                              <td data-label="Tanggal">
+                                <strong>
+                                  {formatWibDayLabel(day.date)}
+                                </strong>
+                              </td>
+                              <td data-label="Pesanan">
+                                {day.orders}
+                              </td>
+                              <td data-label="Masuk: pembayaran">
+                                {formatIDR(day.grossRevenue)}
+                              </td>
+                              <td data-label="Masuk: pelunasan toko">
+                                {formatIDR(day.merchantSettled)}
+                              </td>
+                              <td data-label="Keluar: modal supplier">
+                                {formatIDR(day.supplierCost)}
+                              </td>
+                              <td data-label="Keluar: pencairan">
+                                {formatIDR(day.affiliatePaidOut)}
+                              </td>
+                              <td data-label="Keluar: fee gateway">
+                                {formatIDR(day.gatewayFee)}
+                              </td>
+                              <td data-label="Selisih">
+                                <span
+                                  className={
+                                    day.netCash < 0
+                                      ? "acc-net-negative"
+                                      : "acc-net-positive"
+                                  }
+                                >
+                                  {formatIDR(day.netCash)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td>TOTAL</td>
+                            <td>{cashFlowData.totals.orders}</td>
+                            <td>{formatIDR(cashFlowData.totals.grossRevenue)}</td>
+                            <td>
+                              {formatIDR(cashFlowData.totals.merchantSettled)}
+                            </td>
+                            <td>
+                              {formatIDR(cashFlowData.totals.supplierCost)}
+                            </td>
+                            <td>
+                              {formatIDR(cashFlowData.totals.affiliatePaidOut)}
+                            </td>
+                            <td>{formatIDR(cashFlowData.totals.gatewayFee)}</td>
+                            <td>
+                              <span
+                                className={
+                                  cashFlowData.totals.netCash < 0
+                                    ? "acc-net-negative"
+                                    : "acc-net-positive"
+                                }
+                              >
+                                {formatIDR(cashFlowData.totals.netCash)}
+                              </span>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {cashFlowDaysDescending.length === 0 ? (
+                      <div className="acc-empty">
+                        Belum ada transaksi pada periode ini.
+                      </div>
+                    ) : null}
+
+                    {hiddenCashFlowDayCount > 0 ? (
+                      <p className="acc-table-note">
+                        {hiddenCashFlowDayCount} hari tanpa transaksi
+                        disembunyikan. Baris TOTAL tetap mencakup seluruh
+                        periode.
+                      </p>
+                    ) : null}
+
+                    <p className="acc-table-note">
+                      Urutan baris terbaru di atas. "Masuk: pembayaran" adalah
+                      QRIS, VA, dan e-Wallet dari pembeli; "Masuk: pelunasan
+                      toko" adalah transfer dari toko ritel yang dicatat di
+                      Toko ritel. "Keluar: modal supplier" termasuk untuk
+                      order ritel - barangnya sudah dikirim meski uangnya
+                      masih ditunggu dari toko, jadi hari dengan order ritel
+                      besar bisa punya Selisih negatif. Biaya layanan toko
+                      tidak masuk kolom mana pun: dibayar pembeli langsung ke
+                      toko, tidak pernah melewati Lacte.
+                    </p>
                   </div>
 
                   <div className="acc-grid-two">

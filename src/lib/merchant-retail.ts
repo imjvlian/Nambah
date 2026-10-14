@@ -8,6 +8,7 @@ import {
 import {
   MAX_RECEIVABLE_IDR,
   evaluateMerchantCredit,
+  merchantReceivableAmount,
   type MerchantEligibility,
 } from "@/lib/merchant-retail-rules";
 import type { MerchantStatus } from "@/lib/merchant-retail-types";
@@ -133,8 +134,9 @@ export async function getMerchantByCode(code: string) {
 export async function getOutstandingReceivable(merchantId: string) {
   const rows = await supabaseSelect<{
     final_price: number | string;
+    service_fee_amount: number | string | null;
   }>("orders", {
-    select: "final_price",
+    select: "final_price,service_fee_amount",
     filters: {
       merchant_id: `eq.${merchantId}`,
       // Filter `status = awaiting_receivable` TIDAK dipakai di sini, dan itu
@@ -150,14 +152,29 @@ export async function getOutstandingReceivable(merchantId: string) {
     },
   });
 
-  // Piutang Lacte adalah harga produk saja (`final_price`).
-  //
-  // `service_fee_amount` SENGAJA tidak ikut dihitung. Biaya layanan itu
-  // dibayar user langsung ke merchant dan tidak pernah melewati Lacte —
-  // menghitungnya di sini akan menagih utang yang bukan milik Lacte, dan
-  // karena fee ikut terkirim ke supplier sebagai modal kerja, limit kredit
-  // merchant jadi tergambar lebih besar dari risiko sebenarnya.
-  return rows.reduce((total, row) => total + (Number(row.final_price) || 0), 0);
+  /*
+   * Piutang Lacte = `final_price` DIKURANGI `service_fee_amount`.
+   *
+   * `final_price` sudah memuat `merchantServiceFee` (lihat `pricing.ts`),
+   * dan biaya layanan itu dibayar pengguna langsung ke merchant - uangnya
+   * tidak pernah melewati Lacte. Jadi fee bukan piutang Lacte dan tidak
+   * boleh ditagih ke merchant.
+   *
+   * Catatan versi lama di sini menyatakan fee "sengaja tidak ikut
+   * dihitung", padahal kodenya hanya tidak meng-SELECT kolom itu -
+   * nilainya tetap ada di dalam `final_price`. Akibatnya merchant ditagih
+   * fee tokonya sendiri. Perhitungannya dipindah ke
+   * `merchantReceivableAmount` supaya tiga call site lain tidak bisa
+   * menyimpang lagi.
+   */
+  return rows.reduce(
+    (total, row) =>
+      total + merchantReceivableAmount({
+        finalPrice: row.final_price,
+        serviceFee: row.service_fee_amount,
+      }),
+    0,
+  );
 }
 
 /**
@@ -254,8 +271,11 @@ export async function getUnappliedPaymentCredit(merchantId: string) {
       select: "amount",
       filters: { merchant_id: `eq.${merchantId}` },
     }),
-    supabaseSelect<{ final_price: number | string }>("orders", {
-      select: "final_price",
+    supabaseSelect<{
+      final_price: number | string;
+      service_fee_amount: number | string | null;
+    }>("orders", {
+      select: "final_price,service_fee_amount",
       filters: {
         merchant_id: `eq.${merchantId}`,
         receivable_paid_at: "not.is.null",
@@ -267,8 +287,20 @@ export async function getUnappliedPaymentCredit(merchantId: string) {
     (total, row) => total + (Number(row.amount) || 0),
     0,
   );
+  /*
+   * `consumed` memakai helper yang sama dengan piutang yang sedang
+   * berjalan. Kalau ini menjumlahkan `final_price` mentah sementara
+   * `getOutstandingReceivable` memakai nilai bersih, selisihnya akan
+   * muncul sebagai kredit palsu - dan kredit palsu mengurangi piutang
+   * toko yang seharusnya masih berutang.
+   */
   const consumed = settled.reduce(
-    (total, row) => total + (Number(row.final_price) || 0),
+    (total, row) =>
+      total +
+      merchantReceivableAmount({
+        finalPrice: row.final_price,
+        serviceFee: row.service_fee_amount,
+      }),
     0,
   );
 

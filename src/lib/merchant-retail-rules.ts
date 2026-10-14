@@ -28,6 +28,47 @@ import type { MerchantStatus } from "@/lib/merchant-retail-types";
  */
 export const MAX_RECEIVABLE_IDR = 5_000_000;
 
+/**
+ * Piutang Lacte atas satu order ritel.
+ *
+ * `final_price` BUKAN jumlah yang Lacte terima dari toko.
+ *
+ * Susunan `final_price` (lihat `pricing.ts`):
+ *
+ *   finalPrice = loyaltyEligibleSpend + customerPaymentFee + merchantServiceFee
+ *
+ * `merchantServiceFee` adalah biaya layanan yang dibayar pengguna LANGSUNG
+ * ke merchant di tokonya. Uangnya tidak pernah melewati Lacte, jadi Lacte
+ * tidak punya hak atasnya dan tidak boleh menagihnya ke merchant.
+ *
+ * Fungsi ini pernah salah di empat tempat sekaligus:
+ * `getOutstandingReceivable`, `getUnappliedPaymentCredit`,
+ * `getPayableInvoices` (basis alokasi FIFO), dan `merchantReceivable` di
+ * laporan arus kas semuanya menjumlahkan `final_price` mentah. Akibatnya
+ * merchant ditagih biaya layanan tokonya sendiri, dan karena FIFO memakai
+ * angka yang sama, pelunasan yang benar justru selalu terlihat kurang.
+ *
+ * Kenapa satu fungsi, bukan pengurangan di tiap tempat: keempat call site
+ * menghitung hal yang sama dan HARUS menghasilkan angka yang sama. Empat
+ * salinan adalah empat tempat untuk menyimpang lagi.
+ *
+ * Hasilnya dibatasi nol: `service_fee_amount` yang lebih besar dari
+ * `final_price` akan menghasilkan piutang negatif, dan piutang negatif
+ * berarti Lacte berutang ke merchant - bukan yang dimaksudkan kode ini.
+ */
+export function merchantReceivableAmount(input: {
+  finalPrice: number | string | null | undefined;
+  serviceFee: number | string | null | undefined;
+}) {
+  const finalPrice = Number(input.finalPrice ?? 0);
+  const serviceFee = Number(input.serviceFee ?? 0);
+
+  const price = Number.isFinite(finalPrice) ? finalPrice : 0;
+  const fee = Number.isFinite(serviceFee) ? serviceFee : 0;
+
+  return Math.max(0, price - fee);
+}
+
 export type MerchantCreditInput = {
   /** Merchant-nya benar-benar ada di database. */
   found: boolean;
