@@ -4556,23 +4556,35 @@
 .acc-range-picker {
   display: grid;
   gap: 10px;
-  margin-bottom: 16px;
-
   /*
-   * Anak langsung `.acc-tx-filter-row`.
+   * `flex` SENGAJA TIDAK ada di sini.
    *
-   * Aturan `.acc-tx-filter-row > .acc-field { flex: 1 1 180px }` tidak
-   * berlaku di sini, karena anak langsung baris filter itu adalah
-   * wrapper ini - bukan `.acc-field` yang ada di dalamnya. Akibatnya
-   * range picker tidak pernah ikut menyusut atau melebar bersama kolom
-   * pencarian di sebelahnya, dan pemicunya menabrak batas kolom.
+   * Nilai `flex: 1 1 220px` pernah ada di kelas ini karena picker
+   * jadi anak `.acc-tx-filter-row`, yaitu flex BARIS - grow-nya ke samping,
+   * yang memang itu yang diinginkan: pemicunya menyusut dan melebar
+   * bersama kolom pencarian di sebelahnya.
    *
-   * `min-width: 0` yang menentukan: tanpa itu, isi grid tidak boleh
-   * menyusut lebih kecil dari isinya, dan tanggal rentang yang panjang
-   * akan tetap memaksa kolom melebar sampai kolom terdorong ke bawah.
+   * Tapi di halaman Arus Kas, `ReportRangePicker` adalah anak LANGSUNG
+   * `.acc-content` - dan `.acc-content` adalah flex KOLOM. Di sana
+   * `flex-basis: 220px` dihitung sebagai TINGGI, bukan lebar, jadi picker
+   * menjadi kotak setinggi 220px dengan tombol "30 hari" setinggi itu
+   * juga.
+   *
+   * Karena itu aturan flex-nya dipindah ke `.acc-tx-filter-row` di bawah,
+   * di tempat yang benar-benar butuh - dan di sini tidak ada sama sekali.
+   * Nilai yang berlaku untuk dua induk sekaligus tidak ada.
    */
-  flex: 1 1 220px;
   min-width: 0;
+}
+
+/*
+ * Hanya di baris filter laporan. Baris itu flex BARIS, jadi di sinilah
+ * `flex: 1 1 220px` berarti "lebar minimal 220px, lalu ikut melebar dan
+ * menyusut" - persis yang dibutuhkan supaya tanggal rentang yang panjang
+ * tidak menabrak batas kolom dan mendorong kolom pencarian ke bawah.
+ */
+.acc-tx-filter-row > .acc-range-picker {
+  flex: 1 1 220px;
 }
 
 .acc-range-fields {
