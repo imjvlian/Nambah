@@ -4,6 +4,12 @@ import {
   isTelegramConfigured,
 } from "@/lib/telegram";
 import { supabaseSelect } from "@/lib/supabase/server";
+import {
+  brandLabel,
+  fulfillmentFailedText,
+  fulfillmentSuccessText,
+  type AlertGameRow,
+} from "@/lib/fulfillment-alert-text";
 
 /**
  * Alert peristiwa bisnis untuk admin, lewat antrean Telegram.
@@ -33,6 +39,7 @@ type AlertProductRow = {
 };
 
 type AlertTransactionRow = {
+  supplier_id: string | null;
   message: string | null;
   status: string;
   serial_number: string | null;
@@ -48,14 +55,27 @@ async function loadOrderContext(orderId: string) {
   const order = orders[0];
   if (!order) return null;
 
-  const [products, transactions] = await Promise.all([
+  /*
+   * Tiga lookup paralel: paket, game (brand), dan transaksi supplier.
+   *
+   * `games` ditambahkan supaya pesan menyebut brand game, bukan cuma
+   * nama paket. Untuk order Melostore, `products.label` sering hanya
+   * "128 Diamond" - tanpa brand, pesan sukses tidak bisa dibedakan dari
+   * order Digiflazz dengan nama paket identik.
+   */
+  const [products, games, transactions] = await Promise.all([
     supabaseSelect<AlertProductRow>("products", {
       select: "id,label",
       filters: { id: `eq.${order.product_id}` },
       limit: 1,
     }),
+    supabaseSelect<AlertGameRow>("games", {
+      select: "id,name,short_name",
+      filters: { id: `eq.${order.game_id}` },
+      limit: 1,
+    }),
     supabaseSelect<AlertTransactionRow>("supplier_transactions", {
-      select: "message,status,serial_number,supplier_sku",
+      select: "supplier_id,message,status,serial_number,supplier_sku",
       filters: { order_id: `eq.${orderId}` },
       order: "created_at.desc",
       limit: 1,
@@ -65,17 +85,9 @@ async function loadOrderContext(orderId: string) {
   return {
     order,
     productLabel: products[0]?.label ?? order.product_id,
+    brand: brandLabel(games[0], order.game_id),
     transaction: transactions[0] ?? null,
   };
-}
-
-function rupiah(value: number | string) {
-  const amount = Number(value ?? 0);
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(amount) ? amount : 0);
 }
 
 /**
@@ -91,18 +103,16 @@ export async function notifyFulfillmentFailed(orderId: string) {
   const context = await loadOrderContext(orderId);
   if (!context) return { queued: false as const, reason: "order-not-found" as const };
 
-  const { order, productLabel, transaction } = context;
-    const reason = transaction?.message?.trim() || "Tanpa pesan dari supplier.";
+  const { order, productLabel, brand, transaction } = context;
 
-  const text = [
-    "<b>Fulfillment GAGAL</b>",
-    `Order <code>${escapeTelegramHtml(order.id)}</code>`,
-    `Produk: ${escapeTelegramHtml(productLabel)}`,
-    `Supplier: ${escapeTelegramHtml(transaction?.supplier_sku ?? "-")}`,
-    `Alasan: ${escapeTelegramHtml(reason)}`,
-    `Dibayar: ${escapeTelegramHtml(rupiah(order.selling_price))}`,
-    `Modal: ${escapeTelegramHtml(rupiah(order.supplier_cost))}`,
-  ].join("\n");
+  const text = fulfillmentFailedText({
+    orderId: order.id,
+    brand,
+    productLabel,
+    transaction,
+    sellingPrice: order.selling_price,
+    supplierCost: order.supplier_cost,
+  });
 
   return enqueueTelegramMessage(text, {
     kind: "fulfillment",
@@ -129,6 +139,7 @@ export async function notifyReceiptDeliveryFailed(
     "<b>Receipt GAGAL terkirim</b>",
     `Order <code>${escapeTelegramHtml(context.order.id)}</code>`,
     `Kanal: ${escapeTelegramHtml(channel)}`,
+    `Brand game: ${escapeTelegramHtml(context.brand)}`,
     `Produk: ${escapeTelegramHtml(context.productLabel)}`,
     `Alasan: ${escapeTelegramHtml(reason.trim() || "Tidak diketahui")}`,
   ].join("\n");
@@ -156,6 +167,7 @@ export async function notifyOrderStuck(orderId: string, stuckMinutes: number) {
     "<b>Order NYANGKUT</b>",
     `Order <code>${escapeTelegramHtml(context.order.id)}</code>`,
     `Status: ${escapeTelegramHtml(context.order.status)}`,
+    `Brand game: ${escapeTelegramHtml(context.brand)}`,
     `Produk: ${escapeTelegramHtml(context.productLabel)}`,
     `Nyelepet ${stuckMinutes} menit sejak update terakhir.`,
   ].join("\n");
@@ -183,12 +195,14 @@ export async function notifyFulfillmentSucceeded(
   const context = await loadOrderContext(orderId);
   if (!context) return { queued: false as const, reason: "order-not-found" as const };
 
-  const text = [
-    "<b>Fulfillment SUKSES</b>",
-    `Order <code>${escapeTelegramHtml(context.order.id)}</code>`,
-    `Produk: ${escapeTelegramHtml(context.productLabel)}`,
-    `SN: <code>${escapeTelegramHtml(serialNumber.trim())}</code>`,
-  ].join("\n");
+  const text = fulfillmentSuccessText({
+    orderId: context.order.id,
+    brand: context.brand,
+    productLabel: context.productLabel,
+    serialNumber,
+    transaction: context.transaction,
+    sellingPrice: context.order.selling_price,
+  });
 
   return enqueueTelegramMessage(text, {
     kind: "fulfillment",
