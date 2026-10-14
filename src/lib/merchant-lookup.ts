@@ -46,6 +46,8 @@ export type MerchantLookupResult =
         | "order_not_found"
         | "wrong_merchant"
         | "merchant_disabled";
+      /** Nama toko pemilik kode, hanya saat code === "wrong_merchant". */
+      merchantName?: string;
     };
 
 /**
@@ -98,6 +100,7 @@ export async function lookupMerchantScanCode(
       status: 403,
       reason: "Kode ini bukan untuk toko Anda.",
       code: "wrong_merchant",
+      merchantName: relatedName(row.merchants) ?? undefined,
     };
   }
 

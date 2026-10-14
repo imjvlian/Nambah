@@ -56,6 +56,8 @@ export async function POST(request: Request) {
     ? await getMerchantById(sessionMerchantId)
     : null;
 
+  let currentMerchantName: string | null = sessionMerchant?.name ?? null;
+
   let merchant: { id: string; status: string } | null = sessionMerchant
     ? { id: sessionMerchant.id, status: sessionMerchant.status }
     : null;
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
     const auth = await authenticateMerchant(request, body, "merchant_lookup");
     if ("response" in auth) return auth.response;
     merchant = { id: auth.merchant.id, status: auth.merchant.status };
+    currentMerchantName = auth.merchant.name;
   }
 
   if (merchant.status !== "active") {
@@ -83,6 +86,16 @@ export async function POST(request: Request) {
   const result = await lookupMerchantScanCode(orderCode, merchant.id);
 
   if (!result.found) {
+    if (result.code === "wrong_merchant") {
+      const ownerName = result.merchantName ?? "toko lain";
+      const mine = currentMerchantName ?? "toko Anda";
+      return Response.json(
+        {
+          error: `Kode ini milik toko ${ownerName}, bukan ${mine}. Pastikan Anda login di toko yang sama dengan pemesan.`,
+        },
+        { status: result.status },
+      );
+    }
     return Response.json({ error: result.reason }, { status: result.status });
   }
 
