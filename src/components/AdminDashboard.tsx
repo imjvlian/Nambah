@@ -11,6 +11,10 @@ import AffiliatePerformancePanel from "@/components/AffiliatePerformancePanel";
 import AffiliateDirectoryPanel from "@/components/AffiliateDirectoryPanel";
 import ReceiptPreview from "@/components/ReceiptPreview";
 import { STATUS_LABEL as ORDER_STATUS_LABELS } from "@/lib/order-status-display";
+import {
+  canManageAdmins,
+  wouldRemoveLastSuperadmin,
+} from "@/lib/admin-access-rules";
 import { BRAND } from "@/lib/brand";
 
 type AdminSection =
@@ -306,6 +310,22 @@ type AdminOrderDetail = {
   commissions: Array<Record<string, unknown>>;
   points: Array<Record<string, unknown>>;
   promotionRedemptions: Array<Record<string, unknown>>;
+};
+
+type AdminAccountsPayload = {
+  admins: Array<{
+    userId: string;
+    role: "admin" | "superadmin";
+    active: boolean;
+    createdAt: string | null;
+    updatedAt: string | null;
+    activeSuperadmins: number;
+    email: string | null;
+    displayName: string | null;
+    whatsapp: string | null;
+    /** Baris ini adalah akun yang sedang logged in. */
+    isSelf: boolean;
+  }>;
 };
 
 type AdminUsersPayload = {
@@ -1066,6 +1086,16 @@ export default function AdminDashboard() {
   const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
+  const [adminAccounts, setAdminAccounts] = useState<AdminAccountsPayload | null>(null);
+  /*
+   * Role tujuan untuk setiap baris customer yang akan dipromote.
+   *
+   * Disimpan per userId, bukan sebagai satu state global, supaya pilihan di
+   * satu baris tidak ikut berubah ketika baris lain dipakai. Dengan satu
+   * state global, operator yang menyiapkan tiga akun sekaligus akan selalu
+   * promotes semuanya dengan role terakhir yang dipilih.
+   */
+  const [promoteRole, setPromoteRole] = useState<Record<string, "admin" | "superadmin">>({});
   const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
   const [cashFlowData, setCashFlowData] = useState<CashFlowPayload | null>(null);
   /** Halaman tabel "Catatan kas harian". */
@@ -1447,6 +1477,68 @@ export default function AdminDashboard() {
     const data = (await response.json()) as AdminUsersPayload & { error?: string };
     if (!response.ok) throw new Error(data.error ?? "Data user gagal dimuat.");
     setUsersData(data);
+  }
+
+  /**
+   * Daftar akun admin.
+   *
+   * Route-nya superadminOnly, jadi kegagalan 403 di sini itu jawaban yang
+   * benar - bukan error. Daftar dikosongkan supaya UI tidak menampilkan
+   * "gagal dimuat" untuk operator yang memang tidak berhak melihatnya.
+   */
+  async function loadAdminAccounts() {
+    const response = await fetch("/api/admin/admin-users", { cache: "no-store" });
+    if (response.status === 403) {
+      setAdminAccounts(null);
+      return;
+    }
+    const data = (await response.json()) as AdminAccountsPayload & { error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Daftar admin gagal dimuat.");
+    setAdminAccounts(data);
+  }
+
+  async function changeAdminAccess(input: {
+    userId: string;
+    role: "admin" | "superadmin";
+    active: boolean;
+  }) {
+    setBusy(`admin-access:${input.userId}`);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/admin-users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: input.userId,
+          role: input.role,
+          active: input.active,
+        }),
+      });
+      const data = (await response.json()) as { error?: string; changed?: boolean };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Perubahan akses gagal.");
+      }
+
+      /*
+       * Pesan sukses selalu menyebut langkah berikutnya. Menonaktifkan akses
+       * tidak langsung mengeluarkan orang dari dashboard: cookie-nya masih
+       * hidup sampai dua jam. Tanpa kalimat ini, operator akan melihat
+       * orang yang sudah dinonaktifkan masih masuk, lalu menganggap
+       * fiturnya tidak bekerja.
+       */
+      const target = adminAccounts?.admins.find((item) => item.userId === input.userId);
+      setNotice(
+        input.active
+          ? `Akses admin diberikan sebagai ${input.role === "superadmin" ? "superadmin" : "admin"}. Akun harus login ulang sebelum dashboard terbuka.`
+          : `Akses admin dicabut dari ${target?.email ?? target?.displayName ?? "akun tersebut"}. Sesi yang sedang berjalan tetap berlaku sampai cookie habis - sekitar 2 jam.`,
+      );
+
+      await Promise.all([loadAdminAccounts(), loadUsers()]);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Perubahan akses gagal.");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function loadFinance() {
@@ -1942,7 +2034,9 @@ const txDataStamp = txRange.preset
       if (section === "points") await loadPoints();
       if (section === "affiliates") await loadAffiliates();
       if (section === "promotions") await loadPromotions();
-      if (section === "users") await loadUsers();
+      if (section === "users") {
+        await Promise.all([loadUsers(), loadAdminAccounts()]);
+      }
       if (section === "finance") await loadFinance();
       if (section === "cashflow") await loadCashFlow();
       if (section === "transactions") await loadTransactions();
@@ -2070,12 +2164,27 @@ const txDataStamp = txRange.preset
         ),
       );
     }
-    if (section === "users" && !usersData) {
-      void loadUsers().catch((error) =>
-        setNotice(
-          error instanceof Error ? error.message : "Data user gagal dimuat.",
-        ),
-      );
+    if (section === "users") {
+      if (!usersData) {
+        void loadUsers().catch((error) =>
+          setNotice(
+            error instanceof Error ? error.message : "Data user gagal dimuat.",
+          ),
+        );
+      }
+      /*
+       * Dimuat terpisah dari `usersData` supaya kegagalan satu tidak
+       * memblokir yang lain. Role admin biasa akan selalu mendapat 403 di
+       * sini, dan itu jawaban yang benar - bukan kondisi yang perlu
+       * ditampilkan sebagai galat.
+       */
+      if (!adminAccounts && canManageAdmins(adminRole)) {
+        void loadAdminAccounts().catch((error) =>
+          setNotice(
+            error instanceof Error ? error.message : "Daftar admin gagal dimuat.",
+          ),
+        );
+      }
     }
     if (section === "finance" && !financeData) {
       void loadFinance().catch((error) =>
@@ -6475,14 +6584,139 @@ const txDataStamp = txRange.preset
                 title="Pengguna & akses"
                 copy="Lookup customer memakai profile server-side dan agregasi transaksi tanpa mengekspos credential auth."
               />
+
+              {/*
+               * Kartu akun admin hanya untuk yang boleh mengelolanya.
+               *
+               * Menyembunyikan bagian ini di klien bukan pengaman - route-nya sudah
+               * menolak 403. Tapi menampilkan tombol yang pasti ditolak
+               * hanya membingungkan, dan membuat operator mengira fiturnya
+               * rusak.
+               */}
+              {canManageAdmins(adminRole) && (
+                <section className="acc-admin-access">
+                  <header className="acc-admin-access-head">
+                    <div>
+                      <h3>Akun admin</h3>
+                      <p>
+                        {adminAccounts?.admins.filter((item) => item.active).length ?? 0} aktif
+                        dari {adminAccounts?.admins.length ?? 0} akun terdaftar.
+                        {" "}Menonaktifkan akses tidak langsung mengeluarkan orang dari
+                        dashboard: sesi yang sedang berjalan tetap berlaku sampai
+                        cookie habis, sekitar 2 jam.
+                      </p>
+                    </div>
+                  </header>
+
+                  <div className="acc-admin-access-list">
+                    {(adminAccounts?.admins ?? []).map((item) => {
+                      /*
+                       * Syarat disable dihitung di klien dengan fungsi yang
+                       * SAMA dengan yang dipakai server. Mengulang syaratnya
+                       * di sini dengan tangan sudah pasti akan menyimpang
+                       * begitu aturannya berubah.
+                       */
+                      const blocksLastSuperadmin = wouldRemoveLastSuperadmin({
+                        targetRole: item.role,
+                        targetActive: item.active,
+                        nextActive: false,
+                        nextRole: item.role,
+                        activeSuperadminCount: item.activeSuperadmins,
+                      });
+                      const isBusy = busy === `admin-access:${item.userId}`;
+                      const demoteBlocked = item.isSelf || blocksLastSuperadmin;
+
+                      return (
+                        <div
+                          className={`acc-admin-access-row${item.active ? "" : " is-off"}`}
+                          key={item.userId}
+                        >
+                          <div>
+                            <strong>
+                              {item.displayName ?? item.email ?? item.userId.slice(0, 8) + "…"}
+                              {item.isSelf && <em className="acc-self-tag">akun Anda</em>}
+                            </strong>
+                            <span>
+                              {item.email ?? item.whatsapp ?? item.userId}
+                            </span>
+                          </div>
+                          <span className={`acc-role-chip ${item.role}`}>
+                            {item.role === "superadmin" ? "Superadmin" : "Admin"}
+                          </span>
+                          <span className={`acc-status ${item.active ? "success" : "failed"}`}>
+                            {item.active ? "Aktif" : "Nonaktif"}
+                          </span>
+                          {item.active ? (
+                            <button
+                              type="button"
+                              className="acc-btn-danger"
+                              disabled={demoteBlocked || isBusy}
+                              title={
+                                item.isSelf
+                                  ? "Anda tidak bisa mencabut akses milik akun Anda sendiri."
+                                  : blocksLastSuperadmin
+                                    ? "Ini superadmin aktif terakhir. Menonaktifkannya akan menutup dashboard untuk semua orang."
+                                    : "Cabut akses dashboard dari akun ini."
+                              }
+                              onClick={() =>
+                                void changeAdminAccess({
+                                  userId: item.userId,
+                                  role: item.role,
+                                  active: false,
+                                })
+                              }
+                            >
+                              {isBusy ? "Menyimpan..." : "Nonaktifkan"}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="acc-btn"
+                              disabled={isBusy}
+                              onClick={() =>
+                                void changeAdminAccess({
+                                  userId: item.userId,
+                                  role: item.role,
+                                  active: true,
+                                })
+                              }
+                            >
+                              {isBusy ? "Menyimpan..." : "Aktifkan lagi"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {adminAccounts && adminAccounts.admins.length === 0 && (
+                      <div className="acc-empty">Belum ada akun admin.</div>
+                    )}
+                  </div>
+                </section>
+              )}
+
               <div className="acc-table-card">
                 <div className="acc-users-head">
                   <span>Pengguna</span>
                   <span>WhatsApp</span>
                   <span>Pesanan</span>
                   <span>Total belanja</span>
+                  {canManageAdmins(adminRole) && <span>Akses admin</span>}
                 </div>
-                {(usersData?.users ?? []).slice(0, 100).map((item) => (
+                {(usersData?.users ?? []).slice(0, 100).map((item) => {
+                  /*
+                   * Status admin diambil dari daftar akun admin, bukan
+                   * dijawab ulang di sini. Dua sumber berarti dua jawaban
+                   * yang bisa berbeda - dan layar akan menampilkan "bukan
+                   * admin" untuk orang yang sebenarnya punya akses.
+                   */
+                  const adminRow = adminAccounts?.admins.find(
+                    (entry) => entry.userId === item.userId,
+                  );
+                  const canSeeControls = canManageAdmins(adminRole);
+                  const chosenRole = promoteRole[item.userId] ?? "admin";
+                  const isBusy = busy === `admin-access:${item.userId}`;
+
+                  return (
                   <div className="acc-users-row" key={item.userId}>
                     <div>
                       <strong>
@@ -6498,8 +6732,58 @@ const txDataStamp = txRange.preset
                       <strong>{formatIDR(item.spend)}</strong>
                       <span>{formatTime(item.lastOrderAt)}</span>
                     </div>
+                    {canSeeControls && (
+                      <div className="acc-users-access">
+                        {adminRow ? (
+                          <>
+                            <span
+                              className={`acc-role-chip ${adminRow.role}${
+                                adminRow.active ? "" : " is-off"
+                              }`}
+                            >
+                              {adminRow.role === "superadmin" ? "Superadmin" : "Admin"}
+                            </span>
+                            {!adminRow.active && <small>nonaktif</small>}
+                          </>
+                        ) : (
+                          <>
+                            <select
+                              aria-label={`Role untuk ${item.displayName ?? item.email ?? item.userId}`}
+                              value={chosenRole}
+                              disabled={isBusy}
+                              onChange={(event) =>
+                                setPromoteRole((current) => ({
+                                  ...current,
+                                  [item.userId]: event.target.value as
+                                    | "admin"
+                                    | "superadmin",
+                                }))
+                              }
+                            >
+                              <option value="admin">Admin</option>
+                              <option value="superadmin">Superadmin</option>
+                            </select>
+                            <button
+                              type="button"
+                              className="acc-btn"
+                              disabled={isBusy}
+                              onClick={() =>
+                                void changeAdminAccess({
+                                  userId: item.userId,
+                                  role: chosenRole,
+                                  active: true,
+                                })
+                              }
+                            >
+                              {isBusy ? "..." : "Berikan"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 {usersData && usersData.users.length === 0 && (
                   <div className="acc-empty">Belum ada customer account activity.</div>
                 )}

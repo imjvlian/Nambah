@@ -84,6 +84,13 @@ export async function GET(request: Request) {
           authenticated: true,
           accountAuthenticated: Boolean(auth.user),
           mode: "legacy",
+          /*
+           * Role wajib dikirim. Tanpa ini, sisi klien jatuh ke
+           * `data.role ?? "admin"` dan menampilkan token yang berkuasa penuh
+           * sebagai admin biasa - tombol khusus superadmin jadi tidak pernah
+           * muncul tepat saat operator paling membutuhkannya.
+           */
+          role: "legacy",
           user: auth.user ? publicNambahUser(auth.user) : null,
         },
         { headers },

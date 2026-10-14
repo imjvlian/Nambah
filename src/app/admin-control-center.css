@@ -3741,7 +3741,12 @@
 .acc-users-head,
 .acc-users-row {
   display: grid;
-  grid-template-columns: minmax(0,1.2fr) minmax(120px,.7fr) minmax(120px,.6fr) minmax(130px,.6fr);
+  /*
+   * Lima kolom: kolom akses admin sengaja paling sempit. Kontrolnya cuma
+   * badge dan satu tombol - kalau diberi lebar sama dengan kolom nominal,
+   * tabel customer akan terasa punya ruang kosong yang tidak terpakai.
+   */
+  grid-template-columns: minmax(0,1.2fr) minmax(110px,.7fr) minmax(100px,.55fr) minmax(120px,.55fr) minmax(132px,auto);
   gap: 12px;
   align-items: center;
 }
@@ -3779,6 +3784,139 @@
   white-space: nowrap;
 }
 
+.acc-users-access {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acc-users-access select {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(9,11,9,.9);
+  color: inherit;
+  font-size: 11px;
+}
+
+.acc-users-access small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/*
+ * Kartu akun admin.
+ *
+ * Berdiri sendiri, bukan kolom baru di tabel customer: daftar admin pendek
+ * dan selalu sama, sementara tabel customer tumbuh. Memadukan keduanya akan
+ * membuat kepala tabel ikut memanjang setiap ada customer baru.
+ */
+.acc-admin-access {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(17,19,16,.9);
+}
+
+.acc-admin-access-head h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.acc-admin-access-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.acc-admin-access-list {
+  display: grid;
+  gap: 8px;
+}
+
+.acc-admin-access-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.05);
+  border-radius: 10px;
+}
+
+.acc-admin-access-row.is-off {
+  opacity: .62;
+}
+
+.acc-admin-access-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.acc-admin-access-row strong {
+  font-size: 12px;
+}
+
+.acc-admin-access-row span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-self-tag {
+  margin-left: 7px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  color: var(--muted);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/*
+ * Badge role.
+ *
+ * `is-off` dipakai pada baris customer yang punya baris admin nonaktif:
+ * badge masih dibaca "admin", dan kata "nonaktif" di sebelahnya yang
+ * membedakan. Tanpa itu, akun yang sudah dicabut aksesnya akan terlihat
+ * sama saja dengan yang masih punya akses.
+ */
+.acc-role-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.acc-role-chip.superadmin {
+  border-color: rgba(255,193,7,.34);
+  background: rgba(255,193,7,.1);
+  color: #f4e2a6;
+}
+
+.acc-role-chip.admin {
+  color: var(--muted);
+}
+
+.acc-role-chip.is-off {
+  opacity: .6;
+}
+
 @media (max-width: 850px) {
   .acc-order-inspector-grid {
     grid-template-columns: 1fr;
@@ -3788,8 +3926,24 @@
     display: none;
   }
 
+  /*
+   * Dua kolom, bukan lima. Lima kolom di layar sempit memaksa tiap kolom
+   * jadi setipis teks dan membuat baris menjulang tinggi - persis masalah
+   * yang harus dihindari. Kolom akses lalu turun ke baris kedua dengan
+   * lebar penuh supaya tombolnya tetap bisa diklik.
+   */
   .acc-users-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .acc-users-access {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .acc-admin-access-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 8px;
   }
 }
 
