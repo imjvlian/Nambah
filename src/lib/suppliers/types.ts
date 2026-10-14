@@ -143,6 +143,21 @@ export interface SupplierClient {
 
   fetchBalance(): Promise<number>;
 
+  /**
+   * True kalau akun supplier sedang berjalan di mode sandbox.
+   *
+   * Opsional: supplier yang tidak punya konsep sandbox tidak wajib
+   * mengimplementasinya, dan pemanggil harus menganggap nilai yang tidak
+   * ada sebagai `false` (bukan `true`) - menebak "sandbox" untuk supplier
+   * yang ternyata Produktif membuat alert dibiarkan mati.
+   *
+   * Kenapa Needed: di sandbox, saldo selalu 0 karena tidak ada uang
+   * sungguhan yang masuk. Tanpa informasi ini, sistem akan mengirim
+   * "Saldo KRITIS" setiap kali cron berjalan - dan alert yang selalu
+   * benar akan membuat operator berhenti membaca alert sama sekali.
+   */
+  sandboxMode?(): Promise<boolean>;
+
   runTransaction(
     input: SupplierTransactionInput,
   ): Promise<SupplierTransactionResult>;

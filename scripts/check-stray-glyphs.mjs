@@ -39,6 +39,13 @@ const ALLOWED_CODEPOINTS = new Set([
   0x2022, // bullet
   0x2212, // minus sign
   0x2713, 0x2717, // check / ballot x
+  // Ikon status di dalam PESAN Telegram (bukan UI aplikasi): pesan saldo
+  // memakainya supaya operator bisa membaca tingkat keparahan tanpa
+  // membaca teksnya. Ditambahkan agar file pesan boleh memakai ikon
+  // tanpa membuat pemeriksaan glyphe gagal terus-menerus.
+  0x1f6a8, // rotating light (kritis)
+  0x26a0, 0xfe0f, // warning sign + variation selector (rendah)
+  0x2705, // check mark button (aman)
 ]);
 
 function isAllowed(codePoint) {

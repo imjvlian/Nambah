@@ -352,6 +352,17 @@ export class MelostoreSupplierClient implements SupplierClient {
   }
 
   /**
+   * Mode sandbox dari profil akun Melostore.
+   *
+   * Satu request profil sudah cukup untuk saldo DAN mode ini, jadi
+   * `fetchProfile` yang dipanggil dua kali hanya menambah satu panggilan
+   * API - tradeoff yang diterima demi kejelasan kode.
+   */
+  async sandboxMode(): Promise<boolean> {
+    return (await this.fetchProfile()).sandbox;
+  }
+
+  /**
    * Tarik seluruh katalog, halaman demi halaman.
    *
    * Berhenti di tiga kondisi: `has_more` false, cursor tidak maju, atau

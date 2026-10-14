@@ -1,10 +1,23 @@
-import { getDigiflazzBalance } from "@/lib/digiflazz/client";
-import { formatIDR } from "@/lib/pricing";
 import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
 import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
-import { BRAND } from "@/lib/brand";
+import { supplierLabel } from "@/lib/fulfillment-alert-text";
+import {
+  buildBalanceAlertMessage,
+  decideBalanceNotify,
+  getStatus,
+  type BalanceSkipReason,
+  type SupplierBalanceStatus,
+} from "@/lib/supplier-balance-alert-text";
+import { tryGetSupplierClient, usableSupplierIds } from "@/lib/suppliers/registry";
+import type { SupplierId } from "@/lib/suppliers/types";
 
-export type SupplierBalanceStatus = "healthy" | "low" | "critical";
+// Efek samping: mengisi registry dengan klien Digiflazz dan Melostore.
+// Tanpa baris ini, `usableSupplierIds()` mengembalikan kosong dan cek
+// saldo Melostore gagal dengan "belum dikonfigurasi" padahal
+// kredensialnya lengkap. Modul ini tidak melakukan I/O saat dimuat.
+import "@/lib/suppliers/register-suppliers";
+
+export type { SupplierBalanceStatus };
 export type SupplierBalanceCheckSource = "manual" | "periodic" | "transaction";
 
 type SupplierBalanceRow = {
@@ -25,69 +38,41 @@ type PricingRuleRow = {
   critical_supplier_balance: number | string;
 };
 
-function getStatus(
-  availableBalance: number,
-  lowThreshold: number,
-  criticalThreshold: number,
-): SupplierBalanceStatus {
-  if (availableBalance <= criticalThreshold) return "critical";
-  if (availableBalance <= lowThreshold) return "low";
-  return "healthy";
-}
-
-function statusLabel(status: SupplierBalanceStatus) {
-  return status.toUpperCase();
-}
-
-function buildAlertMessage(input: {
-  status: SupplierBalanceStatus;
-  previousStatus: SupplierBalanceStatus | "unknown" | null;
-  balance: number;
-  reservedBalance: number;
-  availableBalance: number;
-  targetBalance: number;
-  recommendedDeposit: number;
-}) {
-  const icon = input.status === "critical" ? "🚨" : input.status === "low" ? "⚠️" : "✅";
-  const title =
-    input.status === "healthy"
-      ? "Saldo Digiflazz kembali aman"
-      : input.status === "critical"
-        ? "Saldo Digiflazz KRITIS"
-        : "Saldo Digiflazz rendah";
-
-  return [
-    `${icon} ${BRAND.name} — ${title}`,
-    "",
-    `Status: ${statusLabel(input.status)}`,
-    input.previousStatus ? `Sebelumnya: ${input.previousStatus.toUpperCase()}` : null,
-    `Saldo: ${formatIDR(input.balance)}`,
-    `Reserved: ${formatIDR(input.reservedBalance)}`,
-    `Tersedia: ${formatIDR(input.availableBalance)}`,
-    "",
-    `Target: ${formatIDR(input.targetBalance)}`,
-    `Saran deposit: ${formatIDR(input.recommendedDeposit)}`,
-  ]
-    .filter((line): line is string => line !== null)
-    .join("\n");
-}
-
-export async function checkDigiflazzSupplierBalance(input?: {
-  source?: SupplierBalanceCheckSource;
-  notify?: boolean;
-}) {
+/**
+ * Cek saldo satu supplier, lalu simpan snapshot dan (kalau diminta)
+ * kirim alert saat statusnya berubah.
+ *
+ * Dibuat generik karena nama supplier bukan lagi konstanta: Melostore
+ * dipantau dengan ambang dan pesan yang sama seperti Digiflazz, dan
+ * versi lama yang menulis "Digiflazz" ke dalam teks pesan akan
+ * mengirim alert Melostore berlabel Digiflazz.
+ */
+export async function checkSupplierBalance(
+  supplierId: SupplierId,
+  input?: {
+    source?: SupplierBalanceCheckSource;
+    notify?: boolean;
+  },
+) {
   const source = input?.source ?? "manual";
   const notify = input?.notify === true;
+  const label = supplierLabel(supplierId);
 
-  const [currentRows, previousSnapshots, pricingRows, digiflazzBalance] = await Promise.all([
+  const client = tryGetSupplierClient(supplierId);
+  if (!client) {
+    throw new Error(`Supplier ${label} belum dikonfigurasi, saldo tidak bisa dicek.`);
+  }
+
+  const [currentRows, previousSnapshots, pricingRows, balance, sandboxMode] =
+    await Promise.all([
     supabaseSelect<SupplierBalanceRow>("supplier_balances", {
       select: "supplier_id,balance,reserved_balance,checked_at",
-      filters: { supplier_id: "eq.digiflazz" },
+      filters: { supplier_id: `eq.${supplierId}` },
       limit: 1,
     }),
     supabaseSelect<SupplierBalanceSnapshotRow>("supplier_balance_snapshots", {
       select: "status,checked_at",
-      filters: { supplier_id: "eq.digiflazz" },
+      filters: { supplier_id: `eq.${supplierId}` },
       order: "checked_at.desc",
       limit: 1,
     }),
@@ -96,7 +81,14 @@ export async function checkDigiflazzSupplierBalance(input?: {
       filters: { id: "eq.default" },
       limit: 1,
     }),
-    getDigiflazzBalance(),
+    client.fetchBalance(),
+    /*
+     * `sandboxMode?.()` opsional: supplier tanpa konsep sandbox tidak
+     * punya method ini, jadi hasilnya selalu boolean. Kegagalan dibaca
+     * sebagai "bukan sandbox" - lebih baik satu alert berlebih daripada
+     * alert kritis yang tidak pernah terkirim.
+     */
+    client.sandboxMode ? client.sandboxMode().catch(() => false) : Promise.resolve(false),
   ]);
 
   const pricingRule = pricingRows[0];
@@ -104,9 +96,9 @@ export async function checkDigiflazzSupplierBalance(input?: {
     throw new Error("Pricing rule default belum tersedia untuk balance monitoring.");
   }
 
-  const balance = Math.round(digiflazzBalance);
+  const balanceRounded = Math.round(balance);
   const reservedBalance = Math.max(0, Number(currentRows[0]?.reserved_balance ?? 0));
-  const availableBalance = Math.max(0, balance - reservedBalance);
+  const availableBalance = Math.max(0, balanceRounded - reservedBalance);
   const targetBalance = Number(pricingRule.target_supplier_balance);
   const lowThreshold = Number(pricingRule.low_supplier_balance);
   const criticalThreshold = Number(pricingRule.critical_supplier_balance);
@@ -114,22 +106,23 @@ export async function checkDigiflazzSupplierBalance(input?: {
   const previousStatus = previousSnapshots[0]?.status ?? null;
   const recommendedDeposit = Math.max(0, targetBalance - availableBalance);
   const checkedAt = new Date().toISOString();
+  const sandbox = sandboxMode;
 
   if (currentRows[0]) {
     await supabaseUpdate(
       "supplier_balances",
       {
-        balance,
+        balance: balanceRounded,
         reserved_balance: reservedBalance,
         checked_at: checkedAt,
         updated_at: checkedAt,
       },
-      { filters: { supplier_id: "eq.digiflazz" } },
+      { filters: { supplier_id: `eq.${supplierId}` } },
     );
   } else {
     await supabaseInsert("supplier_balances", {
-      supplier_id: "digiflazz",
-      balance,
+      supplier_id: supplierId,
+      balance: balanceRounded,
       reserved_balance: reservedBalance,
       checked_at: checkedAt,
       updated_at: checkedAt,
@@ -137,8 +130,8 @@ export async function checkDigiflazzSupplierBalance(input?: {
   }
 
   await supabaseInsert("supplier_balance_snapshots", {
-    supplier_id: "digiflazz",
-    balance,
+    supplier_id: supplierId,
+    balance: balanceRounded,
     reserved_balance: reservedBalance,
     status,
     source,
@@ -146,27 +139,48 @@ export async function checkDigiflazzSupplierBalance(input?: {
   });
 
   const statusChanged = previousStatus !== status;
-  const shouldNotify =
-    notify &&
-    statusChanged &&
-    (previousStatus !== null || status === "low" || status === "critical");
+
+  /*
+   * Aturan "kirim atau tidak" semuanya ada di `decideBalanceNotify` -
+   * satu fungsi murni yang bisa diuji tanpa database dan tanpa Telegram.
+   * Sandbox termasuk di sana: di sandbox saldo selalu 0, jadi tanpa
+   * syarat itu cron mengirim "Saldo KRITIS" di setiap berjalan, dan
+   * alert yang selalu benar membuat operator mengabaikan semua alert.
+   *
+   * Snapshot tetap ditulis, jadi `/saldo` tetap menampilkan angka
+   * sebenarnya; hanya pesannya yang ditahan.
+   */
+  const decision = decideBalanceNotify({
+    notify,
+    sandbox,
+    statusChanged,
+    previousStatus,
+    status,
+  });
 
   let notification:
-    | { attempted: false; sent: false; reason: "not-needed" | "not-configured" }
+    | { attempted: false; sent: false; reason: BalanceSkipReason | "not-configured" }
     | { attempted: true; sent: true }
     | { attempted: true; sent: false; reason: "send-failed" };
 
-  if (!shouldNotify) {
-    notification = { attempted: false, sent: false, reason: "not-needed" };
+  if (!decision.send) {
+    /*
+     * Alasan skipping diteruskan apa adanya, bukan disamarkan jadi
+     * "not-needed". Saat sandbox, operator yang melihat "not-needed"
+     * akan mengira tidak ada yang perlu diperiksa - padahal sistem
+     * sengaja menahannya, dan itu perbedaan yang harus terlihat.
+     */
+    notification = { attempted: false, sent: false, reason: decision.reason };
   } else if (!isTelegramConfigured()) {
     notification = { attempted: false, sent: false, reason: "not-configured" };
   } else {
     try {
       const result = await sendTelegramMessage(
-        buildAlertMessage({
+        buildBalanceAlertMessage({
+          supplierLabel: label,
           status,
           previousStatus,
-          balance,
+          balance: balanceRounded,
           reservedBalance,
           availableBalance,
           targetBalance,
@@ -174,28 +188,39 @@ export async function checkDigiflazzSupplierBalance(input?: {
         }),
         {
           kind: "balance",
-          // Transisi status yang sama dalam satu jam cukup satu pesan; tanpa
-          // ini saldo yang naik-turun di sekitar ambang bisa spam tiap cek.
-          dedupeKey: `balance:${previousStatus ?? "none"}->${status}:${checkedAt.slice(0, 13)}`,
+          /*
+           * `supplierId` WAJIB ada di dedupe key. Tanpa itu, Melostore dan
+           * Digiflazz yang sama-sama `low -> critical` di jam yang sama
+           * saling menimpa: hanya satu alert yang terkirim, dan admin
+           * tidak pernah tahu supplier yang satunya sedang kritis.
+           */
+          dedupeKey: `balance:${supplierId}:${previousStatus ?? "none"}->${status}:${checkedAt.slice(0, 13)}`,
         },
       );
       notification = result.sent
         ? { attempted: true, sent: true }
         : { attempted: false, sent: false, reason: "not-configured" };
     } catch (error) {
-      console.error("Telegram supplier balance alert failed", error);
+      console.error(`Telegram supplier balance alert failed (${supplierId})`, error);
       notification = { attempted: true, sent: false, reason: "send-failed" };
     }
   }
 
   return {
-    supplier: "digiflazz",
-    balance,
+    supplier: supplierId,
+    supplierLabel: label,
+    balance: balanceRounded,
     reservedBalance,
     availableBalance,
     status,
     previousStatus,
     statusChanged,
+    /*
+     * Exposed supaya admin bisa membaca "Saldo 0, KRITIS" dan langsung
+     * tahu itu konsekuensi sandbox, bukan uang yang hilang. Tanpa ini,
+     * angka 0 di panel terlihat seperti incident.
+     */
+    sandbox,
     thresholds: {
       target: targetBalance,
       low: lowThreshold,
@@ -206,4 +231,50 @@ export async function checkDigiflazzSupplierBalance(input?: {
     source,
     notification,
   };
+}
+
+/**
+ * Cek saldo Digiflazz.
+ *
+ * Pembungkus yang dipertahankan supaya route lama
+ * (`/api/admin/digiflazz/balance`, `/api/cron/digiflazz-balance`) tidak
+ * perlu diubah bentuk jawabannya.
+ */
+export async function checkDigiflazzSupplierBalance(input?: {
+  source?: SupplierBalanceCheckSource;
+  notify?: boolean;
+}) {
+  return checkSupplierBalance("digiflazz", input);
+}
+
+/**
+ * Cek saldo semua supplier yang siap dipakai.
+ *
+ * Dipakai cron. Supplier yang kredensialnya belum diisi DILEWATI, bukan
+ * menggagalkan seluruh pemeriksaan: alert saldo Melostore tidak boleh
+ * membuat Digiflazz berhenti dipantau hanya karena satu akun belum
+ * diisi.
+ */
+export async function checkAllSupplierBalances(input?: {
+  source?: SupplierBalanceCheckSource;
+  notify?: boolean;
+}) {
+  const ids = usableSupplierIds();
+
+  const results = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        return { ok: true as const, result: await checkSupplierBalance(id, input) };
+      } catch (error) {
+        return {
+          ok: false as const,
+          supplier: id,
+          supplierLabel: supplierLabel(id),
+          error: error instanceof Error ? error.message : "Cek saldo gagal.",
+        };
+      }
+    }),
+  );
+
+  return { checked: results.length, results };
 }

@@ -6,6 +6,7 @@ import {
   telegramHelpText,
 } from "@/lib/telegram-format";
 import { supabaseSelect } from "@/lib/supabase/server";
+import { supplierLabel } from "@/lib/fulfillment-alert-text";
 
 /**
  * Perintah bot Telegram yang dipanggil dari webhook.
@@ -50,6 +51,7 @@ type ReceiptRow = {
 };
 
 type BalanceRow = {
+  supplier_id: string;
   status: string;
   balance: number | string;
   reserved_balance: number | string;
@@ -154,25 +156,56 @@ async function statusText() {
   return lines.join("\n");
 }
 
+/*
+ * `/saldo` menampilkan SEMUA supplier, bukan hanya Digiflazz.
+ *
+ * Versi lama memfilter `supplier_id=eq.digiflazz`, jadi admin yang sedang
+ * menunggu top up Melostore akan melihat saldo Digiflazz yang sehat dan
+ * menyimpulkan tidak ada masalah. Satu perintah harus menutup semua
+ * sumber modal.
+ */
 async function balanceText() {
-  const snapshots = await supabaseSelect<BalanceRow>("supplier_balance_snapshots", {
-    select: "status,balance,reserved_balance,checked_at",
-    filters: { supplier_id: "eq.digiflazz" },
-    order: "checked_at.desc",
-    limit: 1,
-  });
+  const snapshots = await supabaseSelect<BalanceRow>(
+    "supplier_balance_snapshots",
+    {
+      select: "supplier_id,status,balance,reserved_balance,checked_at",
+      order: "checked_at.desc",
+      limit: 50,
+    },
+  );
 
-  const snapshot = snapshots[0];
-  if (!snapshot) return "Belum ada snapshot saldo Digiflazz. Jalankan /api/cron/digiflazz-balance.";
+  if (snapshots.length === 0) {
+    return "Belum ada snapshot saldo supplier. Jalankan /api/cron/supplier-balance.";
+  }
 
-  return [
-    `<b>Saldo Digiflazz</b>`,
-    `Status: ${escapeTelegramHtml(snapshot.status)}`,
-    `Saldo: ${escapeTelegramHtml(rupiah(snapshot.balance))}`,
-    `Reservasi: ${escapeTelegramHtml(rupiah(snapshot.reserved_balance))}`,
-    `Tersedia: ${escapeTelegramHtml(rupiah(Number(snapshot.balance) - Number(snapshot.reserved_balance)))}`,
-    `Diperiksa: ${formatTimestamp(snapshot.checked_at)}`,
-  ].join("\n");
+  /*
+   * Snapshot terbaru per supplier. Query diambil `limit 50` terurut
+   * waktu, jadi satu supplier bisa muncul berkali-kali - dan yang
+   * dipakai harus yang paling baru.
+   */
+  const latest = new Map<string, BalanceRow>();
+  for (const snapshot of snapshots) {
+    if (!latest.has(snapshot.supplier_id)) latest.set(snapshot.supplier_id, snapshot);
+  }
+
+  const lines: string[] = ["<b>Saldo supplier</b>"];
+
+  for (const [supplierId, snapshot] of latest) {
+    const available =
+      Number(snapshot.balance) - Number(snapshot.reserved_balance);
+
+    lines.push(
+      "",
+      escapeTelegramHtml(supplierLabel(supplierId)),
+      `Status: ${escapeTelegramHtml(snapshot.status)}`,
+      `Saldo: ${escapeTelegramHtml(rupiah(snapshot.balance))}`,
+      `Reservasi: ${escapeTelegramHtml(rupiah(snapshot.reserved_balance))}`,
+      `Tersedia: ${escapeTelegramHtml(rupiah(available))}`,
+      `Diperiksa: ${formatTimestamp(snapshot.checked_at)}`,
+    );
+  }
+
+  return lines.join("\n");
 }
 
 async function orderText(argument: string) {
