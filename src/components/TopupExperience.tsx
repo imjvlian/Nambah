@@ -951,7 +951,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       // Popup DOKU langsung dibuka dari gesture klik checkout (masih dalam
       // jendela transient activation) — tanpa halaman perantara.
       if (
-        data.order.payment?.provider === "doku" &&
+        (data.order.payment?.provider === "doku" ||
+          data.order.payment?.provider === "paylabs") &&
         data.order.payment.redirectUrl
       ) {
         const width = 520;

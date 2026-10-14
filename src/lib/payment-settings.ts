@@ -5,9 +5,9 @@ import {
   supabaseUpsert,
 } from "@/lib/supabase/server";
 
-export type PaymentProviderId = "midtrans" | "doku";
+export type PaymentProviderId = "midtrans" | "doku" | "paylabs";
 
-export const PAYMENT_PROVIDERS: PaymentProviderId[] = ["midtrans", "doku"];
+export const PAYMENT_PROVIDERS: PaymentProviderId[] = ["midtrans", "doku", "paylabs"];
 
 const ACTIVE_PROVIDER_KEY = "active_payment_provider";
 const DEFAULT_PROVIDER: PaymentProviderId = "midtrans";
@@ -19,7 +19,7 @@ type AppSettingRow = {
 };
 
 export function isPaymentProviderId(value: unknown): value is PaymentProviderId {
-  return value === "midtrans" || value === "doku";
+  return value === "midtrans" || value === "doku" || value === "paylabs";
 }
 
 /**
@@ -78,6 +78,20 @@ export function getDokuEnvironment(): "sandbox" | "production" {
     : "sandbox";
 }
 
+export function isPaylabsConfigured() {
+  return Boolean(
+    process.env.PAYLABS_MERCHANT_ID?.trim() &&
+      process.env.PAYLABS_PRIVATE_KEY?.trim() &&
+      process.env.PAYLABS_ROOT_URL?.trim(),
+  );
+}
+
+export function getPaylabsEnvironment(): "sandbox" | "production" {
+  return process.env.PAYLABS_ENV?.trim().toLowerCase() === "production"
+    ? "production"
+    : "sandbox";
+}
+
 export type PaymentProviderStatus = {
   id: PaymentProviderId;
   name: string;
@@ -107,6 +121,15 @@ export function getPaymentProviderStatuses(): PaymentProviderStatus[] {
         : isDokuConfigured()
           ? "Checkout hosted siap — lengkapi PRIVATE_KEY/MERCHANT_ID/TERMINAL_ID untuk QRIS inline"
           : "DOKU_CLIENT_ID / DOKU_SECRET_KEY belum diisi",
+    },
+    {
+      id: "paylabs",
+      name: "Paylabs",
+      configured: isPaylabsConfigured(),
+      environment: isPaylabsConfigured() ? getPaylabsEnvironment() : null,
+      note: isPaylabsConfigured()
+        ? "QRIS/VA native + HTML5 fallback siap"
+        : "PAYLABS_MERCHANT_ID / PAYLABS_PRIVATE_KEY / PAYLABS_ROOT_URL belum diisi",
     },
   ];
 }

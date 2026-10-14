@@ -14,6 +14,13 @@ import {
   isDokuSnapConfigured,
   type DokuStatusResult,
 } from "./doku";
+import {
+  createPaylabsPayment,
+  fetchPaylabsQrisStatus,
+  fetchPaylabsVaStatus,
+  isPaylabsConfigured,
+  type PaylabsQrisStatusResult,
+} from "./paylabs";
 import type { CreatePaymentInput, PaymentSession } from "./types";
 
 export function normalizeProviderId(value: unknown): PaymentProviderId {
@@ -49,12 +56,22 @@ export async function createPaymentSession(
     );
   }
 
+  if (provider === "paylabs") {
+    if (!isPaylabsConfigured()) {
+      throw new Error(
+        "Gateway Paylabs belum dikonfigurasi (PAYLABS_MERCHANT_ID + PAYLABS_PRIVATE_KEY + PAYLABS_ROOT_URL).",
+      );
+    }
+    return createPaylabsPayment(input);
+  }
+
   return createMidtransPaymentSession(input);
 }
 
 export type GatewayStatusResult =
   | { provider: "midtrans"; raw: MidtransStatusPayload }
-  | { provider: "doku"; doku: DokuStatusResult };
+  | { provider: "doku"; doku: DokuStatusResult }
+  | { provider: "paylabs"; paylabs: Awaited<ReturnType<typeof fetchPaylabsQrisStatus>> | Awaited<ReturnType<typeof fetchPaylabsVaStatus>> };
 
 /**
  * Mengambil status transaksi dari gateway PEMBUAT order — bukan gateway
@@ -78,6 +95,17 @@ export async function fetchGatewayStatus(
     }
     const doku = await fetchDokuCheckoutStatus(orderId);
     return { provider: "doku", doku };
+  }
+
+  if (provider === "paylabs") {
+    // Coba QRIS lalu VA — channel lain (HTML5) biasanya diperbarui via webhook.
+    try {
+      const paylabs = await fetchPaylabsQrisStatus({ orderId, platformTradeNo: options?.referenceNo ?? null });
+      return { provider: "paylabs", paylabs };
+    } catch {
+      const paylabs = await fetchPaylabsVaStatus({ orderId, platformTradeNo: options?.referenceNo ?? null });
+      return { provider: "paylabs", paylabs };
+    }
   }
 
   return { provider: "midtrans", raw: await fetchMidtransStatus(orderId) };

@@ -2,6 +2,7 @@ import { fetchGatewayStatus, normalizeProviderId } from "@/lib/payments";
 import {
   applyDokuStatus,
   applyMidtransStatus,
+  applyPaylabsStatus,
   getPublicOrder,
   isOrderOwnedByUser,
 } from "@/lib/order-service";
@@ -62,6 +63,24 @@ export async function POST(
 
     if (result.provider === "midtrans") {
       const order = await applyMidtransStatus(result.raw, "status_api", false);
+      return Response.json({ order }, { headers });
+    }
+
+    if (result.provider === "paylabs") {
+      const order = await applyPaylabsStatus(
+        {
+          orderId: result.paylabs.orderId,
+          platformTradeNo: result.paylabs.platformTradeNo,
+          status: result.paylabs.status ?? result.paylabs.transactionStatusDesc ?? undefined,
+          paidTime: result.paylabs.paidTime,
+          amountValue: result.paylabs.amountValue,
+          paymentType:
+            existing.payment.paymentType ?? undefined,
+          raw: result.paylabs.raw,
+        },
+        "status_api",
+        false,
+      );
       return Response.json({ order }, { headers });
     }
 

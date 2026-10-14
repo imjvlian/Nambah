@@ -586,7 +586,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const paymentChannel = paymentTypeLabel(paymentType);
   const redirectUrl = order?.payment.redirectUrl ?? null;
   const isDoku = order?.payment.provider === "doku";
-  const dokuQrContent = isDoku ? order?.doku?.qrContent ?? null : null;
+  const isPaylabs = order?.payment.provider === "paylabs";
+const dokuQrContent = isDoku ? order?.doku?.qrContent ?? null : null;
+const paylabsQrContent = isPaylabs ? order?.paylabs?.qrContent ?? null : null;
+const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
 
   return (
     <main>
@@ -795,6 +798,18 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     amount={order.pricing.finalPrice}
                     expiresAt={order.doku?.expiresAt ?? order.expiresAt ?? null}
                   />
+                ) : paylabsQrContent ? (
+                  <DokuQrisPanel
+                    qrContent={paylabsQrContent}
+                    amount={order.pricing.finalPrice}
+                    expiresAt={order.paylabs?.expiresAt ?? order.expiresAt ?? null}
+                  />
+                ) : paylabsVaNumber ? (
+                  <div className="midtrans-native-payment">
+                    <p>Nomor Virtual Account:</p>
+                    <strong>{paylabsVaNumber}</strong>
+                    <p>{order.paylabs?.bankCode}</p>
+                  </div>
                 ) : redirectUrl ? (
                   <div className="doku-checkout-cta">
                     <p>

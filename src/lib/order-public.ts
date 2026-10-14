@@ -42,7 +42,7 @@ export type PublicOrder = {
     id: string;
     name: string;
     detail: string;
-    provider: "midtrans" | "doku";
+    provider: "midtrans" | "doku" | "paylabs";
     providerStatus: string;
     paymentType: string | null;
     snapToken: string | null;
@@ -63,6 +63,15 @@ export type PublicOrder = {
     expiresAt?: string | null;
     /** Jokul Checkout JS — modal pembayaran di halaman Nambah (mode checkout). */
     checkoutJsUrl?: string;
+  } | null;
+
+  /** Sesi Paylabs (QRIS/VA/HTML5) untuk dirender inline di halaman order. */
+  paylabs?: {
+    qrContent?: string;
+    vaNumber?: string;
+    bankCode?: string;
+    expiresAt?: string | null;
+    redirectUrl?: string | null;
   } | null;
   pricing: {
     sellingPrice: number;

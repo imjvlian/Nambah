@@ -31,6 +31,11 @@ import {
   validateRequestedPoints,
 } from "@/lib/loyalty";
 import { isMidtransConfigured } from "@/lib/midtrans/client";
+import {
+  getActivePaymentProvider,
+  isDokuConfigured,
+  isPaylabsConfigured,
+} from "@/lib/payment-settings";
 import { createPaymentSession } from "@/lib/payments";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { reservePromotionForOrder } from "@/lib/promotion-service";
@@ -102,9 +107,18 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isMidtransConfigured()) {
+  const activePaymentProvider = await getActivePaymentProvider();
+  const gatewayConfigured =
+    activePaymentProvider === "paylabs"
+      ? isPaylabsConfigured()
+      : activePaymentProvider === "doku"
+        ? isDokuConfigured()
+        : isMidtransConfigured();
+  if (!gatewayConfigured) {
     return Response.json(
-      { error: "Midtrans belum dikonfigurasi." },
+      {
+        error: `Gateway ${activePaymentProvider} belum dikonfigurasi.`,
+      },
       { status: 503 },
     );
   }
@@ -275,12 +289,17 @@ if (isMerchantRetail) {
     return Response.json({ error: credit.reason }, { status: 409 });
   }
 } else {
-  enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
-  if (!enabledPayments.length) {
-    return Response.json(
-      { error: "Metode pembayaran belum didukung Midtrans." },
-      { status: 400 },
-    );
+  if (activePaymentProvider === "paylabs") {
+    // Paylabs memetakan channel langsung di createPaymentSession (QRIS/VA/HTML5 fallback).
+    enabledPayments = [];
+  } else {
+    enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
+    if (!enabledPayments.length) {
+      return Response.json(
+        { error: "Metode pembayaran belum didukung Midtrans." },
+        { status: 400 },
+      );
+    }
   }
 }
 
@@ -632,6 +651,40 @@ if (isMerchantRetail) {
           );
         } catch (error) {
           console.error(`DOKU session payload persist failed for order ${orderId}`, error);
+        }
+      }
+
+      if (session.provider === "paylabs") {
+        const raw = (session.payload.raw ?? {}) as Record<string, unknown>;
+        try {
+          await supabaseUpdate(
+            "payments",
+            {
+              provider_transaction_id:
+                (raw.platformTradeNo as string | undefined) ??
+                (raw.referenceNo as string | undefined) ??
+                null,
+              payment_type:
+                session.payload.kind === "qris"
+                  ? "qris"
+                  : session.payload.kind === "va"
+                    ? "va"
+                    : "html5",
+              payment_payload: {
+                mode: session.payload.kind,
+                qrContent: session.payload.qrContent ?? null,
+                vaNumber: session.payload.vaNumber ?? null,
+                bankCode: session.payload.bankCode ?? null,
+                expiresAt: session.payload.expiresAt ?? null,
+                platformTradeNo: raw.platformTradeNo ?? null,
+                requestId: raw.requestId ?? null,
+              },
+              updated_at: new Date().toISOString(),
+            },
+            { filters: { order_id: `eq.${orderId}` } },
+          );
+        } catch (error) {
+          console.error(`Paylabs session payload persist failed for order ${orderId}`, error);
         }
       }
 
