@@ -11,6 +11,11 @@ import {
   type MerchantEligibility,
 } from "@/lib/merchant-retail-rules";
 import type { MerchantStatus } from "@/lib/merchant-retail-types";
+import {
+  normalizeMerchantScanRow,
+  type MerchantScanOrder as ScanOrder,
+  type MerchantScanRow,
+} from "@/lib/merchant-scan-row";
 
 // Di-re-export supaya pemanggil cukup mengimpor dari satu modul.
 export { MAX_RECEIVABLE_IDR };
@@ -314,41 +319,19 @@ export async function syncMerchantBalance(merchantId: string) {
  * menghasilkan pesan yang bisa dibaca kasir ("bukan untuk toko Anda")
  * dan bukan diam-diam gagal karena filter yang tidak cocok.
  */
-export type MerchantScanOrder = {
-  id: string;
-  merchant_id: string | null;
-  merchant_name: string | null;
-  status: string;
-  final_price: number | string;
-  expires_at: string | null;
-};
+export type MerchantScanOrder = ScanOrder;
+export type { MerchantScanRow } from "@/lib/merchant-scan-row";
 
 export async function getOrderForMerchantScan(
   orderId: string,
 ): Promise<MerchantScanOrder | null> {
-  const rows = await supabaseSelect<{
-    orders: MerchantScanOrder;
-    merchants: { name: string } | null;
-  }>("orders", {
-    select:
-      "id,merchant_id,status,final_price,expires_at,merchants!left(name)",
+  const rows = await supabaseSelect<MerchantScanRow>("orders", {
+    select: "id,merchant_id,status,final_price,expires_at,merchants!left(name)",
     filters: { id: `eq.${orderId}` },
     limit: 1,
   });
 
-  const row = rows[0];
-  if (!row) return null;
-
-  // `merchants` adalah relasi, jadi PostgREST mengirimnya sebagai array
-  // atau objek tergantung jawaban join. Dua-duanya dinormalisasi di sini
-  // supaya pemanggil tidak perlu tahu bentuknya.
-  const raw = (row as unknown as { merchants: unknown }).merchants;
-  const name =
-    Array.isArray(raw) ?
-      ((raw[0] as { name?: string } | undefined)?.name ?? null)
-    : ((raw as { name?: string } | null)?.name ?? null);
-
-  return { ...row.orders, merchant_name: name };
+  return normalizeMerchantScanRow(rows[0]);
 }
 
 type ReceivableMerchantRow = {
