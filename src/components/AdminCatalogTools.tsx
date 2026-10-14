@@ -472,9 +472,9 @@ export default function AdminCatalogTools() {
 
           {markupResult && (
             <div className="admin-tool-preview">
-              <div><small>Eligible</small><strong>{markupResult.summary.eligible}</strong></div>
+              <div><small>Bisa diubah</small><strong>{markupResult.summary.eligible}</strong></div>
               <div><small>Berubah</small><strong>{markupResult.summary.changed}</strong></div>
-              <div><small>Min profit</small><strong>{formatIDR(markupResult.rules.minimumProfit)}</strong></div>
+              <div><small>Profit minimum</small><strong>{formatIDR(markupResult.rules.minimumProfit)}</strong></div>
             </div>
           )}
 
@@ -502,20 +502,20 @@ export default function AdminCatalogTools() {
         <article className="admin-automation-card cleanup-card">
           <div className="admin-automation-card-head">
             <div>
-              <small>Catalog hygiene</small>
-              <strong>Clean unmapped</strong>
+              <small>Kebersihan katalog</small>
+              <strong>Bersihkan produk belum terpetakan</strong>
             </div>
             <span>{catalog.stats.unmapped} terdeteksi</span>
           </div>
 
           <p className="admin-cleanup-copy">
-            Clean menyembunyikan produk orphan agar tidak masuk katalog user, lalu menonaktifkan game yang sudah tidak punya produk aktif mapped. Hapus permanen hanya untuk produk tanpa riwayat order; yang bersejarah otomatis dilewati dan cukup dinonaktifkan.
+            Bersihkan menyembunyikan produk orphan agar tidak masuk katalog user, lalu menonaktifkan game yang sudah tidak punya produk aktif terpetakan. Hapus permanen hanya untuk produk tanpa riwayat order; yang bersejarah otomatis dilewati dan cukup dinonaktifkan.
           </p>
 
           {cleanupResult && (
             <div className="admin-tool-preview cleanup-preview">
-              <div><small>Orphan</small><strong>{cleanupResult.summary.orphanProducts}</strong></div>
-              <div><small>Masih aktif</small><strong>{cleanupResult.summary.activeOrphans}</strong></div>
+              <div><small>Tanpa induk</small><strong>{cleanupResult.summary.orphanProducts}</strong></div>
+              <div><small>Orphan aktif</small><strong>{cleanupResult.summary.activeOrphans}</strong></div>
               <div><small>Produk mati</small><strong>{cleanupResult.summary.activeUnavailable ?? 0}</strong></div>
               <div><small>Game kosong</small><strong>{cleanupResult.summary.gamesToDisable}</strong></div>
             </div>
@@ -535,7 +535,7 @@ export default function AdminCatalogTools() {
           {purgeResult && (
             <div className="admin-tool-preview cleanup-preview">
               <div><small>Bisa dihapus</small><strong>{purgeResult.summary.deletable}</strong></div>
-              <div><small>Bersejarah</small><strong>{purgeResult.summary.skipped}</strong></div>
+              <div><small>Dilewati</small><strong>{purgeResult.summary.skipped}</strong></div>
               <div><small>Terhapus</small><strong>{purgeResult.summary.deleted}</strong></div>
             </div>
           )}

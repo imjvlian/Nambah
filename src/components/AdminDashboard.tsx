@@ -636,6 +636,17 @@ const REPORT_PRESET_OPTIONS = [
   { value: "90", label: "90 hari" },
 ] as const;
 
+/**
+ * Baris per halaman untuk tabel "Catatan kas harian".
+ *
+ * 14 dipilih karena satu halaman jadi muat di layar laptop tanpa scroll
+ * dan tombol paginasi masih terlihat - kalau 30, operator harus menggulir
+ * ke bawah hanya untuk menemukan tombol "Berikutnya", lalu menggulir lagi
+ * untuk kembali ke tabel. Tabel dengan paginasi yang tersembunyi di bawah
+ * lipatan adalah paginasi yang tidak dipakai.
+ */
+const CASH_DAYS_PER_PAGE = 14;
+
 const COMMISSION_STATUS_LABEL: Record<string, string> = {
   pending: "Menunggu",
   available: "Siap dicairkan",
@@ -955,10 +966,10 @@ function RoadmapCard({
         <strong>{title}</strong>
         <span className={`acc-roadmap-status ${status}`}>
           {status === "live"
-            ? "Live"
+            ? "Jalan"
             : status === "foundation"
-              ? "Foundation"
-              : "Planned"}
+              ? "Pondasi"
+              : "Direncanakan"}
         </span>
       </div>
       <p>{copy}</p>
@@ -1052,6 +1063,8 @@ export default function AdminDashboard() {
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
   const [financeData, setFinanceData] = useState<FinancePayload | null>(null);
   const [cashFlowData, setCashFlowData] = useState<CashFlowPayload | null>(null);
+  /** Halaman tabel "Catatan kas harian". */
+  const [cashFlowDayPage, setCashFlowDayPage] = useState(0);
   /*
    * Periode laporan arus kas.
    *
@@ -1460,6 +1473,15 @@ export default function AdminDashboard() {
       throw new Error(data.error ?? "Laporan arus kas gagal dimuat.");
     }
     setCashFlowData(data);
+    /*
+     * Halaman tabel kas harian dikembalikan ke awal setiap rentang baru
+     * dimuat.
+     *
+     * Tanpa ini, membuka "90 hari" lalu menyaring sampai halaman 4, lalu
+     * beralih ke "7 hari", membuat operator melihat tabel kosong - bukan
+     * karena periode itu sepi, tapi karena halaman 4 tidak ada di sana.
+     */
+    setCashFlowDayPage(0);
   }
 
   /**
@@ -3091,6 +3113,18 @@ const txDataStamp = txRange.preset
   const hiddenCashFlowDayCount =
     (cashFlowData?.days.length ?? 0) - cashFlowDaysDescending.length;
 
+  const cashFlowDayPageCount = Math.max(
+    1,
+    Math.ceil(cashFlowDaysDescending.length / CASH_DAYS_PER_PAGE),
+  );
+  // Dijepit supaya perubahan rentang tidak pernah menyisakan halaman
+  // kosong di tabel yang isinya baru saja berkurang.
+  const safeCashFlowDayPage = Math.min(cashFlowDayPage, cashFlowDayPageCount - 1);
+  const cashFlowDayRows = cashFlowDaysDescending.slice(
+    safeCashFlowDayPage * CASH_DAYS_PER_PAGE,
+    (safeCashFlowDayPage + 1) * CASH_DAYS_PER_PAGE,
+  );
+
   if (authState === "loading") {
     return (
       <main className="admin-shell">
@@ -3200,7 +3234,7 @@ const txDataStamp = txRange.preset
               onClick={() => void refreshCurrent()}
               disabled={busy === "refresh"}
             >
-              {busy === "refresh" ? "Refreshing..." : "Refresh"}
+              {busy === "refresh" ? "Memuat ulang..." : "Muat ulang"}
             </button>
             <Link href="/" target="_blank">
               Website ↗
@@ -3225,7 +3259,7 @@ const txDataStamp = txRange.preset
             <>
               <section className="acc-hero">
                 <div>
-                  <span className="acc-eyebrow">Operations overview</span>
+                  <span className="acc-eyebrow">Ringkasan operasional</span>
                   <h1>Semua yang penting, satu layar.</h1>
                   <p>
                     Pantau order, supplier, receipt, pricing, dan kesiapan
@@ -3237,7 +3271,7 @@ const txDataStamp = txRange.preset
                     <small>Saldo Digiflazz tersedia</small>
                     <strong>{formatIDR(overview.finance.availableBalance)}</strong>
                     <span>
-                      Update {formatTime(overview.finance.balanceCheckedAt)}
+                      Diperiksa {formatTime(overview.finance.balanceCheckedAt)}
                     </span>
                   </div>
                   {/*
@@ -4579,6 +4613,7 @@ const txDataStamp = txRange.preset
                         {merchantData.merchants.map((merchant) => (
                           <tr
                             key={merchant.id}
+                            className="acc-row-link"
                             tabIndex={0}
                             onKeyDown={(event) => {
                               if (event.key !== "Enter" && event.key !== " ") return;
@@ -4961,33 +4996,33 @@ const txDataStamp = txRange.preset
 
               <div className="acc-metrics">
                 <article>
-                  <small>Checked</small>
+                  <small>Diperiksa</small>
                   <strong>{financeData?.stats.checked ?? 0}</strong>
                   <span>Snapshot terbaru</span>
                 </article>
                 <article>
-                  <small>OK</small>
+                  <small>Sesuai</small>
                   <strong>{financeData?.stats.ok ?? 0}</strong>
-                  <span>Financial invariant cocok</span>
+                  <span>Aturan keuangan cocok</span>
                 </article>
                 <article>
-                  <small>Warning</small>
+                  <small>Peringatan</small>
                   <strong>{financeData?.stats.warning ?? 0}</strong>
                   <span>Perlu ditinjau</span>
                 </article>
                 <article>
-                  <small>Error</small>
+                  <small>Kesalahan</small>
                   <strong>{financeData?.stats.error ?? 0}</strong>
-                  <span>Mismatch penting</span>
+                  <span>Selisih penting</span>
                 </article>
               </div>
 
               <div className="acc-table-card">
                 <div className="acc-finance-head">
                   <span>Order</span>
-                  <span>Checked</span>
-                  <span>Issues</span>
-                  <span>Result</span>
+                  <span>Diperiksa</span>
+                  <span>Masalah</span>
+                  <span>Hasil</span>
                 </div>
                 {(financeData?.rows ?? []).map((row) => (
                   <div className="acc-finance-row" key={row.orderId}>
@@ -5177,9 +5212,9 @@ const txDataStamp = txRange.preset
                    * Catatan kas harian.
                    *
                    * Chart di atas cuma menunjukkan satu angka (omzet). Untuk
-                   * "¿uang masuk hari ini dari mana, uang keluar untuk apa"
+                   * "Uang masuk hari ini dari mana, uang keluar untuk apa"
                    * chart itu tidak menjawab apa pun - jadi tabel ini yang
-                   * memuat jawabannya, dengan setiap kolomnamed setelah
+                   * memuat jawabannya, dengan setiap kolom dinamai setelah
                    * sumber dan tujuannya.
                    *
                    * Kolom dikelompokkan dua: yang MEMASUK dari rekening, dan
@@ -5195,47 +5230,89 @@ const txDataStamp = txRange.preset
                       </small>
                     </div>
 
+                    {/*
+                     * Ringkasan di atas tabel.
+                     *
+                     * Tabel delapan kolom harus digulir dan dipindai baris per
+                     * baris untuk menjawab "berapa yang masuk, berapa yang
+                     * keluar, jadi berapa". Tiga angka itu diletakkan dulu
+                     * karena itu pertanyaan yang sebenarnya dicari.
+                     */}
+                    <div className="acc-cash-summary">
+                      <article>
+                        <small>Masuk</small>
+                        <strong className="acc-net-positive">
+                          {formatIDR(cashFlowData.totals.cashIn)}
+                        </strong>
+                      </article>
+                      <article>
+                        <small>Keluar</small>
+                        <strong>{formatIDR(cashFlowData.totals.cashOut)}</strong>
+                      </article>
+                      <article>
+                        <small>Selisih</small>
+                        <strong
+                          className={
+                            cashFlowData.totals.netCash < 0
+                              ? "acc-net-negative"
+                              : "acc-net-positive"
+                          }
+                        >
+                          {formatIDR(cashFlowData.totals.netCash)}
+                        </strong>
+                      </article>
+                    </div>
+
                     <div className="acc-table-scroll">
-                      <table className="acc-table">
+                      <table className="acc-table acc-table-money">
                         <thead>
                           <tr>
                             <th>Tanggal</th>
-                            <th>Pesanan</th>
-                            <th>Masuk: pembayaran</th>
-                            <th>Masuk: pelunasan toko</th>
-                            <th>Keluar: modal supplier</th>
-                            <th>Keluar: pencairan</th>
-                            <th>Keluar: fee gateway</th>
-                            <th>Selisih</th>
+                            <th className="acc-num">Pesanan</th>
+                            <th className="acc-num">Masuk: pembayaran</th>
+                            <th className="acc-num">Masuk: pelunasan toko</th>
+                            <th className="acc-num">Keluar: modal supplier</th>
+                            <th className="acc-num">Keluar: pencairan</th>
+                            <th className="acc-num">Keluar: fee gateway</th>
+                            <th className="acc-num">Selisih</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {cashFlowDaysDescending.map((day) => (
+                          {cashFlowDayRows.map((day) => (
                             <tr key={day.date}>
                               <td data-label="Tanggal">
                                 <strong>
                                   {formatWibDayLabel(day.date)}
                                 </strong>
                               </td>
-                              <td data-label="Pesanan">
+                              <td className="acc-num" data-label="Pesanan">
                                 {day.orders}
                               </td>
-                              <td data-label="Masuk: pembayaran">
+                              <td className="acc-num" data-label="Masuk: pembayaran">
                                 {formatIDR(day.grossRevenue)}
                               </td>
-                              <td data-label="Masuk: pelunasan toko">
+                              <td
+                                className="acc-num"
+                                data-label="Masuk: pelunasan toko"
+                              >
                                 {formatIDR(day.merchantSettled)}
                               </td>
-                              <td data-label="Keluar: modal supplier">
+                              <td
+                                className="acc-num"
+                                data-label="Keluar: modal supplier"
+                              >
                                 {formatIDR(day.supplierCost)}
                               </td>
-                              <td data-label="Keluar: pencairan">
+                              <td className="acc-num" data-label="Keluar: pencairan">
                                 {formatIDR(day.affiliatePaidOut)}
                               </td>
-                              <td data-label="Keluar: fee gateway">
+                              <td
+                                className="acc-num"
+                                data-label="Keluar: fee gateway"
+                              >
                                 {formatIDR(day.gatewayFee)}
                               </td>
-                              <td data-label="Selisih">
+                              <td className="acc-num" data-label="Selisih">
                                 <span
                                   className={
                                     day.netCash < 0
@@ -5252,19 +5329,23 @@ const txDataStamp = txRange.preset
                         <tfoot>
                           <tr>
                             <td>TOTAL</td>
-                            <td>{cashFlowData.totals.orders}</td>
-                            <td>{formatIDR(cashFlowData.totals.grossRevenue)}</td>
-                            <td>
+                            <td className="acc-num">{cashFlowData.totals.orders}</td>
+                            <td className="acc-num">
+                              {formatIDR(cashFlowData.totals.grossRevenue)}
+                            </td>
+                            <td className="acc-num">
                               {formatIDR(cashFlowData.totals.merchantSettled)}
                             </td>
-                            <td>
+                            <td className="acc-num">
                               {formatIDR(cashFlowData.totals.supplierCost)}
                             </td>
-                            <td>
+                            <td className="acc-num">
                               {formatIDR(cashFlowData.totals.affiliatePaidOut)}
                             </td>
-                            <td>{formatIDR(cashFlowData.totals.gatewayFee)}</td>
-                            <td>
+                            <td className="acc-num">
+                              {formatIDR(cashFlowData.totals.gatewayFee)}
+                            </td>
+                            <td className="acc-num">
                               <span
                                 className={
                                   cashFlowData.totals.netCash < 0
@@ -5283,6 +5364,50 @@ const txDataStamp = txRange.preset
                     {cashFlowDaysDescending.length === 0 ? (
                       <div className="acc-empty">
                         Belum ada transaksi pada periode ini.
+                      </div>
+                    ) : null}
+
+                    {cashFlowDayPageCount > 1 ? (
+                      <div className="acc-tx-pagination">
+                        <span>
+                          Menampilkan{" "}
+                          {safeCashFlowDayPage * CASH_DAYS_PER_PAGE + 1}-
+                          {Math.min(
+                            (safeCashFlowDayPage + 1) * CASH_DAYS_PER_PAGE,
+                            cashFlowDaysDescending.length,
+                          )}{" "}
+                          dari {cashFlowDaysDescending.length} hari
+                        </span>
+                        <div>
+                          <button
+                            type="button"
+                            disabled={safeCashFlowDayPage === 0}
+                            onClick={() =>
+                              setCashFlowDayPage(
+                                Math.max(0, safeCashFlowDayPage - 1),
+                              )
+                            }
+                          >
+                            Sebelumnya
+                          </button>
+                          <span className="acc-tx-pageinfo">
+                            {safeCashFlowDayPage + 1} / {cashFlowDayPageCount}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={safeCashFlowDayPage >= cashFlowDayPageCount - 1}
+                            onClick={() =>
+                              setCashFlowDayPage(
+                                Math.min(
+                                  cashFlowDayPageCount - 1,
+                                  safeCashFlowDayPage + 1,
+                                ),
+                              )
+                            }
+                          >
+                            Berikutnya
+                          </button>
+                        </div>
                       </div>
                     ) : null}
 

@@ -2457,16 +2457,69 @@
   border-bottom: 0;
 }
 
-/* Baris tabel yang bisa diklik (dipakai untuk memilih toko yang mau diubah).
-   Sasarannya harus terlihat sebagai target, bukan hanya berubah warna saat
-   kursor lewat - di layar sentuh tidak ada hover sama sekali. */
+/*
+ * Baris tabel yang bisa diklik harus MINTA kursor pointer.
+ *
+ * Versi lama menulis `.acc-table tbody tr { cursor: pointer }` tanpa
+ * syarat - jadi SEMUA baris di SEMUA tabel terlihat bisa diklik, termasuk
+ * laporan transaksi dan catatan kas harian yang memang tidak punya
+ * handlers. Kursor yang berbohong lebih buruk daripada tanpa kursor: operator
+ * mengklik, tidak terjadi apa-apa, dan mulai menebak-nebak di halaman lain.
+ *
+ * Karena itu baris yang bisa diklik harus menandai dirinya lewat
+ * `.acc-row-link`.
+ */
 .acc-table tbody tr {
-  cursor: pointer;
   transition: background .12s ease;
+}
+
+.acc-table tbody tr.acc-row-link {
+  cursor: pointer;
 }
 
 .acc-table tbody tr:hover {
   background: rgba(255,255,255,.03);
+}
+
+/* Zebra halus. Tanpa itu, tabel 8 kolom seperti catatan kas harian sulit
+   dibaca - mata berhenti di baris yang salah saat berpindah kolom. */
+.acc-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,.012);
+}
+
+.acc-table tbody tr:nth-child(even):hover {
+  background: rgba(255,255,255,.03);
+}
+
+/*
+ * Kolom angka.
+ *
+ * `tabular-nums` adalah inti dari kelas ini. Tanpa itu, digit "1" dan "8"
+ * punya lebar berbeda dan kolom rupiah terlihat bergeser ke kiri-kanan -
+ * membandingkan dua nominal jadi kerja mata, bukan kerja tabel.
+ *
+ * `.acc-num` dipakai per sel, bukan lewat `:nth-child`, karena "kolom
+ * ketiga adalah angka" tidak berlaku di semua tabel: tabel Toko ritel punya
+ * "Toko" di kolom pertama dan teks di kolom kedua.
+ */
+.acc-table .acc-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.acc-table th.acc-num {
+  text-align: right;
+}
+
+/* Kepala tabel menempel saat tabel digulir. Di tabel kas harian yang
+  kolomnya banyak, menggulir vertikal membuat nama kolom hilang dan angka
+  jadi tidak punya konteks. */
+.acc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #121410;
 }
 
 /* Baris yang sedang fokus keyboard. `outline` dipakai, bukan hanya
@@ -5944,6 +5997,47 @@
 .acc-net-negative {
   color: #e0aaaa;
   font-weight: 800;
+}
+
+/*
+ * Tiga angka di atas "Catatan kas harian".
+ *
+ * Total masuk, total keluar, dan selisihnya adalah pertanyaan yang
+ * sebenarnya ditanyakan orang yang membuka halaman ini. Tabelnya lengkap,
+ * tapi menjawabnya butuh menggulir dan menjumlahkan - jadi ketiga angka
+ * itu ditumpuk di sini, sebelum tabel, supaya tidak perlu dipakai OTA.
+ *
+ * `tabular-nums` di sini bukan hiasan: kolom "Selisih" adalah selisih dua
+ * nominal panjang, dan tanpa lebar digit tetap angkanya terlihat bergeser
+ * setiap kali digitHundreds berubah.
+ */
+.acc-cash-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.acc-cash-summary article {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px 13px;
+  background: #121410;
+}
+
+.acc-cash-summary small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.acc-cash-summary strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
 }
 
 /* Baris TOTAL harus terlihat berbeda dari data, bukan baris biasa. */

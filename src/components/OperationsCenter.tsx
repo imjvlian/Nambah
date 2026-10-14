@@ -204,10 +204,10 @@ export default function OperationsCenter() {
 
           <section className="acc-table-card ops-incidents">
             <div className="ops-incidents-head">
-              <span>Severity</span>
-              <span>Incident</span>
-              <span>Detail</span>
-              <span>Count</span>
+              <span>Tingkat</span>
+              <span>Insiden</span>
+              <span>Rincian</span>
+              <span>Jumlah</span>
             </div>
 
             {(data?.incidents ?? []).map((item) => {

@@ -550,7 +550,7 @@ export default function AdminSidebar({
           </span>
           <span>
             <b>{BRAND.shortName}</b>
-            <small>Control Center</small>
+            <small>Pusat kendali</small>
           </span>
         </Link>
 
