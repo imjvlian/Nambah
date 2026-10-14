@@ -119,7 +119,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     id: "orders",
     label: "Pesanan",
     Icon: IconOrders,
-    hint: "Order masuk dan top up",
+    hint: "Pesanan masuk dan top up",
     group: "Operasional",
   },
   {
@@ -136,7 +136,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
      */
     label: "Log Email",
     Icon: IconReceipts,
-    hint: "Pengiriman email receipt ke user",
+    hint: "Pengiriman email bukti ke user",
     group: "Operasional",
   },
   {
@@ -187,7 +187,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     id: "merchants",
     label: "Toko Ritel",
     Icon: IconMerchants,
-    hint: "Piutang merchant",
+    hint: "Piutang toko",
     group: "Keuangan",
   },
 
@@ -202,7 +202,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     id: "affiliates",
     label: "Afiliasi",
     Icon: IconAffiliates,
-    hint: "Komisi dan penarikan",
+    hint: "Komisi dan pencairan",
     group: "Pertumbuhan",
   },
 
@@ -217,7 +217,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
     id: "system",
     label: "Sistem",
     Icon: IconSystem,
-    hint: "Health dan konfigurasi",
+    hint: "Kesehatan dan konfigurasi",
     group: "Sistem",
   },
 ];
@@ -340,7 +340,7 @@ export const ADMIN_TOOLS: Array<{
   {
     href: "/admin/operations",
     label: "Operations Center",
-    hint: "Health seluruh service",
+    hint: "Kesehatan seluruh layanan",
     group: "Alat",
     Icon: IconPulse,
   },

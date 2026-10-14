@@ -3,8 +3,8 @@ import AffiliateAdminPanel from "@/components/AffiliateAdminPanel";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: `Affiliate Withdrawal Center — ${BRAND.name}`,
-  description: "Admin affiliate ownership and payout workflow.",
+  title: `Pusat Pencairan Mitra - ${BRAND.name}`,
+  description: "Kelola mitra afiliasi dan alur pencairan komisinya.",
 };
 
 export const dynamic = "force-dynamic";

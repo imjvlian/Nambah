@@ -349,7 +349,7 @@ async function applyManualMapping(
 ) {
   if (!productId || !sku) {
     return Response.json(
-      { error: "productId dan sku wajib diisi." },
+      { error: "ID produk dan SKU wajib diisi." },
       { status: 400 },
     );
   }

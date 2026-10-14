@@ -393,7 +393,7 @@ export default function DigiflazzCatalogBrowserV2() {
       <main className="supplier-browser-shell clean-catalog">
         <section className="supplier-browser-empty">
           <span className="admin-kicker">Admin</span>
-          <h1>Session admin diperlukan.</h1>
+          <h1>Sesi admin diperlukan.</h1>
           <p>Login dulu dari Dashboard Admin, lalu buka kembali katalog supplier.</p>
           <Link className="primary-button" href="/admin">Ke Dashboard Admin <span>→</span></Link>
         </section>

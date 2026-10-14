@@ -165,7 +165,7 @@ async function main() {
     paymentId: "merchant_retail",
     merchantId: merchant.id,
     // Untuk game voucher (Google Play, Steam, PSN) kolom "akun" diisi email
-    // atau nomor HP, bukan User ID. Skema账号 diambil dari game, jadi nilai
+    // atau nomor HP, bukan User ID. Skema akun diambil dari game, jadi nilai
     // di sini harus cocok dengan game yang dipilih di atas.
     targetUserId: "081234567890",
     targetServerId: "",

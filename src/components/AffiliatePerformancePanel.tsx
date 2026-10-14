@@ -247,7 +247,7 @@ export default function AffiliatePerformancePanel() {
                   {reviewMode === "approve" ? (
                     <>
                       <label>
-                        <span>Kode affiliate (opsional)</span>
+                        <span>Kode mitra (opsional)</span>
                         <input
                           value={reviewForm.code}
                           onChange={(event) =>
@@ -337,7 +337,7 @@ export default function AffiliatePerformancePanel() {
 
       <section className="acc-panel">
         <header className="acc-panel-head">
-          <h3>Kinerja affiliate</h3>
+          <h3>Kinerja mitra</h3>
           <div className="acc-window-picker">
             {WINDOWS.map((window) => (
               <button
@@ -356,7 +356,7 @@ export default function AffiliatePerformancePanel() {
           <>
             <div className="acc-metrics">
               <article>
-                <small>Affiliate</small>
+                <small>Mitra</small>
                 <strong>{data.totals.affiliates}</strong>
               </article>
               <article>

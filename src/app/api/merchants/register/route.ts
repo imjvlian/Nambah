@@ -27,7 +27,7 @@ export const runtime = "nodejs";
  * disetujui tidak bisa muncul di checkout, tidak bisa memindai, dan tidak
  * punya piutang.
  *
- * Rate limit 5 per jam per IP. Pendaftaran yang sahاء dibatasi satu kali per
+ * Rate limit 5 per jam per IP. Pendaftaran yang sah — dibatasi satu kali per
  * toko; sisanya adalah penyalahgunaan.
  */
 export async function POST(request: Request) {

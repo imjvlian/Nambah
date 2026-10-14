@@ -439,7 +439,7 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
         <div className="account-section-head">
           <div>
             <span className="eyebrow">Profil</span>
-            <h2>Data checkout.</h2>
+            <h2>Data transaksi.</h2>
           </div>
           <span className="account-profile-saved">
             {profile?.updatedAt ? "Tersimpan " + formatDate(profile.updatedAt) : "Belum disimpan"}

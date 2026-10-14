@@ -169,7 +169,7 @@ export default function OperationsCenter() {
             <article>
               <small>Receipt issues</small>
               <strong>{receiptIssues}</strong>
-              <span>Failed atau stale delivery</span>
+              <span>Pengiriman gagal atau menggantung</span>
             </article>
             <article>
               <small>Finance errors</small>

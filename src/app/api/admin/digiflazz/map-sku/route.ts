@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   if (!productId || !supplierSku) {
     return Response.json(
-      { error: "productId dan supplierSku wajib diisi." },
+      { error: "ID produk dan SKU supplier wajib diisi." },
       { status: 400 },
     );
   }

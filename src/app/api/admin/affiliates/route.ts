@@ -368,7 +368,7 @@ export async function POST(request: Request) {
       if (!existing) break;
       if (requestedCode) {
         return Response.json(
-          { error: `Kode ${finalCode} sudah dipakai affiliate lain.` },
+          { error: `Kode ${finalCode} sudah dipakai mitra lain.` },
           { status: 409 },
         );
       }

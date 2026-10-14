@@ -137,7 +137,7 @@ export async function PATCH(request: Request) {
     // affiliate kedua tidak boleh dibuat dengan kode berbeda.
     if (row.status !== "pending") {
       return Response.json(
-        { error: `Request ini sudah ${row.status}.` },
+        { error: `Permintaan ini sudah ${row.status}.` },
         { status: 409 },
       );
     }

@@ -39,14 +39,14 @@ export async function POST(request: Request) {
 
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       return Response.json(
-        { error: "Nominal withdrawal tidak valid." },
+        { error: "Nominal pencairan tidak valid." },
         { status: 400, headers },
       );
     }
 
     if (method.length < 2 || accountName.length < 2 || accountNumber.length < 4) {
       return Response.json(
-        { error: "Data rekening withdrawal belum lengkap." },
+        { error: "Data rekening pencairan belum lengkap." },
         { status: 400, headers },
       );
     }
@@ -94,7 +94,7 @@ export async function PATCH(request: Request) {
     const withdrawalId = Number(body.withdrawalId);
     if (!Number.isSafeInteger(withdrawalId) || withdrawalId <= 0) {
       return Response.json(
-        { error: "Withdrawal ID tidak valid." },
+        { error: "ID pencairan tidak valid." },
         { status: 400, headers },
       );
     }

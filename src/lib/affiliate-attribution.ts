@@ -135,7 +135,7 @@ export function evaluateCooldown({
  * Sisa cooldown dalam jam, dibulatkan ke atas.
  *
  * Untuk pesan user: "coba lagi dalam 5 jam" lebih berguna daripada
- * "18123847 milidetik". `Math.ceil` supaya 1 menit tersisa tetap يقول 1 jam,
+ * "18123847 milidetik". `Math.ceil` supaya 1 menit tersisa tetap dibaca 1 jam,
  * tidak 0 — kalau 0 jam, user akan mengira cooldown-nya sudah habis.
  */
 export function remainingHours(remainingMs: number): number {

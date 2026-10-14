@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     }
     console.error("Affiliate account GET failed", error);
     return Response.json(
-      { error: "Data affiliate belum dapat dimuat." },
+      { error: "Data mitra belum dapat dimuat." },
       { status: 503 },
     );
   }

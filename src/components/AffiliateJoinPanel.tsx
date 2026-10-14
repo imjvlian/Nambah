@@ -295,7 +295,7 @@ export default function AffiliateJoinPanel() {
             </p>
             {existing.grantedCode && (
               <p className="affiliate-join-hint">
-                Kode affiliate: <b>{existing.grantedCode}</b>
+                Kode mitra: <b>{existing.grantedCode}</b>
                 <br />
                 Bagikan <code>/r/{existing.grantedCode}</code> untuk mulai
                 mendapat komisi.

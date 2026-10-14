@@ -181,7 +181,7 @@ export async function GET(request: Request) {
   //
   // Yang dihitung hanya game aktif yang skemanya memang memakai checker.
   // Game voucher/pulsa/e-wallet tidak punya konsep nickname, jadi tidak boleh
-  // dihitung sebagai gap —和刘gua route-nya memang kosong itu normal.
+  // dihitung sebagai gap — karena route-nya memang kosong itu normal.
   const checkerEnvRoutes = parseVolseverRoutesEnv(
     process.env.VOLSEVER_GAME_ROUTES_JSON,
   );
@@ -231,7 +231,7 @@ export async function GET(request: Request) {
         digiflazzCallback.startsWith("https://")
           ? "pass"
           : "blocker",
-      detail: "Credentials dan callback HTTPS wajib lengkap.",
+      detail: "Kredensial dan callback HTTPS wajib lengkap.",
     },
     {
       id: "admin-session",

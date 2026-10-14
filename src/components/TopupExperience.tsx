@@ -1344,7 +1344,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           >
             <div className="form-label">
               <span className="step-number">3</span>
-              <div><strong>Promo & referral</strong><small>Kode promo dan referral otomatis dihitung dan langsung berlaku saat pembayaran.</small></div>
+              <div><strong>Promo dan referral</strong><small>Kode promo dan referral otomatis dihitung dan langsung berlaku saat pembayaran.</small></div>
             </div>
 
             <div className="discount-stack">

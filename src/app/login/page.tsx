@@ -40,7 +40,7 @@ export default async function LoginPage({
           <div className="trust-list">
             <span><b>01</b> Riwayat transaksi</span>
             <span><b>02</b> Status pesanan</span>
-            <span><b>03</b> Guest checkout tetap tersedia</span>
+            <span><b>03</b> Checkout tanpa akun tetap tersedia</span>
           </div>
         </aside>
         <AuthForm

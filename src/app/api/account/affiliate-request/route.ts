@@ -128,7 +128,7 @@ export async function GET(request: Request) {
       return Response.json({ error: error.message }, { status: 401 });
     }
     return Response.json(
-      { error: "Request tidak dapat diproses." },
+      { error: "Permintaan tidak dapat diproses." },
       { status: 500 },
     );
   }
@@ -191,7 +191,7 @@ export async function POST(request: Request) {
 
     if (!instagram && !tiktok && !youtube && !otherUrl) {
       return Response.json(
-        { error: "Isi minimal satu link channel kamu." },
+        { error: "Isi minimal satu tautan channel kamu." },
         { status: 400, headers },
       );
     }
@@ -267,7 +267,7 @@ export async function POST(request: Request) {
       return Response.json({ error: error.message }, { status: 401 });
     }
     return Response.json(
-      { error: "Request tidak dapat diproses." },
+      { error: "Permintaan tidak dapat diproses." },
       { status: 500 },
     );
   }

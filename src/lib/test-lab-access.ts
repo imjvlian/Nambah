@@ -12,10 +12,10 @@ import { isFlowTestMode } from "@/lib/flow-test";
  *
  * Jadi: `NAMBAH_FLOW_TEST_MODE=true` membuka akses di mana pun, termasuk
  * production. Itu tetap berisiko, tapi itu keputusan sadar operator yang
- *fvill mengaktifkan variabelnya - bukan sakelar yang tidak sengaja aktif.
+ * mengaktifkan variabelnya sendiri - bukan sakelar yang tidak sengaja aktif.
  *
  * Kalau variabelnya tidak diisi di production, akses tertutup tanpa perlu
- *Operator melakukan apa pun. Itu keadaan default yang benar untuk situs
+ * operator melakukan apa pun. Itu keadaan default yang benar untuk situs
  * yang benar-benar melayani pelanggan.
  */
 export function isTestLabEnabled() {

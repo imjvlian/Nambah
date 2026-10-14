@@ -3585,7 +3585,7 @@ const txDataStamp = txRange.preset
                       <pre>{JSON.stringify(orderDetail.commissions, null, 2)}</pre>
                     </article>
                     <article>
-                      <small>Points / Promo</small>
+                      <small>Poin / Promo</small>
                       <pre>{JSON.stringify({
                         points: orderDetail.points,
                         promotions: orderDetail.promotionRedemptions,
@@ -4498,7 +4498,7 @@ const txDataStamp = txRange.preset
                 <article>
                   <small>Direservasi</small>
                   <strong>{pointsData.stats.reserved.toLocaleString("id-ID")} pts</strong>
-                  <span>Checkout belum final</span>
+                  <span>Pembayaran belum final</span>
                 </article>
                 <article>
                   <small>Total ditukar</small>
@@ -5632,7 +5632,7 @@ const txDataStamp = txRange.preset
                           </strong>
                         </div>
                         <div>
-                          <span>Sudah ditransfer merchant</span>
+                          <span>Sudah ditransfer ke toko</span>
                           <strong>
                             {formatIDR(cashFlowData.totals.merchantSettled)}
                           </strong>
@@ -5640,7 +5640,7 @@ const txDataStamp = txRange.preset
                         <div className="acc-cost-total">
                           <span>
                             {cashFlowData.totals.merchantOutstanding < 0
-                              ? "Sisa bayar (kredit merchant)"
+                              ? "Sisa bayar (kredit toko)"
                               : "Masih terutang"}
                           </span>
                           <strong>
@@ -5652,7 +5652,7 @@ const txDataStamp = txRange.preset
                         <div>
                           <span>
                             Biaya layanan merchant{" "}
-                            <small>(diteruskan ke merchant)</small>
+                            <small>(diteruskan ke toko)</small>
                           </span>
                           <strong>
                             {formatIDR(
@@ -5832,7 +5832,7 @@ const txDataStamp = txRange.preset
                           ? `${formatIDR(txReport.summary.merchantUnpaidRevenue)} ritel menunggu transfer merchant - belum dihitung`
                           : txReport.summary.merchantServiceFee > 0
                             ? `sudah dikurangi biaya layanan merchant ${formatIDR(txReport.summary.merchantServiceFee)}`
-                            : "harga final dikurangi biaya layanan merchant"}
+                            : "harga final dikurangi biaya layanan toko"}
                       </span>
                     </article>
                     <article>
@@ -5884,7 +5884,7 @@ const txDataStamp = txRange.preset
                                 !row.receivable_paid_at ? (
                                   <small
                                     className="tx-unpaid-badge"
-                                    title="Uang order ini masih di tangan merchant - belum masuk omzet sampai transfer merchant dicatat"
+                                    title="Uang order ini masih di tangan toko - belum masuk omzet sampai transfer ke toko dicatat"
                                   >
                                     Belum dibayar merchant
                                   </small>
@@ -6018,7 +6018,7 @@ const txDataStamp = txRange.preset
                 <article>
                   <small>Promo aktif</small>
                   <strong>{promotionData.promotions.filter((item) => item.active).length}</strong>
-                  <span>{promotionData.promotions.length} total campaign</span>
+                  <span>{promotionData.promotions.length} total kampanye</span>
                 </article>
                 <article>
                   <small>Terpakai</small>

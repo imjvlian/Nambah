@@ -381,7 +381,7 @@ export default function DigiflazzCatalogBrowser() {
       <main className="supplier-browser-shell">
         <section className="supplier-browser-empty">
           <span className="admin-kicker">Admin</span>
-          <h1>Session admin diperlukan.</h1>
+          <h1>Sesi admin diperlukan.</h1>
           <p>Login dulu dari Dashboard Admin, lalu buka kembali katalog supplier.</p>
           <Link className="primary-button" href="/admin">Ke Dashboard Admin <span>→</span></Link>
         </section>
@@ -413,7 +413,7 @@ export default function DigiflazzCatalogBrowser() {
       </section>
 
       <section className="supplier-browser-warning">
-        <strong>Draft checkbox</strong>
+        <strong>Draf centang</strong>
         <span>
           Centang tidak langsung mengubah database. Saat Simpan tampilan ditekan, SKU baru otomatis membuat brand/game, produk, mapping supplier, dan harga minimum aman.
         </span>

@@ -56,7 +56,7 @@ export default function PrivacyPage() {
           <li>Memproses dan mengirimkan pesanan kamu.</li>
           <li>Memverifikasi pembayaran dan mengirim bukti transaksi (struk).</li>
           <li>Memberikan layanan pelanggan, termasuk melalui asisten digital.</li>
-          <li>Mengelola program poin, promo, dan komisi referral/affiliate.</li>
+          <li>Mengelola program poin, promo, dan komisi referral dan afiliasi.</li>
           <li>Mencegah penipuan, penyalahgunaan, dan aktivitas melanggar hukum.</li>
           <li>Memenuhi kewajiban hukum dan pencatatan keuangan.</li>
         </ul>

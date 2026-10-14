@@ -262,7 +262,7 @@ function productCandidates(game: Game): string[] {
  * denomination di `scripts/build-nambah-asset-manifest.mjs`, sedangkan aset
  * Codashop diambil dari halaman publik yang penamaannya bisa berbeda. Untuk
  * game yang ada di keduanya, memakai yang Codashop bisa mengembalikan gambar
- * untuk nominal yang berbeda dari yangريضcustomer lihat.
+ * untuk nominal yang berbeda dari yang dilihat customer.
  */
 /** Apakah entry punya aset nominal yang bisa dipakai untuk sebuah item. */
 function hasNominalArtwork(product: ProductAssetEntry | null | undefined) {

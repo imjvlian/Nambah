@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
   if (!isCloudinaryConfigured()) {
     return Response.json(
-      { error: "Cloudinary belum dikonfigurasi di server." },
+      { error: "Layanan gambar (Cloudinary) belum dikonfigurasi di server." },
       { status: 503 },
     );
   }
