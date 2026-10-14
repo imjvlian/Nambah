@@ -953,6 +953,20 @@
   letter-spacing: -.035em;
 }
 
+/*
+ * Catatan yang mengelola perbedaan angka, bukan sekadar info.
+ *
+ * Dipakai saat kartu menunjukkan ada order yang belum ikut terhitung.
+ * Warnanya penting: kalau kartu tetap terlihat seperti hari biasa padahal
+ * ada order yang luput, operator akan menganggap angkanya sudah benar.
+ *
+ * Warnanya dipinjam dari kartu peringatan yang sudah ada, supaya tidak
+ * menambah warna baru ke palet admin.
+ */
+.acc-metrics .acc-metric-warn {
+  color: #e8d9a8;
+}
+
 .acc-grid-two {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr);

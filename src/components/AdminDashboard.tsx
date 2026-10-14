@@ -152,6 +152,8 @@ type OverviewPayload = {
     revenueToday: number;
     /** Nominal ritel yang top up-nya sudah terkirim tapi uangnya belum masuk. */
     retailReceivableToday: number;
+    /** Order sukses hari ini yang tidak punya `paid_at`, jadi tidak terhitung di omzet. */
+    ordersMissingPaidAt: number;
     supplierBalance: number;
     reservedBalance: number;
     availableBalance: number;
@@ -3329,13 +3331,24 @@ const txDataStamp = txRange.preset
                   <strong>
                     {formatIDR(overview.finance.revenueToday)}
                   </strong>
-                  {overview.finance.retailReceivableToday > 0 ? (
+                  {/*
+                   * Dua catatan muncul bergantian supaya kartu tidak jadi
+                   * tinggi. Keduanya menjelaskan kenapa angkanya BUKAN
+                   * "GMV" mentah, dan keduanya perlu terlihat - Rp yang
+                   * terlihat lebih besar dari kenyataannya akan dipercaya.
+                   */}
+                  {overview.finance.ordersMissingPaidAt > 0 ? (
+                    <span className="acc-metric-warn">
+                      {numberOrDash(overview.finance.ordersMissingPaidAt)}{" "}
+                      order tanpa catatan pembayaran tidak ikut
+                    </span>
+                  ) : overview.finance.retailReceivableToday > 0 ? (
                     <span>
                       + {formatIDR(overview.finance.retailReceivableToday)}{" "}
                       ditunggu dari toko ritel
                     </span>
                   ) : (
-                    <span>dari order berstatus berhasil</span>
+                    <span>dari order yang pembayarannya sudah masuk</span>
                   )}
                 </article>
                 <article>

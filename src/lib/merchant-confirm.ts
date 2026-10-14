@@ -261,6 +261,16 @@ export async function confirmMerchantScan(
     {
       status: "paid",
       status_changed_at: new Date().toISOString(),
+      /*
+       * Order ritel dibayar di toko, jadi tidak ada webhook gateway yang
+       * mengisi `paid_at` seperti pada order Midtrans. Kalau kolom ini
+       * dibiarkan kosong, order ini hilang dari semua laporan yang menghitung
+       * omzet per `paid_at` - termasuk kartu "Omzet hari ini" dan Arus Kas.
+       *
+       * Nilainya adalah saat kasir memindai, bukan saat pembeli membayar di
+       * toko. Itu satu-satunya momen yang kita ketahui, jadi itu yang dicatat.
+       */
+      paid_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     {

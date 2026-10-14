@@ -93,6 +93,17 @@ export async function GET(request: Request) {
   }
 
   try {
+    /*
+     * Batas "hari ini" dihitung di waktu lokal server, bukan UTC.
+     *
+     * Ini penting untuk omzet: filter memakai `paid_at`, yaitu kapan uangnya
+     * masuk. Kalau batasnya UTC sementara VPS berada di WIB, enam jam
+     * terakhir hari tersebut terbuang - order yang dibayar pukul 23.30 WIB
+     * akan masuk ke kartu HARI BESOK, padahal uangnya masuk hari ini.
+     *
+     * `setHours(0,0,0,0)` memakai jam lokal server, jadi kartu ini dan Arus
+     * Kas memakai batas yang sama selama keduanya memakai waktu lokal.
+     */
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
@@ -100,6 +111,7 @@ export async function GET(request: Request) {
     const [
       recentOrders,
       successfulToday,
+      successfulWithoutPaidAt,
       balanceRows,
       melostoreBalanceRows,
       ordersToday,
@@ -136,6 +148,29 @@ export async function GET(request: Request) {
         select: "final_price,service_fee_amount,merchant_id,receivable_paid_at",
         filters: {
           status: "eq.success",
+          paid_at: `gte.${todayIso}`,
+        },
+        limit: 1000,
+      }),
+      /*
+       * Order sukses HARI INI yang `paid_at`-nya kosong.
+       *
+       * Ada karena filter omzet di atas memakai `paid_at`, dan `paid_at` bisa
+       * null untuk order yang pembayaran-nya tidak tercatat - order lama
+       * sebelum migration 048, atau order ritel yang tombol pindainya tidak
+       * pernah menambah kolomnya. Order seperti itu tidak salah: hanya
+       * tidak bisa masuk hitungan per tanggal pembayaran.
+       *
+       * Dihitung terpisah supaya tidak hilang diam-diam. Kalau angka ini
+       * naik, artinya ada order yang tercatat sukses tanpa jejak waktu
+       * pembayaran - itu yang perlu diperbaiki, bukan disembunyikan sampai
+       * jelas sendiri.
+       */
+      supabaseSelect<{ id: string }>("orders", {
+        select: "id",
+        filters: {
+          status: "eq.success",
+          paid_at: "is.null",
           created_at: `gte.${todayIso}`,
         },
         limit: 1000,
@@ -206,6 +241,13 @@ export async function GET(request: Request) {
       },
       finance: {
         ...overviewRevenue(successfulToday),
+        /*
+         * Order sukses hari ini yang tidak punya `paid_at`, jadi tidak
+         * termasuk hitungan omzet. Bukan error - tapi kalau naik, ada order
+         * yang tercatat sukses tanpa jejak waktu pembayaran, dan itu perlu
+         * diperiksa sebelum angkanya dipercaya.
+         */
+        ordersMissingPaidAt: successfulWithoutPaidAt.length,
         supplierBalance: balanceValue,
         reservedBalance,
         availableBalance: Math.max(0, balanceValue - reservedBalance),
