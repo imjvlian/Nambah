@@ -607,6 +607,37 @@
   color: var(--lime);
 }
 
+/*
+ * `.acc-btn` dipakai di admin Toko ritel: tombol "Catat pelunasan"
+ * (di tabel toko) dan "Simpan pelunasan" (di form pelunasan).
+ *
+ * SEBELUM: tidak ada aturan dasarnya - hanya muncul di @media
+ * (max-width:420px) target sentuh, jadi tombol memakai gaya
+ * `<button>` browser (tidak ada border/background/radius).
+ *
+ * Pola selaras dengan `.acc-primary-link`/`.acc-inline-button`
+ * sehingga tombol kompak di desktop (34px tinggi) dan konsisten
+ * di layar kecil. Tambah `:disabled` supaya Mati terlihat mati.
+ */
+.acc-btn {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .02);
+  color: #bdc3b8;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+.acc-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
 /* Tombol yang belum bisa dipakai.
  *
  * Tanpa aturan ini, tombol disabled di `.acc-primary-link` tetap tampil
