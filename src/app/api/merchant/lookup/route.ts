@@ -1,9 +1,13 @@
 import { lookupMerchantScanCode } from "@/lib/merchant-lookup";
 import { authenticateMerchant } from "@/lib/merchant-route-auth";
-import { isMerchantRetailEnabled } from "@/lib/merchant-retail";
+import {
+  getMerchantById,
+  isMerchantRetailEnabled,
+} from "@/lib/merchant-retail";
+import { readMerchantSession } from "@/lib/merchant-session";
 
 /**
- * POST /api/merchant/lookup — pratinjau order sebelum dijalankan.
+ * POST /api/merchant/lookup - pratinjau order sebelum dijalankan.
  *
  * TIDAK mengubah apa pun. Kasir memakai ini untuk memeriksa kode yang salah
  * ketik (atau kode orang lain) sebelum menekan tombol yang mengirim top up.
@@ -12,9 +16,10 @@ import { isMerchantRetailEnabled } from "@/lib/merchant-retail";
  * memproses" - tapi berhasil memproses order yang salah. Sekali top up terkirim,
  * tidak ada yang bisa membatalkannya.
  *
- * Autentikasi memakai helper yang sama dengan `/api/merchant/confirm`.
- * Kalau keduanya punya logikanya sendiri, akan datang waktunya keduanya
- * berbeda - dan route yang bisa melihat pratinjau tanpa login adalah lubang.
+ * Autentikasi memakai helper yang sama dengan `/api/merchant/confirm`: sesi
+ * portal dulu, kode + PIN sebagai cadangan. Kalau keduanya punya logikanya
+ * sendiri, akan datang waktunya keduanya berbeda - dan route yang bisa melihat
+ * pratinjau tanpa login adalah lubang.
  */
 export async function POST(request: Request) {
   if (!isMerchantRetailEnabled()) {
@@ -31,12 +36,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Permintaan tidak valid." }, { status: 400 });
   }
 
-  const auth = await authenticateMerchant(request, body, "merchant_lookup");
-  if ("response" in auth) return auth.response;
-
-  const orderCode =
-    typeof body.orderCode === "string" ? body.orderCode.trim() : "";
-
+  const orderCode = typeof body.orderCode === "string" ? body.orderCode.trim() : "";
   if (!orderCode) {
     return Response.json(
       { error: "Kode pesanan wajib diisi." },
@@ -44,7 +44,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await lookupMerchantScanCode(orderCode, auth.merchant.id);
+  /*
+   * Autentikasi berlapis: sesi portal dulu, kode + PIN sebagai cadangan.
+   *
+   * Kasir yang sudah login di `/merchant` tidak mengirim PIN di client, jadi
+   * tanpa sesi endpoint ini menolak preview dengan 400 (\"Kode toko dan PIN
+   * wajib diisi\") padahal sesi masih hidup.
+   */
+  const sessionMerchantId = readMerchantSession(request);
+  const sessionMerchant = sessionMerchantId
+    ? await getMerchantById(sessionMerchantId)
+    : null;
+
+  let merchant: { id: string; status: string } | null = sessionMerchant
+    ? { id: sessionMerchant.id, status: sessionMerchant.status }
+    : null;
+
+  if (!merchant) {
+    const auth = await authenticateMerchant(request, body, "merchant_lookup");
+    if ("response" in auth) return auth.response;
+    merchant = { id: auth.merchant.id, status: auth.merchant.status };
+  }
+
+  if (merchant.status !== "active") {
+    return Response.json(
+      {
+        error:
+          merchant.status === "pending"
+            ? "Toko ini belum disetujui admin."
+            : merchant.status === "frozen"
+              ? "Toko sedang dibekukan karena ada piutang yang belum lunas."
+              : "Toko sedang tidak menerima pesanan.",
+      },
+      { status: 403 },
+    );
+  }
+
+  const result = await lookupMerchantScanCode(orderCode, merchant.id);
 
   if (!result.found) {
     return Response.json({ error: result.reason }, { status: result.status });
@@ -57,9 +93,6 @@ export async function POST(request: Request) {
      * `found: true` BUKAN berarti order ini bisa dijalankan.
      *
      * `blockedReason` yang menentukan itu, dan sengaja dikirim terpisah.
-     * Mengembalikan `ok: true` untuk order yang sudah dipindai membuat
-     * kasir menekan tombol konfirmasi, lalu mendapat penolakan yang tidak
-     * dia ожидавал - dan dia akan mengira kodenya yang salah.
      */
     canRun: result.blockedReason === null,
   });
