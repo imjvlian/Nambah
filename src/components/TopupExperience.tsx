@@ -1599,7 +1599,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 <span>Biaya pembayaran</span>
                 <strong>
                   {pricing.customerPaymentFee === 0
-                    ? "Rp0 (MVP)"
+                    ? "Rp0"
                     : formatIDR(pricing.customerPaymentFee)}
                 </strong>
               </div>
@@ -1705,7 +1705,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   )}
                   <div className="summary-line">
                     <span>Biaya pembayaran</span>
-                    <strong>{pricing.customerPaymentFee === 0 ? "Rp0 (MVP)" : formatIDR(pricing.customerPaymentFee)}</strong>
+                    <strong>{pricing.customerPaymentFee === 0 ? "Rp0" : formatIDR(pricing.customerPaymentFee)}</strong>
                   </div>
                   <div className="summary-total"><span>Total dibayar</span><strong>{formatIDR(pricing.finalPrice)}</strong></div>
                 </div>
