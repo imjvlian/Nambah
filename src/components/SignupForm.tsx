@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
 import PasswordMeter from "@/components/PasswordMeter";
@@ -27,6 +28,8 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -138,7 +141,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
       const response = await fetch("/api/auth/resend-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken }),
       });
       const data = (await response.json()) as { message?: string; error?: string };
 
@@ -180,7 +183,13 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ displayName, email, password, confirmPassword }),
+        body: JSON.stringify({
+          displayName,
+          email,
+          password,
+          confirmPassword,
+          turnstileToken,
+        }),
       });
 
       const data = (await response.json()) as {
@@ -281,10 +290,15 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
               Konfirmasi password tidak sama.
             </p>
           )}
+          {!siteKey && (
+            <p className="auth-message error" role="alert">
+              Captcha belum dikonfigurasi. Set NEXT_PUBLIC_TURNSTILE_SITE_KEY.
+            </p>
+          )}
 
           <button
             className="primary-button auth-submit"
-            disabled={busy || !requirementsMet || mismatch}
+            disabled={busy || !requirementsMet || mismatch || Boolean(siteKey && !turnstileToken)}
             type="submit"
           >
             {busy ? "Memproses..." : "Buat akun"}
@@ -351,6 +365,15 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
             Ganti email
           </button>
         </>
+      )}
+      {siteKey && (
+        <TurnstileWidget
+          siteKey={siteKey}
+          action="signup"
+          execution="render"
+          onVerify={setTurnstileToken}
+          onError={() => setError("Captcha tidak dapat dimuat. Coba lagi.")}
+        />
       )}
     </form>
   );

@@ -7,6 +7,7 @@ import { safeNext } from "@/lib/next-path";
 import { createPkcePair } from "@/lib/pkce";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { resolveSiteUrl } from "@/lib/site-url";
+import { getClientIp, verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,16 @@ export async function GET(request: Request) {
     windowSeconds: 10 * 60,
   });
   if (limited) return limited;
+
+  const urlForCaptcha = new URL(request.url);
+  const captchaToken = urlForCaptcha.searchParams.get("turnstileToken")?.trim() ?? "";
+  const captchaValid = await verifyTurnstileToken(captchaToken, getClientIp(request));
+  if (!captchaValid) {
+    const origin = resolveSiteUrl(request, "/login");
+    const backToLogin = new URL(origin);
+    backToLogin.searchParams.set("error", "captcha");
+    return Response.redirect(backToLogin.toString(), 302);
+  }
 
   let verifier: string;
   let challenge: string;

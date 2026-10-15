@@ -1,5 +1,6 @@
 import { NambahAuthError, resendSignupCode } from "@/lib/nambah-auth";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { getClientIp, verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -19,12 +20,19 @@ const NEUTRAL_RESPONSE = {
  * addresses are registered.
  */
 export async function POST(request: Request) {
-  let body: { email?: unknown };
+  let body: { email?: unknown; turnstileToken?: unknown };
 
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "Request tidak valid." }, { status: 400 });
+  }
+
+  const turnstileToken =
+    typeof body.turnstileToken === "string" ? body.turnstileToken.trim() : "";
+  const captchaValid = await verifyTurnstileToken(turnstileToken, getClientIp(request));
+  if (!captchaValid) {
+    return Response.json({ error: "Captcha tidak valid. Coba lagi." }, { status: 403 });
   }
 
   const email = cleanText(body.email, 254).toLowerCase();

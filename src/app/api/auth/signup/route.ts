@@ -10,6 +10,7 @@ import {
 } from "@/lib/password-strength";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { resolveSiteUrl, resolveSiteOrigin } from "@/lib/site-url";
+import { getClientIp, verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -30,12 +31,21 @@ export async function POST(request: Request) {
     email?: unknown;
     password?: unknown;
     confirmPassword?: unknown;
+    turnstileToken?: unknown;
   };
 
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "Request pendaftaran tidak valid." }, { status: 400 });
+  }
+
+  const token =
+    typeof body.turnstileToken === "string" ? body.turnstileToken.trim() : "";
+
+  const captchaValid = await verifyTurnstileToken(token, getClientIp(request));
+  if (!captchaValid) {
+    return Response.json({ error: "Captcha tidak valid. Coba lagi." }, { status: 403 });
   }
 
   const displayName = cleanText(body.displayName, 50);

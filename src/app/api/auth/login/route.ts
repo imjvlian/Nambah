@@ -6,6 +6,7 @@ import {
 } from "@/lib/nambah-auth";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { BRAND } from "@/lib/brand";
+import { getClientIp, verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -21,11 +22,23 @@ export async function POST(request: Request) {
   });
   if (limited) return limited;
 
-  let body: { email?: unknown; password?: unknown };
+  let body: { email?: unknown; password?: unknown; turnstileToken?: unknown };
   try {
-    body = (await request.json()) as { email?: unknown; password?: unknown };
+    body = (await request.json()) as {
+      email?: unknown;
+      password?: unknown;
+      turnstileToken?: unknown;
+    };
   } catch {
     return Response.json({ error: "Request login tidak valid." }, { status: 400 });
+  }
+
+  const token =
+    typeof body.turnstileToken === "string" ? body.turnstileToken.trim() : "";
+
+  const captchaValid = await verifyTurnstileToken(token, getClientIp(request));
+  if (!captchaValid) {
+    return Response.json({ error: "Captcha tidak valid. Coba lagi." }, { status: 403 });
   }
 
   const email = cleanEmail(body.email);

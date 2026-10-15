@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import { BRAND } from "@/lib/brand";
 import { safeNext, signInHref } from "@/lib/next-path";
 
@@ -34,6 +35,8 @@ export default function LoginForm({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,7 +49,7 @@ export default function LoginForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, turnstileToken }),
       });
 
       const data = (await response.json()) as { error?: string };
@@ -106,7 +109,16 @@ export default function LoginForm({
         </p>
       )}
 
-      <button className="primary-button auth-submit" disabled={busy} type="submit">
+      {siteKey && (
+        <TurnstileWidget
+          siteKey={siteKey}
+          action="login"
+          execution="render"
+          onVerify={setTurnstileToken}
+          onError={() => setError("Captcha tidak dapat dimuat. Coba lagi.")}
+        />
+      )}
+      <button className="primary-button auth-submit" disabled={busy || Boolean(siteKey && !turnstileToken)} type="submit">
         {busy ? "Memproses..." : "Masuk"}
         <span aria-hidden="true">→</span>
       </button>

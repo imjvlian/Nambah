@@ -11,9 +11,9 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} https://app.sandbox.midtrans.com https://app.midtrans.com`,
-  "connect-src 'self' https://*.supabase.co https://api.sandbox.midtrans.com https://api.midtrans.com https://api.digiflazz.com https://api.brevo.com https://gate.volsever.com",
-  "frame-src https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com",
+  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} https://app.sandbox.midtrans.com https://app.midtrans.com https://challenges.cloudflare.com`,
+  "connect-src 'self' https://*.supabase.co https://api.sandbox.midtrans.com https://api.midtrans.com https://api.digiflazz.com https://api.brevo.com https://gate.volsever.com https://challenges.cloudflare.com",
+  "frame-src https://app.sandbox.midtrans.com https://app.midtrans.com https://*.midtrans.com https://challenges.cloudflare.com",
   isProduction ? "upgrade-insecure-requests" : "",
 ]
   .filter(Boolean)
