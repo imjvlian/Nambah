@@ -152,6 +152,7 @@
 }
 
 .auth-card {
+  position: relative;
   padding: 26px;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -1425,10 +1426,12 @@
 }
 
 
-/* Cloudflare Turnstile: visible challenge, one per page */
+/* Cloudflare Turnstile: visible challenge, positioned above the submit button */
 .auth-turnstile {
-  margin-top: 1rem;
+  position: absolute;
+  top: 1rem;
+  left: 0;
   width: 300px;
-  /* let the widget height be determined by Cloudflare; we just give a min height */
   min-height: 80px;
+  z-index: 10;
 }
