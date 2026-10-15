@@ -21,6 +21,8 @@ type LoginFormProps = {
 const OAUTH_ERRORS: Record<string, string> = {
   google:
     "Login dengan Google belum selesai. Coba lagi, atau pakai email dan password.",
+  captcha:
+    "Captcha tidak valid. Coba lagi.",
 };
 
 export default function LoginForm({
