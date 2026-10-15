@@ -177,11 +177,10 @@ export default function AccountNav({
         <b>{user.displayName}</b>
         {showPoints && (
           <span className="account-nav-points" aria-hidden="true">
-            <i>N+</i>
             <strong>
               {points === undefined
                 ? "..."
-                : (points ?? 0).toLocaleString("id-ID")}
+                : (points ?? 0).toLocaleString("id-ID")} pts
             </strong>
           </span>
         )}
