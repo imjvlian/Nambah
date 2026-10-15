@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
+import AuthCaptchaProvider from "@/components/AuthCaptchaProvider";
 import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
@@ -36,7 +37,9 @@ export default async function RegisterPage({
             <span><b>03</b> Akses order lebih mudah</span>
           </div>
         </aside>
-        <AuthForm mode="register" nextPath={optionalSafeNext(params.next)} />
+        <AuthCaptchaProvider>
+          <AuthForm mode="register" nextPath={optionalSafeNext(params.next)} />
+        </AuthCaptchaProvider>
       </section>
     </main>
   );

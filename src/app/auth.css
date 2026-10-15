@@ -1423,3 +1423,16 @@
     font-size: 8px;
   }
 }
+
+
+/* Cloudflare Turnstile: keep invisible challenge off-screen. */
+.auth-turnstile {
+  position: fixed;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}

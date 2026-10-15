@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
 import PasswordMeter from "@/components/PasswordMeter";
@@ -28,9 +28,8 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-
+  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+    useAuthCaptcha();
   const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
 
   // Guards the auto-submit effect below: it must fire once per completed
@@ -147,6 +146,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
 
       if (!response.ok) {
         setError(data.error ?? "Kode belum dapat dikirim.");
+        resetTurnstile();
         return;
       }
 
@@ -200,6 +200,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
 
       if (!response.ok) {
         setError(data.error ?? "Permintaan belum dapat diproses.");
+        resetTurnstile();
         return;
       }
 
@@ -209,6 +210,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
           data.message ?? "Kode 6 digit sudah dikirim ke emailmu.",
         );
         setCooldown(RESEND_SECONDS);
+        resetTurnstile();
         return;
       }
 
@@ -365,15 +367,6 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
             Ganti email
           </button>
         </>
-      )}
-      {siteKey && (
-        <TurnstileWidget
-          siteKey={siteKey}
-          action="signup"
-          execution="render"
-          onVerify={setTurnstileToken}
-          onError={() => setError("Captcha tidak dapat dimuat. Coba lagi.")}
-        />
       )}
     </form>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { safeNext } from "@/lib/next-path";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
 
 type GoogleSignInButtonProps = {
   next?: string;
@@ -43,10 +43,10 @@ function GoogleMark() {
 export default function GoogleSignInButton({ next }: GoogleSignInButtonProps) {
   const resolved = safeNext(next);
   const [token, setToken] = useState("");
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const { siteKey, token: turnstileToken } = useAuthCaptcha();
   const params = new URLSearchParams();
   if (resolved !== "/account") params.set("next", resolved);
-  if (token) params.set("turnstileToken", token);
+  if (turnstileToken) params.set("turnstileToken", turnstileToken);
   const href = `/api/auth/google${params.toString() ? `?${params.toString()}` : ""}`;
 
   return (
@@ -58,14 +58,6 @@ export default function GoogleSignInButton({ next }: GoogleSignInButtonProps) {
         <GoogleMark />
         <span>Lanjutkan dengan Google</span>
       </a>
-      {siteKey && (
-        <TurnstileWidget
-          siteKey={siteKey}
-          action="google-sign-in"
-          execution="render"
-          onVerify={setToken}
-        />
-      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
 
 /**
  * Requests a password reset link.
@@ -16,8 +16,8 @@ export default function ForgotPasswordForm() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-  const [turnstileToken, setTurnstileToken] = useState("");
+  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+    useAuthCaptcha();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,16 +81,7 @@ export default function ForgotPasswordForm() {
       {error && <p className="auth-message error" role="alert">{error}</p>}
       {notice && <p className="auth-message success" role="status">{notice}</p>}
 
-      {siteKey && (
-        <TurnstileWidget
-          siteKey={siteKey}
-          action="forgot"
-          execution="render"
-          onVerify={setTurnstileToken}
-          onError={() => setError("Captcha tidak dapat dimuat. Coba lagi.")}
-        />
-      )}
-      <button className="primary-button auth-submit" disabled={busy || sent || Boolean(siteKey && !turnstileToken)} type="submit">
+      <button className="primary-button auth-submit" disabled={busy || sent || Boolean(!turnstileToken)} type="submit">
         {busy ? "Mengirim..." : "Kirim tautan"}
         <span aria-hidden="true">→</span>
       </button>

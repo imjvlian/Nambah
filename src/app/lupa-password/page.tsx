@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ForgotPasswordForm from "@/components/ForgotPasswordForm";
+import AuthCaptchaProvider from "@/components/AuthCaptchaProvider";
 import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
@@ -18,7 +19,9 @@ export default function ForgotPasswordPage() {
       </SiteHeader>
 
       <section className="auth-shell auth-shell-narrow shell">
+        <AuthCaptchaProvider>
         <ForgotPasswordForm />
+      </AuthCaptchaProvider>
       </section>
     </main>
   );

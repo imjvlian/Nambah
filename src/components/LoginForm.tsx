@@ -3,8 +3,7 @@
 import { FormEvent, useState } from "react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
-import TurnstileWidget from "@/components/TurnstileWidget";
-import { BRAND } from "@/lib/brand";
+import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";import { BRAND } from "@/lib/brand";
 import { safeNext, signInHref } from "@/lib/next-path";
 
 type LoginFormProps = {
@@ -37,9 +36,8 @@ export default function LoginForm({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
-  const [turnstileToken, setTurnstileToken] = useState("");
-
+  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+    useAuthCaptcha();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -58,9 +56,11 @@ export default function LoginForm({
 
       if (!response.ok) {
         setError(data.error ?? "Permintaan belum dapat diproses.");
+        resetTurnstile();
         return;
       }
 
+      resetTurnstile();
       window.location.href = safeNext(nextPath);
     } catch {
       setError(`Tidak dapat terhubung ke server akun ${BRAND.shortName}.`);
@@ -111,15 +111,6 @@ export default function LoginForm({
         </p>
       )}
 
-      {siteKey && (
-        <TurnstileWidget
-          siteKey={siteKey}
-          action="login"
-          execution="render"
-          onVerify={setTurnstileToken}
-          onError={() => setError("Captcha tidak dapat dimuat. Coba lagi.")}
-        />
-      )}
       <button className="primary-button auth-submit" disabled={busy || Boolean(siteKey && !turnstileToken)} type="submit">
         {busy ? "Memproses..." : "Masuk"}
         <span aria-hidden="true">→</span>

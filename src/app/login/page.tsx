@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
+import AuthCaptchaProvider from "@/components/AuthCaptchaProvider";
 import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
@@ -36,12 +37,14 @@ export default async function LoginPage({
             <span><b>03</b> Checkout tanpa akun tetap tersedia</span>
           </div>
         </aside>
-        <AuthForm
-          mode="login"
-          nextPath={optionalSafeNext(params.next)}
-          confirmed={params.confirmed === "1"}
-          oauthError={params.error}
-        />
+        <AuthCaptchaProvider>
+          <AuthForm
+            mode="login"
+            nextPath={optionalSafeNext(params.next)}
+            confirmed={params.confirmed === "1"}
+            oauthError={params.error}
+          />
+        </AuthCaptchaProvider>
       </section>
     </main>
   );
