@@ -346,6 +346,8 @@ type AdminUsersPayload = {
     spend: number;
     lastOrderAt: string | null;
   }>;
+  /** Jumlah seluruh akun terdaftar, bukan jumlah baris yang sedang tampil. */
+  total: number;
 };
 
 type MerchantRow = {
@@ -676,6 +678,16 @@ const REPORT_PRESET_OPTIONS = [
  * lipatan adalah paginasi yang tidak dipakai.
  */
 const CASH_DAYS_PER_PAGE = 14;
+
+/**
+ * Baris pengguna per halaman.
+ *
+ * 25, bukan 100. Seratus baris sekaligus terlihat cukup sampai daftar ini
+ * melewati angka itu - lalu user ke-101 dan seterusnya hilang tanpa jalan
+ * apa pun untuk ditemukan. Yang lebih pendek lebih enak dibaca, dan
+ * pencarian menutup sisanya.
+ */
+const USERS_PER_PAGE = 25;
 
 const COMMISSION_STATUS_LABEL: Record<string, string> = {
   pending: "Menunggu",
@@ -1125,6 +1137,17 @@ export default function AdminDashboard() {
   const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
   const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
   const [usersData, setUsersData] = useState<AdminUsersPayload | null>(null);
+  /*
+   * Halaman tabel pengguna.
+   *
+   * 25 baris per halaman, bukan "tampilkan 100 lalu berhenti". Versi lama
+   * memakai `slice(0, 100)` tanpa pencarian, tanpa paginasi, dan tanpa
+   * jumlah total - jadi user ke-101 dan seterusnya tidak punya jalan
+   * apa pun untuk ditemukan, dan operator tidak punya alasan untuk menduga
+   * bahwa mereka ada.
+   */
+  const [usersPage, setUsersPage] = useState(0);
+  const [usersQuery, setUsersQuery] = useState("");
   const [adminAccounts, setAdminAccounts] = useState<AdminAccountsPayload | null>(null);
   /*
    * Role tujuan untuk setiap baris customer yang akan dipromote.
@@ -1517,6 +1540,41 @@ export default function AdminDashboard() {
     if (!response.ok) throw new Error(data.error ?? "Data user gagal dimuat.");
     setUsersData(data);
   }
+
+  /*
+   * Pencarian pengguna.
+   *
+   * Dicocokkan di sisi klien karena seluruh daftar sudah termuat di memori.
+   * Kalau nanti daftar ini tumbuh jadi ribuan baris, pencarian pindah ke
+   * server. Memindahkannya sekarang hanya menambah satu request per
+   * ketikan tanpa memperbaiki apa pun.
+   *
+   * `toLowerCase` dipakai di KEDUA sisi. Tanpa itu, pencarian "Elin" tidak
+   * akan menemukan "elinapromedia@gmail.com" hanya karena huruf besarnya
+   * berbeda - dan itu bentuk kegagalan yang paling mudah disalahkan ke
+   * orang yang keliru.
+   */
+  const normalizedUsersQuery = usersQuery.trim().toLowerCase();
+
+  const filteredUsers = (usersData?.users ?? []).filter((item) => {
+    if (!normalizedUsersQuery) return true;
+
+    return [
+      item.displayName,
+      item.email,
+      item.whatsapp,
+      item.userId,
+    ].some((field) =>
+      (field ?? "").toLowerCase().includes(normalizedUsersQuery),
+    );
+  });
+
+  const usersPageCount = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const safeUsersPage = Math.min(usersPage, usersPageCount - 1);
+  const visibleUsers = filteredUsers.slice(
+    safeUsersPage * USERS_PER_PAGE,
+    (safeUsersPage + 1) * USERS_PER_PAGE,
+  );
 
   /**
    * Daftar akun admin.
@@ -6754,6 +6812,38 @@ const txDataStamp = txRange.preset
                 </section>
               )}
 
+              {/*
+               * Pencarian + jumlah total.
+               *
+               * Jumlah total selalu ditulis walaupun tabel sedang memangkas. Tanpa
+               * angka ini, operator tidak punya alasan untuk menduga
+               * bahwa ada akun yang tidak terlihat - dan itulah bentuk
+               * bug yang baru saja diperbaiki: user terdaftar tapi tidak
+               * pernah muncul di mana pun.
+               */}
+              <div className="acc-users-toolbar">
+                <label className="acc-field">
+                  <span>Cari pengguna</span>
+                  <input
+                    type="search"
+                    value={usersQuery}
+                    aria-label="Cari pengguna berdasarkan nama, email, atau WhatsApp"
+                    placeholder="nama, email, atau WhatsApp"
+                    onChange={(event) => {
+                      setUsersQuery(event.target.value);
+                      // Halaman kembali ke awal: menjaga halaman 4 saat
+                      // hasil menyempit membuat daftar tampak kosong.
+                      setUsersPage(0);
+                    }}
+                  />
+                </label>
+                <p className="acc-table-note">
+                  {normalizedUsersQuery
+                    ? `${filteredUsers.length} dari ${usersData?.total ?? 0} akun cocok dengan "${usersQuery.trim()}".`
+                    : `${usersData?.total ?? 0} akun terdaftar. Akun yang belum pernah-ordered atau menyimpan profil tetap ikut dihitung.`}
+                </p>
+              </div>
+
               <div className="acc-table-card">
                 <div className="acc-users-head">
                   <span>Pengguna</span>
@@ -6762,7 +6852,7 @@ const txDataStamp = txRange.preset
                   <span>Total belanja</span>
                   {canManageAdmins(adminRole) && <span>Akses admin</span>}
                 </div>
-                {(usersData?.users ?? []).slice(0, 100).map((item) => {
+                {visibleUsers.map((item) => {
                   /*
                    * Status admin diambil dari daftar akun admin, bukan
                    * dijawab ulang di sini. Dua sumber berarti dua jawaban
@@ -6845,9 +6935,53 @@ const txDataStamp = txRange.preset
                   );
                 })}
                 {usersData && usersData.users.length === 0 && (
-                  <div className="acc-empty">Belum ada customer account activity.</div>
+                  <div className="acc-empty">Belum ada akun terdaftar.</div>
                 )}
+                {usersData &&
+                  usersData.users.length > 0 &&
+                  filteredUsers.length === 0 && (
+                    <div className="acc-empty">
+                      Tidak ada akun yang cocok dengan &quot;{usersQuery.trim()}&quot;.
+                    </div>
+                  )}
               </div>
+
+              {usersPageCount > 1 && (
+                <div className="acc-tx-pagination">
+                  <span>
+                    Menampilkan{" "}
+                    {safeUsersPage * USERS_PER_PAGE + 1}-
+                    {Math.min(
+                      (safeUsersPage + 1) * USERS_PER_PAGE,
+                      filteredUsers.length,
+                    )}{" "}
+                    dari {filteredUsers.length} akun
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      disabled={safeUsersPage === 0}
+                      onClick={() => setUsersPage(Math.max(0, safeUsersPage - 1))}
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="acc-tx-pageinfo">
+                      {safeUsersPage + 1} / {usersPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safeUsersPage >= usersPageCount - 1}
+                      onClick={() =>
+                        setUsersPage(
+                          Math.min(usersPageCount - 1, safeUsersPage + 1),
+                        )
+                      }
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

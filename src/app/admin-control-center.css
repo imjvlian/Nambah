@@ -3790,6 +3790,34 @@
   gap: 6px;
 }
 
+/*
+ * Pencarian + jumlah total di atas tabel pengguna.
+ *
+ * Dua kolom: pencarian di kiri, angka di kanan. Jumlah total mendapat
+ * tempatnya sendiri karena itu satu-satunya cara operator tahu ada akun
+ * yang tidak sedang terlihat - persis informasi yang hilang ketika tabel
+ * ini dulu dipangkas tanpa pemberitahuan.
+ */
+.acc-users-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.acc-users-toolbar .acc-field {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+}
+
+.acc-users-toolbar .acc-table-note {
+  margin: 0;
+  padding-bottom: 2px;
+}
+
 .acc-users-access select {
   min-width: 0;
   flex: 1 1 auto;

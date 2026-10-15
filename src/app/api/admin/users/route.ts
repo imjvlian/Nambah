@@ -1,7 +1,9 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { buildAdminUserDirectory } from "@/lib/admin-user-directory";
 import {
   supabaseAuthAdminListUsers,
-  supabaseSelect,
+  supabaseRpc,
+  supabaseSelectAll,
 } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -15,11 +17,12 @@ type ProfileRow = {
   updated_at: string;
 };
 
-type OrderRow = {
-  customer_user_id: string | null;
-  final_price: number | string;
-  status: string;
-  created_at: string;
+type OrderStatRow = {
+  user_id: string;
+  orders: number | string;
+  success: number | string;
+  spend: number | string;
+  last_order_at: string | null;
 };
 
 export async function GET(request: Request) {
@@ -27,76 +30,72 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
-    const [profiles, orders, authUsers] = await Promise.all([
-      supabaseSelect<ProfileRow>("customer_profiles", {
+    const [profiles, orderStats, authUsers] = await Promise.all([
+      /*
+       * `selectAll`, bukan `select` dengan limit.
+       *
+       * Versi lama memakai limit 1000 yang tidak pernah diumumkan. Melewati
+       * angka itu, profil user langka diam-diam hilang dari daftar - jenis
+       * bug yang sama dengan yang jadi akar masalah halaman ini, dan akan
+       * muncul lagi kalau tidak dihapus sekarang.
+       */
+      supabaseSelectAll<ProfileRow>("customer_profiles", {
         select:
           "user_id,display_name,whatsapp,preferred_receipt_channel,created_at,updated_at",
         order: "updated_at.desc",
-        limit: 1000,
-      }).catch(() => []),
-      supabaseSelect<OrderRow>("orders", {
-        select: "customer_user_id,final_price,status,created_at",
-        order: "created_at.desc",
-        limit: 5000,
-      }),
-      // Email hanya ada di Supabase Auth, bukan di customer_profiles.
-      // Gagal mengambilnya tidak boleh mematikan seluruh lookup.
+      }).catch(() => [] as ProfileRow[]),
+
+      /*
+       * Agregat dari database.
+       *
+       * Versi lama menarik 5000 order terbaru dan menjumlahkannya di
+       * memori. Di bawah 5000 order hasilnya benar; di atasnya, user lama
+       * tampil dengan angka yang salah dan tidak ada apa pun yang
+       * memberi tahu. RPC ini tidak punya batas baris.
+       */
+      supabaseRpc<OrderStatRow[]>("nambah_customer_order_stats").catch(
+        () => [] as OrderStatRow[],
+      ),
+
+      // Kegagalan di sini tidak boleh mematikan seluruh halaman: daftar
+      // profil dan statistik order masih berguna tanpa daftar akun.
       supabaseAuthAdminListUsers().catch(() => []),
     ]);
 
-    const emailById = new Map(
-      authUsers
-        .filter((user) => user.email)
-        .map((user) => [user.id, user.email as string]),
-    );
-
-    const stats = new Map<
-      string,
-      { orders: number; success: number; spend: number; lastOrderAt: string | null }
-    >();
-
-    for (const order of orders) {
-      if (!order.customer_user_id) continue;
-      const current = stats.get(order.customer_user_id) ?? {
-        orders: 0,
-        success: 0,
-        spend: 0,
-        lastOrderAt: null,
-      };
-      current.orders += 1;
-      if (order.status === "success") {
-        current.success += 1;
-        current.spend += Number(order.final_price);
-      }
-      if (!current.lastOrderAt) current.lastOrderAt = order.created_at;
-      stats.set(order.customer_user_id, current);
-    }
-
-    const ids = new Set([
-      ...profiles.map((row) => row.user_id),
-      ...Array.from(stats.keys()),
-    ]);
+    /*
+     * DAFTAR USER = DAFTAR AKUN, BUKAN DAFTAR AKTIVITAS.
+     *
+     * Bug yang diperbaiki di sini: id himpunan dibangun dari profil dan
+     * order saja. `customer_profiles` hanya dibuat saat pengguna menyimpan
+     * profil atau membuat order - tidak ada baris saat pendaftaran. Jadi
+     * siapa yang daftar lalu pergi tanpa bertransaksi TIDAK PERNAH MUNCUL,
+     * padahal dia akun sungguhan. Daftar akun dari Supabase Auth sudah
+     * diambil sejak lama, tapi hanya dipakai untuk mencari email.
+     *
+     * Sekarang auth users adalah sumber kebenarannya, dan profil serta
+     * order hanya menambah rincian yang tidak ada di sana.
+     *
+     * Penyusunannya dipindah ke `admin-user-directory.ts` supaya aturan ini
+     * bisa diuji. Bug struktural seperti ini tidak akan pernah ditemukan
+     * test yang menuliskan kasus "pengguna daftar tapi belum bertransaksi".
+     */
+    const directory = buildAdminUserDirectory({
+      authUsers,
+      profiles,
+      stats: orderStats,
+    });
 
     return Response.json({
-      users: Array.from(ids).map((userId) => {
-        const profile = profiles.find((row) => row.user_id === userId);
-        const summary = stats.get(userId) ?? {
-          orders: 0,
-          success: 0,
-          spend: 0,
-          lastOrderAt: null,
-        };
-        return {
-          userId,
-          displayName: profile?.display_name ?? null,
-          email: emailById.get(userId) ?? null,
-          whatsapp: profile?.whatsapp ?? null,
-          preferredReceiptChannel:
-            profile?.preferred_receipt_channel ?? "email",
-          profileUpdatedAt: profile?.updated_at ?? null,
-          ...summary,
-        };
-      }),
+      users: directory.users,
+      /*
+       * Jumlah total dikirim terpisah, bukan hanya lewat `users.length`.
+       *
+       * Yang dikirim adalah SELURUH daftar, jadi `users.length` sudah cukup
+       * - tapi begitu UI mulai memangkas (pencarian, paginasi), angka itu
+       * berhenti artinya. Total eksplisit membuat UI bisa selalu
+       * menulis "menampilkan 25 dari 143" tanpa harus menebak.
+       */
+      total: directory.total,
     });
   } catch (error) {
     console.error("Admin user lookup failed", error);
