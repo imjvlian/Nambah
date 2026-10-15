@@ -21,7 +21,6 @@ export default async function RegisterPage({
     <main className="auth-page">
       <SiteHeader className="auth-header">
         <BrandLogo href="/" size="md" variant="horizontal" />
-        <a className="text-link" href="/">Kembali ke beranda</a>
       </SiteHeader>
 
       <section className="auth-shell shell">

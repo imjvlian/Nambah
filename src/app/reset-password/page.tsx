@@ -16,7 +16,6 @@ export default function ResetPasswordPage() {
     <main className="auth-page">
       <SiteHeader className="auth-header">
         <BrandLogo href="/" size="md" variant="horizontal" />
-        <a className="text-link" href="/">Kembali ke beranda</a>
       </SiteHeader>
 
       <section className="auth-shell auth-shell-narrow shell">

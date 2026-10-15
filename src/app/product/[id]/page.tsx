@@ -63,7 +63,6 @@ export default async function ProductPage({
         </nav>
         <div className="header-actions">
           <AccountNav />
-          <a className="header-cta" href="#transaction">Top up sekarang</a>
         </div>
       </SiteHeader>
 

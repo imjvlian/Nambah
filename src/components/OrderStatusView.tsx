@@ -510,7 +510,6 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           <BrandLogo href="/" size="md" variant="horizontal" />
           <div className="header-actions">
             <AccountNav />
-            <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
           </div>
         </SiteHeader>
         <section className="order-status-shell shell">
@@ -646,7 +645,6 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
         <div className="order-header-center">Status pesanan</div>
         <div className="header-actions">
           <AccountNav />
-          <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
         </div>
       </SiteHeader>
 

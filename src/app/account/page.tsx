@@ -23,7 +23,6 @@ export default function AccountPage() {
         </nav>
         <div className="header-actions">
           <AccountNav />
-          <a className="header-cta" href="/#catalog-start">Top up lagi</a>
         </div>
       </SiteHeader>
 
