@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
-import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";import { BRAND } from "@/lib/brand";
+import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
+import { BRAND } from "@/lib/brand";
 import { safeNext, signInHref } from "@/lib/next-path";
 
 type LoginFormProps = {
@@ -36,7 +38,7 @@ export default function LoginForm({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+  const { siteKey, token: turnstileToken, setToken: setTurnstileToken, widgetKey, reset: resetTurnstile } =
     useAuthCaptcha();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,6 +111,18 @@ export default function LoginForm({
         <p className="auth-message error" role="alert">
           {OAUTH_ERRORS[oauthError] ?? OAUTH_ERRORS.google}
         </p>
+      )}
+
+      {siteKey && (
+        <TurnstileWidget
+          key={widgetKey}
+          siteKey={siteKey}
+          action="login"
+          execution="render"
+          onVerify={setTurnstileToken}
+          onError={() => setTurnstileToken("")}
+          onExpired={resetTurnstile}
+        />
       )}
 
       <button className="primary-button auth-submit" disabled={busy || Boolean(siteKey && !turnstileToken)} type="submit">

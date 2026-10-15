@@ -5,6 +5,7 @@ import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
 import PasswordMeter from "@/components/PasswordMeter";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import { BRAND } from "@/lib/brand";
 import { safeNext, signInHref } from "@/lib/next-path";
 import { assessPassword } from "@/lib/password-strength";
@@ -28,7 +29,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+  const { siteKey, token: turnstileToken, setToken: setTurnstileToken, widgetKey, reset: resetTurnstile } =
     useAuthCaptcha();
   const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -296,6 +297,18 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
             <p className="auth-message error" role="alert">
               Captcha belum dikonfigurasi. Set NEXT_PUBLIC_TURNSTILE_SITE_KEY.
             </p>
+          )}
+
+          {siteKey && (
+            <TurnstileWidget
+              key={widgetKey}
+              siteKey={siteKey}
+              action="signup"
+              execution="render"
+              onVerify={setTurnstileToken}
+              onError={() => setTurnstileToken("")}
+              onExpired={resetTurnstile}
+            />
           )}
 
           <button

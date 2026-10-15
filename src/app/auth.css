@@ -1428,10 +1428,8 @@
 
 /* Cloudflare Turnstile: visible challenge, positioned above the submit button */
 .auth-turnstile {
-  position: absolute;
-  top: 1rem;
-  left: 0;
+  display: block;
+  margin-top: 1rem;
   width: 300px;
   min-height: 80px;
-  z-index: 10;
 }

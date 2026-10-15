@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useAuthCaptcha } from "@/components/AuthCaptchaProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 /**
  * Requests a password reset link.
@@ -16,7 +17,7 @@ export default function ForgotPasswordForm() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const { siteKey, token: turnstileToken, reset: resetTurnstile } =
+  const { siteKey, token: turnstileToken, setToken: setTurnstileToken, widgetKey, reset: resetTurnstile } =
     useAuthCaptcha();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -44,6 +45,7 @@ export default function ForgotPasswordForm() {
           "Kalau email itu terdaftar, kami sudah mengirim tautan untuk mengatur ulang password.",
       );
       setSent(true);
+      resetTurnstile();
     } catch {
       setError("Tidak dapat menghubungi server.");
     } finally {
@@ -81,7 +83,19 @@ export default function ForgotPasswordForm() {
       {error && <p className="auth-message error" role="alert">{error}</p>}
       {notice && <p className="auth-message success" role="status">{notice}</p>}
 
-      <button className="primary-button auth-submit" disabled={busy || sent || Boolean(!turnstileToken)} type="submit">
+      {siteKey && (
+        <TurnstileWidget
+          key={widgetKey}
+          siteKey={siteKey}
+          action="forgot"
+          execution="render"
+          onVerify={setTurnstileToken}
+          onError={() => setTurnstileToken("")}
+          onExpired={resetTurnstile}
+        />
+      )}
+
+      <button className="primary-button auth-submit" disabled={busy || sent || Boolean(siteKey && !turnstileToken)} type="submit">
         {busy ? "Mengirim..." : "Kirim tautan"}
         <span aria-hidden="true">→</span>
       </button>

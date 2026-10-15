@@ -6,11 +6,12 @@ import {
   useContext,
   useState,
 } from "react";
-import TurnstileWidget from "@/components/TurnstileWidget";
 
 type AuthCaptchaContextValue = {
   siteKey: string;
   token: string;
+  setToken: (token: string) => void;
+  widgetKey: number;
   reset: () => void;
 };
 
@@ -40,19 +41,10 @@ export default function AuthCaptchaProvider({
   }, [siteKey]);
 
   return (
-    <AuthCaptchaContext.Provider value={{ siteKey, token, reset }}>
+    <AuthCaptchaContext.Provider
+      value={{ siteKey, token, setToken, widgetKey, reset }}
+    >
       {children}
-      {siteKey && (
-        <TurnstileWidget
-          key={widgetKey}
-          siteKey={siteKey}
-          action="auth"
-          execution="render"
-          onVerify={(verifiedToken) => setToken(verifiedToken)}
-          onError={() => setToken("")}
-          onExpired={reset}
-        />
-      )}
     </AuthCaptchaContext.Provider>
   );
 }
