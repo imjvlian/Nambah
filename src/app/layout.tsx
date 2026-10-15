@@ -53,12 +53,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/logo/lacte-logo.svg", type: "image/svg+xml", sizes: "any" },
       { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
     ],
-    shortcut: "/logo/lacte-logo.svg",
+    shortcut: "/icon.svg",
     apple: [
-      { url: "/logo/lacte-logo.svg", sizes: "180x180", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
     other: [
       {
