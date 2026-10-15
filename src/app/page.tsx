@@ -28,7 +28,6 @@ export default async function Home() {
 
         <div className="header-actions">
           <AccountNav showPoints />
-          <a className="header-cta" href="#catalog-start">Mulai top up</a>
         </div>
       </SiteHeader>
 
