@@ -35,13 +35,20 @@
   max-width: 160px;
 }
 
-.account-nav-user > span {
+.account-nav-user > span,
+.account-nav-user > img.account-nav-avatar {
   width: 23px;
   height: 23px;
   flex: 0 0 auto;
+  display: inline-block;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.account-nav-user > span {
   display: grid;
   place-items: center;
-  border-radius: 50%;
   background: var(--lime);
   color: var(--ink);
   font-size: 9px;

@@ -7,6 +7,7 @@ type AccountUser = {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl?: string | null;
 };
 
 type PointsSummary = {
@@ -26,6 +27,7 @@ export default function AccountNav({
     showPoints ? undefined : null,
   );
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -136,6 +138,10 @@ export default function AccountNav({
     };
   }, [showPoints]);
 
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.id]);
+
   const next = pathname && pathname.startsWith("/") ? pathname : "/";
 
   if (user === undefined) {
@@ -189,7 +195,17 @@ export default function AccountNav({
         href="/account"
         title={user.email}
       >
-        <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
+        {user.avatarUrl && !avatarError ? (
+          <img
+            className="account-nav-avatar"
+            src={user.avatarUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setAvatarError(true)}
+          />
+        ) : (
+          <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
+        )}
         <b>{user.displayName}</b>
       </a>
     </div>

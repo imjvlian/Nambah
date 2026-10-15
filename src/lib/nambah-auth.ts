@@ -9,7 +9,12 @@ export type NambahAuthUser = {
   email?: string | null;
   email_confirmed_at?: string | null;
   created_at?: string;
-  user_metadata?: Record<string, unknown>;
+  user_metadata?: Record<string, unknown> | null;
+  identities?: Array<{
+    id?: string | null;
+    provider?: string | null;
+    identity_data?: Record<string, unknown> | null;
+  }> | null;
 };
 
 export type NambahAuthSession = {
@@ -578,19 +583,77 @@ export function readNambahAccessToken(request: Request) {
   return readCookie(request, ACCESS_COOKIE);
 }
 
+function normalizeRemoteUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
+  } catch {
+    // Invalid URL values should be ignored instead of followed in the browser.
+  }
+  return null;
+}
+
+function getGoogleProfileSources(user: NambahAuthUser) {
+  const identityData = Array.isArray(user.identities)
+    ? user.identities.map((identity) => identity?.identity_data ?? null)
+    : [];
+
+  return [user.user_metadata, ...identityData].filter(
+    (source): source is Record<string, unknown> => Boolean(source),
+  );
+}
+
+function getProviderDisplayName(user: NambahAuthUser) {
+  const sources = getGoogleProfileSources(user);
+
+  for (const source of sources) {
+    for (const key of ["display_name", "full_name", "name", "preferred_username"]) {
+      const value = source[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+
+  const given = user.user_metadata?.given_name;
+  const family = user.user_metadata?.family_name;
+  if (typeof given === "string" || typeof family === "string") {
+    return [given, family]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+      .join(" ")
+      .trim();
+  }
+
+  return "";
+}
+
 export function publicNambahUser(user: NambahAuthUser) {
-  const metadataName =
-    typeof user.user_metadata?.display_name === "string"
-      ? user.user_metadata.display_name.trim()
-      : "";
+  const identityData = Array.isArray(user.identities)
+    ? user.identities.map((identity) => identity?.identity_data ?? null)
+    : [];
+  const profileSources = [user.user_metadata, ...identityData].filter(
+    (source): source is Record<string, unknown> => Boolean(source),
+  );
+
+  const avatarUrl = (() => {
+    for (const source of profileSources) {
+      for (const key of ["avatar_url", "picture", "avatar", "image", "photo", "photo_url"]) {
+        const url = normalizeRemoteUrl(source[key]);
+        if (url) return url;
+      }
+    }
+    return null;
+  })();
+
+  const metadataName = getProviderDisplayName(user);
+  const fallbackName = user.email?.split("@")[0] || `Pengguna ${BRAND.shortName}`;
 
   return {
     id: user.id,
     email: user.email ?? "",
-    displayName:
-      metadataName ||
-      user.email?.split("@")[0] ||
-      `Pengguna ${BRAND.shortName}`,
+    displayName: metadataName || fallbackName,
+    avatarUrl,
     emailConfirmed: Boolean(user.email_confirmed_at),
     createdAt: user.created_at ?? null,
   };
