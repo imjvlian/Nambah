@@ -6,6 +6,7 @@ import {
 import { safeNext } from "@/lib/next-path";
 import { createPkcePair } from "@/lib/pkce";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { resolveSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -19,8 +20,9 @@ const CALLBACK_PATH = "/api/auth/google/callback";
  * be reached by keyboard and by screen readers as an ordinary link.
  */
 export async function GET(request: Request) {
-  const origin = new URL(request.url).origin;
-  const originError = `${origin}/login?error=google`;
+  const origin = resolveSiteUrl(request, "/login");
+  const originError = `${origin}?error=google`;
+  const callbackUrl = resolveSiteUrl(request, CALLBACK_PATH);
 
   const limited = await rateLimitResponse(request, {
     scope: "auth-google-start",
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
   let authorizeUrl: string;
   try {
     authorizeUrl = buildGoogleAuthorizeUrl({
-      redirectTo: `${origin}${CALLBACK_PATH}`,
+      redirectTo: callbackUrl,
       codeChallenge: challenge,
     });
   } catch (error) {

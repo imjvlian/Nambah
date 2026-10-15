@@ -7,6 +7,7 @@ import {
 } from "@/lib/nambah-auth";
 import { safeNext } from "@/lib/next-path";
 import { isPlausibleVerifier } from "@/lib/pkce";
+import { resolveSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -23,9 +24,8 @@ export const runtime = "nodejs";
  * keeps the person inside the flow and gives the form something to say.
  */
 export async function GET(request: Request) {
-  const origin = new URL(request.url).origin;
   const url = new URL(request.url);
-  const backToLogin = new URL("/login", origin);
+  const backToLogin = new URL(resolveSiteUrl(request, "/login"));
 
   const failure = (reason: string) => {
     backToLogin.searchParams.set("error", reason);

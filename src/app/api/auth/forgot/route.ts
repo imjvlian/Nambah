@@ -1,5 +1,6 @@
 import { NambahAuthError, requestPasswordRecovery } from "@/lib/nambah-auth";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { resolveSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -61,10 +62,9 @@ export async function POST(request: Request) {
   if (emailLimited) return emailLimited;
 
   try {
-    const origin = new URL(request.url).origin;
     await requestPasswordRecovery({
       email,
-      redirectTo: `${origin}/reset-password`,
+      redirectTo: resolveSiteUrl(request, "/reset-password"),
     });
   } catch (error) {
     // 4xx from Supabase here means the address is unknown. That is masked on

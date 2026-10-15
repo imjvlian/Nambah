@@ -9,6 +9,7 @@ import {
   passwordPolicyError,
 } from "@/lib/password-strength";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { resolveSiteUrl, resolveSiteOrigin } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -75,12 +76,12 @@ export async function POST(request: Request) {
   if (addressLimited) return addressLimited;
 
   try {
-    const origin = new URL(request.url).origin;
     const result = await signUpNambah({
       displayName,
       email,
       password,
-      redirectTo: `${origin}/login?confirmed=1`,
+      redirectTo:
+        `${resolveSiteOrigin(request)}/login?confirmed=1`,
     });
 
     if (result.session && result.session.user?.id) {
