@@ -4,6 +4,10 @@ import {
   publicNambahUser,
   signUpNambah,
 } from "@/lib/nambah-auth";
+import {
+  passwordConfirmationError,
+  passwordPolicyError,
+} from "@/lib/password-strength";
 import { rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
     displayName?: unknown;
     email?: unknown;
     password?: unknown;
+    confirmPassword?: unknown;
   };
 
   try {
@@ -34,7 +39,12 @@ export async function POST(request: Request) {
 
   const displayName = cleanText(body.displayName, 50);
   const email = cleanText(body.email, 254).toLowerCase();
+  // Passwords are never trimmed. Leading and trailing spaces are legitimate
+  // characters, and silently stripping them would let a password pass
+  // validation as one thing and then be stored as another.
   const password = typeof body.password === "string" ? body.password : "";
+  const confirmPassword =
+    typeof body.confirmPassword === "string" ? body.confirmPassword : "";
 
   if (displayName.length < 2) {
     return Response.json({ error: "Nama minimal 2 karakter." }, { status: 400 });
@@ -42,12 +52,27 @@ export async function POST(request: Request) {
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return Response.json({ error: "Email tidak valid." }, { status: 400 });
   }
-  if (password.length < 8) {
-    return Response.json(
-      { error: "Password minimal 8 karakter." },
-      { status: 400 },
-    );
+
+  const policyError = passwordPolicyError(password, email);
+  if (policyError) {
+    return Response.json({ error: policyError }, { status: 400 });
   }
+
+  const confirmationError = passwordConfirmationError(password, confirmPassword);
+  if (confirmationError) {
+    return Response.json({ error: confirmationError }, { status: 400 });
+  }
+
+  // A per-address limit on top of the per-IP one. Without it, signup doubles
+  // as a way to bury someone's inbox with signup emails, since the sender
+  // address on those is this project.
+  const addressLimited = await rateLimitResponse(request, {
+    scope: "auth-signup-address",
+    limit: 3,
+    windowSeconds: 60 * 60,
+    subject: email,
+  });
+  if (addressLimited) return addressLimited;
 
   try {
     const origin = new URL(request.url).origin;
@@ -76,7 +101,7 @@ export async function POST(request: Request) {
       {
         user: result.user?.id ? publicNambahUser(result.user) : null,
         requiresEmailConfirmation: true,
-        message: "Akun dibuat. Cek email untuk konfirmasi sebelum login.",
+        message: "Kode 6 digit sudah dikirim ke emailmu. Masukkan kode itu untuk selesai mendaftar.",
       },
       { status: 201 },
     );

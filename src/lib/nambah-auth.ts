@@ -204,6 +204,84 @@ export async function signUpNambah(input: {
   };
 }
 
+/**
+ * Exchanges the emailed six digit code for a session.
+ *
+ * This is the reason the signup template must render {{ .Token }} rather than
+ * {{ .ConfirmationURL }}: verifying the code here returns a full session, so
+ * the user is signed in immediately and never has to enter a password again.
+ */
+export async function verifySignupNambah(input: { email: string; token: string }) {
+  const payload = await authRequest("/verify", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "signup",
+      email: input.email,
+      token: input.token,
+    }),
+  });
+
+  const session = normalizeSession(payload);
+  if (!session) {
+    throw new NambahAuthError(
+      "Kode verifikasi tidak dapat diproses.",
+      400,
+      "verify_failed",
+    );
+  }
+  return session;
+}
+
+/**
+ * Sends a fresh signup code. Supabase replaces any earlier unused code, so
+ * only the most recently requested one will verify.
+ */
+export async function resendSignupCode(input: { email: string }) {
+  await authRequest("/resend", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "signup",
+      email: input.email,
+    }),
+  });
+}
+
+/**
+ * Asks Supabase to email a password recovery link.
+ *
+ * Callers must not branch on whether this throws. Supabase answers with an
+ * error when the address is unknown, and surfacing that would turn this
+ * endpoint into a way to enumerate which emails have accounts here.
+ */
+export async function requestPasswordRecovery(input: {
+  email: string;
+  redirectTo?: string;
+}) {
+  const query = input.redirectTo
+    ? `?redirect_to=${encodeURIComponent(input.redirectTo)}`
+    : "";
+
+  await authRequest(`/recover${query}`, {
+    method: "POST",
+    body: JSON.stringify({ email: input.email }),
+  });
+}
+
+/** Sets a new password on the user that owns the given recovery session. */
+export async function updatePassword(input: {
+  accessToken: string;
+  password: string;
+}) {
+  await authRequest(
+    "/user",
+    {
+      method: "PUT",
+      body: JSON.stringify({ password: input.password }),
+    },
+    input.accessToken,
+  );
+}
+
 export async function refreshNambahSession(refreshToken: string) {
   const payload = await authRequest("/token?grant_type=refresh_token", {
     method: "POST",
