@@ -1425,14 +1425,10 @@
 }
 
 
-/* Cloudflare Turnstile: keep invisible challenge off-screen. */
+/* Cloudflare Turnstile: visible challenge, one per page */
 .auth-turnstile {
-  position: fixed;
-  inset: 0;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  z-index: -1;
+  margin-top: 1rem;
+  width: 300px;
+  /* let the widget height be determined by Cloudflare; we just give a min height */
+  min-height: 80px;
 }
