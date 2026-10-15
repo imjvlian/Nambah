@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatIDR } from "@/lib/pricing";
 import { BRAND } from "@/lib/brand";
+import BrandLogo from "@/components/BrandLogo";
 
 type SupplierItem = {
   sku: string;
@@ -392,7 +393,7 @@ export default function DigiflazzCatalogBrowser() {
   return (
     <main className="supplier-browser-shell">
       <header className="supplier-browser-header">
-        <Link className="brand" href="/"><span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span><span>{BRAND.shortName}</span></Link>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <nav>
           <Link href="/admin">Produk {BRAND.shortName}</Link>
           <Link className="active" href="/admin/digiflazz">Katalog Digiflazz</Link>

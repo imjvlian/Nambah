@@ -3,6 +3,7 @@ import SiteFooter from "@/components/SiteFooter";
 import { notFound } from "next/navigation";
 import TopupExperience from "@/components/TopupExperience";
 import SiteHeader from "@/components/SiteHeader";
+import BrandLogo from "@/components/BrandLogo";
 import ProductRatingRail from "@/components/ProductRatingRail";
 import { getPublicCatalog } from "@/lib/catalog-repository";
 import type { Game } from "@/lib/catalog";
@@ -54,10 +55,7 @@ export default async function ProductPage({
   return (
     <main className="product-page">
       <SiteHeader className="product-site-header">
-        <a className="brand" href="/" aria-label={BRAND.name}>
-          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-          <span>{BRAND.shortName}</span>
-        </a>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <nav className="desktop-nav" aria-label="Navigasi produk">
           <a href="/">Katalog</a>
           <a href="#transaction">Transaksi</a>

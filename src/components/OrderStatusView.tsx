@@ -3,6 +3,7 @@
 import Link from "next/link";
 import AccountNav from "@/components/AccountNav";
 import SiteHeader from "@/components/SiteHeader";
+import BrandLogo from "@/components/BrandLogo";
 import DokuQrisPanel, { DOKU_QRIS_PANEL_ID } from "@/components/DokuQrisPanel";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -490,10 +491,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return (
       <main>
         <SiteHeader className="order-header">
-          <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-            <span>{BRAND.shortName}</span>
-          </Link>
+          <BrandLogo href="/" size="md" variant="horizontal" />
           <div className="header-actions">
             <AccountNav />
           </div>
@@ -509,10 +507,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return (
       <main>
         <SiteHeader className="order-header">
-          <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-            <span>{BRAND.shortName}</span>
-          </Link>
+          <BrandLogo href="/" size="md" variant="horizontal" />
           <div className="header-actions">
             <AccountNav />
             <Link className="header-cta" href="/#catalog-start">Top up lagi</Link>
@@ -647,10 +642,7 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
       )}
 
       <SiteHeader className="order-header">
-        <Link className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-          <span>{BRAND.shortName}</span>
-        </Link>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <div className="order-header-center">Status pesanan</div>
         <div className="header-actions">
           <AccountNav />

@@ -21,6 +21,7 @@ import {
   SECTION_SCOPE,
 } from "@/lib/admin-scope";
 import { BRAND } from "@/lib/brand";
+import BrandLogo from "@/components/BrandLogo";
 
 type AdminSection =
   | "overview"
@@ -3369,10 +3370,7 @@ const txDataStamp = txRange.preset
     return (
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
-          <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-            <span>{BRAND.shortName}</span>
-          </Link>
+          <BrandLogo href="/" size="md" variant="horizontal" />
           <span className="admin-kicker">Admin account</span>
           <h1>Masuk dengan akun admin.</h1>
           <p>
@@ -3395,10 +3393,7 @@ const txDataStamp = txRange.preset
     return (
       <main className="admin-shell admin-login-shell">
         <section className="admin-login-card">
-          <Link className="brand" href="/">
-            <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-            <span>{BRAND.shortName}</span>
-          </Link>
+          <BrandLogo href="/" size="md" variant="horizontal" />
           <span className="admin-kicker">Akses ditolak</span>
           <h1>Akun ini bukan admin.</h1>
           <p>

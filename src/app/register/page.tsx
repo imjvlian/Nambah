@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 import SiteHeader from "@/components/SiteHeader";
+import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
 import { optionalSafeNext } from "@/lib/next-path";
 
@@ -19,10 +20,7 @@ export default async function RegisterPage({
   return (
     <main className="auth-page">
       <SiteHeader className="auth-header">
-        <a className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-          <span>{BRAND.shortName}</span>
-        </a>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <a className="text-link" href="/">Kembali ke beranda</a>
       </SiteHeader>
 

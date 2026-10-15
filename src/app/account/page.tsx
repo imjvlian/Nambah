@@ -2,6 +2,7 @@ import AccountNav from "@/components/AccountNav";
 import type { Metadata } from "next";
 import AccountDashboard from "@/components/AccountDashboard";
 import SiteHeader from "@/components/SiteHeader";
+import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -15,10 +16,7 @@ export default function AccountPage() {
   return (
     <main className="account-page">
       <SiteHeader className="account-header">
-        <a className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-          <span>{BRAND.shortName}</span>
-        </a>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <nav className="desktop-nav" aria-label="Navigasi akun">
           <a href="/">Katalog</a>
           <a href="/account">Akun</a>

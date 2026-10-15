@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ResetPasswordForm from "@/components/ResetPasswordForm";
 import SiteHeader from "@/components/SiteHeader";
+import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -14,10 +15,7 @@ export default function ResetPasswordPage() {
   return (
     <main className="auth-page">
       <SiteHeader className="auth-header">
-        <a className="brand" href="/">
-          <span className="brand-mark"><img src="/logo/lacte-logo.svg" alt="" /></span>
-          <span>{BRAND.shortName}</span>
-        </a>
+        <BrandLogo href="/" size="md" variant="horizontal" />
         <a className="text-link" href="/">Kembali ke beranda</a>
       </SiteHeader>
 
