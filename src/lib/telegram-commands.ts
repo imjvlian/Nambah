@@ -137,10 +137,13 @@ async function statusText() {
     `Galat keuangan 24 jam: ${health.counts.financeErrors}`,
   ];
 
-  if (health.supplierBalance) {
-    lines.push(
-      `Saldo: ${escapeTelegramHtml(rupiah(health.supplierBalance.balance))} (${escapeTelegramHtml(health.supplierBalance.status)})`,
-    );
+  if (health.supplierBalances.length > 0) {
+    lines.push("", "<b>Saldo supplier</b>");
+    for (const balance of health.supplierBalances) {
+      lines.push(
+        `  ${escapeTelegramHtml(balance.supplierLabel)}: ${escapeTelegramHtml(rupiah(balance.balance))} (${escapeTelegramHtml(balance.status)})`,
+      );
+    }
   }
 
   if (health.incidents.length > 0) {
@@ -185,7 +188,8 @@ async function balanceText() {
    */
   const latest = new Map<string, BalanceRow>();
   for (const snapshot of snapshots) {
-    if (!latest.has(snapshot.supplier_id)) latest.set(snapshot.supplier_id, snapshot);
+    if (!latest.has(snapshot.supplier_id))
+      latest.set(snapshot.supplier_id, snapshot);
   }
 
   const lines: string[] = ["<b>Saldo supplier</b>"];
@@ -210,7 +214,8 @@ async function balanceText() {
 
 async function orderText(argument: string) {
   const orderId = parseOrderId(argument);
-  if (!orderId) return "Format order id salah. Contoh: /order NBH-20261008-XXXX";
+  if (!orderId)
+    return "Format order id salah. Contoh: /order NBH-20261008-XXXX";
 
   const orders = await supabaseSelect<OrderRow>("orders", {
     select:
@@ -253,7 +258,9 @@ async function orderText(argument: string) {
     lines.push("");
     lines.push(`Supplier: ${escapeTelegramHtml(transaction.status)}`);
     if (transaction.serial_number) {
-      lines.push(`SN: <code>${escapeTelegramHtml(transaction.serial_number)}</code>`);
+      lines.push(
+        `SN: <code>${escapeTelegramHtml(transaction.serial_number)}</code>`,
+      );
     }
     if (transaction.message) {
       lines.push(`Pesan: ${escapeTelegramHtml(transaction.message)}`);
@@ -279,7 +286,8 @@ async function orderText(argument: string) {
 
 async function incidentText() {
   const incidents = await supabaseSelect<IncidentRow>("operational_incidents", {
-    select: "fingerprint,severity,status,title,detail,occurrence_count,last_seen_at",
+    select:
+      "fingerprint,severity,status,title,detail,occurrence_count,last_seen_at",
     filters: { status: "eq.open" },
     order: "last_seen_at.desc",
     limit: 20,
@@ -310,7 +318,8 @@ async function incidentText() {
  */
 async function retryReceiptText(argument: string, chatId: string) {
   const orderId = parseOrderId(argument);
-  if (!orderId) return "Format order id salah. Contoh: /retry-receipt NBH-20261008-XXXX";
+  if (!orderId)
+    return "Format order id salah. Contoh: /retry-receipt NBH-20261008-XXXX";
 
   const { deliverSuccessReceipt } = await import("@/lib/receipt-service");
   const result = await deliverSuccessReceipt(orderId);

@@ -57,7 +57,7 @@ Migration fitur terbaru:
 - [Production Guide](./PRODUCTION.md) — deployment dan controlled production launch.
 - [Changelog](./CHANGELOG.md) — milestone release.
 
-Default scheduled operations untuk Vercel didefinisikan di `vercel.json`. Semua endpoint cron tetap memerlukan `CRON_SECRET`.
+Default scheduled operations untuk VPS didefinisikan di `deploy/systemd/`. Semua endpoint cron tetap memerlukan `CRON_SECRET`.
 
 **1.0.0 berarti code baseline stabil, bukan live-money otomatis aktif.** Aktivasi Midtrans Production dan Digiflazz live tetap mempunyai ENV gate, catalog readiness gate, manual provider setup, dan explicit owner approval.
 

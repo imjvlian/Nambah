@@ -95,12 +95,15 @@ Penjadwalan ada di `deploy/systemd/`:
 ~~~text
 reconcile             setiap 5 menit
 operations-health     setiap 10 menit
-digiflazz-balance     setiap 15 menit
+supplier-balance      setiap 15 menit
 financial-reconcile   setiap jam (menit 7)
 points-expiry         00:30 UTC setiap hari
 telegram-dispatch     setiap menit
 daily-digest          01:00 UTC = 08:00 WIB
 ~~~
+
+`supplier-balance` mengecek semua supplier sekaligus, termasuk Melostore, dan
+menggantikan timer lama `digiflazz-balance`.
 
 Semua jadwal ditulis eksplisit dalam UTC, jadi tidak berubah kalau timezone
 server diganti.

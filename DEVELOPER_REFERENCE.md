@@ -58,12 +58,12 @@ Prinsip utama:
 | Database | Supabase PostgreSQL |
 | Customer auth | Supabase Auth melalui server routes + HttpOnly cookies |
 | Payment | Midtrans Snap |
-| Supplier | Digiflazz |
+| Supplier | Digiflazz + Melostore |
 | Receipt | Brevo transactional email |
 | Account checker | Volsever, dengan fallback tertentu melalui Gempay/Mimih |
 | Alerts | Telegram |
 | CI | GitHub Actions |
-| Hosting target | Vercel |
+| Hosting target | VPS (systemd timer) |
 
 Current npm scripts:
 

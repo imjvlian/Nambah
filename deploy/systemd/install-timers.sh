@@ -29,7 +29,7 @@ UNIT_DIR="${APP_DIR}/deploy/systemd"
 read -r -d '' JOBS <<'EOF' || true
 reconcile|*-*-* *:0/5:00 UTC|*/5 * * * *|Sweep order kedaluwarsa, retry supplier & receipt
 operations-health|*-*-* *:0/10:00 UTC|*/10 * * * *|Alert incident + order nyangkut
-digiflazz-balance|*-*-* *:0/15:00 UTC|*/15 * * * *|Alert saldo Digiflazz
+supplier-balance|*-*-* *:0/15:00 UTC|*/15 * * * *|Cek saldo semua supplier (Digiflazz + Melostore)
 financial-reconcile|*-*-* *:07:00:00 UTC|7 * * * *|Rekonsiliasi keuangan
 points-expiry|*-*-* 00:30:00 UTC|30 0 * * *|Expiry poin
 telegram-dispatch|*-*-* *:*:0/1:00 UTC|* * * * *|Drain antrean notifikasi Telegram
@@ -96,6 +96,12 @@ if ! grep -q "^ExecStart=$RUN_SCRIPT %i$" /etc/systemd/system/nambah-cron@.servi
 fi
 
 systemctl daemon-reload
+
+# Timer lama `digiflazz-balance` sengaja dimatikan kalau masih ada, supaya
+# saldo tidak dicek dua kali oleh dua endpoint yang berbeda.
+if systemctl is-active --quiet nambah-cron@digiflazz-balance.timer; then
+  systemctl disable --now nambah-cron@digiflazz-balance.timer
+fi
 
 echo ""
 ENABLED=0
