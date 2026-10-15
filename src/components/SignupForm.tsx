@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
 import PasswordMeter from "@/components/PasswordMeter";
 import { BRAND } from "@/lib/brand";
+import { safeNext, signInHref } from "@/lib/next-path";
 import { assessPassword } from "@/lib/password-strength";
 
 const CODE_LENGTH = 6;
@@ -12,13 +14,6 @@ const RESEND_SECONDS = 45;
 type SignupFormProps = {
   nextPath?: string;
 };
-
-function safeNext(value?: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/account";
-  }
-  return value;
-}
 
 export default function SignupForm({ nextPath }: SignupFormProps) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -296,11 +291,10 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
             <span aria-hidden="true">→</span>
           </button>
 
+          <GoogleSignInButton next={nextPath} />
+
           <p className="auth-switch">
-            Sudah punya akun?{" "}
-            <a href={nextPath ? `/login?next=${encodeURIComponent(safeNext(nextPath))}` : "/login"}>
-              Masuk
-            </a>
+            Sudah punya akun? <a href={signInHref("/login", nextPath)}>Masuk</a>
           </p>
         </>
       ) : (

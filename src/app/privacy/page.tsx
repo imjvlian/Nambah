@@ -30,6 +30,8 @@ export default function PrivacyPage() {
         <ul>
           <li>
             <strong>Data akun</strong>: alamat email saat kamu mendaftar dan login.
+            Kalau kamu memilih masuk dengan Google, email dan nama profil
+            diambil dari akun Google kamu.
           </li>
           <li>
             <strong>Data profil</strong>: nama tampilan dan nomor WhatsApp yang
@@ -69,6 +71,12 @@ export default function PrivacyPage() {
           diperlukan untuk menjalankan layanan:
         </p>
         <ul>
+          <li>
+            <strong>Google</strong> — kalau kamu memakai login dengan Google,
+            Google menerima permintaan autentikasi dari kami dan mengirim
+            alamat email serta nama profil kamu. Kami tidak meminta akses ke
+            email, kontak, file, atau data lain di akun Google kamu.
+          </li>
           <li>
             <strong>Penyedia pembayaran</strong> — untuk memproses transaksi
             pembayaran kamu secara aman.

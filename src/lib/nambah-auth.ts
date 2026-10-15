@@ -233,6 +233,76 @@ export async function verifySignupNambah(input: { email: string; token: string }
 }
 
 /**
+ * Scopes requested from Google.
+ *
+ * Supabase already asks Google for exactly three: openid, email and profile.
+ * They are the non-sensitive identity scopes, and an app that asks for only
+ * these is exempt from Google's unverified-app treatment, which includes the
+ * 100 user cap. Requesting them here as well would be misleading rather than
+ * defensive: Supabase merges the scopes passed in with its own defaults
+ * instead of replacing them, so it cannot pin anything.
+ *
+ * Do not add a Gmail, Drive or Contacts scope. Doing so would put the project
+ * inside the unverified-app rules and reinstate that cap.
+ */
+
+/**
+ * Builds the URL that starts the Google flow.
+ *
+ * The PKCE challenge travels as a query parameter while the verifier that
+ * produced it is held in an httpOnly cookie, so only this app can complete the
+ * exchange even if the authorization code leaks from the redirect.
+ */
+export function buildGoogleAuthorizeUrl(input: {
+  redirectTo: string;
+  codeChallenge: string;
+}) {
+  const { url, publishableKey } = requireAuthConfig();
+
+  const authorize = new URL(`${url}/auth/v1/authorize`);
+  authorize.searchParams.set("provider", "google");
+  authorize.searchParams.set("redirect_to", input.redirectTo);
+  authorize.searchParams.set("code_challenge", input.codeChallenge);
+  authorize.searchParams.set("code_challenge_method", "S256");
+  // Scopes are left to Supabase's default, which is GOOGLE_SCOPES_DOC. Sending
+  // them explicitly produced a duplicated, not narrowed, scope parameter.
+  authorize.searchParams.set("apikey", publishableKey);
+
+  return authorize.toString();
+}
+
+/**
+ * Exchanges an authorization code for a session, server-side.
+ *
+ * This is what lets the Google flow produce the exact same httpOnly cookies as
+ * a password login. A browser-side exchange would have to hand the tokens to
+ * client JavaScript first, which would put the session somewhere it does not
+ * belong.
+ */
+export async function exchangeGoogleCode(input: {
+  code: string;
+  codeVerifier: string;
+}) {
+  const payload = await authRequest("/token?grant_type=pkce", {
+    method: "POST",
+    body: JSON.stringify({
+      auth_code: input.code,
+      code_verifier: input.codeVerifier,
+    }),
+  });
+
+  const session = normalizeSession(payload);
+  if (!session) {
+    throw new NambahAuthError(
+      "Login Google belum dapat diselesaikan.",
+      502,
+      "oauth_exchange_failed",
+    );
+  }
+  return session;
+}
+
+/**
  * Sends a fresh signup code. Supabase replaces any earlier unused code, so
  * only the most recently requested one will verify.
  */
@@ -345,11 +415,11 @@ function readCookie(request: Request, name: string) {
 function serializeCookie(
   name: string,
   value: string,
-  options: { maxAge: number },
+  options: { maxAge: number; path?: string },
 ) {
   return [
     `${name}=${encodeURIComponent(value)}`,
-    "Path=/",
+    `Path=${options.path ?? "/"}`,
     "HttpOnly",
     "SameSite=Lax",
     process.env.NODE_ENV === "production" ? "Secure" : "",
@@ -357,6 +427,61 @@ function serializeCookie(
   ]
     .filter(Boolean)
     .join("; ");
+}
+
+/**
+ * Cookies that carry the OAuth handshake between the authorize redirect and
+ * the callback.
+ *
+ * The path is scoped to the two OAuth routes so these never travel with
+ * ordinary page requests. SameSite=Lax is required, not a preference: the
+ * callback arrives as a top-level cross-site navigation from Google, and
+ * SameSite=Strict would drop the cookie and break every sign-in.
+ */
+const OAUTH_VERIFIER_COOKIE = "nambah_oauth_verifier";
+const OAUTH_NEXT_COOKIE = "nambah_oauth_next";
+const OAUTH_COOKIE_PATH = "/api/auth/google";
+const OAUTH_COOKIE_MAX_AGE = 10 * 60;
+
+export function appendNambahOAuthCookies(
+  headers: Headers,
+  state: { verifier: string; next: string },
+) {
+  headers.append(
+    "Set-Cookie",
+    serializeCookie(OAUTH_VERIFIER_COOKIE, state.verifier, {
+      maxAge: OAUTH_COOKIE_MAX_AGE,
+      path: OAUTH_COOKIE_PATH,
+    }),
+  );
+  headers.append(
+    "Set-Cookie",
+    serializeCookie(OAUTH_NEXT_COOKIE, state.next, {
+      maxAge: OAUTH_COOKIE_MAX_AGE,
+      path: OAUTH_COOKIE_PATH,
+    }),
+  );
+}
+
+/**
+ * Clears the OAuth cookies on both success and failure. Leaving the verifier
+ * behind would let a second callback reuse it, and Supabase would reject that
+ * anyway; clearing keeps the cookie jar clean either way.
+ */
+export function appendClearNambahOAuthCookies(headers: Headers) {
+  for (const name of [OAUTH_VERIFIER_COOKIE, OAUTH_NEXT_COOKIE]) {
+    headers.append(
+      "Set-Cookie",
+      serializeCookie(name, "", { maxAge: 0, path: OAUTH_COOKIE_PATH }),
+    );
+  }
+}
+
+export function readNambahOAuthState(request: Request) {
+  return {
+    verifier: readCookie(request, OAUTH_VERIFIER_COOKIE),
+    next: readCookie(request, OAUTH_NEXT_COOKIE),
+  };
 }
 
 export function appendNambahAuthSessionCookies(

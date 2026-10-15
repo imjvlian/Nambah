@@ -2,16 +2,12 @@ import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 import SiteHeader from "@/components/SiteHeader";
 import { BRAND } from "@/lib/brand";
+import { optionalSafeNext } from "@/lib/next-path";
 
 export const metadata: Metadata = {
   title: `Daftar — ${BRAND.name}`,
   description: `Buat akun ${BRAND.shortName}.`,
 };
-
-function safeNext(value?: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
-  return value;
-}
 
 export default async function RegisterPage({
   searchParams,
@@ -43,7 +39,7 @@ export default async function RegisterPage({
             <span><b>03</b> Akses order lebih mudah</span>
           </div>
         </aside>
-        <AuthForm mode="register" nextPath={safeNext(params.next)} />
+        <AuthForm mode="register" nextPath={optionalSafeNext(params.next)} />
       </section>
     </main>
   );

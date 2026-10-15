@@ -2,21 +2,17 @@ import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 import SiteHeader from "@/components/SiteHeader";
 import { BRAND } from "@/lib/brand";
+import { optionalSafeNext } from "@/lib/next-path";
 
 export const metadata: Metadata = {
   title: `Masuk — ${BRAND.name}`,
   description: `Masuk ke akun ${BRAND.shortName}.`,
 };
 
-function safeNext(value?: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
-  return value;
-}
-
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; confirmed?: string }>;
+  searchParams: Promise<{ next?: string; confirmed?: string; error?: string }>;
 }) {
   const params = await searchParams;
 
@@ -45,8 +41,9 @@ export default async function LoginPage({
         </aside>
         <AuthForm
           mode="login"
-          nextPath={safeNext(params.next)}
+          nextPath={optionalSafeNext(params.next)}
           confirmed={params.confirmed === "1"}
+          oauthError={params.error}
         />
       </section>
     </main>

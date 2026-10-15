@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PasswordField from "@/components/PasswordField";
 import { BRAND } from "@/lib/brand";
+import { safeNext, signInHref } from "@/lib/next-path";
 
 type LoginFormProps = {
   nextPath?: string;
@@ -11,16 +13,20 @@ type LoginFormProps = {
    * bookmarked link still explains itself instead of rendering a blank notice.
    */
   confirmed?: boolean;
+  /** Set when the Google flow bounced back without completing. */
+  oauthError?: string;
 };
 
-function safeNext(value?: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/account";
-  }
-  return value;
-}
+const OAUTH_ERRORS: Record<string, string> = {
+  google:
+    "Login dengan Google belum selesai. Coba lagi, atau pakai email dan password.",
+};
 
-export default function LoginForm({ nextPath, confirmed = false }: LoginFormProps) {
+export default function LoginForm({
+  nextPath,
+  confirmed = false,
+  oauthError,
+}: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState(
@@ -94,17 +100,22 @@ export default function LoginForm({ nextPath, confirmed = false }: LoginFormProp
 
       {error && <p className="auth-message error" role="alert">{error}</p>}
       {notice && <p className="auth-message success" role="status">{notice}</p>}
+      {oauthError && (
+        <p className="auth-message error" role="alert">
+          {OAUTH_ERRORS[oauthError] ?? OAUTH_ERRORS.google}
+        </p>
+      )}
 
       <button className="primary-button auth-submit" disabled={busy} type="submit">
         {busy ? "Memproses..." : "Masuk"}
         <span aria-hidden="true">→</span>
       </button>
 
+      <GoogleSignInButton next={nextPath} />
+
       <p className="auth-switch">
         Belum punya akun?{" "}
-        <a href={nextPath ? `/register?next=${encodeURIComponent(safeNext(nextPath))}` : "/register"}>
-          Daftar
-        </a>
+        <a href={signInHref("/register", nextPath)}>Daftar</a>
       </p>
     </form>
   );
