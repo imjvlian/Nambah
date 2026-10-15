@@ -6,7 +6,10 @@ import {
   sign as rsaSign,
   verify as rsaVerify,
 } from "node:crypto";
-import { getPaylabsEnvironment, type PaymentProviderId } from "@/lib/payment-settings";
+import {
+  getPaylabsEnvironment,
+  type PaymentProviderId,
+} from "@/lib/payment-settings";
 import type { CreatePaymentInput, PaymentSession } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +39,7 @@ export function getPaylabsConfig(): PaylabsConfig | null {
   const merchantId = env("PAYLABS_MERCHANT_ID");
   const partnerId = env("PAYLABS_PARTNER_ID") || merchantId;
   const rootUrl = env("PAYLABS_ROOT_URL").replace(/\/+$/, "");
+  const environment = getPaylabsEnvironment();
   let privateKey = env("PAYLABS_PRIVATE_KEY").replace(/\\n/g, "\n");
   let publicKey = env("PAYLABS_PUBLIC_KEY").replace(/\\n/g, "\n");
 
@@ -76,14 +80,24 @@ export function getPaylabsConfig(): PaylabsConfig | null {
     }
   }
 
+  // Di production, webhook Paylabs wajib diverifikasi dengan public key.
+  // Tanpa ini, notifikasi bisa dipalsukan dan status order bisa dimanipulasi.
+  if (environment === "production" && !publicKey) {
+    console.error(
+      "PAYLABS_PUBLIC_KEY wajib diisi di production untuk verifikasi webhook Paylabs.",
+    );
+    return null;
+  }
+
   return {
     rootUrl,
     merchantId,
     partnerId,
     privateKey,
     publicKey,
-    environment: getPaylabsEnvironment(),
-    defaultVaPaymentType: env("PAYLABS_DEFAULT_VA_PAYMENT_TYPE") || "SinarmasVA",
+    environment,
+    defaultVaPaymentType:
+      env("PAYLABS_DEFAULT_VA_PAYMENT_TYPE") || "SinarmasVA",
     notifyUrl: env("PAYLABS_NOTIFY_URL") || null,
   };
 }
@@ -133,7 +147,11 @@ export function createPaylabsSignature(input: {
     sha256HexLower(bodyString),
     input.timestamp,
   ].join(":");
-  return rsaSign("RSA-SHA256", Buffer.from(stringToSign, "utf8"), input.privateKey).toString("base64");
+  return rsaSign(
+    "RSA-SHA256",
+    Buffer.from(stringToSign, "utf8"),
+    input.privateKey,
+  ).toString("base64");
 }
 
 export function verifyPaylabsSignature(input: {
@@ -189,11 +207,18 @@ async function paylabsFetch<T>(
   body: Record<string, unknown>,
 ): Promise<{ result: T; requestId: string; timestamp: string }> {
   const config = getPaylabsConfig();
-  if (!config) throw new Error("Paylabs belum dikonfigurasi (PAYLABS_MERCHANT_ID / PAYLABS_PRIVATE_KEY / PAYLABS_ROOT_URL).");
+  if (!config)
+    throw new Error(
+      "Paylabs belum dikonfigurasi (PAYLABS_MERCHANT_ID / PAYLABS_PRIVATE_KEY / PAYLABS_ROOT_URL).",
+    );
 
   const requestId = randomUUID();
   const timestamp = paylabsTimestamp();
-  const payload = { ...body, requestId, merchantId: body.merchantId ?? config.merchantId };
+  const payload = {
+    ...body,
+    requestId,
+    merchantId: body.merchantId ?? config.merchantId,
+  };
 
   const bodyString = minifyJson(payload);
   const signature = createPaylabsSignature({
@@ -222,7 +247,10 @@ async function paylabsFetch<T>(
       signal: controller.signal,
     });
 
-    const result = (await response.json()) as T & { errCode?: string; errCodeDes?: string };
+    const result = (await response.json()) as T & {
+      errCode?: string;
+      errCodeDes?: string;
+    };
     if (!response.ok || (result.errCode && result.errCode !== "0")) {
       throw new Error(
         `Paylabs ${path} gagal (${result.errCode ?? response.status}): ${result.errCodeDes ?? "tanpa pesan"}`,
@@ -267,20 +295,21 @@ export interface PaylabsQrisCreateResult {
   raw: unknown;
 }
 
-export async function createPaylabsQrisPayment(input: CreatePaymentInput): Promise<PaymentSession> {
+export async function createPaylabsQrisPayment(
+  input: CreatePaymentInput,
+): Promise<PaymentSession> {
   const config = getPaylabsConfig();
   if (!config) throw new Error("Paylabs belum dikonfigurasi.");
 
-  const { result, requestId } = await paylabsFetch<PaylabsQrisCreateResult & Record<string, unknown>>(
-    "/payment/v2.3/qris/create",
-    {
-      paymentType: "QRIS",
-      amount: amountString(input.grossAmount),
-      merchantTradeNo: input.orderId,
-      productName: input.itemName,
-      notifyUrl: config.notifyUrl ?? undefined,
-    },
-  );
+  const { result, requestId } = await paylabsFetch<
+    PaylabsQrisCreateResult & Record<string, unknown>
+  >("/payment/v2.3/qris/create", {
+    paymentType: "QRIS",
+    amount: amountString(input.grossAmount),
+    merchantTradeNo: input.orderId,
+    productName: input.itemName,
+    notifyUrl: config.notifyUrl ?? undefined,
+  });
 
   const r = result as Record<string, unknown>;
   if (!r.qrCode && !r.qrisUrl) {
@@ -323,15 +352,21 @@ export async function fetchPaylabsQrisStatus(input: {
   const config = getPaylabsConfig();
   if (!config) throw new Error("Paylabs belum dikonfigurasi.");
 
-  const { result } = await paylabsFetch<Record<string, unknown>>("/payment/v2.3/qris/query", {
-    merchantTradeNo: input.orderId,
-    paymentType: "QRIS",
-  });
+  const { result } = await paylabsFetch<Record<string, unknown>>(
+    "/payment/v2.3/qris/query",
+    {
+      merchantTradeNo: input.orderId,
+      paymentType: "QRIS",
+    },
+  );
 
   const r = result as Record<string, unknown>;
   return {
     orderId: (r.merchantTradeNo as string | undefined) ?? input.orderId,
-    platformTradeNo: (r.platformTradeNo as string | undefined) ?? input.platformTradeNo ?? null,
+    platformTradeNo:
+      (r.platformTradeNo as string | undefined) ??
+      input.platformTradeNo ??
+      null,
     transactionStatus: normalizePaylabsStatus(r.status as string | undefined),
     transactionStatusDesc: (r.status as string | undefined) ?? null,
     paidTime: (r.successTime as string | undefined) ?? null,
@@ -345,7 +380,9 @@ export async function fetchPaylabsQrisStatus(input: {
 // VA
 // ---------------------------------------------------------------------------
 
-export async function createPaylabsVaPayment(input: CreatePaymentInput): Promise<PaymentSession> {
+export async function createPaylabsVaPayment(
+  input: CreatePaymentInput,
+): Promise<PaymentSession> {
   const config = getPaylabsConfig();
   if (!config) throw new Error("Paylabs belum dikonfigurasi.");
 
@@ -385,17 +422,26 @@ export async function fetchPaylabsVaStatus(input: {
   orderId: string;
   platformTradeNo?: string | null;
 }) {
-  const { result } = await paylabsFetch<Record<string, unknown>>("/payment/v2.3/va/query", {
-    merchantTradeNo: input.orderId,
-    paymentType: (resultPaymentTypeFallback()),
-  });
+  const { result } = await paylabsFetch<Record<string, unknown>>(
+    "/payment/v2.3/va/query",
+    {
+      merchantTradeNo: input.orderId,
+      paymentType: resultPaymentTypeFallback(),
+    },
+  );
   const r = result;
   return {
     orderId: (r.merchantTradeNo as string | undefined) ?? input.orderId,
-    platformTradeNo: (r.platformTradeNo as string | undefined) ?? input.platformTradeNo ?? null,
+    platformTradeNo:
+      (r.platformTradeNo as string | undefined) ??
+      input.platformTradeNo ??
+      null,
     transactionStatus: normalizePaylabsStatus(r.status as string | undefined),
     transactionStatusDesc: (r.status as string | undefined) ?? null,
-    paidTime: (r.successTime as string | undefined) ?? (r.createTime as string | undefined) ?? null,
+    paidTime:
+      (r.successTime as string | undefined) ??
+      (r.createTime as string | undefined) ??
+      null,
     amountValue: r.amount != null ? String(r.amount) : null,
     status: (r.status as string | undefined) ?? null,
     raw: result,
@@ -410,7 +456,9 @@ function resultPaymentTypeFallback() {
 // HTML5 (hosted fallback)
 // ---------------------------------------------------------------------------
 
-export async function createPaylabsHtml5Payment(input: CreatePaymentInput): Promise<PaymentSession> {
+export async function createPaylabsHtml5Payment(
+  input: CreatePaymentInput,
+): Promise<PaymentSession> {
   const config = getPaylabsConfig();
   if (!config) throw new Error("Paylabs belum dikonfigurasi.");
 
@@ -446,10 +494,13 @@ export async function createPaylabsHtml5Payment(input: CreatePaymentInput): Prom
 // Router
 // ---------------------------------------------------------------------------
 
-export async function createPaylabsPayment(input: CreatePaymentInput): Promise<PaymentSession> {
+export async function createPaylabsPayment(
+  input: CreatePaymentInput,
+): Promise<PaymentSession> {
   const method = input.paymentMethodId.toLowerCase();
   if (method.includes("qris")) return createPaylabsQrisPayment(input);
-  if (method.includes("va") || method.includes("virtual")) return createPaylabsVaPayment(input);
+  if (method.includes("va") || method.includes("virtual"))
+    return createPaylabsVaPayment(input);
   return createPaylabsHtml5Payment(input);
 }
 

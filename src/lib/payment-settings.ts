@@ -1,4 +1,7 @@
-import { isMidtransConfigured, getMidtransEnvironment } from "@/lib/midtrans/client";
+import {
+  isMidtransConfigured,
+  getMidtransEnvironment,
+} from "@/lib/midtrans/client";
 import {
   isSupabaseConfigured,
   supabaseSelect,
@@ -7,7 +10,11 @@ import {
 
 export type PaymentProviderId = "midtrans" | "doku" | "paylabs";
 
-export const PAYMENT_PROVIDERS: PaymentProviderId[] = ["midtrans", "doku", "paylabs"];
+export const PAYMENT_PROVIDERS: PaymentProviderId[] = [
+  "midtrans",
+  "doku",
+  "paylabs",
+];
 
 const ACTIVE_PROVIDER_KEY = "active_payment_provider";
 const DEFAULT_PROVIDER: PaymentProviderId = "midtrans";
@@ -18,7 +25,9 @@ type AppSettingRow = {
   updated_at: string;
 };
 
-export function isPaymentProviderId(value: unknown): value is PaymentProviderId {
+export function isPaymentProviderId(
+  value: unknown,
+): value is PaymentProviderId {
   return value === "midtrans" || value === "doku" || value === "paylabs";
 }
 
@@ -65,10 +74,10 @@ export function isDokuConfigured() {
 export function isDokuSnapConfigured() {
   return Boolean(
     process.env.DOKU_CLIENT_ID?.trim() &&
-      process.env.DOKU_SECRET_KEY?.trim() &&
-      process.env.DOKU_PRIVATE_KEY?.trim() &&
-      process.env.DOKU_MERCHANT_ID?.trim() &&
-      process.env.DOKU_TERMINAL_ID?.trim(),
+    process.env.DOKU_SECRET_KEY?.trim() &&
+    process.env.DOKU_PRIVATE_KEY?.trim() &&
+    process.env.DOKU_MERCHANT_ID?.trim() &&
+    process.env.DOKU_TERMINAL_ID?.trim(),
   );
 }
 
@@ -79,10 +88,13 @@ export function getDokuEnvironment(): "sandbox" | "production" {
 }
 
 export function isPaylabsConfigured() {
+  const isProduction =
+    process.env.PAYLABS_ENV?.trim().toLowerCase() === "production";
   return Boolean(
     process.env.PAYLABS_MERCHANT_ID?.trim() &&
-      process.env.PAYLABS_PRIVATE_KEY?.trim() &&
-      process.env.PAYLABS_ROOT_URL?.trim(),
+    process.env.PAYLABS_PRIVATE_KEY?.trim() &&
+    process.env.PAYLABS_ROOT_URL?.trim() &&
+    (!isProduction || process.env.PAYLABS_PUBLIC_KEY?.trim()),
   );
 }
 
