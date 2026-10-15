@@ -1,3 +1,4 @@
+import { sanitizeExternalUrl } from "@/lib/banner-display";
 import { optimizedBannerUrl } from "@/lib/cloudinary";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 
@@ -7,7 +8,10 @@ type BannerRow = {
   id: number;
   title: string;
   subtitle: string | null;
+  popup_message: string | null;
   image_url: string;
+  image_width: number | null;
+  image_height: number | null;
   cta_label: string | null;
   cta_href: string | null;
   promo_code: string | null;
@@ -42,7 +46,7 @@ export async function GET() {
     const [banners, promotions, redemptions] = await Promise.all([
       supabaseSelect<BannerRow>("promo_banners", {
         select:
-          "id,title,subtitle,image_url,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,starts_at,ends_at",
+          "id,title,subtitle,popup_message,image_url,image_width,image_height,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,starts_at,ends_at",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
         limit: 10,
@@ -82,9 +86,24 @@ export async function GET() {
           id: banner.id,
           title: banner.title,
           subtitle: banner.subtitle,
+          popupMessage: banner.popup_message ?? null,
           imageUrl: optimizedBannerUrl(banner.image_url, 1200),
+          /*
+           * Dimensi asli ikut dikirim ke publik supaya popup bisa
+           * memesan ruang yang tepat sebelum gambar selesai dimuat.
+           * Tanpa itu, kotak popup melompat saat gambar tiba - dan pada
+           * gambar potret lompatan itu cukup jauh untuk terasa seperti
+           * halaman yang rusak.
+           */
+          imageWidth: banner.image_width ?? null,
+          imageHeight: banner.image_height ?? null,
           ctaLabel: banner.cta_label,
-          ctaHref: banner.cta_href,
+          /*
+           * URL tetap disaring di sini, bukan hanya di panel admin.
+           * Banner bisa dibuat sebelum Migrasi ini ada, dan baris lama bisa
+           * berisi apa pun yang tersimpan sebelumnya.
+           */
+          ctaHref: sanitizeExternalUrl(banner.cta_href),
           promoCode: banner.promo_code,
           displayMode: banner.display_mode ?? "carousel",
           showTextOverlay: banner.show_text_overlay ?? true,

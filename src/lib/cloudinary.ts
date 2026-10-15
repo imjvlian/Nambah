@@ -38,6 +38,10 @@ export function validateBannerImage(file: File) {
 export async function uploadBannerImage(file: File): Promise<{
   secureUrl: string;
   publicId: string;
+  /** Lebar asli gambar. `null` kalau Cloudinary tidak mengembalikannya. */
+  width: number | null;
+  /** Tinggi asli gambar. `null` kalau Cloudinary tidak mengembalikannya. */
+  height: number | null;
 }> {
   const { cloudName, apiKey, apiSecret } = getConfig();
   if (!cloudName || !apiKey || !apiSecret) {
@@ -66,6 +70,8 @@ export async function uploadBannerImage(file: File): Promise<{
   const payload = (await response.json().catch(() => null)) as {
     secure_url?: string;
     public_id?: string;
+    width?: number;
+    height?: number;
     error?: { message?: string };
   } | null;
 
@@ -75,7 +81,26 @@ export async function uploadBannerImage(file: File): Promise<{
     );
   }
 
-  return { secureUrl: payload.secure_url, publicId: payload.public_id };
+  /*
+ * Dimensi diambil dari respons Cloudinary, bukan dari form.
+ *
+ * Ini yang membuat rasio gambar bisa dipercaya. Kalau dimensinya dikirim
+ * klien, operator bisa mengisinya dengan angka apa pun - dan popup akan
+ * menampilkan gambar dengan rasio yang salah tanpa ada yang kelihatan salah.
+ *
+ * Cloudinary selalu mengirim `width` dan `height` di respons upload. Kalau
+ * suatu saat tidak, hasilnya `null` dan popup membaca ukuran sendiri dari
+ * gambar saat tampil - lebih lambat, tapi tetap benar.
+ */
+  const width = Number(payload.width);
+  const height = Number(payload.height);
+
+  return {
+    secureUrl: payload.secure_url,
+    publicId: payload.public_id,
+    width: Number.isFinite(width) && width > 0 ? Math.round(width) : null,
+    height: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+  };
 }
 
 export async function deleteBannerAsset(publicId: string) {

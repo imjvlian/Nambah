@@ -236,8 +236,7 @@
    * lebih baik daripada banner yang teksnya hilang.
    *
    * `min-height` sengaja TIDAK ditambahkan: begitu ada, tinggi minimum
-   * mengalahkan rasionya dan `cover` memotong lagi — bug yang sama seperti
-   * yang sebelumnya ada di `.promo-popup-media-clean`.
+   * mengalahkan rasionya dan `cover` memotong lagi.
    */
   .promo-slide-banner {
     aspect-ratio: 3 / 1;
@@ -266,7 +265,18 @@
 
 .promo-popup {
   position: relative;
-  width: min(440px, 100%);
+  /*
+   * 560px, bukan 440px.
+   *
+   * Lebar tetap, tapi tinggi mengikuti rasio gambar asli. Itu yang membuat
+   * "lebar popup mengikuti gambar" bekerja tanpa memaksa gambar jadi
+   * setinggi apa pun: banner lanskap tetap pendek dan lebar, banner potret
+   * tetap tinggi dan sempit.
+   */
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -275,85 +285,98 @@
   animation: promoPopupIn 260ms ease;
 }
 
+/*
+ * Kotak gambar.
+ *
+ * TIDAK ADA `height` tetap, TIDAK ADA `aspect-ratio` yang dipaksat, dan
+ * TIDAK ADA `object-fit: cover`. Ketiganya adalah penyebab gambar terpotong.
+ *
+ * `aspect-ratio` di sini datang dari `inline style` yang nilainya rasio
+ * asli gambar - bukan angka tebakan seperti `4 / 5` yang dipakai dulu.
+ * Kalau dimensinya belum diketahui (banner lama yang belum punya ukuran
+ * tersimpan), properti ini kosong dan gambar tetap tampil utuh; hanya saja
+ * kotaknya baru tahu tinggi sebenarnya setelah gambar dimuat.
+ */
 .promo-popup-media {
-  height: 220px;
-  background-size: cover;
-  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  flex: 0 1 auto;
+  background: #0a0c09;
 }
 
-/* Mode bersih: gambar memenuhi popup dan menjadi satu tombol besar.
- *
- * `aspect-ratio` saja, TANPA `min-height`.
- *
- * Sebelumnya ada `min-height: 180px` bersama `aspect-ratio: 3 / 1`. Di popup
- * 440px, 3:1 menghasilkan tinggi 147px — lebih kecil dari min-height, jadi
- * yang menang adalah `min-height` dan rasionya bukan 3:1 lagi. Dengan
- * `background-size: cover`, gambar banner terpotong di tepi dan teksnya ikut
- * hilang.
- *
- * Banner promo dibuat potret, bukan lanseps. Rasio dibuat lebih tinggi supaya
- * komposisi aslinya terbaca: 3:1 memotong bagian atas dan bawah, tempat
- * headline biasanya berada.
- */
-.promo-popup-media-clean {
+.promo-popup-media img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 5;
   height: auto;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  background-color: transparent;
-  background-repeat: no-repeat;
+  max-height: calc(100dvh - 140px);
+  /*
+   * `contain`, bukan `cover`.
+   *
+   * Banner potret yang lebih tinggi daripada ruang layar tidak boleh dipotong
+   * - lebih baik ada ruang kosong di samping daripada separuh desain hilang.
+   * Aturan ini hanya aktif kalau `max-height` benar-benar tersentuh.
+   */
+  object-fit: contain;
 }
 
-/* Di layar pendek (landscape ponsel, tablet tegak) popup boleh lebih
- * vertikal lagi supaya seluruh banner masuk tanpa terpotong. */
-@media (max-height: 640px) {
-  .promo-popup-media-clean {
-    aspect-ratio: 1 / 1;
-  }
-}
-
-.promo-popup-media-clean:focus-visible {
-  outline: 2px solid var(--lime, #c9ff3f);
-  outline-offset: -2px;
-}
-
+/*
+ * Badan popup.
+ *
+ * `flex-shrink: 0` menjaga pesan dan link tetap terbaca saat gambar
+ * memakai seluruh ruang vertikal. Tanpa itu, badan popup yang menyusut
+ * duluan dan pesannya terpotong - persis hal yang sedang kita cegah.
+ */
 .promo-popup-body {
   display: grid;
-  gap: 8px;
-  padding: 18px 20px 20px;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 16px 20px 18px;
 }
 
-.promo-popup-body strong {
-  font-size: 18px;
-  line-height: 1.25;
-  color: var(--text);
-}
-
-.promo-popup-body p {
+.promo-popup-message {
   margin: 0;
+  color: #d7dbd2;
   font-size: 13px;
-  color: #b9beb5;
+  line-height: 1.55;
+  /*
+   * `pre-line` menjaga baris baru yang diketik operator di textarea.
+   * Tanpa itu, "Baris satu\nBaris dua" dirender sebagai satu paragraf
+   * panjang - dan pesan yang sengaja ditulis dua baris akan terlihat
+   * seperti satu kalimat yang salah ketik.
+   */
+  white-space: pre-line;
 }
 
-.promo-popup-cta {
-  margin-top: 6px;
-  height: 44px;
-  border: 1px solid rgba(201, 255, 63, 0.45);
-  border-radius: 12px;
-  background: rgba(201, 255, 63, 0.14);
-  color: var(--text);
+.promo-popup-link {
+  justify-self: start;
+  color: var(--lime, #c9ff3f);
   font-size: 13px;
   font-weight: 800;
-  cursor: pointer;
-  transition: background 160ms ease;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.promo-popup-cta:hover {
-  background: rgba(201, 255, 63, 0.22);
+.promo-popup-link:hover {
+  color: #e2ffb0;
 }
+
+.promo-popup-link:focus-visible {
+  outline: 2px solid var(--lime, #c9ff3f);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/*
+ * `.promo-popup-cta` dihapus.
+ *
+ * Popup tidak lagi punya tombol. Link pesan sekarang berupa teks
+ * tautan di dalam badan popup, bukan tombol. Aturan ini tidak dihapus
+ * karena tombolnya masih ada - melainkan karena tidak ada lagi elemen
+ * dengan kelas ini di mana pun, dan membiarkannya membuat siapa pun
+ * yang membaca CSS mengira tombol popup masih ada.
+ */
 
 /* Admin: badge mode bersih + toggle inline di form upload */
 .acc-chip-clean {

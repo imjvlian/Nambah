@@ -8,7 +8,10 @@ type Banner = {
   id: number;
   title: string;
   subtitle: string | null;
+  popupMessage: string | null;
   imageUrl: string;
+  imageWidth: number | null;
+  imageHeight: number | null;
   ctaLabel: string | null;
   ctaHref: string | null;
   promoCode: string | null;
@@ -20,6 +23,8 @@ type Banner = {
   endsAt: string | null;
   createdAt: string;
 };
+
+const POPUP_MESSAGE_MAX = 500;
 
 const DISPLAY_MODE_LABEL: Record<string, string> = {
   carousel: "Carousel",
@@ -39,6 +44,7 @@ export default function BannerAdminPanel() {
   const [draft, setDraft] = useState({
     title: "",
     subtitle: "",
+    popupMessage: "",
     ctaLabel: "",
     ctaHref: "",
     promoCode: "",
@@ -92,6 +98,7 @@ export default function BannerAdminPanel() {
       form.set("file", file);
       form.set("title", draft.title);
       form.set("subtitle", draft.subtitle);
+      form.set("popupMessage", draft.popupMessage);
       form.set("ctaLabel", draft.ctaLabel);
       form.set("ctaHref", draft.ctaHref);
       form.set("promoCode", draft.promoCode);
@@ -110,6 +117,7 @@ export default function BannerAdminPanel() {
       setDraft({
         title: "",
         subtitle: "",
+        popupMessage: "",
         ctaLabel: "",
         ctaHref: "",
         promoCode: "",
@@ -311,15 +319,49 @@ export default function BannerAdminPanel() {
                 />
               </label>
 
+              {/*
+               * Pesan popup.
+               *
+               * Field terpisah dari `Subjudul` di atas, bukan field yang sama.
+               * Alasannya: `Subjudul` dipakai carousel, dan pop-up tidak punya
+               * tombol lagi - memakai ulang satu field berarti setiap edit
+               * pesan pop-up ikut mengubah isi carousel.
+               */}
+              <label className="acc-field acc-field-wide">
+                <span>Pesan popup</span>
+                <textarea
+                  rows={3}
+                  maxLength={POPUP_MESSAGE_MAX}
+                  placeholder="Contoh: Diskon gajian sampai 31 Oktober. Tulis beberapa baris kalau perlu."
+                  value={draft.popupMessage}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      popupMessage: event.target.value,
+                    }))
+                  }
+                />
+                <small>
+                  Tampil di bawah gambar pada pop-up. Baris baru ikut
+                  dipertahankan.{" "}
+                  {draft.popupMessage.length}/{POPUP_MESSAGE_MAX} karakter.
+                  {draft.popupMessage.trim() ? "" : " Kosongkan bila pop-up ingin menampilkan gambar saja."}
+                </small>
+              </label>
+
               <label className="acc-field">
-                <span>Label tombol (CTA)</span>
+                <span>Teks link / tombol</span>
                 <input
-                  placeholder="Default: Pakai kode / Top up sekarang"
+                  placeholder="Default: Selengkapnya"
                   value={draft.ctaLabel}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, ctaLabel: event.target.value }))
                   }
                 />
+                <small>
+                  Di carousel jadi label tombol. Di pop-up jadi teks link di
+                  bawah pesan.
+                </small>
               </label>
 
               <label className="acc-field">
@@ -338,14 +380,19 @@ export default function BannerAdminPanel() {
               </label>
 
               <label className="acc-field">
-                <span>Link CTA (opsional)</span>
+                <span>Link tujuan (opsional)</span>
                 <input
-                  placeholder="https://… (menimpa aksi kode promo)"
+                  type="url"
+                  placeholder="https://…"
                   value={draft.ctaHref}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, ctaHref: event.target.value }))
                   }
                 />
+                <small>
+                  Hanya http/https yang diterima. Di carousel jadi tujuan
+                  tombol; di pop-up jadi tautan yang dibuka di tab baru.
+                </small>
               </label>
 
               <label className="acc-field">
@@ -379,8 +426,16 @@ export default function BannerAdminPanel() {
                 baris toggle dan teksnya. Pola yang sama dipakai
                 `acc-checkbox-field` di halaman Toko Ritel.
               */}
+              {/*
+               * Toggle ini sekarang hanya berlaku untuk carousel.
+               *
+               * Popup tidak punya tombol dan tidak pernah punya judul
+               * terpisah lagi, jadi "teks di atas gambar" tidak punya
+               * artinya di sana. Labelnya diperjelas supaya operator tidak
+               * meng-toggle sesuatu yang tidak terjadi.
+               */}
               <label className="acc-field">
-                <span>Teks di atas gambar</span>
+                <span>Teks di atas gambar (carousel)</span>
                 <label className="acc-checkbox-field">
                   <input
                     type="checkbox"
@@ -399,9 +454,9 @@ export default function BannerAdminPanel() {
                   </span>
                 </label>
                 <small>
-                  Matikan kalau desain sudah memuat teks dan tombol di
-                  dalam gambar — banner tampil penuh dan seluruh gambar
-                  bisa diklik.
+                  Matikan kalau desain banner sudah memuat teks dan tombol
+                  sendiri. Tidak memengaruhi popup: gambar popup selalu
+                  tampil utuh, dan pesan + link selalu tampil apa adanya.
                 </small>
               </label>
 
@@ -469,6 +524,22 @@ export default function BannerAdminPanel() {
                         <em className="acc-chip-clean">Bersih</em>
                       )}
                       {banner.subtitle ?? "Tanpa subjudul"}
+                    </span>
+                    {/*
+                     * Dimensi asli ditampilkan supaya operator bisa
+                     * memastikan gambar yang diunggah memang yang dimaksud
+                     * sebelum popup tayang ke pengguna.
+                     *
+                     * Banner lama (sebelum ada penyimpanannya) ditandai
+                     * "ukuran belum tercatat" - jujur, bukan disembunyikan.
+                     * Popup tetap menampilkannya dengan benar, hanya saja
+                     * kotaknya baru tahu tinggi sebenarnya setelah gambar
+                     * selesai dimuat.
+                     */}
+                    <span className="acc-banner-dims">
+                      {banner.imageWidth && banner.imageHeight
+                        ? `${banner.imageWidth} x ${banner.imageHeight} px`
+                        : "ukuran belum tercatat"}
                     </span>
                   </div>
                 </div>

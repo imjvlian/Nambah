@@ -3784,6 +3784,34 @@
   white-space: nowrap;
 }
 
+/* Dimensi asli gambar di tabel banner.
+ *
+ * Ditampilkan sebagai baris kecil di bawah judul, karena ini informasi
+ * verifikasi - bukan hal yang perlu dibaca saat memindai tabel. Yang
+ * penting: operator bisa memastikan gambar yang terunggah memang yang
+ * dimaksud sebelum popup tayang ke pengguna.
+ */
+.acc-banner-dims {
+  color: var(--muted);
+  font-size: 10px;
+  opacity: .8;
+}
+
+/* Field pesan popup melebar penuh.
+ *
+ * Pesan bisa beberapa baris, jadi menyempitkannya setara field lain akan
+ * membuat area ketikannya jadi dua baris yang pendek dan sulit dibaca
+ * saat menulis. Lebar penuh di barisnya sendiri, bukan di kolom grid.
+ */
+.acc-field-wide {
+  grid-column: 1 / -1;
+}
+
+.acc-field-wide textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
 .acc-users-access {
   display: flex;
   align-items: center;

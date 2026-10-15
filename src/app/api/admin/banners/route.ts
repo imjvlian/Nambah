@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { auditAdminAction } from "@/lib/admin-audit";
+import { cleanPopupMessage, sanitizeExternalUrl } from "@/lib/banner-display";
 import {
   deleteBannerAsset,
   isCloudinaryConfigured,
@@ -19,7 +20,10 @@ type BannerRow = {
   id: number;
   title: string;
   subtitle: string | null;
+  popup_message: string | null;
   image_url: string;
+  image_width: number | null;
+  image_height: number | null;
   cloudinary_public_id: string | null;
   cta_label: string | null;
   cta_href: string | null;
@@ -34,7 +38,7 @@ type BannerRow = {
 };
 
 const SELECT =
-  "id,title,subtitle,image_url,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,active,starts_at,ends_at,created_at";
+  "id,title,subtitle,popup_message,image_url,image_width,image_height,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,active,starts_at,ends_at,created_at";
 
 const DISPLAY_MODES = new Set(["carousel", "popup", "both"]);
 
@@ -43,7 +47,10 @@ function mapBanner(row: BannerRow) {
     id: row.id,
     title: row.title,
     subtitle: row.subtitle,
+    popupMessage: row.popup_message ?? null,
     imageUrl: row.image_url,
+    imageWidth: row.image_width ?? null,
+    imageHeight: row.image_height ?? null,
     ctaLabel: row.cta_label,
     ctaHref: row.cta_href,
     promoCode: row.promo_code,
@@ -133,10 +140,23 @@ export async function POST(request: Request) {
     const rows = await supabaseInsert<BannerRow>("promo_banners", {
       title,
       subtitle: cleanText(form.get("subtitle"), 200) || null,
+      popup_message: cleanPopupMessage(cleanText(form.get("popupMessage"), 500)),
       image_url: uploaded.secureUrl,
+      // Dari respons Cloudinary, bukan dari form - lihat catatan di
+      // `uploadBannerImage`.
+      image_width: uploaded.width,
+      image_height: uploaded.height,
       cloudinary_public_id: uploaded.publicId,
       cta_label: cleanText(form.get("ctaLabel"), 40) || null,
-      cta_href: cleanText(form.get("ctaHref"), 300) || null,
+      /*
+       * URL divalidasi di sini, bukan hanya saat dirender.
+       *
+       * Popup memakainya sebagai `href`. Nilai yang lolos ke database tanpa
+       * cek akan muncul sebagai tautan yang menjalankan `javascript:` kalau
+       * form-nya diisi manual - dan tidak ada penyaringan di sisi klien yang
+       * akan menangkapnya.
+       */
+      cta_href: sanitizeExternalUrl(cleanText(form.get("ctaHref"), 300)) || null,
       promo_code: cleanText(form.get("promoCode"), 40).toUpperCase() || null,
       display_mode: DISPLAY_MODES.has(cleanText(form.get("displayMode"), 10))
         ? cleanText(form.get("displayMode"), 10)
@@ -190,8 +210,19 @@ export async function PATCH(request: Request) {
       updates.title = title;
     }
     if (body.subtitle !== undefined) updates.subtitle = cleanNullable(body.subtitle, 200);
+    if (body.popupMessage !== undefined) {
+      updates.popup_message = cleanPopupMessage(
+        typeof body.popupMessage === "string" ? body.popupMessage : "",
+      );
+    }
     if (body.ctaLabel !== undefined) updates.cta_label = cleanNullable(body.ctaLabel, 40);
-    if (body.ctaHref !== undefined) updates.cta_href = cleanNullable(body.ctaHref, 300);
+    if (body.ctaHref !== undefined) {
+      // Divalidasi juga di jalur edit, bukan hanya saat upload. Tanpa ini,
+      // `javascript:` bisa masuk lewat PATCH lalu dirender sebagai tautan.
+      updates.cta_href =
+        sanitizeExternalUrl(typeof body.ctaHref === "string" ? body.ctaHref : "") ||
+        null;
+    }
     if (body.promoCode !== undefined) {
       updates.promo_code = cleanNullable(body.promoCode, 40)?.toUpperCase() ?? null;
     }
