@@ -293,22 +293,36 @@
   min-width: 0;
 }
 
+/* Icon-only, so the box is square rather than sized to text. */
 .password-toggle {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
   height: 50px;
-  padding: 0 13px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 13px;
   background: #0d0f0c;
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 750;
   cursor: pointer;
+}
+
+.password-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .password-toggle:hover {
   border-color: rgba(201, 255, 63, 0.35);
   color: var(--lime);
+}
+
+.password-toggle:focus-visible {
+  outline: none;
+  border-color: rgba(201, 255, 63, 0.45);
+  box-shadow: 0 0 0 3px rgba(201, 255, 63, 0.05);
 }
 
 /* --- Password meter ------------------------------------------------------ */
