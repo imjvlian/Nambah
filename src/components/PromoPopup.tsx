@@ -12,6 +12,8 @@ type Banner = {
   title: string;
   subtitle: string | null;
   popupMessage: string | null;
+  popupLinkLabel: string | null;
+  popupLinkHref: string | null;
   imageUrl: string;
   imageWidth: number | null;
   imageHeight: number | null;
@@ -108,8 +110,8 @@ export default function PromoPopup() {
   }
 
   const message = banner!.popupMessage?.trim() ?? "";
-  const linkHref = banner!.ctaHref ?? "";
-  const linkLabel = banner!.ctaLabel?.trim() || "Selengkapnya";
+  const linkHref = banner!.popupLinkHref?.trim() ?? "";
+  const linkLabel = banner!.popupLinkLabel?.trim() || "Selengkapnya";
 
   return (
     <div className="promo-popup-backdrop" role="presentation" onClick={close}>

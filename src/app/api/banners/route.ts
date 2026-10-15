@@ -9,6 +9,8 @@ type BannerRow = {
   title: string;
   subtitle: string | null;
   popup_message: string | null;
+  popup_link_label: string | null;
+  popup_link_href: string | null;
   image_url: string;
   image_width: number | null;
   image_height: number | null;
@@ -46,7 +48,7 @@ export async function GET() {
     const [banners, promotions, redemptions] = await Promise.all([
       supabaseSelect<BannerRow>("promo_banners", {
         select:
-          "id,title,subtitle,popup_message,image_url,image_width,image_height,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,starts_at,ends_at",
+          "id,title,subtitle,popup_message,popup_link_label,popup_link_href,image_url,image_width,image_height,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,starts_at,ends_at",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
         limit: 10,
@@ -87,6 +89,16 @@ export async function GET() {
           title: banner.title,
           subtitle: banner.subtitle,
           popupMessage: banner.popup_message ?? null,
+          /*
+           * Link pop-up punya kolom sendiri. Kalau kosong, jatuh ke
+           * `cta_label` / `cta_href` supaya banner yang sudah ada sebelum
+           * migration 052 tetap punya link - tanpa ini, mengosongkan kolom
+           * baru akan diam-diam menghapus link dari banner yang tayang.
+           */
+          popupLinkLabel: banner.popup_link_label || banner.cta_label,
+          popupLinkHref: sanitizeExternalUrl(
+            banner.popup_link_href || banner.cta_href,
+          ),
           imageUrl: optimizedBannerUrl(banner.image_url, 1200),
           /*
            * Dimensi asli ikut dikirim ke publik supaya popup bisa

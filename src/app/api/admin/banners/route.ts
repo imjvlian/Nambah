@@ -21,6 +21,8 @@ type BannerRow = {
   title: string;
   subtitle: string | null;
   popup_message: string | null;
+  popup_link_label: string | null;
+  popup_link_href: string | null;
   image_url: string;
   image_width: number | null;
   image_height: number | null;
@@ -38,7 +40,7 @@ type BannerRow = {
 };
 
 const SELECT =
-  "id,title,subtitle,popup_message,image_url,image_width,image_height,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,active,starts_at,ends_at,created_at";
+  "id,title,subtitle,popup_message,popup_link_label,popup_link_href,image_url,image_width,image_height,cloudinary_public_id,cta_label,cta_href,promo_code,sort_order,display_mode,show_text_overlay,active,starts_at,ends_at,created_at";
 
 const DISPLAY_MODES = new Set(["carousel", "popup", "both"]);
 
@@ -48,6 +50,8 @@ function mapBanner(row: BannerRow) {
     title: row.title,
     subtitle: row.subtitle,
     popupMessage: row.popup_message ?? null,
+    popupLinkLabel: row.popup_link_label ?? null,
+    popupLinkHref: row.popup_link_href ?? null,
     imageUrl: row.image_url,
     imageWidth: row.image_width ?? null,
     imageHeight: row.image_height ?? null,
@@ -141,6 +145,9 @@ export async function POST(request: Request) {
       title,
       subtitle: cleanText(form.get("subtitle"), 200) || null,
       popup_message: cleanPopupMessage(cleanText(form.get("popupMessage"), 500)),
+      popup_link_label: cleanText(form.get("popupLinkLabel"), 40) || null,
+      popup_link_href:
+        sanitizeExternalUrl(cleanText(form.get("popupLinkHref"), 300)) || null,
       image_url: uploaded.secureUrl,
       // Dari respons Cloudinary, bukan dari form - lihat catatan di
       // `uploadBannerImage`.
@@ -214,6 +221,15 @@ export async function PATCH(request: Request) {
       updates.popup_message = cleanPopupMessage(
         typeof body.popupMessage === "string" ? body.popupMessage : "",
       );
+    }
+    if (body.popupLinkLabel !== undefined) {
+      updates.popup_link_label = cleanNullable(body.popupLinkLabel, 40);
+    }
+    if (body.popupLinkHref !== undefined) {
+      updates.popup_link_href =
+        sanitizeExternalUrl(
+          typeof body.popupLinkHref === "string" ? body.popupLinkHref : "",
+        ) || null;
     }
     if (body.ctaLabel !== undefined) updates.cta_label = cleanNullable(body.ctaLabel, 40);
     if (body.ctaHref !== undefined) {

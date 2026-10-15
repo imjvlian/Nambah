@@ -9,6 +9,8 @@ type Banner = {
   title: string;
   subtitle: string | null;
   popupMessage: string | null;
+  popupLinkLabel: string | null;
+  popupLinkHref: string | null;
   imageUrl: string;
   imageWidth: number | null;
   imageHeight: number | null;
@@ -53,6 +55,81 @@ export default function BannerAdminPanel() {
     showTextOverlay: true,
   });
   const [file, setFile] = useState<File | null>(null);
+
+  /*
+   * Isi pop-up untuk satu banner yang sudah ada.
+   *
+   * Dipisah dari `draft` di atas karena yang ini tidak membuat banner baru -
+   * ia mengubah banner yang sudah ada. Kalau keduanya jadi satu state,
+   * mengisi pesan pop-up akan terlihat seperti sedang membuat banner kedua.
+   */
+  const [popupDraft, setPopupDraft] = useState({
+    bannerId: 0,
+    popupMessage: "",
+    popupLinkLabel: "",
+    popupLinkHref: "",
+  });
+
+  /** Isi form pop-up dari data banner yang tersimpan. */
+  function loadPopupDraft(bannerId: number) {
+    const banner = (payload?.banners ?? []).find((row) => row.id === bannerId);
+
+    if (!banner) {
+      setPopupDraft({ bannerId: 0, popupMessage: "", popupLinkLabel: "", popupLinkHref: "" });
+      return;
+    }
+
+    setPopupDraft({
+      bannerId,
+      popupMessage: banner.popupMessage ?? "",
+      popupLinkLabel: banner.popupLinkLabel ?? "",
+      popupLinkHref: banner.popupLinkHref ?? "",
+    });
+
+    /*
+     * Dikirim ke panel kedua, karena tombolnya ada di tabel paling bawah
+     * halaman. Tanpa ini, isinya terisi tapi operator tetap tidak tahu di
+     * mana - dan tombolnya terlihat seperti tidak melakukan apa-apa.
+     */
+    requestAnimationFrame(() => {
+      document.getElementById("panel-popup")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  async function savePopupDraft() {
+    if (!popupDraft.bannerId) return;
+
+    setBusy("popup-save");
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/admin/banners", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: popupDraft.bannerId,
+          popupMessage: popupDraft.popupMessage,
+          popupLinkLabel: popupDraft.popupLinkLabel,
+          popupLinkHref: popupDraft.popupLinkHref,
+        }),
+      });
+
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Isi pop-up gagal disimpan.");
+      }
+
+      await load();
+      setNotice("Isi pop-up disimpan. Beri waktu 1 menit sebelum tampil lagi di beranda.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Isi pop-up gagal disimpan.");
+    } finally {
+      setBusy("");
+    }
+  }
   const [busy, setBusy] = useState("");
   const confirm = useConfirm();
   const [notice, setNotice] = useState("");
@@ -277,11 +354,27 @@ export default function BannerAdminPanel() {
             </div>
           )}
 
+          {/*
+             * DUA PANEL, SATU HALAMAN.
+             *
+             * Dipisah karena tiga field sebelumnya dipakai dua arti
+             * sekaligus: teks tombol dan link. Satu banner bisa muncul di
+             * carousel DAN pop-up, dan tanpa pemisahan operator tidak bisa
+             * tahu field mana yang miliknya yang mana tanpa membaca satu
+             * per satu.
+             *
+             * Kolom link pop-up sudah terpisah sejak migration 052, jadi
+             * dua panel ini bisa jujur tentang siapa pemilik apa - bukan
+             * sekadar membagi tampilan.
+             *
+             * Gambar TIDAK diduplikasi: satu banner, satu gambar. Panel
+             * pop-up tidak punya upload - ia mengubah banner yang sudah ada.
+             */}
           <div className="acc-panel">
             <div className="acc-section-head">
               <div>
-                <span className="acc-eyebrow">Upload baru</span>
-                <h2>Tambah banner.</h2>
+                <span className="acc-eyebrow">Panel 1 dari 2</span>
+                <h2>Banner carousel.</h2>
               </div>
             </div>
 
@@ -309,7 +402,7 @@ export default function BannerAdminPanel() {
               </label>
 
               <label className="acc-field">
-                <span>Subjudul</span>
+                <span>Subjudul carousel</span>
                 <input
                   placeholder="Opsional"
                   value={draft.subtitle}
@@ -317,50 +410,34 @@ export default function BannerAdminPanel() {
                     setDraft((current) => ({ ...current, subtitle: event.target.value }))
                   }
                 />
-              </label>
-
-              {/*
-               * Pesan popup.
-               *
-               * Field terpisah dari `Subjudul` di atas, bukan field yang sama.
-               * Alasannya: `Subjudul` dipakai carousel, dan pop-up tidak punya
-               * tombol lagi - memakai ulang satu field berarti setiap edit
-               * pesan pop-up ikut mengubah isi carousel.
-               */}
-              <label className="acc-field acc-field-wide">
-                <span>Pesan popup</span>
-                <textarea
-                  rows={3}
-                  maxLength={POPUP_MESSAGE_MAX}
-                  placeholder="Contoh: Diskon gajian sampai 31 Oktober. Tulis beberapa baris kalau perlu."
-                  value={draft.popupMessage}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      popupMessage: event.target.value,
-                    }))
-                  }
-                />
-                <small>
-                  Tampil di bawah gambar pada pop-up. Baris baru ikut
-                  dipertahankan.{" "}
-                  {draft.popupMessage.length}/{POPUP_MESSAGE_MAX} karakter.
-                  {draft.popupMessage.trim() ? "" : " Kosongkan bila pop-up ingin menampilkan gambar saja."}
-                </small>
+                <small>Hanya carousel. Pop-up memakai Pesan popup di panel kedua.</small>
               </label>
 
               <label className="acc-field">
-                <span>Teks link / tombol</span>
+                <span>Teks tombol carousel</span>
                 <input
-                  placeholder="Default: Selengkapnya"
+                  placeholder="Default: Pakai kode / Top up sekarang"
                   value={draft.ctaLabel}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, ctaLabel: event.target.value }))
                   }
                 />
+                <small>Label tombol di carousel. Tidak dipakai pop-up.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Link tombol carousel (opsional)</span>
+                <input
+                  type="url"
+                  placeholder="https://…"
+                  value={draft.ctaHref}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, ctaHref: event.target.value }))
+                  }
+                />
                 <small>
-                  Di carousel jadi label tombol. Di pop-up jadi teks link di
-                  bawah pesan.
+                  Hanya http/https. Kalau dikosongkan dan tidak ada kode promo,
+                  tombolnya jatuh ke scroll ke katalog.
                 </small>
               </label>
 
@@ -380,22 +457,6 @@ export default function BannerAdminPanel() {
               </label>
 
               <label className="acc-field">
-                <span>Link tujuan (opsional)</span>
-                <input
-                  type="url"
-                  placeholder="https://…"
-                  value={draft.ctaHref}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, ctaHref: event.target.value }))
-                  }
-                />
-                <small>
-                  Hanya http/https yang diterima. Di carousel jadi tujuan
-                  tombol; di pop-up jadi tautan yang dibuka di tab baru.
-                </small>
-              </label>
-
-              <label className="acc-field">
                 <span>Tampil di</span>
                 <select
                   value={draft.displayMode}
@@ -407,7 +468,9 @@ export default function BannerAdminPanel() {
                   <option value="popup">Pop-up beranda</option>
                   <option value="both">Carousel + Pop-up</option>
                 </select>
-                <small>Pop-up muncul sebagai modal sekali per 24 jam per pengunjung.</small>
+                <small>
+                  Pop-up muncul sebagai modal sekali per 24 jam per pengunjung.
+                </small>
               </label>
 
               {/*
@@ -417,23 +480,12 @@ export default function BannerAdminPanel() {
                 HTML yang tidak valid: browser akan menutup label luar
                 lebih awal, lalu styling `.acc-field` (grid + gap)
                 berhenti berlaku tepat di field ini - padahal semua
-                field lain di form ini ikut memakainya. Akibatnya satu
-                baris ini terlihat berbeda dari yang di atas dan
-                bawahnya, tanpa alasan yang bisa ditunjuk.
+                field lain di form ini ikut memakainya.
 
                 Sekarang dua `<label>` terpisah: yang luar untuk
                 mengaitkan label teks ke checkbox, yang dalam untuk
-                baris toggle dan teksnya. Pola yang sama dipakai
-                `acc-checkbox-field` di halaman Toko Ritel.
+                baris toggle dan teksnya.
               */}
-              {/*
-               * Toggle ini sekarang hanya berlaku untuk carousel.
-               *
-               * Popup tidak punya tombol dan tidak pernah punya judul
-               * terpisah lagi, jadi "teks di atas gambar" tidak punya
-               * artinya di sana. Labelnya diperjelas supaya operator tidak
-               * meng-toggle sesuatu yang tidak terjadi.
-               */}
               <label className="acc-field">
                 <span>Teks di atas gambar (carousel)</span>
                 <label className="acc-checkbox-field">
@@ -453,11 +505,7 @@ export default function BannerAdminPanel() {
                       : "Banner bersih, gambar saja"}
                   </span>
                 </label>
-                <small>
-                  Matikan kalau desain banner sudah memuat teks dan tombol
-                  sendiri. Tidak memengaruhi popup: gambar popup selalu
-                  tampil utuh, dan pesan + link selalu tampil apa adanya.
-                </small>
+                <small>Matikan kalau desain banner sudah memuat teks sendiri.</small>
               </label>
 
               <label className="acc-field">
@@ -482,6 +530,125 @@ export default function BannerAdminPanel() {
                 onClick={() => void uploadBanner()}
               >
                 {busy === "upload" ? "Mengunggah..." : "Upload & aktifkan"}
+              </button>
+            </div>
+          </div>
+
+          {/*
+           * PANEL POP-UP
+           *
+           * Tidak punya upload. Panel ini mengubah banner yang sudah ada -
+           * karena gambarnya milik banner itu, bukan milik pop-up. Kalau
+           * ada upload di sini, operator mengunggah gambar yang sama dua
+           * kali tanpa sadar, dan berakhir dengan dua banner berbeda yang
+           * kelihatan identik.
+           */}
+          <div className="acc-panel" id="panel-popup">
+            <div className="acc-section-head">
+              <div>
+                <span className="acc-eyebrow">Panel 2 dari 2</span>
+                <h2>Pop-up beranda.</h2>
+              </div>
+            </div>
+
+            {payload?.banners?.length ? null : (
+              <div className="acc-empty">
+                Belum ada banner. Unggah dulu di panel carousel, lalu kembali ke
+                sini untuk mengisi isi pop-upnya.
+              </div>
+            )}
+
+            <div className="testlab-form-grid">
+              <label className="acc-field acc-field-wide">
+                <span>Banner yang dipakai</span>
+                <select
+                  value={popupDraft.bannerId ? String(popupDraft.bannerId) : ""}
+                  onChange={(event) => loadPopupDraft(Number(event.target.value))}
+                >
+                  <option value="">Pilih banner…</option>
+                  {(payload?.banners ?? [])
+                    .filter((banner) => banner.displayMode !== "carousel")
+                    .map((banner) => (
+                      <option key={banner.id} value={banner.id}>
+                        {banner.title}
+                        {banner.displayMode === "popup" ? " — hanya pop-up" : " — carousel + pop-up"}
+                      </option>
+                    ))}
+                </select>
+                <small>
+                  Hanya banner yang tampil di pop-up. Kalau daftar kosong,
+                  banner masih disetel carousel saja - ubah di panel 1.
+                </small>
+              </label>
+
+              <label className="acc-field acc-field-wide">
+                <span>Pesan popup</span>
+                <textarea
+                  rows={3}
+                  maxLength={POPUP_MESSAGE_MAX}
+                  disabled={!popupDraft.bannerId}
+                  placeholder="Contoh: Diskon gajian sampai 31 Oktober."
+                  value={popupDraft.popupMessage}
+                  onChange={(event) =>
+                    setPopupDraft((current) => ({
+                      ...current,
+                      popupMessage: event.target.value,
+                    }))
+                  }
+                />
+                <small>
+                  Tampil di bawah gambar. Baris baru ikut dipertahankan.{" "}
+                  {popupDraft.popupMessage.length}/{POPUP_MESSAGE_MAX} karakter.
+                  {popupDraft.popupMessage.trim()
+                    ? ""
+                    : " Kosongkan untuk pop-up gambar saja."}
+                </small>
+              </label>
+
+              <label className="acc-field">
+                <span>Teks link popup</span>
+                <input
+                  disabled={!popupDraft.bannerId}
+                  placeholder="Default: Selengkapnya"
+                  value={popupDraft.popupLinkLabel}
+                  onChange={(event) =>
+                    setPopupDraft((current) => ({
+                      ...current,
+                      popupLinkLabel: event.target.value,
+                    }))
+                  }
+                />
+                <small>Kosongkan untuk memakai teks tombol carousel.</small>
+              </label>
+
+              <label className="acc-field">
+                <span>Link popup (opsional)</span>
+                <input
+                  type="url"
+                  disabled={!popupDraft.bannerId}
+                  placeholder="https://…"
+                  value={popupDraft.popupLinkHref}
+                  onChange={(event) =>
+                    setPopupDraft((current) => ({
+                      ...current,
+                      popupLinkHref: event.target.value,
+                    }))
+                  }
+                />
+                <small>
+                  Hanya http/https, dibuka di tab baru. Kosongkan untuk memakai
+                  link tombol carousel.
+                </small>
+              </label>
+            </div>
+
+            <div className="acc-action-panel">
+              <button
+                type="button"
+                disabled={busy === "popup-save" || !canManage || !popupDraft.bannerId}
+                onClick={() => void savePopupDraft()}
+              >
+                {busy === "popup-save" ? "Menyimpan..." : "Simpan isi pop-up"}
               </button>
             </div>
           </div>
@@ -544,6 +711,21 @@ export default function BannerAdminPanel() {
                   </div>
                 </div>
                 <span>{banner.promoCode ?? banner.ctaLabel ?? "-"}</span>
+                {/*
+                 * Penanda isi pop-up.
+                 *
+                 * Tanpa ini, banner yang "tampil di pop-up" tapi pesannya
+                 * masih kosong terlihat sama saja dengan yang sudah
+                 * terisi lengkap. Padahal yang pertama akan tampil sebagai
+                 * gambar telanjang tanpa konteks apa pun.
+                 */}
+                <span className="acc-banner-dims">
+                  {banner.displayMode === "carousel"
+                    ? "—"
+                    : banner.popupMessage || banner.popupLinkHref
+                      ? "Pop-up terisi"
+                      : "Pop-up kosong"}
+                </span>
                 <select
                   value={banner.displayMode}
                   disabled={!canManage || Boolean(busy)}
@@ -560,6 +742,14 @@ export default function BannerAdminPanel() {
                   {banner.active ? "Aktif" : "Nonaktif"}
                 </span>
                 <div className="acc-action-panel">
+                  <button
+                    type="button"
+                    disabled={!canManage || Boolean(busy) || banner.displayMode === "carousel"}
+                    title="Buka isi pop-up untuk banner ini di panel 2"
+                    onClick={() => loadPopupDraft(banner.id)}
+                  >
+                    Isi pop-up
+                  </button>
                   <button
                     type="button"
                     disabled={!canManage || Boolean(busy)}
