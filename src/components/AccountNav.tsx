@@ -167,30 +167,24 @@ export default function AccountNav({
         </a>
       )}
 
-      {showPoints && (
-        <a
-          className="account-header-points"
-          href="/account#nambah-points"
-          aria-label={`Lacte Points: ${points ?? 0} points`}
-          title="Lacte Points"
-        >
-          <i aria-hidden="true">N+</i>
-          <strong>
-            {points === undefined
-              ? "..."
-              : (points ?? 0).toLocaleString("id-ID")}
-          </strong>
-          <small>pts</small>
-        </a>
-      )}
-
       <a
-        className="account-nav account-nav-user"
+        className="account-nav account-nav-user account-nav-user-with-points"
         href="/account"
         title={user.email}
+        aria-label={`Akun ${user.displayName}. Lacte Points: ${points ?? 0} points`}
       >
         <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
         <b>{user.displayName}</b>
+        {showPoints && (
+          <span className="account-nav-points" aria-hidden="true">
+            <i>N+</i>
+            <strong>
+              {points === undefined
+                ? "..."
+                : (points ?? 0).toLocaleString("id-ID")}
+            </strong>
+          </span>
+        )}
       </a>
     </div>
   );
