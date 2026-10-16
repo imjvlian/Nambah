@@ -85,6 +85,14 @@ export type PublicOrder = {
   };
   promoCode?: string;
   referralCode?: string;
+  /** Status refund terbaru untuk order ini, kalau ada. */
+  refund?: {
+    status: "requested" | "processing" | "completed" | "failed" | "rejected";
+    provider: "midtrans" | "doku" | "paylabs" | "manual";
+    amount: number;
+    requestedAt: string;
+    processedAt: string | null;
+  } | null;
   // SN supplier (bukti pembelian, mis. SN pulsa/token). Hanya diisi saat
   // order berstatus `success`; sengaja tidak diekspos pada status lain.
   serialNumber?: string | null;

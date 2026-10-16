@@ -86,6 +86,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const [countdown, setCountdown] = useState(() => calculateCountdown(null));
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundBusy, setRefundBusy] = useState(false);
   const embeddedOrderRef = useRef<string | null>(null);
   const dokuPopupRef = useRef<Window | null>(null);
   const dokuPopupTimerRef = useRef<number | null>(null);
@@ -515,6 +517,55 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     void navigator.clipboard.writeText(url).then(() => {
       setNotice("Link status disalin.");
     });
+  }
+
+  async function submitRefundRequest() {
+    if (!order || refundBusy) return;
+
+    const reason = refundReason.trim();
+    if (reason.length < 3) {
+      setNotice("Ceritakan dulu alasannya, minimal 3 karakter.");
+      return;
+    }
+
+    setRefundBusy(true);
+    setNotice("");
+
+    try {
+      const url = new URL(
+        `/api/orders/${encodeURIComponent(order.id)}/refund`,
+        window.location.origin,
+      );
+      if (accessToken) url.searchParams.set("access_token", accessToken);
+
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ reason }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        message?: string;
+        refund?: PublicOrder["refund"];
+      };
+
+      if (!response.ok || !data.refund) {
+        setNotice(data.error ?? "Permintaan refund gagal dikirim.");
+        return;
+      }
+
+      setOrder((current) =>
+        current ? { ...current, refund: data.refund ?? null } : current,
+      );
+      setRefundReason("");
+      setNotice(data.message ?? "Permintaan refund kamu sudah kami terima.");
+    } catch {
+      setNotice("Permintaan refund belum dapat dikirim. Coba lagi sebentar.");
+    } finally {
+      setRefundBusy(false);
+    }
   }
 
   if (preview === undefined || order === undefined) {
@@ -1121,6 +1172,45 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 ))}
               </div>
             )}
+
+            {!isPreview && order?.refund && (
+              <div className="order-refund-status">
+                <strong>Status refund</strong>
+                <p>
+                  {order.refund.status === "completed"
+                    ? `Refund ${formatIDR(order.refund.amount)} sudah selesai.`
+                    : order.refund.status === "processing"
+                      ? `Refund ${formatIDR(order.refund.amount)} sedang diproses.`
+                      : order.refund.status === "failed"
+                        ? "Refund gagal diproses. Hubungi CS untuk dibantu."
+                        : order.refund.status === "rejected"
+                          ? "Permintaan refund ditolak. Hubungi CS kalau kamu masih butuh bantuan."
+                          : `Permintaan refund ${formatIDR(order.refund.amount)} sudah kami terima.`}
+                </p>
+              </div>
+            )}
+
+            {!isPreview &&
+              !order?.refund &&
+              (liveStatus === "failed" || liveStatus === "success") && (
+                <div className="order-refund-request">
+                  <strong>Ada masalah dengan pesanan ini?</strong>
+                  <textarea
+                    value={refundReason}
+                    rows={2}
+                    placeholder="Ceritakan masalahnya, misalnya produk tidak masuk."
+                    onChange={(event) => setRefundReason(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="order-action-button secondary"
+                    disabled={refundBusy || refundReason.trim().length < 3}
+                    onClick={() => void submitRefundRequest()}
+                  >
+                    {refundBusy ? "Mengirim..." : "Ajukan refund"}
+                  </button>
+                </div>
+              )}
 
             <div className="order-secondary-links">
               <button

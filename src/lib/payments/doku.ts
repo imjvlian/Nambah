@@ -27,6 +27,7 @@ const BASE_URLS = {
 const TOKEN_PATH = "/authorization/v1/access-token/b2b";
 const QRIS_GENERATE_PATH = "/snap-adapter/b2b/v1.0/qr/qr-mpm-generate";
 const QRIS_QUERY_PATH = "/snap-adapter/b2b/v1.0/qr/qr-mpm-query";
+const QRIS_REFUND_PATH = "/snap-adapter/b2b/v1.0/qr/qr-mpm-refund";
 const QRIS_SERVICE_CODE = "47";
 /** QRIS host-to-host channel id mengikuti dokumentasi DOKU. */
 const QRIS_CHANNEL_ID = "H2H";
@@ -408,6 +409,74 @@ export async function fetchDokuQrisStatus(input: {
     transactionStatusDesc: result.transactionStatusDesc ?? null,
     paidTime: result.paidTime ?? null,
     amountValue: result.amount?.value ?? null,
+    raw: result,
+  };
+}
+
+export type DokuRefundResult = {
+  orderId: string;
+  referenceNo: string | null;
+  refundNo: string | null;
+  partnerRefundNo: string;
+  amountValue: string | null;
+  refundTime: string | null;
+  raw: unknown;
+};
+
+type QrisRefundResponse = {
+  responseCode?: string;
+  responseMessage?: string;
+  originalReferenceNo?: string;
+  originalPartnerReferenceNo?: string;
+  refundNo?: string;
+  partnerRefundNo?: string;
+  refundAmount?: { value?: string; currency?: string };
+  refundTime?: string;
+};
+
+export async function refundDokuQrisPayment(input: {
+  orderId: string;
+  referenceNo: string | null;
+  amount: number;
+  reason: string;
+  refundKey: string;
+}): Promise<DokuRefundResult> {
+  const config = getDokuSnapConfig();
+  if (!config) {
+    throw new Error("DOKU SNAP belum dikonfigurasi.");
+  }
+  if (!input.referenceNo) {
+    throw new Error("referenceNo DOKU untuk order ini tidak ditemukan.");
+  }
+
+  const result = await dokuSignedFetch<QrisRefundResponse>(config, {
+    path: QRIS_REFUND_PATH,
+    body: {
+      originalPartnerReferenceNo: input.orderId,
+      originalReferenceNo: input.referenceNo,
+      partnerRefundNo: input.refundKey,
+      merchantId: config.merchantId,
+      refundAmount: { value: formatAmount(input.amount), currency: "IDR" },
+      reason: input.reason,
+      additionalInfo: {
+        approvalCode: input.referenceNo,
+      },
+    },
+  });
+
+  if (!result.refundNo && !result.partnerRefundNo) {
+    throw new Error(
+      `DOKU QRIS refund tidak mengembalikan refundNo (${result.responseCode ?? "?"}: ${result.responseMessage ?? "tanpa pesan"}).`,
+    );
+  }
+
+  return {
+    orderId: result.originalPartnerReferenceNo ?? input.orderId,
+    referenceNo: result.originalReferenceNo ?? input.referenceNo,
+    refundNo: result.refundNo ?? null,
+    partnerRefundNo: result.partnerRefundNo ?? input.refundKey,
+    amountValue: result.refundAmount?.value ?? null,
+    refundTime: result.refundTime ?? null,
     raw: result,
   };
 }

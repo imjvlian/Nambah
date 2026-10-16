@@ -405,6 +405,32 @@ create table if not exists public.affiliate_withdrawals (
 create index if not exists affiliate_withdrawals_lookup_idx
   on public.affiliate_withdrawals(affiliate_code, status, requested_at desc);
 
+create table if not exists public.refunds (
+  id bigint generated always as identity primary key,
+  order_id text not null unique references public.orders(id) on delete cascade,
+  provider text not null check (provider in ('midtrans', 'doku', 'paylabs', 'manual')),
+  provider_refund_id text,
+  amount bigint not null check (amount > 0),
+  reason text not null check (length(trim(reason)) >= 2),
+  status text not null default 'requested'
+    check (status in ('requested', 'processing', 'completed', 'failed', 'rejected')),
+  requested_by_admin_user_id uuid,
+  processed_by_admin_user_id uuid,
+  provider_response jsonb,
+  request_note text,
+  completed_note text,
+  requested_at timestamptz not null default now(),
+  processed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists refunds_order_idx
+  on public.refunds(order_id, status, requested_at desc);
+
+create index if not exists refunds_status_idx
+  on public.refunds(status, requested_at desc);
+
 -- Defense in depth: every table in the exposed public schema has RLS enabled.
 alter table public.games enable row level security;
 alter table public.products enable row level security;
@@ -432,6 +458,7 @@ alter table public.admin_audit_logs enable row level security;
 alter table public.financial_reconciliations enable row level security;
 alter table public.commissions enable row level security;
 alter table public.affiliate_withdrawals enable row level security;
+alter table public.refunds enable row level security;
 
 -- 0.2.0 intentionally exposes no database table directly to browsers.
 -- The Next.js server reads through SUPABASE_SECRET_KEY and returns sanitized data.
@@ -462,6 +489,7 @@ revoke all on table public.admin_audit_logs from anon, authenticated;
 revoke all on table public.financial_reconciliations from anon, authenticated;
 revoke all on table public.commissions from anon, authenticated;
 revoke all on table public.affiliate_withdrawals from anon, authenticated;
+revoke all on table public.refunds from anon, authenticated;
 
 revoke usage, select on all sequences in schema public from anon, authenticated;
 

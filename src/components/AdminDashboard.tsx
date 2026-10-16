@@ -316,6 +316,7 @@ type AdminOrderDetail = {
   commissions: Array<Record<string, unknown>>;
   points: Array<Record<string, unknown>>;
   promotionRedemptions: Array<Record<string, unknown>>;
+  refund: Record<string, unknown> | null;
 };
 
 type AdminAccountsPayload = {
@@ -1530,6 +1531,81 @@ export default function AdminDashboard() {
       setNotice(
         error instanceof Error ? error.message : "Receipt gagal dikirim ulang.",
       );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function refundAdminOrder(orderId: string) {
+    const reason = window.prompt(
+      "Alasan refund order ini? Minimal 3 karakter.",
+      "",
+    );
+    if (!reason || reason.trim().length < 3) return;
+
+    setBusy("refund:" + orderId);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/orders/" + encodeURIComponent(orderId) + "/refund",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        },
+      );
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Refund gagal diproses.");
+      }
+      await inspectOrder(orderId);
+      setNotice(data.message ?? "Refund diproses.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Refund gagal diproses.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function refundAdminAction(
+    orderId: string,
+    action: "confirm-completed" | "reject",
+  ) {
+    const reason = window.prompt(
+      action === "confirm-completed"
+        ? "PASTIKAN dana sudah benar-benar keluar dulu (cek dashboard gateway atau bukti transfer manual). Catatan (opsional):"
+        : "Alasan refund ini ditolak?",
+      "",
+    );
+    if (reason === null) return;
+
+    setBusy("refund-action:" + orderId);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/orders/" + encodeURIComponent(orderId) + "/refund",
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            reason,
+            completedNote: reason,
+          }),
+        },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Aksi refund gagal diproses.");
+      }
+      await inspectOrder(orderId);
+      setNotice(
+        action === "confirm-completed"
+          ? "Refund dikonfirmasi selesai."
+          : "Refund ditolak.",
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Aksi refund gagal.");
     } finally {
       setBusy("");
     }
@@ -3789,6 +3865,61 @@ const txDataStamp = txRange.preset
                       >
                         Retry receipt
                       </button>
+                      {(String(orderDetail.order.status ?? "") === "failed" ||
+                        String(orderDetail.order.status ?? "") === "success") &&
+                        (!orderDetail.refund ||
+                          String(orderDetail.refund.status ?? "") ===
+                            "failed") && (
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void refundAdminOrder(
+                                String(orderDetail.order.id ?? ""),
+                              )
+                            }
+                          >
+                            Refund
+                          </button>
+                        )}
+                      {orderDetail.refund &&
+                        !["completed", "rejected"].includes(
+                          String(orderDetail.refund.status ?? ""),
+                        ) &&
+                        (String(orderDetail.refund.provider ?? "") ===
+                          "manual" ||
+                          String(orderDetail.refund.status ?? "") ===
+                            "processing") && (
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void refundAdminAction(
+                                String(orderDetail.order.id ?? ""),
+                                "confirm-completed",
+                              )
+                            }
+                          >
+                            Konfirmasi refund selesai
+                          </button>
+                        )}
+                      {orderDetail.refund &&
+                        !["completed", "rejected"].includes(
+                          String(orderDetail.refund.status ?? ""),
+                        ) && (
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void refundAdminAction(
+                                String(orderDetail.order.id ?? ""),
+                                "reject",
+                              )
+                            }
+                          >
+                            Tolak refund
+                          </button>
+                        )}
                       <button
                         type="button"
                         onClick={() => setOrderDetail(null)}
@@ -3814,6 +3945,10 @@ const txDataStamp = txRange.preset
                     <article>
                       <small>Receipt</small>
                       <pre>{JSON.stringify(orderDetail.receipts, null, 2)}</pre>
+                    </article>
+                    <article>
+                      <small>Refund</small>
+                      <pre>{JSON.stringify(orderDetail.refund, null, 2)}</pre>
                     </article>
                     <article>
                       <small>Commission</small>

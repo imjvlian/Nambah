@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
 import { supabaseSelect } from "@/lib/supabase/server";
+import { getRefundForOrder } from "@/lib/refund-service";
 
 export const runtime = "nodejs";
 
@@ -71,6 +72,8 @@ export async function GET(
       return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });
     }
 
+    const refund = await getRefundForOrder(orderId);
+
     return Response.json({
       order: orders[0],
       payments,
@@ -79,6 +82,7 @@ export async function GET(
       commissions,
       points,
       promotionRedemptions: promo,
+      refund,
     });
   } catch (error) {
     console.error("Admin order detail failed", error);

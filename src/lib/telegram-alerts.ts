@@ -182,6 +182,42 @@ export async function notifyOrderStuck(orderId: string, stuckMinutes: number) {
 }
 
 /**
+ * Refund selesai diproses.
+ *
+ * Ini alert operasional, bukan bukti refund ke user. Nominal dan provider
+ * sengaja dicantumkan supaya admin bisa langsung mengecek dashboard gateway.
+ */
+export async function notifyRefundProcessed(input: {
+  orderId: string;
+  amount: number;
+  provider: string;
+}) {
+  if (!isTelegramConfigured()) {
+    return { queued: false as const, reason: "not-configured" as const };
+  }
+
+  const context = await loadOrderContext(input.orderId);
+  if (!context) {
+    return { queued: false as const, reason: "order-not-found" as const };
+  }
+
+  const text = [
+    "<b>Refund selesai diproses</b>",
+    `Order <code>${escapeTelegramHtml(context.order.id)}</code>`,
+    `Brand game: ${escapeTelegramHtml(context.brand)}`,
+    `Produk: ${escapeTelegramHtml(context.productLabel)}`,
+    `Provider refund: ${escapeTelegramHtml(input.provider)}`,
+    `Nominal: ${escapeTelegramHtml(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(input.amount))}`,
+  ].join("\n");
+
+  return enqueueTelegramMessage(text, {
+    kind: "refund",
+    dedupeKey: `refund-processed:${input.orderId}`,
+    payload: { orderId: input.orderId },
+  });
+}
+
+/**
  * Fulfillment sukses tapi butuh perhatian — dipakai untuk Sending serial
  * number supaya admin punya catatan kalau ada sengketa SN.
  */

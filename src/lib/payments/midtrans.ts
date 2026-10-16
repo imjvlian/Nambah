@@ -1,6 +1,7 @@
 import {
   createMidtransSnapTransaction,
   getMidtransTransactionStatus,
+  refundMidtransTransaction,
   type MidtransStatusPayload,
 } from "@/lib/midtrans/client";
 import type { CreatePaymentInput, PaymentSession } from "./types";
@@ -36,4 +37,13 @@ export async function fetchMidtransStatus(
   orderId: string,
 ): Promise<MidtransStatusPayload> {
   return getMidtransTransactionStatus(orderId);
+}
+
+export async function refundMidtransPayment(input: {
+  orderId: string;
+  amount: number;
+  reason: string;
+  refundKey: string;
+}) {
+  return refundMidtransTransaction(input);
 }

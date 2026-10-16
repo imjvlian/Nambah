@@ -194,6 +194,63 @@ export async function getMidtransTransactionStatus(orderId: string) {
   }
 }
 
+export type MidtransRefundPayload = {
+  refund_key?: string;
+  amount?: number;
+  reason?: string;
+};
+
+export type MidtransRefundResult = {
+  status_code?: string;
+  status_message?: string;
+  transaction_id?: string;
+  order_id?: string;
+  payment_type?: string;
+  transaction_time?: string;
+  transaction_status?: string;
+  refund_chargeback_id?: string | number;
+  refund_amount?: string;
+  refund_key?: string;
+  [key: string]: unknown;
+};
+
+export async function refundMidtransTransaction(input: {
+  orderId: string;
+  amount: number;
+  reason: string;
+  refundKey: string;
+}) {
+  const serverKey = requireServerKey();
+  const environment = getMidtransEnvironment();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    const response = await fetch(
+      `${API_URLS[environment]}/${encodeURIComponent(input.orderId)}/refund/online/direct`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: authorizationHeader(serverKey),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refund_key: input.refundKey,
+          amount: input.amount,
+          reason: input.reason,
+        }),
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+
+    return await readJsonResponse<MidtransRefundResult>(response);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function verifyMidtransNotificationSignature(
   payload: MidtransStatusPayload,
 ) {

@@ -11,6 +11,7 @@ const AUDITED_ROUTES = [
   "src/app/api/admin/telegram/test/route.ts",
   "src/app/api/admin/telegram/dispatch/route.ts",
   "src/app/api/admin/telegram/daily-digest/route.ts",
+  "src/app/api/admin/orders/[id]/refund/route.ts",
 ];
 
 test("mutasi admin berisiko tinggi wajib menghasilkan audit log", () => {

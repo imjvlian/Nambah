@@ -13,7 +13,7 @@ export default function RefundPage() {
     <LegalShell
       eyebrow="Dokumen legal"
       title="Kebijakan Pengembalian Dana"
-      updated="6 Oktober 2026"
+      updated="17 Oktober 2026"
     >
       <section>
         <p>
@@ -49,7 +49,11 @@ export default function RefundPage() {
             Kesalahan penginputan ID akun/nomor tujuan oleh kamu — produk digital
             yang sudah terkirim bersifat final dan tidak dapat ditarik kembali.
           </li>
-          <li>Pesanan yang sudah berstatus berhasil (produk sudah terkirim).</li>
+          <li>
+            Pesanan yang sudah berstatus berhasil — <em>kecuali</em> terbukti ada
+            kesalahan sistem kami, misalnya nominal atau produk yang terkirim
+            tidak sesuai dengan yang kamu bayar.
+          </li>
           <li>Pesanan yang kamu batalkan sendiri atau kedaluwarsa sebelum
             pembayaran dilakukan (tidak ada dana yang terpotong).</li>
           <li>Akibat pemblokiran/pembekuan akun game oleh penerbit game di luar
@@ -60,11 +64,22 @@ export default function RefundPage() {
       <section>
         <h2>3. Cara mengajukan</h2>
         <ul>
-          <li>Hubungi dukungan pelanggan melalui kanal yang tersedia di situs
-            dengan menyertakan <strong>nomor order</strong> (format NBH-…).</li>
-          <li>Sertakan bukti pembayaran bila diminta.</li>
-          <li>Tim kami memverifikasi status pesanan dan pembayaran terlebih
-            dahulu sebelum refund diproses.</li>
+          <li>
+            Buka <strong>halaman status pesanan</strong> kamu (link ada di email
+            atau halaman akun), lalu isi form ajukan refund di kartu ringkasan
+            pesanan. Kamu cukup menjelaskan masalahnya — sisanya kami yang
+            proses.
+          </li>
+          <li>
+            Alternatifnya, hubungi dukungan pelanggan melalui kanal yang
+            tersedia di situs dengan menyertakan{" "}
+            <strong>nomor order</strong> (format NBH-…).
+          </li>
+          <li>
+            Tim kami memverifikasi status pesanan dan pembayaran terlebih
+            dahulu, lalu memproses pengembalian lewat gateway pembayaran asal
+            bila didukung.
+          </li>
         </ul>
       </section>
 
@@ -73,11 +88,20 @@ export default function RefundPage() {
         <ul>
           <li>Refund diproses maksimal <strong>3×24 jam kerja</strong> setelah
             pengajuan disetujui.</li>
-          <li>Dana dikembalikan ke metode/sumber pembayaran yang sama bila
-            didukung penyedia pembayaran; alternatifnya melalui transfer ke
-            rekening/e-wallet yang kamu berikan.</li>
-          <li>Biaya layanan pembayaran yang sudah terjadi dapat dipotong dari
-            nilai refund sesuai kebijakan penyedia pembayaran.</li>
+          <li>
+            Dana dikembalikan ke <strong>metode pembayaran yang sama</strong>{" "}
+            bila didukung penyedia pembayaran; alternatifnya melalui transfer
+            manual ke rekening/e-wallet yang kamu berikan.
+          </li>
+          <li>
+            Untuk refund akibat <strong>kesalahan sistem</strong> kami, biaya
+            layanan pembayaran <strong>diserap oleh {BRAND.shortName}</strong>{" "}
+            — kamu menerima kembali nominal penuh yang kamu bayar.
+          </li>
+          <li>
+            Points dan komisi afiliasi yang terkait pesanan akan{" "}
+            <strong>dikembalikan/dibatalkan</strong> sesuai kondisi semula.
+          </li>
         </ul>
       </section>
 
@@ -95,9 +119,11 @@ export default function RefundPage() {
         <h2>6. Kontak</h2>
         <div className="legal-contact-box">
           <p>
-            Pengajuan refund dan pertanyaan statusnya dapat dilakukan melalui
-            halaman akun atau kanal dukungan yang tersedia di situs. Sertakan
-            selalu nomor order agar proses verifikasi berjalan cepat.
+            Cara tercepat mengajukan refund adalah lewat form di{" "}
+            <strong>halaman status pesanan</strong>. Kamu juga bisa mengecek
+            status refundnya di halaman yang sama setelah diajukan. Untuk bantuan
+            lebih lanjut, hubungi kanal dukungan yang tersedia di situs dan
+            sertakan selalu nomor order agar verifikasi berjalan cepat.
           </p>
         </div>
       </section>

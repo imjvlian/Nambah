@@ -160,6 +160,14 @@ async function transitionOrderStatus(input: {
   return from;
 }
 
+type RefundPublicRow = {
+  status: "requested" | "processing" | "completed" | "failed" | "rejected";
+  provider: "midtrans" | "doku" | "paylabs" | "manual";
+  amount: number | string;
+  requested_at: string;
+  processed_at: string | null;
+};
+
 export async function getPublicOrder(
   orderId: string,
 ): Promise<PublicOrder | null> {
@@ -178,6 +186,7 @@ export async function getPublicOrder(
     paymentMethodRows,
     paymentRows,
     supplierTxRows,
+    refundRows,
   ] = await Promise.all([
     supabaseSelect<GameRow>("games", {
       select: "id,name,short_name,accent,initials",
@@ -209,6 +218,12 @@ export async function getPublicOrder(
       order: "created_at.desc",
       limit: 1,
     }),
+    supabaseSelect<RefundPublicRow>("refunds", {
+      select: "status,provider,amount,requested_at,processed_at",
+      filters: { order_id: `eq.${order.id}` },
+      order: "requested_at.desc",
+      limit: 1,
+    }).catch(() => []),
   ]);
 
   const game = gameRows[0];
@@ -355,6 +370,17 @@ export async function getPublicOrder(
     },
     ...(order.promotion_code ? { promoCode: order.promotion_code } : {}),
     ...(order.affiliate_code ? { referralCode: order.affiliate_code } : {}),
+    ...(refundRows[0]
+      ? {
+          refund: {
+            status: refundRows[0].status,
+            provider: refundRows[0].provider,
+            amount: Number(refundRows[0].amount),
+            requestedAt: refundRows[0].requested_at,
+            processedAt: refundRows[0].processed_at,
+          },
+        }
+      : { refund: null }),
     // SN hanya diekspos saat order sukses — pada status lain nilainya
     // belum final (atau transaksi gagal) dan bisa menyesatkan customer.
     ...(order.status === "success" && supplierTx?.serial_number
@@ -972,6 +998,43 @@ export async function applyPaylabsStatus(
   }
 
   return publicOrder;
+}
+
+export async function markOrderRefunded(
+  orderId: string,
+  fromStatus: Extract<PublicOrderStatus, "failed" | "success">,
+) {
+  const now = new Date().toISOString();
+  const nextStatus = await transitionOrderStatus({
+    orderId,
+    fromStatus,
+    nextStatus: "refunded",
+    buildPayload: (timestamp) => ({
+      status: "refunded",
+      status_changed_at: timestamp,
+      terminal_at: timestamp,
+      updated_at: timestamp,
+    }),
+    recompute: () => "refunded",
+  });
+
+  try {
+    await syncOrderPointsLifecycle(orderId, "refunded");
+  } catch (error) {
+    console.error(`Lacte Points lifecycle sync failed for refund ${orderId}`, error);
+  }
+  try {
+    await syncOrderCommissionLifecycle(orderId, "refunded");
+  } catch (error) {
+    console.error(`Affiliate commission lifecycle sync failed for refund ${orderId}`, error);
+  }
+  try {
+    await syncPromotionLifecycle(orderId, "refunded");
+  } catch (error) {
+    console.error(`Promotion lifecycle sync failed for refund ${orderId}`, error);
+  }
+
+  return nextStatus;
 }
 
 export async function isOrderOwnedByUser(orderId: string, userId: string) {

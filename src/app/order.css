@@ -599,6 +599,48 @@
   padding: 2px 16px 14px;
 }
 
+.order-refund-status,
+.order-refund-request {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.order-refund-status strong,
+.order-refund-request strong {
+  color: #d1d6cc;
+  font-size: 12px;
+}
+
+.order-refund-status p {
+  margin: 0;
+  color: #9aa199;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.order-refund-request textarea {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  background: #0f110d;
+  color: #e6e9e2;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.order-refund-request textarea:focus-visible {
+  border-color: rgba(201, 255, 63, 0.45);
+  outline: none;
+}
+
 .order-secondary-link {
   padding: 8px 4px;
   min-height: 32px;
