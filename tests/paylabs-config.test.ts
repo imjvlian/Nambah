@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { generateKeyPairSync } from "node:crypto";
 
-import { getPaylabsConfig } from "../src/lib/payments/paylabs.ts";
+import {
+  createPaylabsSignature,
+  getPaylabsConfig,
+  verifyPaylabsSignature,
+} from "../src/lib/payments/paylabs.ts";
 import { isPaylabsConfigured } from "../src/lib/payment-settings.ts";
 
 const ENV_KEYS = [
@@ -69,4 +73,56 @@ test("sandbox Paylabs config still works without a public key", () => {
 
   assert.equal(isPaylabsConfigured(), true);
   assert.notEqual(getPaylabsConfig(), null);
+});
+
+test("Paylabs webhook signature can be signed and verified", () => {
+  const body = { merchantTradeNo: "NBH-20261016-ABCDEF", status: "02" };
+  const timestamp = "2026-10-16T10:00:00.000+07:00";
+  const path = "/api/webhooks/paylabs";
+
+  const signature = createPaylabsSignature({
+    method: "POST",
+    path,
+    body,
+    timestamp,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+  });
+
+  assert.equal(
+    verifyPaylabsSignature({
+      method: "POST",
+      path,
+      body: JSON.stringify(body),
+      timestamp,
+      signature,
+      publicKey: publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }),
+    true,
+  );
+});
+
+test("Paylabs webhook signature rejects a different body", () => {
+  const body = { merchantTradeNo: "NBH-20261016-ABCDEF", status: "02" };
+  const timestamp = "2026-10-16T10:00:00.000+07:00";
+  const path = "/api/webhooks/paylabs";
+
+  const signature = createPaylabsSignature({
+    method: "POST",
+    path,
+    body,
+    timestamp,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+  });
+
+  assert.equal(
+    verifyPaylabsSignature({
+      method: "POST",
+      path,
+      body: JSON.stringify({ ...body, status: "09" }),
+      timestamp,
+      signature,
+      publicKey: publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }),
+    false,
+  );
 });

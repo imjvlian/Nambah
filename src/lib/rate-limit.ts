@@ -61,11 +61,9 @@ export function anonymizedKey(
   subject?: string,
 ) {
   const normalizedSubject = normalizeSubject(subject);
-  const raw =
-    scope +
-    "|" +
-    clientIdentity(request) +
-    (normalizedSubject ? "|" + normalizedSubject : "");
+  const raw = normalizedSubject
+    ? `${scope}|${normalizedSubject}`
+    : `${scope}|${clientIdentity(request)}`;
   const secret = process.env.NAMBAH_RATE_LIMIT_SECRET?.trim() ?? "";
 
   return secret
@@ -95,8 +93,7 @@ export async function checkRateLimit(
       count: Number(result.count ?? 0),
       limit: Number(result.limit ?? limit),
       remaining: Math.max(0, Number(result.remaining ?? limit)),
-      resetAt:
-        typeof result.resetAt === "string" ? result.resetAt : null,
+      resetAt: typeof result.resetAt === "string" ? result.resetAt : null,
       degraded: false,
     };
   } catch (error) {
@@ -122,9 +119,7 @@ export async function rateLimitResponse(
   const retryAfter = result.resetAt
     ? Math.max(
         1,
-        Math.ceil(
-          (new Date(result.resetAt).getTime() - Date.now()) / 1000,
-        ),
+        Math.ceil((new Date(result.resetAt).getTime() - Date.now()) / 1000),
       )
     : options.windowSeconds;
 

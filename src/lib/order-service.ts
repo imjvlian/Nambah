@@ -9,7 +9,11 @@ import { syncOrderPointsLifecycle } from "@/lib/loyalty";
 import { syncOrderCommissionLifecycle } from "@/lib/commission-service";
 import { syncPromotionLifecycle } from "@/lib/promotion-service";
 import { deliverSuccessReceipt } from "@/lib/receipt-service";
-import { supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import {
+  supabaseInsert,
+  supabaseSelect,
+  supabaseUpdate,
+} from "@/lib/supabase/server";
 import { isTerminalStatus } from "./order-status";
 import {
   nextOrderStatusFromPayment,
@@ -95,7 +99,9 @@ type SupplierTransactionPublicRow = {
 
 type MidtransSource = "webhook" | "status_api";
 
-export async function getPublicOrder(orderId: string): Promise<PublicOrder | null> {
+export async function getPublicOrder(
+  orderId: string,
+): Promise<PublicOrder | null> {
   const [order] = await supabaseSelect<OrderRow>("orders", {
     select:
       "id,game_id,product_id,payment_method_id,target_user_id,target_server_id,promotion_code,affiliate_code,status,selling_price,customer_payment_fee,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,created_at,updated_at,expires_at,status_changed_at,terminal_at,merchant_scan_code",
@@ -105,7 +111,13 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
 
   if (!order) return null;
 
-  const [gameRows, productRows, paymentMethodRows, paymentRows, supplierTxRows] = await Promise.all([
+  const [
+    gameRows,
+    productRows,
+    paymentMethodRows,
+    paymentRows,
+    supplierTxRows,
+  ] = await Promise.all([
     supabaseSelect<GameRow>("games", {
       select: "id,name,short_name,accent,initials",
       filters: { id: `eq.${order.game_id}` },
@@ -145,7 +157,9 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
   const supplierTx = supplierTxRows[0];
 
   if (!game || !product || !paymentMethod) {
-    throw new Error(`Order ${order.id} memiliki referensi katalog yang tidak lengkap.`);
+    throw new Error(
+      `Order ${order.id} memiliki referensi katalog yang tidak lengkap.`,
+    );
   }
 
   // Sesi DOKU (konten QRIS dll) disimpan di payments.payment_payload — kolom
@@ -235,10 +249,15 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
       ? {
           doku: {
             ...(dokuSession?.qrContent
-              ? { qrContent: dokuSession.qrContent, expiresAt: dokuSession.expiresAt ?? null }
+              ? {
+                  qrContent: dokuSession.qrContent,
+                  expiresAt: dokuSession.expiresAt ?? null,
+                }
               : {}),
             // Mode checkout: modal Jokul dirender di halaman Nambah.
-            ...(payment.redirect_url ? { checkoutJsUrl: getDokuCheckoutJsUrl() } : {}),
+            ...(payment.redirect_url
+              ? { checkoutJsUrl: getDokuCheckoutJsUrl() }
+              : {}),
           },
         }
       : {}),
@@ -251,8 +270,12 @@ export async function getPublicOrder(orderId: string): Promise<PublicOrder | nul
                   expiresAt: paylabsSession.expiresAt ?? null,
                 }
               : {}),
-            ...(paylabsSession?.vaNumber ? { vaNumber: paylabsSession.vaNumber } : {}),
-            ...(paylabsSession?.bankCode ? { bankCode: paylabsSession.bankCode } : {}),
+            ...(paylabsSession?.vaNumber
+              ? { vaNumber: paylabsSession.vaNumber }
+              : {}),
+            ...(paylabsSession?.bankCode
+              ? { bankCode: paylabsSession.bankCode }
+              : {}),
             ...(payment.redirect_url
               ? { redirectUrl: payment.redirect_url }
               : {}),
@@ -309,15 +332,23 @@ export async function applyMidtransStatus(
    * Ditolak SEBELUM validasi jumlah, karena error "tidak cocok" akan
    * membocorkan bahwa order itu ada dan belum dibayar.
    */
-  if (order.status === "pending_merchant" || order.status === "awaiting_receivable") {
+  if (
+    order.status === "pending_merchant" ||
+    order.status === "awaiting_receivable"
+  ) {
     throw new Error(
       `Order ${orderId} adalah order merchant ritel dan tidak punya sesi pembayaran gateway.`,
     );
   }
 
   const grossAmount = Number(payload.gross_amount);
-  if (!Number.isFinite(grossAmount) || Math.round(grossAmount) !== Number(order.final_price)) {
-    throw new Error(`Gross amount Midtrans tidak cocok untuk order ${orderId}.`);
+  if (
+    !Number.isFinite(grossAmount) ||
+    Math.round(grossAmount) !== Number(order.final_price)
+  ) {
+    throw new Error(
+      `Gross amount Midtrans tidak cocok untuk order ${orderId}.`,
+    );
   }
 
   const now = new Date().toISOString();
@@ -328,7 +359,10 @@ export async function applyMidtransStatus(
     transactionStatus: payload.transaction_status,
     fraudStatus: payload.fraud_status,
   });
-  const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+  const paid =
+    orderStatus === "paid" ||
+    orderStatus === "processing" ||
+    orderStatus === "success";
 
   // Update timestamps for status changes
   const updatePayload: Record<string, unknown> = {};
@@ -338,7 +372,10 @@ export async function applyMidtransStatus(
     if (isTerminalStatus(orderStatus)) {
       updatePayload.terminal_at = now;
     }
-    if (orderStatus === "paid" && (order.status === "pending_payment" || order.status === null)) {
+    if (
+      orderStatus === "paid" &&
+      (order.status === "pending_payment" || order.status === null)
+    ) {
       updatePayload.paid_at = payload.settlement_time ?? now;
     }
     updatePayload.updated_at = now;
@@ -368,7 +405,10 @@ export async function applyMidtransStatus(
   }
 
   if (orderStatus !== order.status) {
-    const orderUpdatePayload: Record<string, unknown> = { status: orderStatus, updated_at: now };
+    const orderUpdatePayload: Record<string, unknown> = {
+      status: orderStatus,
+      updated_at: now,
+    };
     if (orderStatus === "paid") {
       orderUpdatePayload.paid_at = payload.settlement_time ?? now;
     }
@@ -377,7 +417,9 @@ export async function applyMidtransStatus(
     }
     orderUpdatePayload.status_changed_at = now;
 
-    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
+    await supabaseUpdate("orders", orderUpdatePayload, {
+      filters: { id: `eq.${orderId}` },
+    });
   }
 
   try {
@@ -385,19 +427,28 @@ export async function applyMidtransStatus(
   } catch (error) {
     // Payment truth must not be rolled back by a loyalty subsystem issue.
     // Repeated status checks and fulfillment finalization will retry idempotently.
-    console.error(`Lacte Points lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Lacte Points lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
 
   try {
     await syncOrderCommissionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Affiliate commission lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
 
   try {
     await syncPromotionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Promotion lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Promotion lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
 
   await supabaseInsert("midtrans_payment_events", {
@@ -488,18 +539,22 @@ export async function applyDokuStatus(
 
   // Sama seperti jalur Midtrans: order merchant ritel tidak punya sesi
   // gateway, jadi notifikasi DOKU untuk order itu tidak mungkin sah.
-  if (order.status === "pending_merchant" || order.status === "awaiting_receivable") {
+  if (
+    order.status === "pending_merchant" ||
+    order.status === "awaiting_receivable"
+  ) {
     throw new Error(
       `Order ${orderId} adalah order merchant ritel dan tidak punya sesi pembayaran gateway.`,
     );
   }
 
   // Validasi jumlah sama ketatnya dengan jalur Midtrans.
-  if (input.amountValue) {
-    const amount = Number(input.amountValue);
-    if (!Number.isFinite(amount) || Math.round(amount) !== Number(order.final_price)) {
-      throw new Error(`Jumlah DOKU tidak cocok untuk order ${orderId}.`);
-    }
+  if (
+    input.amountValue == null ||
+    !Number.isFinite(Number(input.amountValue)) ||
+    Math.round(Number(input.amountValue)) !== Number(order.final_price)
+  ) {
+    throw new Error(`Jumlah DOKU tidak cocok untuk order ${orderId}.`);
   }
 
   const now = new Date().toISOString();
@@ -509,10 +564,14 @@ export async function applyDokuStatus(
     fraudStatus: null,
   });
   const paid =
-    orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+    orderStatus === "paid" ||
+    orderStatus === "processing" ||
+    orderStatus === "success";
 
   const paymentUpdatePayload: Record<string, unknown> = {
-    ...(input.referenceNo ? { provider_transaction_id: input.referenceNo } : {}),
+    ...(input.referenceNo
+      ? { provider_transaction_id: input.referenceNo }
+      : {}),
     status: paymentStatus,
     raw_status: input.transactionStatus,
     payment_type: input.paymentType ?? "qris",
@@ -526,15 +585,14 @@ export async function applyDokuStatus(
   // sudah ada — qrContent tidak boleh tertimpa).
   if (input.raw !== undefined) {
     try {
-      const existing = await supabaseSelect<{ payment_payload: Record<string, unknown> | null }>(
-        "payments",
-        {
-          select: "payment_payload",
-          filters: { order_id: `eq.${orderId}`, provider: "eq.doku" },
-          order: "created_at.desc",
-          limit: 1,
-        },
-      );
+      const existing = await supabaseSelect<{
+        payment_payload: Record<string, unknown> | null;
+      }>("payments", {
+        select: "payment_payload",
+        filters: { order_id: `eq.${orderId}`, provider: "eq.doku" },
+        order: "created_at.desc",
+        limit: 1,
+      });
       const previous = existing[0]?.payment_payload ?? {};
       paymentUpdatePayload.payment_payload = {
         ...previous,
@@ -545,7 +603,10 @@ export async function applyDokuStatus(
     } catch (error) {
       // Kolom payment_payload belum ada (migrasi 026 belum jalan) — status
       // tetap diterapkan, audit mentah menyusul setelah migrasi.
-      console.error(`payment_payload update skipped for order ${orderId}`, error);
+      console.error(
+        `payment_payload update skipped for order ${orderId}`,
+        error,
+      );
     }
   }
 
@@ -570,23 +631,34 @@ export async function applyDokuStatus(
     if (isTerminalStatus(orderStatus)) {
       orderUpdatePayload.terminal_at = now;
     }
-    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
+    await supabaseUpdate("orders", orderUpdatePayload, {
+      filters: { id: `eq.${orderId}` },
+    });
   }
 
   try {
     await syncOrderPointsLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Lacte Points lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Lacte Points lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
   try {
     await syncOrderCommissionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Affiliate commission lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
   try {
     await syncPromotionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Promotion lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Promotion lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
 
   // Fulfillment decoupled — sama seperti jalur Midtrans.
@@ -618,7 +690,6 @@ export async function applyDokuStatus(
 
   return publicOrder;
 }
-
 
 // ---------------------------------------------------------------------------
 // Paylabs
@@ -663,17 +734,21 @@ export async function applyPaylabsStatus(
   });
   if (!order) throw new Error(`Order ${orderId} tidak ditemukan.`);
 
-  if (order.status === "pending_merchant" || order.status === "awaiting_receivable") {
+  if (
+    order.status === "pending_merchant" ||
+    order.status === "awaiting_receivable"
+  ) {
     throw new Error(
       `Order ${orderId} adalah order merchant ritel dan tidak punya sesi pembayaran gateway.`,
     );
   }
 
-  if (input.amountValue != null) {
-    const amount = Number(input.amountValue);
-    if (Number.isFinite(amount) && Math.round(amount) !== Number(order.final_price)) {
-      throw new Error(`Jumlah Paylabs tidak cocok untuk order ${orderId}.`);
-    }
+  if (
+    input.amountValue == null ||
+    !Number.isFinite(Number(input.amountValue)) ||
+    Math.round(Number(input.amountValue)) !== Number(order.final_price)
+  ) {
+    throw new Error(`Jumlah Paylabs tidak cocok untuk order ${orderId}.`);
   }
 
   const now = new Date().toISOString();
@@ -683,10 +758,15 @@ export async function applyPaylabsStatus(
     transactionStatus: normalizedStatus,
     fraudStatus: null,
   });
-  const paid = orderStatus === "paid" || orderStatus === "processing" || orderStatus === "success";
+  const paid =
+    orderStatus === "paid" ||
+    orderStatus === "processing" ||
+    orderStatus === "success";
 
   const paymentUpdatePayload: Record<string, unknown> = {
-    ...(input.platformTradeNo ? { provider_transaction_id: input.platformTradeNo } : {}),
+    ...(input.platformTradeNo
+      ? { provider_transaction_id: input.platformTradeNo }
+      : {}),
     status: paymentStatus,
     raw_status: input.status ?? "pending",
     payment_type: input.paymentType ?? null,
@@ -698,16 +778,18 @@ export async function applyPaylabsStatus(
 
   if (input.raw !== undefined) {
     try {
-      const existing = await supabaseSelect<{ payment_payload: Record<string, unknown> | null }>(
-        "payments",
-        {
-          select: "payment_payload",
-          filters: { order_id: `eq.${orderId}`, provider: "eq.paylabs" },
-          order: "created_at.desc",
-          limit: 1,
-        },
-      );
-      const previous = (existing[0]?.payment_payload ?? {}) as Record<string, unknown>;
+      const existing = await supabaseSelect<{
+        payment_payload: Record<string, unknown> | null;
+      }>("payments", {
+        select: "payment_payload",
+        filters: { order_id: `eq.${orderId}`, provider: "eq.paylabs" },
+        order: "created_at.desc",
+        limit: 1,
+      });
+      const previous = (existing[0]?.payment_payload ?? {}) as Record<
+        string,
+        unknown
+      >;
       paymentUpdatePayload.payment_payload = {
         ...previous,
         lastStatus: input.raw,
@@ -715,7 +797,10 @@ export async function applyPaylabsStatus(
         lastStatusAt: now,
       };
     } catch (error) {
-      console.error(`payment_payload update skipped for order ${orderId}`, error);
+      console.error(
+        `payment_payload update skipped for order ${orderId}`,
+        error,
+      );
     }
   }
 
@@ -740,23 +825,34 @@ export async function applyPaylabsStatus(
     if (isTerminalStatus(orderStatus)) {
       orderUpdatePayload.terminal_at = now;
     }
-    await supabaseUpdate("orders", orderUpdatePayload, { filters: { id: `eq.${orderId}` } });
+    await supabaseUpdate("orders", orderUpdatePayload, {
+      filters: { id: `eq.${orderId}` },
+    });
   }
 
   try {
     await syncOrderPointsLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Lacte Points lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Lacte Points lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
   try {
     await syncOrderCommissionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Affiliate commission lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Affiliate commission lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
   try {
     await syncPromotionLifecycle(orderId, orderStatus);
   } catch (error) {
-    console.error(`Promotion lifecycle sync failed for order ${orderId}`, error);
+    console.error(
+      `Promotion lifecycle sync failed for order ${orderId}`,
+      error,
+    );
   }
 
   if (orderStatus === "paid" || orderStatus === "processing") {

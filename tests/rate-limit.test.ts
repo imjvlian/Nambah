@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { anonymizedKey } from "../src/lib/rate-limit.ts";
 
-function makeRequest(options: {
-  ip?: string;
-  agent?: string;
-} = {}) {
+function makeRequest(
+  options: {
+    ip?: string;
+    agent?: string;
+  } = {},
+) {
   return new Request("https://nambah.my.id/api/auth/verify-signup", {
     headers: {
       "x-forwarded-for": options.ip ?? "203.0.113.10",
@@ -30,6 +32,20 @@ test("different IPs produce different keys", () => {
   const a = anonymizedKey(makeRequest({ ip: "203.0.113.10" }), "scope");
   const b = anonymizedKey(makeRequest({ ip: "203.0.113.11" }), "scope");
   assert.notEqual(a, b);
+});
+
+test("the same subject produces the same key across different IPs", () => {
+  const a = anonymizedKey(
+    makeRequest({ ip: "203.0.113.10" }),
+    "scope",
+    "same@example.com",
+  );
+  const b = anonymizedKey(
+    makeRequest({ ip: "203.0.113.11" }),
+    "scope",
+    "same@example.com",
+  );
+  assert.equal(a, b);
 });
 
 test("the subject changes the key", () => {

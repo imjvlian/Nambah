@@ -44,7 +44,7 @@ function loadTurnstileScript(): Promise<TurnstileController | null> {
     turnstileScriptPromise = new Promise<TurnstileController | null>(
       (resolve, reject) => {
         const existing = document.querySelector<HTMLScriptElement>(
-          'script[data-turnstile-script="true"]',
+          'script[data-turnstile="true"]',
         );
 
         if (existing) {
@@ -167,5 +167,7 @@ export default function TurnstileWidget({
 
   if (!siteKey) return null;
 
-  return <div ref={containerRef} className="auth-turnstile" aria-hidden="true" />;
+  return (
+    <div ref={containerRef} className="auth-turnstile" aria-hidden="true" />
+  );
 }

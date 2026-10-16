@@ -6,6 +6,7 @@ import {
   isAdminRequestAuthorized,
   verifyAdminToken,
 } from "@/lib/admin-api";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { getNambahAdminAccount } from "@/lib/admin-account";
 import {
   appendResolvedNambahAuthCookies,
@@ -122,6 +123,13 @@ export async function GET(request: Request) {
 // Legacy token exchange is intentionally retained as an emergency/recovery path.
 // The dashboard no longer asks users to type this token.
 export async function POST(request: Request) {
+  const limited = await rateLimitResponse(request, {
+    scope: "admin-session-token",
+    limit: 10,
+    windowSeconds: 10 * 60,
+  });
+  if (limited) return limited;
+
   if (!isAdminApiConfigured()) {
     return Response.json(
       { error: "Admin session secret belum dikonfigurasi." },

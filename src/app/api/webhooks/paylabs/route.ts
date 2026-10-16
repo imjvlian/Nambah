@@ -28,12 +28,25 @@ type PaylabsNotificationBody = {
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
-    return Response.json({ errCode: "503", errCodeDes: "Database belum dikonfigurasi." }, { status: 503 });
+    return Response.json(
+      { errCode: "503", errCodeDes: "Database belum dikonfigurasi." },
+      { status: 503 },
+    );
   }
 
   const config = getPaylabsConfig();
   if (!config) {
-    return Response.json({ errCode: "503", errCodeDes: "Paylabs belum dikonfigurasi." }, { status: 503 });
+    return Response.json(
+      { errCode: "503", errCodeDes: "Paylabs belum dikonfigurasi." },
+      { status: 503 },
+    );
+  }
+
+  if (!config.publicKey) {
+    return Response.json(
+      { errCode: "503", errCodeDes: "Public key Paylabs belum dikonfigurasi." },
+      { status: 503 },
+    );
   }
 
   const rawBody = await request.text();
@@ -41,30 +54,37 @@ export async function POST(request: Request) {
   const timestamp = request.headers.get("x-timestamp");
   const signature = request.headers.get("x-signature");
 
-  if (config.publicKey) {
-    const valid = verifyPaylabsSignature({
-      method: "POST",
-      path: notificationPath,
-      body: rawBody,
-      timestamp,
-      signature,
-      publicKey: config.publicKey,
-    });
-    if (!valid) {
-      return Response.json({ errCode: "401", errCodeDes: "Signature tidak valid." }, { status: 401 });
-    }
+  const valid = verifyPaylabsSignature({
+    method: "POST",
+    path: notificationPath,
+    body: rawBody,
+    timestamp,
+    signature,
+    publicKey: config.publicKey,
+  });
+  if (!valid) {
+    return Response.json(
+      { errCode: "401", errCodeDes: "Signature tidak valid." },
+      { status: 401 },
+    );
   }
 
   let payload: PaylabsNotificationBody;
   try {
     payload = JSON.parse(rawBody) as PaylabsNotificationBody;
   } catch {
-    return Response.json({ errCode: "400", errCodeDes: "Payload tidak valid." }, { status: 400 });
+    return Response.json(
+      { errCode: "400", errCodeDes: "Payload tidak valid." },
+      { status: 400 },
+    );
   }
 
   const orderId = payload.merchantTradeNo?.trim() ?? "";
   if (!orderId) {
-    return Response.json({ errCode: "400", errCodeDes: "merchantTradeNo kosong." }, { status: 400 });
+    return Response.json(
+      { errCode: "400", errCodeDes: "merchantTradeNo kosong." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -79,7 +99,7 @@ export async function POST(request: Request) {
         raw: payload,
       },
       "webhook",
-      Boolean(config.publicKey),
+      true,
     );
 
     const responseTimestamp = paylabsTimestamp();
@@ -115,4 +135,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

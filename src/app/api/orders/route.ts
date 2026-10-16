@@ -726,7 +726,7 @@ if (isMerchantRetail) {
     return Response.json(
       {
         error: dokuFailure
-          ? `Gagal membuat pembayaran DOKU. ${detail}`.slice(0, 200)
+          ? "Gagal membuat pembayaran DOKU. Coba lagi sebentar."
           : "Gagal membuat pembayaran Midtrans.",
       },
       { status: 502 },
