@@ -20,11 +20,25 @@ function safeEqual(left: string, right: string) {
 }
 
 function configuredAdminToken() {
-  return process.env.NAMBAH_ADMIN_API_TOKEN?.trim() ?? "";
+  const token = process.env.NAMBAH_ADMIN_API_TOKEN?.trim() ?? "";
+  if (process.env.NODE_ENV === "production" && token && token.length < 32) {
+    console.error(
+      "NAMBAH_ADMIN_API_TOKEN terlalu pendek untuk production (minimal 32 karakter).",
+    );
+    return "";
+  }
+  return token;
 }
 
 function configuredAdminSessionSecret() {
-  return process.env.NAMBAH_ADMIN_SESSION_SECRET?.trim() || configuredAdminToken();
+  const secret = process.env.NAMBAH_ADMIN_SESSION_SECRET?.trim() ?? "";
+  if (process.env.NODE_ENV === "production" && secret && secret.length < 32) {
+    console.error(
+      "NAMBAH_ADMIN_SESSION_SECRET terlalu pendek untuk production (minimal 32 karakter).",
+    );
+    return "";
+  }
+  return secret || configuredAdminToken();
 }
 
 function signAdminSession(payload: string, secret: string) {
@@ -47,7 +61,9 @@ export function isAdminApiConfigured() {
 export function verifyAdminToken(suppliedToken: string) {
   const configuredToken = configuredAdminToken();
   return Boolean(
-    configuredToken && suppliedToken && safeEqual(suppliedToken.trim(), configuredToken),
+    configuredToken &&
+    suppliedToken &&
+    safeEqual(suppliedToken.trim(), configuredToken),
   );
 }
 
@@ -63,12 +79,12 @@ export function createAdminSessionValue(
   if (!secret) throw new Error("Admin session secret belum dikonfigurasi.");
 
   const mode = input?.mode ?? "legacy";
-  const role = mode === "legacy" ? "legacy" : input?.role ?? "admin";
+  const role = mode === "legacy" ? "legacy" : (input?.role ?? "admin");
   const payload = Buffer.from(
     JSON.stringify({
       exp: Math.floor(now / 1000) + ADMIN_SESSION_TTL_SECONDS,
       mode,
-      userId: mode === "account" ? input?.userId ?? null : null,
+      userId: mode === "account" ? (input?.userId ?? null) : null,
       role,
     }),
   ).toString("base64url");
@@ -107,7 +123,7 @@ export function verifyAdminSessionValue(value: string): AdminPrincipal | null {
     return {
       exp: parsed.exp,
       mode: parsed.mode,
-      userId: parsed.mode === "account" ? parsed.userId ?? null : null,
+      userId: parsed.mode === "account" ? (parsed.userId ?? null) : null,
       role: parsed.role,
     };
   } catch {
@@ -125,12 +141,20 @@ export function clearAdminSessionCookie() {
   return `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
-export function getAdminRequestPrincipal(request: Request): AdminPrincipal | null {
+export function getAdminRequestPrincipal(
+  request: Request,
+): AdminPrincipal | null {
   const configuredToken = configuredAdminToken();
   const header = request.headers.get("authorization") ?? "";
-  const suppliedToken = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const suppliedToken = header.startsWith("Bearer ")
+    ? header.slice(7).trim()
+    : "";
 
-  if (configuredToken && suppliedToken && safeEqual(suppliedToken, configuredToken)) {
+  if (
+    configuredToken &&
+    suppliedToken &&
+    safeEqual(suppliedToken, configuredToken)
+  ) {
     return {
       mode: "legacy",
       userId: null,
@@ -175,7 +199,10 @@ export function authorizeAdminRequest(
   ) {
     return {
       ok: false as const,
-      response: Response.json({ error: "Superadmin access required." }, { status: 403 }),
+      response: Response.json(
+        { error: "Superadmin access required." },
+        { status: 403 },
+      ),
     };
   }
 

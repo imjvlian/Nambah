@@ -77,7 +77,7 @@ test("sandbox Paylabs config still works without a public key", () => {
 
 test("Paylabs webhook signature can be signed and verified", () => {
   const body = { merchantTradeNo: "NBH-20261016-ABCDEF", status: "02" };
-  const timestamp = "2026-10-16T10:00:00.000+07:00";
+  const timestamp = new Date().toISOString();
   const path = "/api/webhooks/paylabs";
 
   const signature = createPaylabsSignature({
@@ -101,9 +101,35 @@ test("Paylabs webhook signature can be signed and verified", () => {
   );
 });
 
+test("Paylabs webhook signature rejects a stale timestamp", () => {
+  const body = { merchantTradeNo: "NBH-20261016-ABCDEF", status: "02" };
+  const timestamp = "2020-01-01T00:00:00.000+07:00";
+  const path = "/api/webhooks/paylabs";
+
+  const signature = createPaylabsSignature({
+    method: "POST",
+    path,
+    body,
+    timestamp,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+  });
+
+  assert.equal(
+    verifyPaylabsSignature({
+      method: "POST",
+      path,
+      body: JSON.stringify(body),
+      timestamp,
+      signature,
+      publicKey: publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }),
+    false,
+  );
+});
+
 test("Paylabs webhook signature rejects a different body", () => {
   const body = { merchantTradeNo: "NBH-20261016-ABCDEF", status: "02" };
-  const timestamp = "2026-10-16T10:00:00.000+07:00";
+  const timestamp = new Date().toISOString();
   const path = "/api/webhooks/paylabs";
 
   const signature = createPaylabsSignature({

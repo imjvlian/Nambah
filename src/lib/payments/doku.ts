@@ -6,6 +6,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { getDokuEnvironment } from "@/lib/payment-settings";
+import { isFreshWebhookTimestamp } from "@/lib/webhook-timestamp";
 import type { CreatePaymentInput, PaymentSession } from "./types";
 
 /**
@@ -65,7 +66,8 @@ export function getDokuSnapConfig(): DokuSnapConfig | null {
   // peringatan jelas supaya order tidak crash saat penandatanganan token.
   if (
     privateKey.includes("BEGIN PUBLIC KEY") ||
-    (!privateKey.includes("BEGIN") && privateKey.replace(/\s/g, "").startsWith("MIIBIj"))
+    (!privateKey.includes("BEGIN") &&
+      privateKey.replace(/\s/g, "").startsWith("MIIBIj"))
   ) {
     console.error(
       "DOKU_PRIVATE_KEY berisi PUBLIC key — mode SNAP dinonaktifkan. Tempel PRIVATE key RSA (-----BEGIN PRIVATE KEY-----).",
@@ -142,7 +144,11 @@ async function getAccessToken(config: DokuSnapConfig): Promise<string> {
 
   const timestamp = snapTimestamp();
   const stringToSign = `${config.clientId}|${timestamp}`;
-  const signature = rsaSign("RSA-SHA256", Buffer.from(stringToSign, "utf8"), config.privateKey).toString("base64");
+  const signature = rsaSign(
+    "RSA-SHA256",
+    Buffer.from(stringToSign, "utf8"),
+    config.privateKey,
+  ).toString("base64");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -288,7 +294,9 @@ export async function createDokuQrisPayment(
 ): Promise<PaymentSession> {
   const config = getDokuSnapConfig();
   if (!config) {
-    throw new Error("DOKU SNAP belum dikonfigurasi (CLIENT_ID/SECRET_KEY/PRIVATE_KEY/MERCHANT_ID/TERMINAL_ID).");
+    throw new Error(
+      "DOKU SNAP belum dikonfigurasi (CLIENT_ID/SECRET_KEY/PRIVATE_KEY/MERCHANT_ID/TERMINAL_ID).",
+    );
   }
 
   const validityPeriod = new Date(
@@ -329,14 +337,12 @@ export async function createDokuQrisPayment(
 }
 
 export type DokuTransactionStatus =
-  | "settlement"
-  | "pending"
-  | "refund"
-  | "cancel"
-  | "failure";
+  "settlement" | "pending" | "refund" | "cancel" | "failure";
 
 /** Mapping kode status SNAP → status ternormalisasi gaya Midtrans. */
-export function mapDokuTransactionStatus(code: string | undefined): DokuTransactionStatus {
+export function mapDokuTransactionStatus(
+  code: string | undefined,
+): DokuTransactionStatus {
   switch (code) {
     case "00":
       return "settlement";
@@ -430,6 +436,7 @@ export function verifyDokuNotificationSignature(input: {
     .replace(/^Bearer\s+/i, "")
     .trim();
   if (!accessToken || !input.timestamp || !input.signature) return false;
+  if (!isFreshWebhookTimestamp(input.timestamp)) return false;
 
   const expected = buildSnapSignature({
     method: input.method,
@@ -560,7 +567,11 @@ function checkoutMethodTypes(input: CreatePaymentInput): string[] | null {
       "VIRTUAL_ACCOUNT_DOKU",
     ];
   }
-  if (method.includes("ewallet") || method.includes("e-wallet") || method.includes("emoney")) {
+  if (
+    method.includes("ewallet") ||
+    method.includes("e-wallet") ||
+    method.includes("emoney")
+  ) {
     return ["EMONEY_OVO", "EMONEY_DANA", "EMONEY_SHOPEE_PAY", "EMONEY_LINKAJA"];
   }
   return null;
@@ -635,7 +646,9 @@ export async function createDokuCheckoutPayment(
 ): Promise<PaymentSession> {
   const config = getDokuCheckoutConfig();
   if (!config) {
-    throw new Error("DOKU Checkout belum dikonfigurasi (DOKU_CLIENT_ID / DOKU_SECRET_KEY).");
+    throw new Error(
+      "DOKU Checkout belum dikonfigurasi (DOKU_CLIENT_ID / DOKU_SECRET_KEY).",
+    );
   }
 
   let methodTypes = checkoutMethodTypes(input);
@@ -644,7 +657,11 @@ export async function createDokuCheckoutPayment(
   // Channel hasil mapping bisa belum diaktifkan di akun merchant (umum di
   // sandbox) — fallback tanpa filter supaya halaman checkout menampilkan
   // semua channel yang AKTIF daripada order gagal total.
-  let messages = (attempt.result.error_messages ?? attempt.result.message ?? []).join(", ");
+  let messages = (
+    attempt.result.error_messages ??
+    attempt.result.message ??
+    []
+  ).join(", ");
   if (
     attempt.status === 400 &&
     methodTypes &&
@@ -655,7 +672,11 @@ export async function createDokuCheckoutPayment(
     );
     methodTypes = null;
     attempt = await checkoutCreateRequest(config, input, null);
-    messages = (attempt.result.error_messages ?? attempt.result.message ?? []).join(", ");
+    messages = (
+      attempt.result.error_messages ??
+      attempt.result.message ??
+      []
+    ).join(", ");
   }
 
   const url = attempt.result.response?.payment?.url;
@@ -670,7 +691,9 @@ export async function createDokuCheckoutPayment(
     payload: {
       kind: "redirect",
       redirectUrl: url,
-      expiresAt: parseDokuExpiredDate(attempt.result.response?.payment?.expired_date),
+      expiresAt: parseDokuExpiredDate(
+        attempt.result.response?.payment?.expired_date,
+      ),
       raw: {
         mode: "checkout",
         requestId: attempt.requestId,
@@ -693,7 +716,9 @@ type CheckoutStatusResponse = {
 };
 
 /** Mapping status non-SNAP (Checkout) → status ternormalisasi gaya Midtrans. */
-export function mapDokuCheckoutStatus(status: string | undefined): DokuTransactionStatus {
+export function mapDokuCheckoutStatus(
+  status: string | undefined,
+): DokuTransactionStatus {
   switch ((status ?? "").toUpperCase()) {
     case "SUCCESS":
       return "settlement";
@@ -759,7 +784,8 @@ export async function fetchDokuCheckoutStatus(
       transactionStatus: mapDokuCheckoutStatus(result.transaction?.status),
       transactionStatusDesc: result.transaction?.status ?? null,
       paidTime: result.transaction?.date ?? null,
-      amountValue: result.order?.amount != null ? String(result.order.amount) : null,
+      amountValue:
+        result.order?.amount != null ? String(result.order.amount) : null,
       raw: result,
     };
   } finally {
@@ -778,9 +804,15 @@ export function verifyDokuNonSnapNotification(input: {
 }): boolean {
   const config = getDokuCheckoutConfig();
   if (!config) return false;
-  if (!input.clientId || !input.requestId || !input.timestamp || !input.signature) {
+  if (
+    !input.clientId ||
+    !input.requestId ||
+    !input.timestamp ||
+    !input.signature
+  ) {
     return false;
   }
+  if (!isFreshWebhookTimestamp(input.timestamp)) return false;
   if (input.clientId !== config.clientId) return false;
 
   const expected = buildNonSnapSignature({

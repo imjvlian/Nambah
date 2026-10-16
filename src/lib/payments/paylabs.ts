@@ -10,6 +10,7 @@ import {
   getPaylabsEnvironment,
   type PaymentProviderId,
 } from "@/lib/payment-settings";
+import { isFreshWebhookTimestamp } from "@/lib/webhook-timestamp";
 import type { CreatePaymentInput, PaymentSession } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,7 @@ export function verifyPaylabsSignature(input: {
   publicKey: string;
 }) {
   if (!input.timestamp || !input.signature || !input.publicKey) return false;
+  if (!isFreshWebhookTimestamp(input.timestamp)) return false;
   let minified: string;
   try {
     minified = minifyJson(JSON.parse(input.body));
