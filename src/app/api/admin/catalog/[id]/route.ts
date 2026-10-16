@@ -48,7 +48,10 @@ export async function PATCH(
   try {
     body = (await request.json()) as UpdateProductBody;
   } catch {
-    return Response.json({ error: "Request update produk tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request update produk tidak valid." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -59,10 +62,14 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+      return Response.json(
+        { error: "Produk tidak ditemukan." },
+        { status: 404 },
+      );
     }
 
-    const nextLabel = body.label === undefined ? existing.label : body.label.trim();
+    const nextLabel =
+      body.label === undefined ? existing.label : body.label.trim();
     const nextNote =
       body.note === undefined
         ? existing.note
@@ -70,12 +77,15 @@ export async function PATCH(
           ? null
           : body.note.trim().slice(0, 120) || null;
     const nextSellingPrice =
-      body.sellingPrice === undefined ? Number(existing.selling_price) : body.sellingPrice;
+      body.sellingPrice === undefined
+        ? Number(existing.selling_price)
+        : body.sellingPrice;
     const nextReferencePrice =
       body.referencePrice === undefined
         ? Number(existing.reference_price)
         : body.referencePrice;
-    const nextActive = body.active === undefined ? existing.active : body.active;
+    const nextActive =
+      body.active === undefined ? existing.active : body.active;
 
     if (!nextLabel || nextLabel.length > 100) {
       return Response.json(
@@ -85,12 +95,20 @@ export async function PATCH(
     }
 
     if (!validMoney(nextSellingPrice) || nextSellingPrice <= 0) {
-      return Response.json({ error: "Harga jual tidak valid." }, { status: 400 });
+      return Response.json(
+        { error: "Harga jual tidak valid." },
+        { status: 400 },
+      );
     }
 
-    if (!validMoney(nextReferencePrice) || nextReferencePrice < nextSellingPrice) {
+    if (
+      !validMoney(nextReferencePrice) ||
+      nextReferencePrice < nextSellingPrice
+    ) {
       return Response.json(
-        { error: "Reference price harus sama atau lebih besar dari harga jual." },
+        {
+          error: "Reference price harus sama atau lebih besar dari harga jual.",
+        },
         { status: 400 },
       );
     }
@@ -105,25 +123,36 @@ export async function PATCH(
     let nextInternalSku = existing.internal_sku;
     if (body.internalSku !== undefined) {
       const diisi =
-        body.internalSku === null ? null : body.internalSku.trim().toUpperCase();
+        body.internalSku === null
+          ? null
+          : body.internalSku.trim().toUpperCase();
       if (diisi === "") {
         return Response.json(
-          { error: "SKU internal tidak boleh dikosongkan - kosongkan lewat generator saja." },
+          {
+            error:
+              "SKU internal tidak boleh dikosongkan - kosongkan lewat generator saja.",
+          },
           { status: 400 },
         );
       }
       if (diisi && !/^[A-Z0-9_-]{3,120}$/.test(diisi)) {
         return Response.json(
-          { error: "SKU internal hanya boleh huruf besar, angka, tanda hubung, dan garis bawah (3-120 karakter)." },
+          {
+            error:
+              "SKU internal hanya boleh huruf besar, angka, tanda hubung, dan garis bawah (3-120 karakter).",
+          },
           { status: 400 },
         );
       }
       if (diisi && diisi !== existing.internal_sku) {
-        const bentrok = await supabaseSelect<{ id: string; label: string }>("products", {
-          select: "id,label",
-          filters: { internal_sku: `eq.${diisi}` },
-          limit: 1,
-        });
+        const bentrok = await supabaseSelect<{ id: string; label: string }>(
+          "products",
+          {
+            select: "id,label",
+            filters: { internal_sku: `eq.${diisi}` },
+            limit: 1,
+          },
+        );
         if (bentrok.length > 0) {
           return Response.json(
             {
@@ -150,6 +179,34 @@ export async function PATCH(
       { filters: { id: `eq.${productId}` } },
     );
 
+    await auditAdminAction(request, {
+      action: "catalog.product.update",
+      targetType: "product",
+      targetId: productId,
+      metadata: {
+        label: {
+          from: existing.label,
+          to: nextLabel,
+        },
+        sellingPrice: {
+          from: Number(existing.selling_price),
+          to: nextSellingPrice,
+        },
+        referencePrice: {
+          from: Number(existing.reference_price),
+          to: nextReferencePrice,
+        },
+        active: {
+          from: existing.active,
+          to: nextActive,
+        },
+        internalSku: {
+          from: existing.internal_sku,
+          to: nextInternalSku,
+        },
+      },
+    });
+
     return Response.json({
       product: {
         id: updated?.id ?? productId,
@@ -163,7 +220,10 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("Admin product update failed", error);
-    return Response.json({ error: "Produk gagal diperbarui." }, { status: 502 });
+    return Response.json(
+      { error: "Produk gagal diperbarui." },
+      { status: 502 },
+    );
   }
 }
 
@@ -215,7 +275,10 @@ export async function DELETE(
     });
 
     if (!existing) {
-      return Response.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+      return Response.json(
+        { error: "Produk tidak ditemukan." },
+        { status: 404 },
+      );
     }
 
     if (existing.active) {

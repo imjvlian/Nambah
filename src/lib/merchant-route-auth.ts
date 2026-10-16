@@ -1,6 +1,9 @@
 import "server-only";
 
-import { resolveMerchantForCode, type MerchantAuthRow } from "@/lib/merchant-auth";
+import {
+  resolveMerchantForCode,
+  type MerchantAuthRow,
+} from "@/lib/merchant-auth";
 import { rateLimitResponse } from "@/lib/rate-limit";
 /**
  * Autentikasi kasir untuk endpoint merchant.
@@ -48,6 +51,20 @@ export async function authenticateMerchant(
     };
   }
 
+  /*
+   * Limit per kode toko, di atas limit per IP.
+   *
+   * PIN-nya 6 digit. Tanpa limit per kode, botnet yang tahu kode toko bisa
+   * mencoba PIN dari banyak IP tanpa pernah kena lockout di toko itu.
+   */
+  const codeLimited = await rateLimitResponse(request, {
+    scope: `${rateLimitScope}_code`,
+    limit: 10,
+    windowSeconds: 300,
+    subject: code,
+  });
+  if (codeLimited) return { response: codeLimited };
+
   const merchant = await resolveMerchantForCode(code, pin);
 
   if (!merchant) {
@@ -90,22 +107,3 @@ export async function authenticateMerchant(
 
   return { merchant };
 }
-import { fulfillPaidOrder } from "@/lib/fulfillment";
-import {
-  isMerchantRetailEnabled,
-  syncMerchantBalance,
-} from "@/lib/merchant-retail";
-
-/**
- * POST /api/merchant/confirm — kasir memindai kode pesanan.
- *
- * Autentikasi merchant memakai `code` + `pin`, bukan sesi Supabase. Alasannya
- * operasional: kasir berada di konter dengan satu perangkat, sering berubah,
- * dan harus bisa masuk tanpa email. `merchants.user_id` tetap tersedia untuk
- * merchant yang memang punya akun, tapi jalur kodenya cukup untuk pekerjaan
- * harian dan tidak menambah langkah login yang tidak perlu.
- *
- * PIN tidak disimpan di database. Yang disimpan adalah hash-nya, pakai
- * scrypt yang sama dengan password pengguna, supaya kebocoran satu merchant
- * tidak langsung memberi akses ke yang lain.
- */

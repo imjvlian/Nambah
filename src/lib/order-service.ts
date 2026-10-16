@@ -18,6 +18,7 @@ import { isTerminalStatus } from "./order-status";
 import {
   nextOrderStatusFromPayment,
   normalizePaymentStatus,
+  type NambahOrderStatus,
   type NormalizedPaymentStatus,
 } from "@/lib/payment-status-policy";
 
@@ -98,6 +99,66 @@ type SupplierTransactionPublicRow = {
 };
 
 type MidtransSource = "webhook" | "status_api";
+
+type OrderStatusRow = {
+  status: NambahOrderStatus;
+};
+
+/**
+ * Transisi status order dengan compare-and-swap.
+ *
+ * Webhook dan tombol refresh bisa datang hampir bersamaan. Tanpa CAS,
+ * dua proses membaca status yang sama lalu saling menimpa: settlement bisa
+ * ditimpa expire, dan order yang sudah dibayar jadi batal. Helper ini
+ * mengulangi transisi dari status terbaru kalau ada proses lain yang lebih
+ * dulu menulis.
+ */
+async function transitionOrderStatus(input: {
+  orderId: string;
+  fromStatus: NambahOrderStatus;
+  nextStatus: NambahOrderStatus;
+  buildPayload: (
+    now: string,
+    nextStatus: NambahOrderStatus,
+  ) => Record<string, unknown>;
+  recompute: (status: NambahOrderStatus) => NambahOrderStatus;
+}): Promise<NambahOrderStatus> {
+  let from = input.fromStatus;
+  let next = input.nextStatus;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (next === from) return from;
+
+    const now = new Date().toISOString();
+    const updated = await supabaseUpdate<OrderStatusRow>(
+      "orders",
+      input.buildPayload(now, next),
+      {
+        filters: {
+          id: `eq.${input.orderId}`,
+          status: `eq.${from}`,
+        },
+      },
+    );
+
+    if (updated.length > 0) return updated[0].status;
+
+    const [fresh] = await supabaseSelect<OrderStatusRow>("orders", {
+      select: "status",
+      filters: { id: `eq.${input.orderId}` },
+      limit: 1,
+    });
+
+    if (!fresh) {
+      throw new Error(`Order ${input.orderId} hilang saat update status.`);
+    }
+
+    from = fresh.status;
+    next = input.recompute(from);
+  }
+
+  return from;
+}
 
 export async function getPublicOrder(
   orderId: string,
@@ -355,7 +416,7 @@ export async function applyMidtransStatus(
   const paymentStatus: NormalizedPaymentStatus = normalizePaymentStatus(
     payload.transaction_status,
   );
-  const orderStatus = nextOrderStatusFromPayment(order.status, {
+  let orderStatus = nextOrderStatusFromPayment(order.status, {
     transactionStatus: payload.transaction_status,
     fraudStatus: payload.fraud_status,
   });
@@ -405,20 +466,29 @@ export async function applyMidtransStatus(
   }
 
   if (orderStatus !== order.status) {
-    const orderUpdatePayload: Record<string, unknown> = {
-      status: orderStatus,
-      updated_at: now,
-    };
-    if (orderStatus === "paid") {
-      orderUpdatePayload.paid_at = payload.settlement_time ?? now;
-    }
-    if (isTerminalStatus(orderStatus)) {
-      orderUpdatePayload.terminal_at = now;
-    }
-    orderUpdatePayload.status_changed_at = now;
-
-    await supabaseUpdate("orders", orderUpdatePayload, {
-      filters: { id: `eq.${orderId}` },
+    orderStatus = await transitionOrderStatus({
+      orderId,
+      fromStatus: order.status,
+      nextStatus: orderStatus,
+      buildPayload: (timestamp, nextStatus) => {
+        const orderUpdatePayload: Record<string, unknown> = {
+          status: nextStatus,
+          updated_at: timestamp,
+        };
+        if (nextStatus === "paid") {
+          orderUpdatePayload.paid_at = payload.settlement_time ?? timestamp;
+        }
+        if (isTerminalStatus(nextStatus)) {
+          orderUpdatePayload.terminal_at = timestamp;
+        }
+        orderUpdatePayload.status_changed_at = timestamp;
+        return orderUpdatePayload;
+      },
+      recompute: (status) =>
+        nextOrderStatusFromPayment(status, {
+          transactionStatus: payload.transaction_status,
+          fraudStatus: payload.fraud_status,
+        }),
     });
   }
 
@@ -559,7 +629,7 @@ export async function applyDokuStatus(
 
   const now = new Date().toISOString();
   const paymentStatus = normalizePaymentStatus(input.transactionStatus);
-  const orderStatus = nextOrderStatusFromPayment(order.status, {
+  let orderStatus = nextOrderStatusFromPayment(order.status, {
     transactionStatus: input.transactionStatus,
     fraudStatus: null,
   });
@@ -620,19 +690,29 @@ export async function applyDokuStatus(
   }
 
   if (orderStatus !== order.status) {
-    const orderUpdatePayload: Record<string, unknown> = {
-      status: orderStatus,
-      updated_at: now,
-      status_changed_at: now,
-    };
-    if (orderStatus === "paid") {
-      orderUpdatePayload.paid_at = input.paidTime ?? now;
-    }
-    if (isTerminalStatus(orderStatus)) {
-      orderUpdatePayload.terminal_at = now;
-    }
-    await supabaseUpdate("orders", orderUpdatePayload, {
-      filters: { id: `eq.${orderId}` },
+    orderStatus = await transitionOrderStatus({
+      orderId,
+      fromStatus: order.status,
+      nextStatus: orderStatus,
+      buildPayload: (timestamp, nextStatus) => {
+        const orderUpdatePayload: Record<string, unknown> = {
+          status: nextStatus,
+          updated_at: timestamp,
+          status_changed_at: timestamp,
+        };
+        if (nextStatus === "paid") {
+          orderUpdatePayload.paid_at = input.paidTime ?? timestamp;
+        }
+        if (isTerminalStatus(nextStatus)) {
+          orderUpdatePayload.terminal_at = timestamp;
+        }
+        return orderUpdatePayload;
+      },
+      recompute: (status) =>
+        nextOrderStatusFromPayment(status, {
+          transactionStatus: input.transactionStatus,
+          fraudStatus: null,
+        }),
     });
   }
 
@@ -754,7 +834,7 @@ export async function applyPaylabsStatus(
   const now = new Date().toISOString();
   const normalizedStatus = normalizePaylabsTransactionStatus(input.status);
   const paymentStatus = normalizePaymentStatus(normalizedStatus);
-  const orderStatus = nextOrderStatusFromPayment(order.status, {
+  let orderStatus = nextOrderStatusFromPayment(order.status, {
     transactionStatus: normalizedStatus,
     fraudStatus: null,
   });
@@ -814,19 +894,29 @@ export async function applyPaylabsStatus(
   }
 
   if (orderStatus !== order.status) {
-    const orderUpdatePayload: Record<string, unknown> = {
-      status: orderStatus,
-      updated_at: now,
-      status_changed_at: now,
-    };
-    if (orderStatus === "paid") {
-      orderUpdatePayload.paid_at = input.paidTime ?? now;
-    }
-    if (isTerminalStatus(orderStatus)) {
-      orderUpdatePayload.terminal_at = now;
-    }
-    await supabaseUpdate("orders", orderUpdatePayload, {
-      filters: { id: `eq.${orderId}` },
+    orderStatus = await transitionOrderStatus({
+      orderId,
+      fromStatus: order.status,
+      nextStatus: orderStatus,
+      buildPayload: (timestamp, nextStatus) => {
+        const orderUpdatePayload: Record<string, unknown> = {
+          status: nextStatus,
+          updated_at: timestamp,
+          status_changed_at: timestamp,
+        };
+        if (nextStatus === "paid") {
+          orderUpdatePayload.paid_at = input.paidTime ?? timestamp;
+        }
+        if (isTerminalStatus(nextStatus)) {
+          orderUpdatePayload.terminal_at = timestamp;
+        }
+        return orderUpdatePayload;
+      },
+      recompute: (status) =>
+        nextOrderStatusFromPayment(status, {
+          transactionStatus: normalizedStatus,
+          fraudStatus: null,
+        }),
     });
   }
 

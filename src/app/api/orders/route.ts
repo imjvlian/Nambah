@@ -16,6 +16,7 @@ import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 import { allocateMerchantScanCode } from "@/lib/merchant-confirm";
 import { isFlowTestMode } from "@/lib/flow-test";
 import { pilihSupplierUntukProduk } from "@/lib/suppliers/selection-service";
+import { reserveSupplierBalance } from "@/lib/suppliers/reservation";
 import {
   MERCHANT_ORDER_EXPIRY_WINDOW_MS,
   checkMerchantCredit,
@@ -47,7 +48,12 @@ import {
 } from "@/lib/order-access";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
-import { isSupabaseConfigured, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/supabase/server";
+import {
+  isSupabaseConfigured,
+  supabaseInsert,
+  supabaseSelect,
+  supabaseUpdate,
+} from "@/lib/supabase/server";
 import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
@@ -102,7 +108,9 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return Response.json(
-      { error: `Database ${BRAND.shortName} belum dikonfigurasi untuk membuat order.` },
+      {
+        error: `Database ${BRAND.shortName} belum dikonfigurasi untuk membuat order.`,
+      },
       { status: 503 },
     );
   }
@@ -127,7 +135,10 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as CreateOrderBody;
   } catch {
-    return Response.json({ error: "Request order tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request order tidak valid." },
+      { status: 400 },
+    );
   }
 
   // Sengaja TIDAK dipotong di sini. Nilai mentah diteruskan ke
@@ -145,7 +156,9 @@ export async function POST(request: Request) {
     receiptEmail = normalizeReceiptEmail(auth.user.email);
     if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
       return Response.json(
-        { error: `Email akun ${BRAND.shortName} tidak tersedia untuk receipt.` },
+        {
+          error: `Email akun ${BRAND.shortName} tidak tersedia untuk receipt.`,
+        },
         { status: 409 },
       );
     }
@@ -159,10 +172,7 @@ export async function POST(request: Request) {
         limit: 1,
       });
       const normalizedWhatsapp = normalizeReceiptWhatsapp(profile?.whatsapp);
-      if (
-        normalizedWhatsapp &&
-        isValidIndonesianWhatsapp(normalizedWhatsapp)
-      ) {
+      if (normalizedWhatsapp && isValidIndonesianWhatsapp(normalizedWhatsapp)) {
         receiptWhatsapp = normalizedWhatsapp;
       }
     } catch (error) {
@@ -190,7 +200,10 @@ export async function POST(request: Request) {
   });
 
   if (!pricingContext.ok) {
-    return Response.json({ error: pricingContext.error }, { status: pricingContext.status });
+    return Response.json(
+      { error: pricingContext.error },
+      { status: pricingContext.status },
+    );
   }
 
   if (pricingContext.context.source !== "supabase") {
@@ -217,7 +230,10 @@ export async function POST(request: Request) {
   });
 
   if (!gameConfig) {
-    return Response.json({ error: "Konfigurasi akun produk tidak ditemukan." }, { status: 409 });
+    return Response.json(
+      { error: "Konfigurasi akun produk tidak ditemukan." },
+      { status: 409 },
+    );
   }
 
   const account = validateGameAccountTarget(
@@ -236,72 +252,73 @@ export async function POST(request: Request) {
   }
 
   /*
- * Jalur merchant Dan jalur Midtrans/DOKU dipisah di sini, bukan digabung.
- *
- * Jalur merchant TIDAK lewat payment gateway sama sekali: user membayar ke
- * merchant, merchant yang scan kodenya. Jadi semua gate Midtrans di bawah
- * (payment type, expiry window, webhook) TIDAK berlaku untuknya — memaksa
- * order merchant lewat Midtrans akan membuat customer membayar dua kali.
- *
- * Sebaliknya, jalur merchant punya gate sendiri: env flag, merchant harus
- * ada dan aktif, dan kapasitas piutangnya harus cukup.
- */
-const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
-let merchant: MerchantRow | null = null;
+   * Jalur merchant Dan jalur Midtrans/DOKU dipisah di sini, bukan digabung.
+   *
+   * Jalur merchant TIDAK lewat payment gateway sama sekali: user membayar ke
+   * merchant, merchant yang scan kodenya. Jadi semua gate Midtrans di bawah
+   * (payment type, expiry window, webhook) TIDAK berlaku untuknya — memaksa
+   * order merchant lewat Midtrans akan membuat customer membayar dua kali.
+   *
+   * Sebaliknya, jalur merchant punya gate sendiri: env flag, merchant harus
+   * ada dan aktif, dan kapasitas piutangnya harus cukup.
+   */
+  const isMerchantRetail =
+    paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+  let merchant: MerchantRow | null = null;
 
-/*
- * Hanya dipakai di jalur gateway. Di jalur merchant nilainya tidak pernah
- * dibaca — `createPaymentSession` seluruhnya dilewati. tetap dideklarasikan di
- * luar `else` karena TypeScript membutuhkannya ada di scope saat blok
- * `if (!isMerchantRetail)` dievaluasi.
- */
-let enabledPayments: string[] = [];
+  /*
+   * Hanya dipakai di jalur gateway. Di jalur merchant nilainya tidak pernah
+   * dibaca — `createPaymentSession` seluruhnya dilewati. tetap dideklarasikan di
+   * luar `else` karena TypeScript membutuhkannya ada di scope saat blok
+   * `if (!isMerchantRetail)` dievaluasi.
+   */
+  let enabledPayments: string[] = [];
 
-if (isMerchantRetail) {
-  if (!isMerchantRetailEnabled()) {
-    return Response.json(
-      { error: "Pembelian lewat toko ritel belum tersedia." },
-      { status: 403 },
-    );
-  }
-
-  // Merchant dipilih eksplisit. Tidak ada default: memilih merchant acak
-  // berarti user membayar ke orang yang tidak dipilihnya.
-  const requestedMerchantId =
-    typeof body.merchantId === "string" ? body.merchantId.trim() : "";
-  if (!requestedMerchantId) {
-    return Response.json(
-      { error: "Pilih toko ritel sebelum melanjutkan checkout." },
-      { status: 400 },
-    );
-  }
-
-  merchant = await getMerchantById(requestedMerchantId);
-  if (!merchant) {
-    return Response.json(
-      { error: "Toko ritel yang dipilih tidak ditemukan." },
-      { status: 404 },
-    );
-  }
-
-  const credit = await checkMerchantCredit(merchant.id);
-  if (!credit.eligible) {
-    return Response.json({ error: credit.reason }, { status: 409 });
-  }
-} else {
-  if (activePaymentProvider === "paylabs") {
-    // Paylabs memetakan channel langsung di createPaymentSession (QRIS/VA/HTML5 fallback).
-    enabledPayments = [];
-  } else {
-    enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
-    if (!enabledPayments.length) {
+  if (isMerchantRetail) {
+    if (!isMerchantRetailEnabled()) {
       return Response.json(
-        { error: "Metode pembayaran belum didukung Midtrans." },
+        { error: "Pembelian lewat toko ritel belum tersedia." },
+        { status: 403 },
+      );
+    }
+
+    // Merchant dipilih eksplisit. Tidak ada default: memilih merchant acak
+    // berarti user membayar ke orang yang tidak dipilihnya.
+    const requestedMerchantId =
+      typeof body.merchantId === "string" ? body.merchantId.trim() : "";
+    if (!requestedMerchantId) {
+      return Response.json(
+        { error: "Pilih toko ritel sebelum melanjutkan checkout." },
         { status: 400 },
       );
     }
+
+    merchant = await getMerchantById(requestedMerchantId);
+    if (!merchant) {
+      return Response.json(
+        { error: "Toko ritel yang dipilih tidak ditemukan." },
+        { status: 404 },
+      );
+    }
+
+    const credit = await checkMerchantCredit(merchant.id);
+    if (!credit.eligible) {
+      return Response.json({ error: credit.reason }, { status: 409 });
+    }
+  } else {
+    if (activePaymentProvider === "paylabs") {
+      // Paylabs memetakan channel langsung di createPaymentSession (QRIS/VA/HTML5 fallback).
+      enabledPayments = [];
+    } else {
+      enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
+      if (!enabledPayments.length) {
+        return Response.json(
+          { error: "Metode pembayaran belum didukung Midtrans." },
+          { status: 400 },
+        );
+      }
+    }
   }
-}
 
   const pointsRequest = validateRequestedPoints(body.pointsToRedeem);
   if (!pointsRequest.ok) {
@@ -326,7 +343,10 @@ if (isMerchantRetail) {
 
   if (!basePricing.safeToCheckout) {
     return Response.json(
-      { error: basePricing.rejectionReason ?? "Harga belum aman untuk checkout." },
+      {
+        error:
+          basePricing.rejectionReason ?? "Harga belum aman untuk checkout.",
+      },
       { status: 409 },
     );
   }
@@ -400,7 +420,10 @@ if (isMerchantRetail) {
   }
 
   if (!Number.isInteger(pricing.finalPrice) || pricing.finalPrice <= 0) {
-    return Response.json({ error: "Total pembayaran tidak valid." }, { status: 409 });
+    return Response.json(
+      { error: "Total pembayaran tidak valid." },
+      { status: 409 },
+    );
   }
 
   const orderId = createOrderId();
@@ -459,10 +482,7 @@ if (isMerchantRetail) {
       cost: pricing.supplierCost,
     };
   } else {
-    return Response.json(
-      { error: supplierSelection.detail },
-      { status: 409 },
-    );
+    return Response.json({ error: supplierSelection.detail }, { status: 409 });
   }
 
   // Pembuatan order di bawah ini adalah saga 6 langkah, bukan transaksi: ada
@@ -538,6 +558,44 @@ if (isMerchantRetail) {
       terminal_at: null,
     });
 
+    /*
+     * Kunci saldo supplier SEBELUM order dianggap siap dibayar.
+     *
+     * `pilihSupplierUntukProduk` hanya membaca saldo bebas. Tanpa reservasi,
+     * dua order bersamaan bisa dua-duanya lolos cek, dua-duanya dibayar,
+     * lalu salah satu gagal di supplier karena saldo riilnya habis.
+     * Reservasi ini membuat `releaseSupplierReservationForOrder` di
+     * `cancelOrderWithCleanup` benar-benar bermakna.
+     *
+     * Flow test mode sengaja dilewati supaya test lab tidak menggerakkan
+     * saldo supplier nyata.
+     */
+    const reservationOutcome = isFlowTestMode()
+      ? ("ok" as const)
+      : await reserveSupplierBalance(
+          supplierTerpilih.supplierId,
+          supplierTerpilih.cost,
+        );
+
+    if (reservationOutcome !== "ok") {
+      await cancelOrderWithCleanup(
+        orderId,
+        reservationOutcome === "insufficient"
+          ? "supplier_balance_insufficient"
+          : "supplier_balance_reservation_failed",
+      );
+
+      return Response.json(
+        {
+          error:
+            reservationOutcome === "insufficient"
+              ? "Saldo supplier sedang tidak cukup untuk produk ini."
+              : "Produk ini sedang tidak bisa dibeli. Coba beberapa saat lagi.",
+        },
+        { status: 409 },
+      );
+    }
+
     if (pricing.pointsRedeemed > 0 && auth.user) {
       try {
         await reserveOrderPoints(orderId, auth.user.id);
@@ -607,7 +665,11 @@ if (isMerchantRetail) {
         await cancelOrderWithCleanup(orderId, "snap_create_failed");
         await supabaseUpdate(
           "payments",
-          { status: "failure", raw_status: "snap_create_failed", updated_at: new Date().toISOString() },
+          {
+            status: "failure",
+            raw_status: "snap_create_failed",
+            updated_at: new Date().toISOString(),
+          },
           { filters: { order_id: `eq.${orderId}` } },
         );
         throw error;
@@ -636,10 +698,14 @@ if (isMerchantRetail) {
           await supabaseUpdate(
             "payments",
             {
-              provider_transaction_id: raw?.referenceNo ?? raw?.requestId ?? null,
-              payment_type: session.payload.kind === "qris" ? "qris" : "checkout",
+              provider_transaction_id:
+                raw?.referenceNo ?? raw?.requestId ?? null,
+              payment_type:
+                session.payload.kind === "qris" ? "qris" : "checkout",
               payment_payload: {
-                mode: raw?.mode ?? (session.payload.kind === "qris" ? "snap" : "checkout"),
+                mode:
+                  raw?.mode ??
+                  (session.payload.kind === "qris" ? "snap" : "checkout"),
                 qrContent: session.payload.qrContent ?? null,
                 expiresAt: session.payload.expiresAt ?? null,
                 referenceNo: raw?.referenceNo ?? null,
@@ -650,7 +716,10 @@ if (isMerchantRetail) {
             { filters: { order_id: `eq.${orderId}` } },
           );
         } catch (error) {
-          console.error(`DOKU session payload persist failed for order ${orderId}`, error);
+          console.error(
+            `DOKU session payload persist failed for order ${orderId}`,
+            error,
+          );
         }
       }
 
@@ -684,10 +753,12 @@ if (isMerchantRetail) {
             { filters: { order_id: `eq.${orderId}` } },
           );
         } catch (error) {
-          console.error(`Paylabs session payload persist failed for order ${orderId}`, error);
+          console.error(
+            `Paylabs session payload persist failed for order ${orderId}`,
+            error,
+          );
         }
       }
-
     }
 
     const order = await getPublicOrder(orderId);
@@ -696,7 +767,10 @@ if (isMerchantRetail) {
     const responseHeaders = new Headers({
       "Cache-Control": "private, no-store",
     });
-    responseHeaders.append("Set-Cookie", createOrderAccessCookie(orderId, access.token));
+    responseHeaders.append(
+      "Set-Cookie",
+      createOrderAccessCookie(orderId, access.token),
+    );
     appendResolvedNambahAuthCookies(responseHeaders, auth);
 
     return Response.json(

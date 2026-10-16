@@ -28,7 +28,10 @@ export async function POST(request: Request) {
     appendResolvedNambahAuthCookies(headers, auth);
 
     if (!auth.user) {
-      return Response.json({ error: "Login diperlukan." }, { status: 401, headers });
+      return Response.json(
+        { error: "Login diperlukan." },
+        { status: 401, headers },
+      );
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -44,7 +47,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (method.length < 2 || accountName.length < 2 || accountNumber.length < 4) {
+    if (
+      method.length < 2 ||
+      accountName.length < 2 ||
+      accountNumber.length < 4
+    ) {
       return Response.json(
         { error: "Data rekening pencairan belum lengkap." },
         { status: 400, headers },
@@ -69,12 +76,7 @@ export async function POST(request: Request) {
     }
     console.error("Affiliate withdrawal request failed", error);
     return Response.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message.replace(/^Supabase RPC [^:]+ failed \(\d+\):\s*/, "")
-            : "Withdrawal gagal dibuat.",
-      },
+      { error: "Withdrawal gagal dibuat. Coba beberapa saat lagi." },
       { status: 409 },
     );
   }
@@ -87,7 +89,10 @@ export async function PATCH(request: Request) {
     appendResolvedNambahAuthCookies(headers, auth);
 
     if (!auth.user) {
-      return Response.json({ error: "Login diperlukan." }, { status: 401, headers });
+      return Response.json(
+        { error: "Login diperlukan." },
+        { status: 401, headers },
+      );
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -114,7 +119,7 @@ export async function PATCH(request: Request) {
     }
     console.error("Affiliate withdrawal cancel failed", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Withdrawal gagal dibatalkan." },
+      { error: "Withdrawal gagal dibatalkan. Coba beberapa saat lagi." },
       { status: 409 },
     );
   }

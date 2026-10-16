@@ -11,6 +11,7 @@ import {
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
 import { readOrderAccessToken, verifyOrderAccess } from "@/lib/order-access";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { BRAND } from "@/lib/brand";
 
@@ -20,8 +21,18 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const limited = await rateLimitResponse(request, {
+    scope: "order-status-refresh",
+    limit: 30,
+    windowSeconds: 5 * 60,
+  });
+  if (limited) return limited;
+
   if (!isSupabaseConfigured()) {
-    return Response.json({ error: `Database ${BRAND.shortName} belum dikonfigurasi.` }, { status: 503 });
+    return Response.json(
+      { error: `Database ${BRAND.shortName} belum dikonfigurasi.` },
+      { status: 503 },
+    );
   }
 
   const { id } = await context.params;
@@ -32,7 +43,9 @@ export async function POST(
 
   try {
     const token = readOrderAccessToken(request);
-    let authorized = Boolean(token && (await verifyOrderAccess(orderId, token)));
+    let authorized = Boolean(
+      token && (await verifyOrderAccess(orderId, token)),
+    );
     let auth = null as Awaited<ReturnType<typeof resolveNambahAuth>> | null;
 
     if (!authorized) {
@@ -46,12 +59,18 @@ export async function POST(
     if (auth) appendResolvedNambahAuthCookies(headers, auth);
 
     if (!authorized) {
-      return Response.json({ error: "Akses tidak sah." }, { status: 401, headers });
+      return Response.json(
+        { error: "Akses tidak sah." },
+        { status: 401, headers },
+      );
     }
 
     const existing = await getPublicOrder(orderId);
     if (!existing) {
-      return Response.json({ error: "Order tidak ditemukan." }, { status: 404 });
+      return Response.json(
+        { error: "Order tidak ditemukan." },
+        { status: 404 },
+      );
     }
 
     // Status diambil dari gateway PEMBUAT order, bukan gateway aktif saat ini —
@@ -71,11 +90,13 @@ export async function POST(
         {
           orderId: result.paylabs.orderId,
           platformTradeNo: result.paylabs.platformTradeNo,
-          status: result.paylabs.status ?? result.paylabs.transactionStatusDesc ?? undefined,
+          status:
+            result.paylabs.status ??
+            result.paylabs.transactionStatusDesc ??
+            undefined,
           paidTime: result.paylabs.paidTime,
           amountValue: result.paylabs.amountValue,
-          paymentType:
-            existing.payment.paymentType ?? undefined,
+          paymentType: existing.payment.paymentType ?? undefined,
           raw: result.paylabs.raw,
         },
         "status_api",

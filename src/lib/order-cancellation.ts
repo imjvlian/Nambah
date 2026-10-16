@@ -20,6 +20,8 @@ export type OrderCancelReason =
   | "points_reservation_failed"
   | "promo_reservation_failed"
   | "snap_create_failed"
+  | "supplier_balance_insufficient"
+  | "supplier_balance_reservation_failed"
   | "expired"
   | "merchant_never_scanned";
 
@@ -67,7 +69,9 @@ const CANCELLABLE_STATUSES = ["pending_payment", "pending_merchant"] as const;
  * membatalkan pembatalannya - order sudah dibayar atau sudah kedaluwarsa,
  * dan membatalkannya lagi hanya akan complicating keadaan.
  */
-async function releaseSupplierBalanceForOrder(orderId: string): Promise<boolean> {
+async function releaseSupplierBalanceForOrder(
+  orderId: string,
+): Promise<boolean> {
   const [order] = await supabaseSelect<{
     supplier_id: string | null;
     supplier_cost: number | string;

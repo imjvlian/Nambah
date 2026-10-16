@@ -1,5 +1,8 @@
 import { resolveMerchantForCode } from "@/lib/merchant-auth";
-import { getMerchantById, isMerchantRetailEnabled } from "@/lib/merchant-retail";
+import {
+  getMerchantById,
+  isMerchantRetailEnabled,
+} from "@/lib/merchant-retail";
 import {
   clearMerchantSessionCookie,
   createMerchantSessionToken,
@@ -75,6 +78,20 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+   * Limit per kode toko, di atas limit per IP.
+   *
+   * PIN-nya 6 digit. Tanpa limit per kode, botnet yang tahu kode toko bisa
+   * mencoba PIN dari banyak IP tanpa pernah kena lockout di toko itu.
+   */
+  const codeLimited = await rateLimitResponse(request, {
+    scope: "merchant_login_code",
+    limit: 10,
+    windowSeconds: 300,
+    subject: code,
+  });
+  if (codeLimited) return codeLimited;
+
   const merchant = await resolveMerchantForCode(code, pin);
 
   if (!merchant) {
@@ -111,7 +128,11 @@ export async function POST(request: Request) {
         address: full?.address ?? null,
       },
     },
-    { headers: { "Set-Cookie": merchantSessionCookie(session.token, session.maxAge) } },
+    {
+      headers: {
+        "Set-Cookie": merchantSessionCookie(session.token, session.maxAge),
+      },
+    },
   );
 }
 
