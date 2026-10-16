@@ -172,9 +172,7 @@ function AccountOrderRow({ order }: { order: AccountOrder }) {
       <div className="account-order-time">
         <small>{open ? "Berjalan sejak" : "Dibuat"}</small>
         <span>{formatDate(open ? order.updatedAt : order.createdAt)}</span>
-        {elapsed && (
-          <em className="account-order-elapsed">{elapsed}</em>
-        )}
+        {elapsed && <em className="account-order-elapsed">{elapsed}</em>}
       </div>
 
       <div className="account-order-price">
@@ -185,14 +183,17 @@ function AccountOrderRow({ order }: { order: AccountOrder }) {
       <span className={"account-order-status tone-" + statusTone(order.status)}>
         <b>{statusLabel(order.status)}</b>
         {open && statusHint(order.status) && (
-          <small className="account-order-hint">{statusHint(order.status)}</small>
+          <small className="account-order-hint">
+            {statusHint(order.status)}
+          </small>
         )}
       </span>
     </Link>
   );
 }
 
-export default function AccountDashboard() {  const [user, setUser] = useState<AccountUser | null>(null);
+export default function AccountDashboard() {
+  const [user, setUser] = useState<AccountUser | null>(null);
   const [orders, setOrders] = useState<AccountOrder[]>([]);
   const [points, setPoints] = useState<PointsSummary | null>(null);
   const [ledger, setLedger] = useState<PointLedger[]>([]);
@@ -359,15 +360,17 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
   }
 
   if (loading) {
-    return <div className="account-loading-card">Memuat akun {BRAND.shortName}...</div>;
+    return <div className="account-loading-card">Buka akunmu sebentar…</div>;
   }
 
   if (error) {
     return (
       <div className="account-loading-card">
-        <strong>Akun belum dapat dimuat.</strong>
+        <strong>Akunmu gagal dimuat. Coba refresh halaman.</strong>
         <p>{error}</p>
-        <Link className="text-link" href="/">Kembali ke beranda</Link>
+        <Link className="text-link" href="/">
+          Kembali ke beranda
+        </Link>
       </div>
     );
   }
@@ -436,179 +439,183 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
 
       {tab === "profile" && (
         <section className="account-profile-settings">
-        <div className="account-section-head">
-          <div>
-            <span className="eyebrow">Profil</span>
-            <h2>Data transaksi.</h2>
+          <div className="account-section-head">
+            <div>
+              <span className="eyebrow">Profil</span>
+              <h2>Data checkout kamu.</h2>
+            </div>
+            <span className="account-profile-saved">
+              {profile?.updatedAt
+                ? "Tersimpan " + formatDate(profile.updatedAt)
+                : "Belum disimpan"}
+            </span>
           </div>
-          <span className="account-profile-saved">
-            {profile?.updatedAt ? "Tersimpan " + formatDate(profile.updatedAt) : "Belum disimpan"}
-          </span>
-        </div>
-        <div className="account-profile-form">
-          <label>
-            <span>Nama</span>
-            <input
-              value={profileDraft.displayName}
-              onChange={(event) =>
-                setProfileDraft((current) => ({
-                  ...current,
-                  displayName: event.target.value,
-                }))
-              }
-              placeholder="Nama kamu"
-            />
-          </label>
-          <label>
-            <span>WhatsApp</span>
-            <input
-              inputMode="tel"
-              value={profileDraft.whatsapp}
-              onChange={(event) =>
-                setProfileDraft((current) => ({
-                  ...current,
-                  whatsapp: event.target.value,
-                }))
-              }
-              placeholder="081234567890"
-            />
-          </label>
-          <label>
-            <span>Preferensi receipt</span>
-            <select
-              value={profileDraft.preferredReceiptChannel}
-              onChange={(event) =>
-                setProfileDraft((current) => ({
-                  ...current,
-                  preferredReceiptChannel: event.target.value as
-                    | "email"
-                    | "whatsapp"
-                    | "both",
-                }))
-              }
+          <div className="account-profile-form">
+            <label>
+              <span>Nama</span>
+              <input
+                value={profileDraft.displayName}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    displayName: event.target.value,
+                  }))
+                }
+                placeholder="Nama kamu"
+              />
+            </label>
+            <label>
+              <span>WhatsApp</span>
+              <input
+                inputMode="tel"
+                value={profileDraft.whatsapp}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    whatsapp: event.target.value,
+                  }))
+                }
+                placeholder="081234567890"
+              />
+            </label>
+            <label>
+              <span>Kirim struk ke</span>
+              <select
+                value={profileDraft.preferredReceiptChannel}
+                onChange={(event) =>
+                  setProfileDraft((current) => ({
+                    ...current,
+                    preferredReceiptChannel: event.target.value as
+                      "email" | "whatsapp" | "both",
+                  }))
+                }
+              >
+                <option value="email">Email</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="both">Email + WhatsApp</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={profileSaving}
+              onClick={() => void saveProfile()}
             >
-              <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="both">Email + WhatsApp</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={profileSaving}
-            onClick={() => void saveProfile()}
-          >
-            {profileSaving ? "Menyimpan..." : "Simpan profil"}
-          </button>
-        </div>
-        {profileMessage && (
-          <p className="account-profile-message">{profileMessage}</p>
-        )}
+              {profileSaving ? "Menyimpan..." : "Simpan profil"}
+            </button>
+          </div>
+          {profileMessage && (
+            <p className="account-profile-message">{profileMessage}</p>
+          )}
         </section>
       )}
 
       {tab === "points" && (
-      <section className="account-points-card" id="nambah-points">
-        <div className="account-points-hero">
-          <div>
-            <span className="eyebrow">Lacte Points</span>
-            <h2>
-              {points ? points.available.toLocaleString("id-ID") : "—"}{" "}
-              <small>pts</small>
-            </h2>
-            <p>
-              {points
-                ? "Setara sekitar " +
-                  formatIDR(
-                    points.available * points.rules.pointValueIdr,
-                  ) +
-                  " untuk transaksi berikutnya."
-                : pointsError || "Saldo points sedang dimuat."}
-            </p>
-          </div>
-          {points && (
-            <div className="account-points-stats">
-              <article title="Points yang sedang dipakai untuk order yang belum selesai.">
-                <small>{POINTS_TERM_LABEL.reserved}</small>
-                <strong>{points.reserved.toLocaleString("id-ID")} pts</strong>
-              </article>
-              <article title="Semua points yang pernah didapat sejak akun dibuat.">
-                <small>{POINTS_TERM_LABEL.lifetimeEarned}</small>
-                <strong>
-                  {points.lifetimeEarned.toLocaleString("id-ID")} pts
-                </strong>
-              </article>
-              <article title="Semua points yang pernah dipakai untuk transaksi.">
-                <small>{POINTS_TERM_LABEL.lifetimeRedeemed}</small>
-                <strong>
-                  {points.lifetimeRedeemed.toLocaleString("id-ID")} pts
-                </strong>
-              </article>
+        <section className="account-points-card" id="nambah-points">
+          <div className="account-points-hero">
+            <div>
+              <span className="eyebrow">Lacte Points</span>
+              <h2>
+                {points ? points.available.toLocaleString("id-ID") : "—"}{" "}
+                <small>pts</small>
+              </h2>
+              <p>
+                {points
+                  ? "Setara sekitar " +
+                    formatIDR(points.available * points.rules.pointValueIdr) +
+                    " untuk transaksi berikutnya."
+                  : pointsError || "Saldo points sedang dimuat."}
+              </p>
             </div>
-          )}
-        </div>
-
-        {points && (
-          <div className="account-points-rule">
-            <span>Setiap {formatIDR(points.rules.earnEveryIdr)} belanja dapat 1 point</span>
-            <span>1 point setara {formatIDR(points.rules.pointValueIdr)}</span>
-            <span>Minimal pakai {points.rules.minimumRedeem} points</span>
-            <span>
-              Maksimal {Math.round(points.rules.maxRedeemRate * 100)}% dari total belanja
-            </span>
-          </div>
-        )}
-
-        <div className="account-points-ledger">
-          <div className="account-points-ledger-head">
-            <strong>Aktivitas points</strong>
-            <span>30 aktivitas terbaru</span>
-          </div>
-          {ledger.length === 0 ? (
-            <div className="account-points-empty">
-              Belum ada aktivitas points. Points masuk setelah transaksi login
-              berstatus berhasil.
-            </div>
-          ) : (
-            ledger.map((entry) => (
-              <div className="account-point-row" key={entry.id}>
-                <span
-                  className={"account-point-icon type-" + entry.type}
-                >
-                  N+
-                </span>
-                <div>
+            {points && (
+              <div className="account-points-stats">
+                <article title="Points yang sedang dipakai untuk order yang belum selesai.">
+                  <small>{POINTS_TERM_LABEL.reserved}</small>
+                  <strong>{points.reserved.toLocaleString("id-ID")} pts</strong>
+                </article>
+                <article title="Semua points yang pernah didapat sejak akun dibuat.">
+                  <small>{POINTS_TERM_LABEL.lifetimeEarned}</small>
                   <strong>
-                    {POINT_TYPE_LABEL[entry.type] ?? entry.type}
+                    {points.lifetimeEarned.toLocaleString("id-ID")} pts
                   </strong>
-                  <small>
-                    {entry.orderId ?? "Akun"} · {formatDate(entry.createdAt)}
-                  </small>
-                </div>
-                <b
-                  className={
-                    entry.pointsDelta > 0
-                      ? "positive"
-                      : entry.pointsDelta < 0
-                        ? "negative"
-                        : ""
-                  }
-                >
-                  {entry.pointsDelta === 0
-                    ? entry.reservedDelta > 0
-                      ? "ditahan " +
-                        entry.reservedDelta.toLocaleString("id-ID")
-                      : entry.reservedDelta < 0
-                        ? "dilepas " +
-                          Math.abs(entry.reservedDelta).toLocaleString("id-ID")
-                        : "0"
-                    : signedPoints(entry.pointsDelta)}{" "}
-                  pts
-                </b>
+                </article>
+                <article title="Semua points yang pernah dipakai untuk transaksi.">
+                  <small>{POINTS_TERM_LABEL.lifetimeRedeemed}</small>
+                  <strong>
+                    {points.lifetimeRedeemed.toLocaleString("id-ID")} pts
+                  </strong>
+                </article>
               </div>
-            ))
+            )}
+          </div>
+
+          {points && (
+            <div className="account-points-rule">
+              <span>
+                Setiap {formatIDR(points.rules.earnEveryIdr)} belanja dapat 1
+                point
+              </span>
+              <span>
+                1 point setara {formatIDR(points.rules.pointValueIdr)}
+              </span>
+              <span>Minimal pakai {points.rules.minimumRedeem} points</span>
+              <span>
+                Maksimal {Math.round(points.rules.maxRedeemRate * 100)}% dari
+                total belanja
+              </span>
+            </div>
           )}
-        </div>
-      </section>
+
+          <div className="account-points-ledger">
+            <div className="account-points-ledger-head">
+              <strong>Aktivitas points</strong>
+              <span>30 aktivitas terbaru</span>
+            </div>
+            {ledger.length === 0 ? (
+              <div className="account-points-empty">
+                Belum ada aktivitas points. Top up apa aja sambil login, points
+                langsung masuk.
+              </div>
+            ) : (
+              ledger.map((entry) => (
+                <div className="account-point-row" key={entry.id}>
+                  <span className={"account-point-icon type-" + entry.type}>
+                    N+
+                  </span>
+                  <div>
+                    <strong>
+                      {POINT_TYPE_LABEL[entry.type] ?? entry.type}
+                    </strong>
+                    <small>
+                      {entry.orderId ?? "Akun"} · {formatDate(entry.createdAt)}
+                    </small>
+                  </div>
+                  <b
+                    className={
+                      entry.pointsDelta > 0
+                        ? "positive"
+                        : entry.pointsDelta < 0
+                          ? "negative"
+                          : ""
+                    }
+                  >
+                    {entry.pointsDelta === 0
+                      ? entry.reservedDelta > 0
+                        ? "ditahan " +
+                          entry.reservedDelta.toLocaleString("id-ID")
+                        : entry.reservedDelta < 0
+                          ? "dilepas " +
+                            Math.abs(entry.reservedDelta).toLocaleString(
+                              "id-ID",
+                            )
+                          : "0"
+                      : signedPoints(entry.pointsDelta)}{" "}
+                    pts
+                  </b>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       )}
 
       {tab === "affiliate" && (
@@ -619,63 +626,58 @@ export default function AccountDashboard() {  const [user, setUser] = useState<A
       )}
 
       {tab === "orders" && (
-      <section className="account-orders-card">
-        <div className="account-section-head">
-          <div>
-            <span className="eyebrow">Transaksi</span>
-            <h2>Riwayat pesanan.</h2>
-          </div>
-          <Link className="header-cta" href="/#catalog-start">
-            Top up lagi
-          </Link>
-        </div>
-
-        {openCount > 0 && (
-          <div className="account-orders-open">
-            <strong className="account-orders-open-title">
-              {openCount} pesanan sedang berjalan
-            </strong>
-            <p>
-              Yang masih diproses atau menunggu pembayaran. Klik untuk melihat
-              detail danSN.
-            </p>
-            <div className="account-order-list">
-              {openOrders.map((order) => (
-                <AccountOrderRow key={order.id} order={order} />
-              ))}
+        <section className="account-orders-card">
+          <div className="account-section-head">
+            <div>
+              <span className="eyebrow">Transaksi</span>
+              <h2>Riwayat pesanan.</h2>
             </div>
-          </div>
-        )}
-
-        {closedOrders.length > 0 && (
-          <details
-            className="account-orders-closed"
-            open={openCount === 0}
-          >
-            <summary>
-              {openCount > 0 ? "Tampilkan" : ""} riwayat selesai ({closedOrders.length})
-            </summary>
-            <div className="account-order-list">
-              {closedOrders.map((order) => (
-                <AccountOrderRow key={order.id} order={order} />
-              ))}
-            </div>
-          </details>
-        )}
-
-        {orders.length === 0 ? (
-          <div className="account-empty">
-            <strong>Belum ada transaksi di akun ini.</strong>
-            <p>
-              Pesanan baru yang dibuat saat kamu login akan muncul otomatis di
-              sini.
-            </p>
-            <Link className="primary-button" href="/#catalog-start">
-              Mulai top up <span>→</span>
+            <Link className="header-cta" href="/#catalog-start">
+              Top up lagi
             </Link>
           </div>
-        ) : null}
-      </section>
+
+          {openCount > 0 && (
+            <div className="account-orders-open">
+              <strong className="account-orders-open-title">
+                {openCount} pesanan sedang berjalan
+              </strong>
+              <p>
+                Yang masih diproses atau nunggu pembayaran. Klik buat lihat
+                detail dan SN.
+              </p>
+              <div className="account-order-list">
+                {openOrders.map((order) => (
+                  <AccountOrderRow key={order.id} order={order} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {closedOrders.length > 0 && (
+            <details className="account-orders-closed" open={openCount === 0}>
+              <summary>
+                {openCount > 0 ? "Tampilkan" : ""} riwayat selesai (
+                {closedOrders.length})
+              </summary>
+              <div className="account-order-list">
+                {closedOrders.map((order) => (
+                  <AccountOrderRow key={order.id} order={order} />
+                ))}
+              </div>
+            </details>
+          )}
+
+          {orders.length === 0 ? (
+            <div className="account-empty">
+              <strong>Belum ada transaksi di akun ini.</strong>
+              <p>Top up pertamamu bakal muncul di sini.</p>
+              <Link className="primary-button" href="/#catalog-start">
+                Mulai top up <span>→</span>
+              </Link>
+            </div>
+          ) : null}
+        </section>
       )}
     </>
   );

@@ -5,7 +5,7 @@ import { BRAND } from "@/lib/brand";
 export const STATUS_LABEL: Record<PublicOrderStatus, string> = {
   pending_payment: "Menunggu pembayaran",
   pending_merchant: "Menunggu konfirmasi toko",
-  awaiting_receivable: "Selesai - menunggu pembayaran toko",
+  awaiting_receivable: "Top up beres — pembayaran toko menyusul",
   paid: "Pembayaran diterima",
   processing: "Sedang diproses",
   success: "Top up berhasil",
@@ -15,23 +15,27 @@ export const STATUS_LABEL: Record<PublicOrderStatus, string> = {
 };
 
 export const STATUS_DESCRIPTION: Record<PublicOrderStatus, string> = {
-  pending_payment:
-    "Silakan selesaikan pembayaran di bawah. Order akan kedaluwarsa dalam 30 menit.",
+  pending_payment: "Selesaikan bayarnya di bawah ya — kamu punya 30 menit.",
   pending_merchant:
-    "Pembayaran sudah diterima toko. Tinggal tunjukkan layar ini ke kasir agar pesanan langsung diproses.",
+    "Pembayaran sudah diterima toko. Tinggal tunjukkan layar ini ke kasir biar pesanan langsung diproses.",
   awaiting_receivable:
     "Top up sudah berhasil. Toko akan menerima pembayaran paling lambat 7 hari ke depan.",
-  paid: "Pembayaran Anda telah diterima dan sedang diverifikasi.",
-  processing: "Pesanan Anda sedang diteruskan ke penyedia layanan.",
-  success: `Top up telah berhasil diproses. Terima kasih telah menggunakan ${BRAND.shortName}.`,
-  failed: "Pembayaran gagal atau ditolak. Anda dapat membuat pesanan baru.",
-  refunded: "Pembayaran telah dikembalikan ke sumber dana asli.",
-  cancelled: "Pembayaran dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.",
+  paid: "Pembayaranmu udah masuk. Sebentar, lagi dicek otomatis.",
+  processing:
+    "Pesananmu lagi dikirim ke game. Biasanya cuma butuh beberapa menit.",
+  success: `Berhasil! Item sudah masuk ke akunmu. Makasih sudah top up di ${BRAND.shortName}.`,
+  failed:
+    "Pembayaran gagal atau ditolak. Tenang, kamu bisa langsung buat pesanan baru.",
+  refunded: "Uangmu sudah dikembalikan ke metode bayar yang kamu pakai.",
+  cancelled: "Pesanan dibatalkan atau waktunya habis. Buat pesanan baru ya.",
 };
 
 export type StatusAction = "copy" | "pay" | "refresh" | "new_order" | "support";
 
-export const STATUS_CTA: Record<PublicOrderStatus, { label: string; action: StatusAction }[]> = {
+export const STATUS_CTA: Record<
+  PublicOrderStatus,
+  { label: string; action: StatusAction }[]
+> = {
   pending_payment: [
     { label: "Salin Order ID", action: "copy" },
     { label: "Buka pembayaran", action: "pay" },
@@ -67,7 +71,7 @@ export const STATUS_CTA: Record<PublicOrderStatus, { label: string; action: Stat
   ],
   failed: [
     { label: "Buat pesanan baru", action: "new_order" },
-    { label: "Hubungi bantuan", action: "support" },
+    { label: "Hubungi CS", action: "support" },
     { label: "Salin Order ID", action: "copy" },
   ],
   refunded: [
@@ -80,11 +84,31 @@ export const STATUS_CTA: Record<PublicOrderStatus, { label: string; action: Stat
   ],
 };
 
-export const TIMELINE_STEPS: { title: string; description: string; status: PublicOrderStatus }[] = [
-  { title: "Pesanan dibuat", description: "Menunggu pembayaran Anda", status: "pending_payment" },
-  { title: "Pembayaran diterima", description: "Transaksi diverifikasi oleh sistem", status: "paid" },
-  { title: "Sedang diproses", description: "Diteruskan ke penyedia layanan", status: "processing" },
-  { title: "Top up berhasil", description: "Saldo telah dikirim ke akun Anda", status: "success" },
+export const TIMELINE_STEPS: {
+  title: string;
+  description: string;
+  status: PublicOrderStatus;
+}[] = [
+  {
+    title: "Pesanan dibuat",
+    description: "Nunggu kamu bayar",
+    status: "pending_payment",
+  },
+  {
+    title: "Pembayaran diterima",
+    description: "Sistem lagi ngecek pembayaranmu",
+    status: "paid",
+  },
+  {
+    title: "Sedang diproses",
+    description: "Item lagi dikirim ke akunmu",
+    status: "processing",
+  },
+  {
+    title: "Top up berhasil",
+    description: "Sudah masuk ke akunmu. Selamat main!",
+    status: "success",
+  },
 ];
 
 /*
@@ -103,9 +127,21 @@ export const MERCHANT_TIMELINE_STEPS: {
   description: string;
   status: PublicOrderStatus;
 }[] = [
-  { title: "Pesanan dibuat", description: "Pembayaran diterima toko", status: "pending_merchant" },
-  { title: "Sedang diproses", description: "Toko sedang memproses pesanan", status: "processing" },
-  { title: "Top up berhasil", description: "Saldo telah dikirim ke akun Anda", status: "success" },
+  {
+    title: "Pesanan dibuat",
+    description: "Pembayaran diterima toko",
+    status: "pending_merchant",
+  },
+  {
+    title: "Sedang diproses",
+    description: "Toko sedang memproses pesanan",
+    status: "processing",
+  },
+  {
+    title: "Top up berhasil",
+    description: "Sudah masuk ke akunmu. Selamat main!",
+    status: "success",
+  },
 ];
 
 /** Terminal status set for quick checks */

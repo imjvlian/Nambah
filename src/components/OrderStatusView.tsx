@@ -9,10 +9,7 @@ import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { PublicOrder } from "@/lib/order-public";
-import {
-  previewOrderStorageKey,
-  type PreviewOrder,
-} from "@/lib/order-preview";
+import { previewOrderStorageKey, type PreviewOrder } from "@/lib/order-preview";
 import { paymentTypeLabel } from "@/lib/payment-label";
 import { formatIDR } from "@/lib/pricing";
 import OrderRatingForm from "@/components/OrderRatingForm";
@@ -78,7 +75,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     searchParams.get("access_token"),
   );
-  const [preview, setPreview] = useState<PreviewOrder | null | undefined>(undefined);
+  const [preview, setPreview] = useState<PreviewOrder | null | undefined>(
+    undefined,
+  );
   const [order, setOrder] = useState<PublicOrder | null | undefined>(undefined);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -111,7 +110,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       : "https://app.sandbox.midtrans.com/snap/snap.js";
 
   async function loadLiveOrder(id: string, token = accessToken) {
-    const url = new URL(`/api/orders/${encodeURIComponent(id)}`, window.location.origin);
+    const url = new URL(
+      `/api/orders/${encodeURIComponent(id)}`,
+      window.location.origin,
+    );
     if (token) url.searchParams.set("access_token", token);
 
     const response = await fetch(url.toString(), {
@@ -134,7 +136,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     setNotice("Memeriksa status pembayaran...");
 
     try {
-      const url = new URL(`/api/orders/${encodeURIComponent(id)}/refresh`, window.location.origin);
+      const url = new URL(
+        `/api/orders/${encodeURIComponent(id)}/refresh`,
+        window.location.origin,
+      );
       if (accessToken) url.searchParams.set("access_token", accessToken);
 
       const response = await fetch(url.toString(), {
@@ -144,7 +149,10 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       const data = (await response.json()) as OrderApiResponse;
 
       if (!response.ok || !data.order) {
-        setNotice(data.error ?? "Status pembayaran belum dapat diperbarui.");
+        setNotice(
+          data.error ??
+            "Statusnya belum berhasil di-update. Coba beberapa saat lagi.",
+        );
         return;
       }
 
@@ -152,7 +160,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       setLastChecked(new Date().toLocaleTimeString("id-ID"));
       setNotice(`Status diperbarui: ${STATUS_LABEL[data.order.status]}.`);
     } catch {
-      setNotice("Tidak dapat memeriksa status pembayaran.");
+      setNotice("Sistemnya lagi sibuk — status belum bisa dicek.");
     } finally {
       setBusy(false);
     }
@@ -162,11 +170,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     return {
       language: "id",
       onSuccess: () => {
-        setNotice(`Pembayaran selesai. ${BRAND.shortName} sedang memverifikasi pembayaran...`);
+        setNotice(
+          `Pembayaran selesai. ${BRAND.shortName} lagi cek pembayaranmu…`,
+        );
         void refreshStatus(id);
       },
       onPending: () => {
-        setNotice(`Pembayaran masih pending. ${BRAND.shortName} sedang memverifikasi status...`);
+        setNotice(
+          `Pembayaran masih pending. ${BRAND.shortName} lagi cek statusnya…`,
+        );
         void refreshStatus(id);
       },
       onError: () => {
@@ -174,7 +186,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         void refreshStatus(id);
       },
       onClose: () => {
-        setNotice("Panel pembayaran ditutup. Order masih dapat dibayar selama belum kedaluwarsa.");
+        setNotice(
+          "Jendela bayarnya ditutup. Tenang, ordernya masih bisa dibayar sebelum waktunya habis.",
+        );
       },
     };
   }
@@ -196,7 +210,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       }
 
       try {
-        const raw = window.localStorage.getItem(previewOrderStorageKey(orderId));
+        const raw = window.localStorage.getItem(
+          previewOrderStorageKey(orderId),
+        );
         if (!raw) {
           if (mounted) {
             setOrder(null);
@@ -310,9 +326,17 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       setNotice("Pembayaran siap digunakan.");
     } catch {
       embeddedOrderRef.current = null;
-      setNotice("Pembayaran belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.");
+      setNotice(
+        "Pembayaran belum dapat dimuat. Muat ulang halaman atau gunakan pembayaran cadangan.",
+      );
     }
-  }, [order?.id, order?.status, order?.payment.snapToken, snapReady, accessToken]);
+  }, [
+    order?.id,
+    order?.status,
+    order?.payment.snapToken,
+    snapReady,
+    accessToken,
+  ]);
 
   async function copyOrderId() {
     const id = order?.id ?? preview?.id ?? "";
@@ -455,7 +479,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       const tokenParam = data.accessToken
         ? `?access_token=${encodeURIComponent(data.accessToken)}`
         : "";
-      router.replace(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
+      router.replace(
+        `/order/${encodeURIComponent(data.order.id)}${tokenParam}`,
+      );
 
       // Popup langsung dibuka dari gesture klik "Buat pesanan" (masih dalam
       // jendela transient activation Chrome) — tanpa halaman perantara.
@@ -465,9 +491,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       ) {
         openDokuPopup(data.order.payment.redirectUrl, data.order.id);
       }
-      setNotice("Order dibuat. Pembayaran sedang dimuat.");
+      setNotice("Order dibuat. Sebentar, pembayarannya kita siapkan.");
     } catch {
-      setNotice("Tidak dapat menghubungi server pembayaran.");
+      setNotice("Jaringannya lagi ngaco. Coba lagi sebentar ya.");
     } finally {
       setBusy(false);
     }
@@ -478,7 +504,11 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     const url = `${window.location.origin}/order/${encodeURIComponent(order.id)}?access_token=${encodeURIComponent(accessToken)}`;
 
     if (navigator.share) {
-      void navigator.share({ title: `Order ${BRAND.shortName}`, text: `Order ${order.id}`, url });
+      void navigator.share({
+        title: `Order ${BRAND.shortName}`,
+        text: `Order ${order.id}`,
+        url,
+      });
       return;
     }
 
@@ -497,7 +527,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
           </div>
         </SiteHeader>
         <section className="order-status-shell shell">
-          <div className="order-empty-card">Memuat status pesanan...</div>
+          <div className="order-empty-card">Nyari pesananmu…</div>
         </section>
       </main>
     );
@@ -514,14 +544,22 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         </SiteHeader>
         <section className="order-status-shell shell">
           <div className="order-empty-card">
-            <span className="eyebrow">{accessDenied ? "AKSES PESANAN DITOLAK" : "PESANAN TIDAK DITEMUKAN"}</span>
-            <h1>{accessDenied ? "Link order tidak memiliki akses." : "Order ini tidak tersedia."}</h1>
+            <span className="eyebrow">
+              {accessDenied ? "LINK TIDAK VALID" : "PESANAN TIDAK DITEMUKAN"}
+            </span>
+            <h1>
+              {accessDenied
+                ? "Link pesanan ini tidak bisa dibuka."
+                : "Pesanan ini tidak ada atau sudah tidak bisa dibuka."}
+            </h1>
             <p>
               {accessDenied
-                ? "Gunakan link order yang dibuat saat checkout. Order baru juga menyimpan akses aman di browser ini."
-                : "Buat pesanan baru dari halaman utama untuk melanjutkan ke pembayaran."}
+                ? "Buka pesanan lewat link yang kamu dapat setelah checkout — atau buat pesanan baru di bawah."
+                : "Buat pesanan baru aja, ya."}
             </p>
-            <Link className="primary-button" href="/#topup">Buat pesanan baru <span>→</span></Link>
+            <Link className="primary-button" href="/#topup">
+              Buat pesanan baru <span>→</span>
+            </Link>
           </div>
         </section>
       </main>
@@ -551,11 +589,16 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
    * akan muncul di depan customer yang membayarnya tunai di konter.
    */
   const isMerchantOrder = payment.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
-  const activeTimeline = isMerchantOrder ? MERCHANT_TIMELINE_STEPS : TIMELINE_STEPS;
+  const activeTimeline = isMerchantOrder
+    ? MERCHANT_TIMELINE_STEPS
+    : TIMELINE_STEPS;
 
   const timelineIndex = isPreview
     ? 0
-    : Math.max(0, activeTimeline.findIndex((step) => step.status === liveStatus));
+    : Math.max(
+        0,
+        activeTimeline.findIndex((step) => step.status === liveStatus),
+      );
   // Countdown sudah lewat tapi status masih `pending_payment`: order baru saja
   // melewati batas, atau cron sweeper belum sempat membatalkannya (jalur
   // paling lama 10 menit, plus 5 menit grace di `order-expiry.ts`).
@@ -581,9 +624,11 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const redirectUrl = order?.payment.redirectUrl ?? null;
   const isDoku = order?.payment.provider === "doku";
   const isPaylabs = order?.payment.provider === "paylabs";
-const dokuQrContent = isDoku ? order?.doku?.qrContent ?? null : null;
-const paylabsQrContent = isPaylabs ? order?.paylabs?.qrContent ?? null : null;
-const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
+  const dokuQrContent = isDoku ? (order?.doku?.qrContent ?? null) : null;
+  const paylabsQrContent = isPaylabs
+    ? (order?.paylabs?.qrContent ?? null)
+    : null;
+  const paylabsVaNumber = isPaylabs ? (order?.paylabs?.vaNumber ?? null) : null;
 
   return (
     <main>
@@ -597,48 +642,59 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
         />
       )}
 
-      {isDoku && !dokuQrContent && checkoutModalOpen && order?.payment.redirectUrl && (
-        <div
-          className="doku-checkout-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Pembayaran DOKU"
-          onClick={() => setCheckoutModalOpen(false)}
-        >
+      {isDoku &&
+        !dokuQrContent &&
+        checkoutModalOpen &&
+        order?.payment.redirectUrl && (
           <div
-            className="doku-checkout-modal-content"
-            onClick={(event) => event.stopPropagation()}
+            className="doku-checkout-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pembayaran DOKU"
+            onClick={() => setCheckoutModalOpen(false)}
           >
-            <div className="doku-checkout-modal-head">
-              <strong>Pembayaran</strong>
-              <button
-                type="button"
-                aria-label="Tutup jendela pembayaran"
-                onClick={() => setCheckoutModalOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-            {/* Halaman checkout DOKU mengirim CSP frame-ancestors / X-Frame-
+            <div
+              className="doku-checkout-modal-content"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="doku-checkout-modal-head">
+                <strong>Pembayaran</strong>
+                <button
+                  type="button"
+                  aria-label="Tutup jendela pembayaran"
+                  onClick={() => setCheckoutModalOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              {/* Halaman checkout DOKU mengirim CSP frame-ancestors / X-Frame-
                 Options yang melarang iframe dari origin mana pun — popup
                 window adalah cara menampilkannya tanpa berpindah tab. */}
-            <div className="doku-checkout-modal-fallback">
-              <strong>Selesaikan pembayaran di jendela popup.</strong>
-              <p>
-                Jendela kecil pembayaran akan terbuka di atas halaman ini.
-                Setelah kamu membayar dan menutupnya, status order di sini
-                langsung diperbarui otomatis.
-              </p>
-              <button type="button" className="order-action-button primary" onClick={openDokuCheckout}>
-                Buka jendela pembayaran
-              </button>
-              <button type="button" className="order-secondary-link" onClick={openFallbackPayment}>
-                atau buka di tab baru
-              </button>
+              <div className="doku-checkout-modal-fallback">
+                <strong>Selesaikan pembayaran di jendela popup.</strong>
+                <p>
+                  Jendela kecil pembayaran akan terbuka di atas halaman ini.
+                  Setelah kamu membayar dan menutupnya, status order di sini
+                  langsung diperbarui otomatis.
+                </p>
+                <button
+                  type="button"
+                  className="order-action-button primary"
+                  onClick={openDokuCheckout}
+                >
+                  Buka jendela pembayaran
+                </button>
+                <button
+                  type="button"
+                  className="order-secondary-link"
+                  onClick={openFallbackPayment}
+                >
+                  atau buka di tab baru
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       <SiteHeader className="order-header">
         <BrandLogo href="/" size="md" variant="horizontal" />
@@ -651,8 +707,14 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
       <section className="order-status-shell shell">
         <div className="order-status-title">
           <div>
-            <span className="eyebrow">{isPreview ? "Ringkasan pesanan" : "Status pesanan"}</span>
-            <h1>{isPreview ? "Siap membuat pembayaran." : STATUS_LABEL[liveStatus]}</h1>
+            <span className="eyebrow">
+              {isPreview ? "Ringkasan pesanan" : "Status pesanan"}
+            </span>
+            <h1>
+              {isPreview
+                ? "Siap membuat pembayaran."
+                : STATUS_LABEL[liveStatus]}
+            </h1>
             <p>
               {isPreview
                 ? "Harga sudah disesuaikan dengan promo, referral, dan points yang kamu pakai."
@@ -662,9 +724,13 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
             </p>
             {!isPreview && (
               <div className="order-status-meta">
-                {liveStatus === "pending_payment" && countdown.totalSeconds > 0 && !countdown.isExpired && (
-                  <span className="order-countdown">Sisa waktu {countdown.display}</span>
-                )}
+                {liveStatus === "pending_payment" &&
+                  countdown.totalSeconds > 0 &&
+                  !countdown.isExpired && (
+                    <span className="order-countdown">
+                      Sisa waktu {countdown.display}
+                    </span>
+                  )}
                 {/* Badge "Waktu habis" hanya relevan selama masih menunggu
                     pembayaran. Tanpa gate status ini, order yang sukses tapi
                     dibuat lebih dari 30 menit lalu tetap akan menampilkan
@@ -672,7 +738,11 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                 {liveStatus === "pending_payment" && countdown.isExpired && (
                   <span className="order-countdown expired">Waktu habis</span>
                 )}
-                {lastChecked && <span className="order-last-checked">Diperiksa {lastChecked}</span>}
+                {lastChecked && (
+                  <span className="order-last-checked">
+                    Diperiksa {lastChecked}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -685,7 +755,10 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
           <article className="order-main-card">
             <div className="order-main-head">
               <div className="order-product-identity">
-                <span className="order-product-mark" style={{ background: product.accent }}>
+                <span
+                  className="order-product-mark"
+                  style={{ background: product.accent }}
+                >
                   {product.initials}
                 </span>
                 <div>
@@ -714,7 +787,11 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                 <small>Order ID</small>
                 <div className="order-id-copy-line">
                   <strong>{displayId}</strong>
-                  <button className="copy-order-id-button" type="button" onClick={() => void copyOrderId()}>
+                  <button
+                    className="copy-order-id-button"
+                    type="button"
+                    onClick={() => void copyOrderId()}
+                  >
                     Salin
                   </button>
                 </div>
@@ -737,8 +814,13 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                   className={`order-timeline-item ${index <= timelineIndex ? "current" : "upcoming"}`}
                   key={item.title}
                 >
-                  <div className="timeline-marker"><span>{String(index + 1).padStart(2, "0")}</span></div>
-                  <div><strong>{item.title}</strong><p>{item.description}</p></div>
+                  <div className="timeline-marker">
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -750,7 +832,11 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                   <strong>{payment.name}</strong>
                   <p>{payment.detail}</p>
                 </div>
-                <button type="button" disabled={busy} onClick={() => void createPaymentOrder()}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void createPaymentOrder()}
+                >
                   {busy ? "Memproses..." : "Buat pembayaran"}
                 </button>
               </div>
@@ -763,8 +849,8 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                   <small>Pembayaran</small>
                   <strong>Waktu pembayaran habis</strong>
                   <p>
-                    {payment.name} tidak lagi berlaku untuk pesanan ini. Buat pesanan
-                    baru untuk melanjutkan top up.
+                    {payment.name} tidak lagi berlaku untuk pesanan ini. Buat
+                    pesanan baru untuk melanjutkan top up.
                   </p>
                 </div>
                 <button type="button" onClick={() => router.push("/#topup")}>
@@ -779,7 +865,7 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>Diverifikasi ${BRAND.shortName}</span>
+                  <span>Diverifikasi otomatis oleh {BRAND.shortName}</span>
                 </div>
 
                 {dokuQrContent ? (
@@ -792,7 +878,9 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                   <DokuQrisPanel
                     qrContent={paylabsQrContent}
                     amount={order.pricing.finalPrice}
-                    expiresAt={order.paylabs?.expiresAt ?? order.expiresAt ?? null}
+                    expiresAt={
+                      order.paylabs?.expiresAt ?? order.expiresAt ?? null
+                    }
                   />
                 ) : paylabsVaNumber ? (
                   <div className="midtrans-native-payment">
@@ -803,24 +891,36 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                 ) : redirectUrl ? (
                   <div className="doku-checkout-cta">
                     <p>
-                      Sesi pembayaran siap — jendela pembayaran aman terbuka di
-                      halaman ini, tanpa berpindah situs.
+                      Tinggal satu langkah — klik "Bayar sekarang" dan
+                      selesaikan di jendela yang muncul.
                     </p>
-                    <button type="button" className="order-action-button primary" onClick={openDokuCheckout}>
+                    <button
+                      type="button"
+                      className="order-action-button primary"
+                      onClick={openDokuCheckout}
+                    >
                       Bayar sekarang
                     </button>
-                    <button type="button" className="order-secondary-link" onClick={openFallbackPayment}>
+                    <button
+                      type="button"
+                      className="order-secondary-link"
+                      onClick={openFallbackPayment}
+                    >
                       Buka di tab baru
                     </button>
                   </div>
                 ) : (
                   <div className="midtrans-native-warning">
-                    Sesi pembayaran belum tersedia. Tekan &quot;Cek status&quot; atau muat ulang halaman.
+                    Pembayarannya belum siap. Klik "Periksa status" atau refresh
+                    halaman.
                   </div>
                 )}
 
                 <div className="midtrans-native-footer">
-                  <span>Pembayaran terverifikasi otomatis — setelah bayar, status berubah tanpa perlu bukti.</span>
+                  <span>
+                    Begitu kamu bayar, statusnya update otomatis — nggak perlu
+                    kirim bukti transfer.
+                  </span>
                 </div>
               </div>
             ) : liveStatus === "pending_payment" ? (
@@ -831,24 +931,31 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                     <strong>{payment.name}</strong>
                     <p>{payment.detail}</p>
                   </div>
-                  <span>Diverifikasi ${BRAND.shortName}</span>
+                  <span>Diverifikasi otomatis oleh {BRAND.shortName}</span>
                 </div>
 
                 {!midtransClientKey && (
                   <div className="midtrans-native-warning">
-                    Pembayaran belum dapat dimuat. Silakan muat ulang halaman.
+                    Pembayarannya belum muncul. Refresh halaman, atau klik "Buka
+                    di tab baru".
                   </div>
                 )}
                 {midtransClientKey && !snapReady && (
-                  <div className="midtrans-native-loading">Memuat pembayaran...</div>
+                  <div className="midtrans-native-loading">
+                    Memuat pembayaran...
+                  </div>
                 )}
 
                 <div id={SNAP_EMBED_ID} className="midtrans-snap-container" />
 
                 <div className="midtrans-native-footer">
-                  <span>Pembayaran diverifikasi otomatis sebelum pesanan diproses.</span>
+                  <span>
+                    Pembayaranmu dicek otomatis sebelum pesanan diproses.
+                  </span>
                   {(!midtransClientKey || !snapReady) && redirectUrl && (
-                    <button type="button" onClick={openFallbackPayment}>Buka pembayaran cadangan</button>
+                    <button type="button" onClick={openFallbackPayment}>
+                      Buka pembayaran cadangan
+                    </button>
                   )}
                 </div>
               </div>
@@ -859,7 +966,9 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                   <strong>{payment.name}</strong>
                   <p>{payment.detail}</p>
                 </div>
-                <button type="button" disabled>{STATUS_LABEL[liveStatus]}</button>
+                <button type="button" disabled>
+                  {STATUS_LABEL[liveStatus]}
+                </button>
               </div>
             )}
 
@@ -872,17 +981,48 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                 <span>Ringkasan pesanan</span>
                 <small>{displayId}</small>
               </div>
-              <small>{isPreview ? "Pratinjau" : STATUS_LABEL[liveStatus]}</small>
+              <small>
+                {isPreview ? "Pratinjau" : STATUS_LABEL[liveStatus]}
+              </small>
             </div>
 
             <dl className="order-detail-list">
-              <div><dt>Produk</dt><dd>{product.gameName}</dd></div>
-              <div><dt>Nominal</dt><dd>{product.packageLabel}</dd></div>
-              <div><dt>User ID</dt><dd>{account.userId}</dd></div>
-              {account.serverId && <div><dt>Server / Zone</dt><dd>{account.serverId}</dd></div>}
-              {promoCode && <div><dt>Promo</dt><dd>{promoCode}</dd></div>}
-              {referralCode && <div><dt>Referral</dt><dd>{referralCode}</dd></div>}
-              {paymentChannel && <div><dt>Channel</dt><dd>{paymentChannel}</dd></div>}
+              <div>
+                <dt>Produk</dt>
+                <dd>{product.gameName}</dd>
+              </div>
+              <div>
+                <dt>Nominal</dt>
+                <dd>{product.packageLabel}</dd>
+              </div>
+              <div>
+                <dt>User ID</dt>
+                <dd>{account.userId}</dd>
+              </div>
+              {account.serverId && (
+                <div>
+                  <dt>Server / Zone</dt>
+                  <dd>{account.serverId}</dd>
+                </div>
+              )}
+              {promoCode && (
+                <div>
+                  <dt>Promo</dt>
+                  <dd>{promoCode}</dd>
+                </div>
+              )}
+              {referralCode && (
+                <div>
+                  <dt>Referral</dt>
+                  <dd>{referralCode}</dd>
+                </div>
+              )}
+              {paymentChannel && (
+                <div>
+                  <dt>Channel</dt>
+                  <dd>{paymentChannel}</dd>
+                </div>
+              )}
               {!isPreview && liveStatus === "success" && serialNumber && (
                 <div>
                   <dt>Serial Number (SN)</dt>
@@ -901,20 +1041,43 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
             </dl>
 
             <div className="order-price-breakdown">
-              <div><span>Harga</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
+              <div>
+                <span>Harga</span>
+                <strong>{formatIDR(pricing.sellingPrice)}</strong>
+              </div>
               {pricing.promotionDiscount > 0 && (
-                <div className="saving"><span>Promo</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
+                <div className="saving">
+                  <span>Promo</span>
+                  <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
+                </div>
               )}
               {pricing.referralDiscount > 0 && (
-                <div className="referral-saving"><span>Referral</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
+                <div className="referral-saving">
+                  <span>Referral</span>
+                  <strong>-{formatIDR(pricing.referralDiscount)}</strong>
+                </div>
               )}
               {pricing.pointsDiscount > 0 && (
-                <div className="points-saving"><span>Lacte Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+                <div className="points-saving">
+                  <span>
+                    Lacte Points ·{" "}
+                    {pricing.pointsRedeemed.toLocaleString("id-ID")} pts
+                  </span>
+                  <strong>-{formatIDR(pricing.pointsDiscount)}</strong>
+                </div>
               )}
               {pricing.pointsEarned > 0 && (
-                <div className="points-earned"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
+                <div className="points-earned">
+                  <span>Points setelah success</span>
+                  <strong>
+                    +{pricing.pointsEarned.toLocaleString("id-ID")} pts
+                  </strong>
+                </div>
               )}
-              <div><span>Biaya pembayaran</span><strong>{formatIDR(pricing.customerPaymentFee)}</strong></div>
+              <div>
+                <span>Biaya pembayaran</span>
+                <strong>{formatIDR(pricing.customerPaymentFee)}</strong>
+              </div>
             </div>
 
             <div className="order-grand-total">
@@ -942,24 +1105,40 @@ const paylabsVaNumber = isPaylabs ? order?.paylabs?.vaNumber ?? null : null;
                     disabled={busy}
                     onClick={() => {
                       if (cta.action === "pay") focusPayment();
-                      if (cta.action === "refresh" && order) void refreshStatus(order.id);
+                      if (cta.action === "refresh" && order)
+                        void refreshStatus(order.id);
                       if (cta.action === "new_order") router.push("/#topup");
-                      if (cta.action === "support") window.open("mailto:support@nambah.com?subject=Order%20Inquiry");
+                      if (cta.action === "support")
+                        window.open(
+                          "mailto:support@nambah.id?subject=Order%20Inquiry",
+                        );
                     }}
                   >
-                    {busy && cta.action === "refresh" ? "Memeriksa..." : cta.label}
+                    {busy && cta.action === "refresh"
+                      ? "Memeriksa..."
+                      : cta.label}
                   </button>
                 ))}
               </div>
             )}
 
             <div className="order-secondary-links">
-              <button className="order-secondary-link" type="button" onClick={() => void copyOrderId()}>
+              <button
+                className="order-secondary-link"
+                type="button"
+                onClick={() => void copyOrderId()}
+              >
                 Salin Order ID
               </button>
-              <Link className="order-secondary-link" href="/#topup">Pesanan baru</Link>
+              <Link className="order-secondary-link" href="/#topup">
+                Pesanan baru
+              </Link>
               {order && accessToken && (
-                <button className="order-secondary-link" type="button" onClick={shareOrder}>
+                <button
+                  className="order-secondary-link"
+                  type="button"
+                  onClick={shareOrder}
+                >
                   Bagikan status
                 </button>
               )}

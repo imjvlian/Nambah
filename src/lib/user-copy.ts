@@ -24,9 +24,9 @@ const INTERNAL_REJECTION_COPY: Record<
   string
 > = {
   profit_below_minimum:
-    "Promo atau kode ini belum bisa dipakai untuk produk ini. Silakan coba tanpa kode promo.",
+    "Kode ini belum bisa dipakai untuk produk ini. Coba checkout tanpa kodenya, ya.",
   referral_margin_too_thin:
-    "Kode referral belum bisa dipakai untuk produk ini. Silakan coba lagi tanpa kode referral.",
+    "Referral ini belum bisa dipakai untuk produk ini. Coba checkout tanpa kodenya, ya.",
 };
 
 /**
@@ -35,10 +35,7 @@ const INTERNAL_REJECTION_COPY: Record<
  * (mis. kode promo dan minimum belanja), bukan data bisnis internal.
  */
 const CUSTOMER_REJECTION_COPY: Record<
-  Exclude<
-    RejectionCode,
-    "profit_below_minimum" | "referral_margin_too_thin"
-  >,
+  Exclude<RejectionCode, "profit_below_minimum" | "referral_margin_too_thin">,
   (context: {
     code?: string;
     otherCode?: string;
@@ -47,16 +44,16 @@ const CUSTOMER_REJECTION_COPY: Record<
   }) => string
 > = {
   promo_minimum_order: ({ code, minimumOrder }) =>
-    `Minimum transaksi untuk ${code} adalah ${minimumOrder}.`,
+    `Kode ${code} bisa dipakai mulai belanja ${minimumOrder}.`,
 
   referral_minimum_order: ({ code, minimumOrder }) =>
-    `Minimum transaksi untuk referral ${code} adalah ${minimumOrder}.`,
+    `Referral ${code} bisa dipakai mulai belanja ${minimumOrder}.`,
 
   referral_not_stackable: ({ code, otherCode }) =>
-    `Referral ${code} tidak dapat digabung dengan promo ${otherCode}.`,
+    `Referral ${code} nggak bisa dipakai bareng promo ${otherCode}. Pilih salah satu ya.`,
 
   points_exceed_subtotal: () =>
-    "Lacte Points yang dipilih melebihi nilai yang dapat dipotong. Kurangi jumlah points.",
+    "Points-nya kebanyakan. Kurangi biar totalnya pas.",
 };
 
 export function rejectionCodeCopy(

@@ -3,7 +3,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { MERCHANT_RETAIL_PAYMENT_METHOD_ID, type Game, type PaymentMethod } from "@/lib/catalog";
+import {
+  MERCHANT_RETAIL_PAYMENT_METHOD_ID,
+  type Game,
+  type PaymentMethod,
+} from "@/lib/catalog";
 import {
   accountFieldOptionLabel,
   accountFieldOptionValue,
@@ -59,7 +63,8 @@ type UsernameCheckState = {
   region?: string | null;
   message?: string;
 };
-type NominalSectionId = "special" | "first-top-up" | "weekly-monthly" | "top-up";
+type NominalSectionId =
+  "special" | "first-top-up" | "weekly-monthly" | "top-up";
 
 type PointsSummary = {
   balance: number;
@@ -162,15 +167,16 @@ function groupsOf(item: Game["packages"][number]) {
 function isOnlyGroupNote(note?: string) {
   return Boolean(
     note &&
-      /^(hemat|populer|popular|langganan|promo|membership|member|weekly|monthly|pass|subscription|subscribe)$/i.test(
-        note.trim(),
-      ),
+    /^(hemat|populer|popular|langganan|promo|membership|member|weekly|monthly|pass|subscription|subscribe)$/i.test(
+      note.trim(),
+    ),
   );
 }
 
 function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
   const text = `${game.name} ${item.label} ${item.note ?? ""}`.toLowerCase();
-  if (/(weekly|pass|membership|member|starlight|langganan)/i.test(text)) return "pass";
+  if (/(weekly|pass|membership|member|starlight|langganan)/i.test(text))
+    return "pass";
   if (/(diamond|diamonds)/i.test(text)) return "diamond";
   if (/(\buc\b|unknown cash)/i.test(text)) return "uc";
   if (/robux/i.test(text)) return "robux";
@@ -238,11 +244,13 @@ export default function TopupExperience({
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPackage.id);
   const promoSectionRef = useRef<HTMLDivElement | null>(null);
-  
+
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
-  const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>({ status: "idle" });
+  const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>({
+    status: "idle",
+  });
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
@@ -253,24 +261,30 @@ export default function TopupExperience({
   const [referralMessage, setReferralMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [accountError, setAccountError] = useState("");
-  const [viewerState, setViewerState] = useState<"loading" | "guest" | "authenticated">("loading");
-  const [pointsSummary, setPointsSummary] = useState<PointsSummary | null>(null);
+  const [viewerState, setViewerState] = useState<
+    "loading" | "guest" | "authenticated"
+  >("loading");
+  const [pointsSummary, setPointsSummary] = useState<PointsSummary | null>(
+    null,
+  );
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsLoading, setPointsLoading] = useState(false);
   const [pointsError, setPointsError] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestWhatsapp, setGuestWhatsapp] = useState("");
   const [contactError, setContactError] = useState("");
-  const [serverPricing, setServerPricing] = useState<PublicPricingResult | null>(null);
+  const [serverPricing, setServerPricing] =
+    useState<PublicPricingResult | null>(null);
   const [pricingError, setPricingError] = useState("");
   const [merchantList, setMerchantList] = useState<PublicMerchant[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-const [confirmOpen, setConfirmOpen] = useState(false);
-const [viewerEmail, setViewerEmail] = useState("");
-const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
-const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [viewerEmail, setViewerEmail] = useState("");
+  const [pendingCheckout, setPendingCheckout] =
+    useState<PendingCheckout | null>(null);
+  const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
   const filteredGames = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -280,7 +294,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     );
   }, [games, query]);
 
-  const selectedGame = games.find((game) => game.id === selectedGameId) ?? defaultGame;
+  const selectedGame =
+    games.find((game) => game.id === selectedGameId) ?? defaultGame;
   const accountSchema = getGameAccountSchema(selectedGame);
   const canCheckUsername = Boolean(accountSchema.checker);
 
@@ -311,7 +326,10 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       return;
     }
 
-    promoSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    promoSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
   }
 
   /**
@@ -352,7 +370,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               src={artwork.src}
               alt={artwork.alt}
               loading="lazy"
-              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                display: "block",
+              }}
             />
           ) : (
             packageVisualLabel(visualKind)
@@ -364,7 +387,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         </span>
 
         <span className="package-card-v4-price">
-          <strong className="package-current-price">{formatIDR(item.sellingPrice)}</strong>
+          <strong className="package-current-price">
+            {formatIDR(item.sellingPrice)}
+          </strong>
           {(showReference || referenceDiscount > 0) && (
             <span className="package-reference-row">
               {showReference && <del>{formatIDR(item.referencePrice)}</del>}
@@ -377,7 +402,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           <span className="package-card-v4-meta">
             {groups.slice(0, 2).map((group) => (
               <b className={`package-badge ${group}`} key={group}>
-                {GROUP_OPTIONS.find((option) => option.id === group)?.label ?? group}
+                {GROUP_OPTIONS.find((option) => option.id === group)?.label ??
+                  group}
               </b>
             ))}
             {item.note && !isOnlyGroupNote(item.note) && (
@@ -394,7 +420,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       NOMINAL_SECTIONS.map((section) => ({
         ...section,
         items: sortNominalItems(
-          selectedGame.packages.filter((item) => getNominalSectionId(item) === section.id),
+          selectedGame.packages.filter(
+            (item) => getNominalSectionId(item) === section.id,
+          ),
         ),
       })).filter((section) => section.items.length > 0),
     [selectedGame],
@@ -406,7 +434,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
   const paymentMethod =
     paymentMethods.find((method) => method.id === paymentId) ?? defaultPayment;
 
-  const isMerchantRetail = paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
+  const isMerchantRetail =
+    paymentMethod.id === MERCHANT_RETAIL_PAYMENT_METHOD_ID;
   const selectedMerchant =
     merchantList.find((merchant) => merchant.id === selectedMerchantId) ?? null;
 
@@ -467,8 +496,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     );
     const step = pointsSummary.rules.redeemStep;
     const orderStepped = Math.floor(maxFromOrder / step) * step;
-    const availableStepped =
-      Math.floor(pointsSummary.available / step) * step;
+    const availableStepped = Math.floor(pointsSummary.available / step) * step;
     return Math.max(0, Math.min(orderStepped, availableStepped));
   }, [
     pointsSummary,
@@ -513,11 +541,15 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               setPointsError("");
             } else {
               setPointsError(
-                pointsData.error ?? "Lacte Points belum dapat dimuat.",
+                pointsData.error ??
+                  "Saldo Lacte Points gagal dimuat. Coba refresh halaman.",
               );
             }
           } catch {
-            if (mounted) setPointsError("Lacte Points belum dapat dimuat.");
+            if (mounted)
+              setPointsError(
+                "Saldo Lacte Points gagal dimuat. Coba refresh halaman.",
+              );
           } finally {
             if (mounted) setPointsLoading(false);
           }
@@ -551,7 +583,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const match = document.cookie.match(/(?:^|;\s*)nambah_ref_code=([^;]+)/);
     if (!match) return;
-    const code = decodeURIComponent(match[1] ?? "").trim().toUpperCase();
+    const code = decodeURIComponent(match[1] ?? "")
+      .trim()
+      .toUpperCase();
     if (!code) return;
 
     // Kode yang sudah diketik manual menang. Kalau tidak, mengetik kode lain
@@ -609,7 +643,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
         if (!mounted) return;
         if (!response.ok || !data.pricing) {
-          setPricingError(data.error ?? "Harga gagal dihitung.");
+          setPricingError(
+            data.error ?? "Sebentar, harga belum ke-update. Coba lagi ya.",
+          );
           setPromoEndsAt(null);
           if (appliedPromoCode) setPromoMessage("");
           if (appliedReferralCode) setReferralMessage("");
@@ -620,13 +656,24 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         setPromoEndsAt(data.promoEndsAt ?? null);
         if (data.points) setPointsSummary(data.points);
         if (appliedPromoCode && data.pricing.promoCode === appliedPromoCode) {
-          setPromoMessage(`${appliedPromoCode} aktif. Harga sudah dihitung ulang.`);
+          setPromoMessage(
+            `${appliedPromoCode} aktif. Harga sudah dihitung ulang.`,
+          );
         }
-        if (appliedReferralCode && data.pricing.referralCode === appliedReferralCode) {
-          setReferralMessage(`${appliedReferralCode} aktif. Benefit dihitung otomatis.`);
+        if (
+          appliedReferralCode &&
+          data.pricing.referralCode === appliedReferralCode
+        ) {
+          setReferralMessage(
+            `${appliedReferralCode} aktif. Benefit dihitung otomatis.`,
+          );
         }
       } catch (error) {
-        if (!mounted || (error instanceof DOMException && error.name === "AbortError")) return;
+        if (
+          !mounted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        )
+          return;
         setPricingError("Tidak bisa menghitung harga. Coba lagi.");
       } finally {
         if (mounted) setPricingLoading(false);
@@ -683,7 +730,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     let mounted = true;
 
     const timer = window.setTimeout(async () => {
-      setUsernameCheck({ status: "loading", message: "Memeriksa akun..." });
+      setUsernameCheck({ status: "loading", message: "Cek akun dulu ya…" });
 
       try {
         const response = await fetch("/api/game-account/check", {
@@ -721,7 +768,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
             server: normalizedServerId,
             message:
               data.message ??
-              "Format akun sudah sesuai, pengecekan otomatis tidak tersedia untuk produk ini.",
+              "Format ID kamu sudah benar. Produk ini belum bisa dicek otomatis — pastikan sekali lagi sebelum bayar.",
           });
           return;
         }
@@ -729,7 +776,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         if (response.status === 202 || data.pending) {
           setUsernameCheck({
             status: "pending",
-            message: data.message ?? "Pengecekan akun masih diproses.",
+            message:
+              data.message ?? "Masih dicek… sebentar lagi hasilnya keluar.",
           });
           return;
         }
@@ -737,7 +785,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         if (!response.ok) {
           setUsernameCheck({
             status: "error",
-            message: data.error ?? "ID atau Server tidak valid.",
+            message:
+              data.error ??
+              "ID atau Server-nya belum cocok. Cek lagi angkanya, lalu tunggu sebentar.",
           });
           return;
         }
@@ -757,13 +807,19 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           status: data.verified ? "success" : "error",
           server: data.server ?? normalizedServerId,
           region: data.region ?? null,
-          message: data.message ?? "Akun ditemukan, tetapi nickname tidak tersedia.",
+          message:
+            data.message ?? "Akun ditemukan, tetapi nickname tidak tersedia.",
         });
       } catch (error) {
-        if (!mounted || (error instanceof DOMException && error.name === "AbortError")) return;
+        if (
+          !mounted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        )
+          return;
         setUsernameCheck({
           status: "error",
-          message: "Pengecekan akun sedang tidak tersedia. Checkout tetap bisa dilanjutkan.",
+          message:
+            "Cek otomatisnya lagi down, tapi tenang — kamu tetap bisa lanjut bayar.",
         });
       }
     }, 700);
@@ -792,7 +848,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     setUsernameCheck({ status: "idle" });
     resetPricingMessages();
     requestAnimationFrame(() => {
-      document.getElementById("topup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById("topup")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -809,13 +867,13 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     if (viewerState !== "authenticated") {
       setAppliedPromoCode("");
       setPromoMessage(
-        "Kode promo hanya untuk pengguna login. Masuk atau daftar gratis dulu, baru pakai kodenya.",
+        "Kode promo cuma bisa dipakai kalau kamu login. Masuk atau daftar gratis dulu, ya.",
       );
       return;
     }
     setAppliedPromoCode(normalized);
     setPromoInput(normalized);
-    setPromoMessage(`${normalized} dipasang. Server sedang memvalidasi kode.`);
+    setPromoMessage(`${normalized} terpasang. Sebentar, kami cek kodenya…`);
   }
 
   function applyReferral() {
@@ -848,7 +906,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     }
     setAppliedReferralCode(normalized);
     setReferralInput(normalized);
-    setReferralMessage(`${normalized} dipasang. Server sedang memvalidasi kode.`);
+    setReferralMessage(`${normalized} terpasang. Sebentar, kami cek kodenya…`);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -871,7 +929,7 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
     let guestContact: { email: string; whatsapp: string } | null = null;
     if (viewerState === "loading") {
-      setContactError("Status akun masih diperiksa. Coba lagi sebentar.");
+      setContactError("Sebentar, kami masih cek login kamu. Coba lagi sesaat.");
       return;
     }
     if (viewerState === "guest") {
@@ -890,11 +948,16 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
     }
 
     if (!serverPricing) {
-      setNotice(pricingError || "Harga belum tervalidasi. Coba lagi.");
+      setNotice(
+        pricingError || "Sebentar, harga belum ke-update. Coba lagi ya.",
+      );
       return;
     }
     if (!serverPricing.safeToCheckout) {
-      setNotice(serverPricing.rejectionReason ?? "Harga belum aman untuk checkout.");
+      setNotice(
+        serverPricing.rejectionReason ??
+          "Totalnya belum bisa dikunci. Coba lagi sebentar.",
+      );
       return;
     }
 
@@ -945,7 +1008,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
       if (!response.ok || !data.order) {
         // Tutup dialog supaya pesan error di form terlihat.
         setConfirmOpen(false);
-        setNotice(data.error ?? "Gagal membuat pembayaran.");
+        setNotice(
+          data.error ?? "Aduh, pembayarannya gagal dibuat. Coba lagi ya.",
+        );
         return;
       }
       // Popup DOKU langsung dibuka dari gesture klik checkout (masih dalam
@@ -958,18 +1023,23 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
         const width = 520;
         const height = 780;
         const left = Math.max(0, Math.round((window.screen.width - width) / 2));
-        const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+        const top = Math.max(
+          0,
+          Math.round((window.screen.height - height) / 2),
+        );
         window.open(
           data.order.payment.redirectUrl,
           "doku_payment",
           `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
         );
       }
-      const tokenParam = data.accessToken ? `?access_token=${data.accessToken}` : "";
+      const tokenParam = data.accessToken
+        ? `?access_token=${data.accessToken}`
+        : "";
       router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
       setConfirmOpen(false);
-      setNotice("Tidak bisa menyiapkan pembayaran. Coba lagi.");
+      setNotice("Sebentar, servernya lagi ngambek. Coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -999,7 +1069,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           {filteredGames.map((game) => {
             const artwork = artworkByGameId[game.id];
             return (
-              <button className="game-card" key={game.id} type="button" onClick={() => chooseGame(game.id)}>
+              <button
+                className="game-card"
+                key={game.id}
+                type="button"
+                onClick={() => chooseGame(game.id)}
+              >
                 <span
                   className="game-mark app-artwork"
                   style={{ background: game.accent, overflow: "hidden" }}
@@ -1009,7 +1084,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       src={artwork.src}
                       alt={artwork.alt}
                       loading="lazy"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
                     />
                   ) : (
                     game.initials
@@ -1017,16 +1097,24 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 </span>
                 <span className="game-copy">
                   <strong>{game.name}</strong>
-                  <small>{game.category === "game" ? "Top up instan" : "Voucher digital"}</small>
+                  <small>
+                    {game.category === "game"
+                      ? "Top up instan"
+                      : "Voucher digital"}
+                  </small>
                 </span>
-                <span className="card-arrow" aria-hidden="true">↗</span>
+                <span className="card-arrow" aria-hidden="true">
+                  ↗
+                </span>
               </button>
             );
           })}
         </div>
 
         {filteredGames.length === 0 && (
-          <div className="empty-state">Belum ada produk yang cocok dengan pencarianmu.</div>
+          <div className="empty-state">
+            Belum ada produk yang cocok dengan pencarianmu.
+          </div>
         )}
       </section>
 
@@ -1042,9 +1130,15 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               disesuaikan dengan kode yang kamu pakai sebelum pembayaran dibuat.
             </p>
             <div className="trust-list">
-              <span><b>01</b> Harga jelas</span>
-              <span><b>02</b> Promo terukur</span>
-              <span><b>03</b> Referral menguntungkan</span>
+              <span>
+                <b>01</b> Harga jelas
+              </span>
+              <span>
+                <b>02</b> Promo nggak ribet
+              </span>
+              <span>
+                <b>03</b> Referral menguntungkan
+              </span>
             </div>
           </div>
         )}
@@ -1060,7 +1154,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   <img
                     src={selectedGameArtwork.src}
                     alt={selectedGameArtwork.alt}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
                   />
                 ) : (
                   selectedGame.initials
@@ -1080,8 +1179,17 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
             style={{ scrollMarginTop: "90px" }}
           >
             {accountError && (
-              <div className="account-validation-error" role="alert" aria-live="assertive">
-                <span className="account-validation-error-icon" aria-hidden="true">!</span>
+              <div
+                className="account-validation-error"
+                role="alert"
+                aria-live="assertive"
+              >
+                <span
+                  className="account-validation-error-icon"
+                  aria-hidden="true"
+                >
+                  !
+                </span>
                 <span className="account-validation-error-copy">
                   <strong>Data akun belum lengkap</strong>
                   <small>{accountError}</small>
@@ -1095,7 +1203,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 <small>{accountSchema.helper}</small>
               </div>
             </div>
-            <div className={accountSchema.server ? "input-grid two" : "input-grid"}>
+            <div
+              className={accountSchema.server ? "input-grid two" : "input-grid"}
+            >
               <label>
                 <span>{accountSchema.user.label}</span>
                 <input
@@ -1104,7 +1214,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   placeholder={accountSchema.user.placeholder}
                   value={userId}
                   onChange={(event) => {
-                    setUserId(sanitizeAccountField(event.target.value, accountSchema.user));
+                    setUserId(
+                      sanitizeAccountField(
+                        event.target.value,
+                        accountSchema.user,
+                      ),
+                    );
                     setAccountError("");
                     setUsernameCheck({ status: "idle" });
                   }}
@@ -1122,7 +1237,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                         setUsernameCheck({ status: "idle" });
                       }}
                     >
-                      <option value="">{accountSchema.server.placeholder}</option>
+                      <option value="">
+                        {accountSchema.server.placeholder}
+                      </option>
                       {accountSchema.server.options.map((option) => (
                         <option
                           key={accountFieldOptionValue(option)}
@@ -1139,7 +1256,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       placeholder={accountSchema.server.placeholder}
                       value={serverId}
                       onChange={(event) => {
-                        setServerId(sanitizeAccountField(event.target.value, accountSchema.server!));
+                        setServerId(
+                          sanitizeAccountField(
+                            event.target.value,
+                            accountSchema.server!,
+                          ),
+                        );
                         setAccountError("");
                         setUsernameCheck({ status: "idle" });
                       }}
@@ -1151,10 +1273,15 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
             {canCheckUsername && usernameCheck.status !== "idle" && (
               <div className="account-auto-check" aria-live="polite">
-                <div className={`account-check-banner ${usernameCheck.status}`} role="status">
+                <div
+                  className={`account-check-banner ${usernameCheck.status}`}
+                  role="status"
+                >
                   {usernameCheck.status === "loading" ? (
                     <>
-                      <span className="account-check-icon" aria-hidden="true">↻</span>
+                      <span className="account-check-icon" aria-hidden="true">
+                        ↻
+                      </span>
                       <span className="account-check-copy">
                         <strong>Memeriksa akun...</strong>
                         {/* "Zone" hanya relevan untuk game yang menanyakan
@@ -1169,9 +1296,17 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     </>
                   ) : usernameCheck.status === "success" ? (
                     <>
-                      <span className="account-check-icon" aria-hidden="true">✓</span>
+                      <span className="account-check-icon" aria-hidden="true">
+                        ✓
+                      </span>
                       <span className="account-check-copy">
-                        <span>Akun kamu <strong>{usernameCheck.nickname ?? "terverifikasi"}</strong>.</span>
+                        <span>
+                          Akun kamu{" "}
+                          <strong>
+                            {usernameCheck.nickname ?? "terverifikasi"}
+                          </strong>
+                          .
+                        </span>
                         <small>
                           {[
                             usernameCheck.region,
@@ -1189,7 +1324,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     </>
                   ) : usernameCheck.status === "unavailable" ? (
                     <>
-                      <span className="account-check-icon" aria-hidden="true">i</span>
+                      <span className="account-check-icon" aria-hidden="true">
+                        i
+                      </span>
                       <span className="account-check-copy">
                         <strong>Pengecekan otomatis tidak tersedia</strong>
                         <small>{usernameCheck.message}</small>
@@ -1197,7 +1334,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     </>
                   ) : usernameCheck.status === "pending" ? (
                     <>
-                      <span className="account-check-icon" aria-hidden="true">…</span>
+                      <span className="account-check-icon" aria-hidden="true">
+                        …
+                      </span>
                       <span className="account-check-copy">
                         <strong>Masih diproses</strong>
                         <small>{usernameCheck.message}</small>
@@ -1205,7 +1344,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     </>
                   ) : (
                     <>
-                      <span className="account-check-icon" aria-hidden="true">!</span>
+                      <span className="account-check-icon" aria-hidden="true">
+                        !
+                      </span>
                       <span className="account-check-copy">
                         <strong>Belum terverifikasi</strong>
                         <small>{usernameCheck.message}</small>
@@ -1218,12 +1359,24 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           </div>
 
           {viewerState === "guest" && (
-            <div className="form-block guest-receipt-block" id="receipt-contact">
+            <div
+              className="form-block guest-receipt-block"
+              id="receipt-contact"
+            >
               {contactError && (
-                <div className="account-validation-error" role="alert" aria-live="assertive">
-                  <span className="account-validation-error-icon" aria-hidden="true">!</span>
+                <div
+                  className="account-validation-error"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  <span
+                    className="account-validation-error-icon"
+                    aria-hidden="true"
+                  >
+                    !
+                  </span>
                   <span className="account-validation-error-copy">
-                    <strong>Kontak receipt belum lengkap</strong>
+                    <strong>Kontak struk belum lengkap</strong>
                     <small>{contactError}</small>
                   </span>
                 </div>
@@ -1232,8 +1385,11 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               <div className="form-label">
                 <span className="step-number">✉</span>
                 <div>
-                  <strong>Kontak receipt</strong>
-                  <small>Karena kamu belum login, receipt transaksi akan menggunakan email dan WhatsApp ini.</small>
+                  <strong>Kirim struk ke</strong>
+                  <small>
+                    Kamu belum login — struk transaksinya akan dikirim ke email
+                    dan WhatsApp ini.
+                  </small>
                 </div>
               </div>
 
@@ -1272,7 +1428,8 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
               </div>
 
               <p className="guest-receipt-note">
-                Kontak ini hanya disimpan pada order untuk status dan receipt transaksi.
+                Kontak ini cuma dipakai buat kirim struk dan update status
+                order. Nggak ada lainnya.
               </p>
             </div>
           )}
@@ -1280,7 +1437,12 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           <div className="form-block nominal-form-block nominal-form-grouped">
             <div className="form-label">
               <span className="step-number">2</span>
-              <div><strong>Pilih nominal</strong><small>Semua nominal ditampilkan sekaligus dan dikelompokkan berdasarkan jenis produk.</small></div>
+              <div>
+                <strong>Pilih nominal</strong>
+                <small>
+                  Semua nominal sudah kami kelompokkan biar gampang dicari.
+                </small>
+              </div>
             </div>
 
             {bestDealItems.length > 0 && (
@@ -1292,9 +1454,17 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   <div>
                     <strong id="best-deals-heading">
                       Best Deals
-                      <span className="nominal-section-spark" aria-hidden="true">✦</span>
+                      <span
+                        className="nominal-section-spark"
+                        aria-hidden="true"
+                      >
+                        ✦
+                      </span>
                     </strong>
-                    <small>Nominal unggulan dan paling dicari untuk {selectedGame.name}.</small>
+                    <small>
+                      Nominal unggulan dan paling dicari untuk{" "}
+                      {selectedGame.name}.
+                    </small>
                   </div>
                   <span>{bestDealItems.length} pilihan</span>
                 </div>
@@ -1312,12 +1482,22 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
 
             <div className="nominal-section-stack">
               {nominalSections.map((section) => (
-                <section className={`nominal-section nominal-section-${section.id}`} key={section.id}>
+                <section
+                  className={`nominal-section nominal-section-${section.id}`}
+                  key={section.id}
+                >
                   <div className="nominal-section-heading">
                     <div>
                       <strong>
                         {section.label}
-                        {section.featured && <span className="nominal-section-spark" aria-hidden="true">✦</span>}
+                        {section.featured && (
+                          <span
+                            className="nominal-section-spark"
+                            aria-hidden="true"
+                          >
+                            ✦
+                          </span>
+                        )}
                       </strong>
                       <small>{section.description}</small>
                     </div>
@@ -1344,22 +1524,48 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           >
             <div className="form-label">
               <span className="step-number">3</span>
-              <div><strong>Promo dan referral</strong><small>Kode promo dan referral otomatis dihitung dan langsung berlaku saat pembayaran.</small></div>
+              <div>
+                <strong>Promo dan referral</strong>
+                <small>
+                  Punya kode promo atau referral? Masukkan di sini — potongannya
+                  langsung kelihatan di total.
+                </small>
+              </div>
             </div>
 
             <div className="discount-stack">
               <label className="discount-field">
                 <span>Kode promo</span>
                 <span className="discount-input-row">
-                  <input autoCapitalize="characters" placeholder="Contoh: WELCOME" value={promoInput} onChange={(event) => setPromoInput(event.target.value.toUpperCase())} />
-                  <button type="button" onClick={applyPromo}>Pakai</button>
+                  <input
+                    autoCapitalize="characters"
+                    placeholder="Contoh: WELCOME"
+                    value={promoInput}
+                    onChange={(event) =>
+                      setPromoInput(event.target.value.toUpperCase())
+                    }
+                  />
+                  <button type="button" onClick={applyPromo}>
+                    Pakai
+                  </button>
                 </span>
               </label>
               <label className="discount-field">
-                <span>Kode referral <em>opsional</em></span>
+                <span>
+                  Kode referral <em>opsional</em>
+                </span>
                 <span className="discount-input-row">
-                  <input autoCapitalize="characters" placeholder="Contoh: TEMAN" value={referralInput} onChange={(event) => setReferralInput(event.target.value.toUpperCase())} />
-                  <button type="button" onClick={applyReferral}>Pakai</button>
+                  <input
+                    autoCapitalize="characters"
+                    placeholder="Contoh: TEMAN"
+                    value={referralInput}
+                    onChange={(event) =>
+                      setReferralInput(event.target.value.toUpperCase())
+                    }
+                  />
+                  <button type="button" onClick={applyReferral}>
+                    Pakai
+                  </button>
                 </span>
               </label>
               {/* Hint login diletakkan di bawah kedua input supaya tidak menutupi
@@ -1368,29 +1574,45 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 <p className="inline-message discount-login-hint">
                   💡 Kode promo & referral khusus pengguna login —{" "}
                   <a href="/login?next=%23topup">masuk</a> atau{" "}
-                  <a href="/register?next=%23topup">daftar gratis</a> dulu untuk memakainya.
+                  <a href="/register?next=%23topup">daftar gratis</a> dulu untuk
+                  memakainya.
                 </p>
               )}
             </div>
 
             {promoMessage && <p className="inline-message">{promoMessage}</p>}
-            {promoEndsAt && appliedPromoCode && promoCountdownLabel(promoEndsAt, promoCountdownNow) && (
-              <p className="inline-message promo-countdown">
-                ⏳ Promo berakhir dalam <b>{promoCountdownLabel(promoEndsAt, promoCountdownNow)}</b>
+            {promoEndsAt &&
+              appliedPromoCode &&
+              promoCountdownLabel(promoEndsAt, promoCountdownNow) && (
+                <p className="inline-message promo-countdown">
+                  ⏳ Promo berakhir dalam{" "}
+                  <b>{promoCountdownLabel(promoEndsAt, promoCountdownNow)}</b>
+                </p>
+              )}
+            {referralMessage && (
+              <p className="inline-message referral-message">
+                {referralMessage}
               </p>
             )}
-            {referralMessage && <p className="inline-message referral-message">{referralMessage}</p>}
-            {pricingError && <p className="inline-message warning">{pricingError}</p>}
+            {pricingError && (
+              <p className="inline-message warning">{pricingError}</p>
+            )}
 
             {pricing.referralCode && pricing.referralDiscount > 0 && (
               <p className="referral-active">
-                Referral {pricing.referralCode} aktif · kamu hemat {formatIDR(pricing.referralDiscount)}.
-                {pricing.referralDiscountCapped ? " Benefit disesuaikan otomatis agar transaksi tetap aman." : ""}
+                Referral {pricing.referralCode} aktif · kamu hemat{" "}
+                {formatIDR(pricing.referralDiscount)}.
+                {pricing.referralDiscountCapped
+                  ? " Benefit disesuaikan otomatis agar transaksi tetap aman."
+                  : ""}
               </p>
             )}
-            {(appliedPromoCode || appliedReferralCode) && pricing.rejectionReason && (
-              <p className="inline-message warning">{pricing.rejectionReason}</p>
-            )}
+            {(appliedPromoCode || appliedReferralCode) &&
+              pricing.rejectionReason && (
+                <p className="inline-message warning">
+                  {pricing.rejectionReason}
+                </p>
+              )}
           </div>
 
           <div className="form-block points-checkout-block">
@@ -1400,28 +1622,38 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 <strong>Lacte Points</strong>
                 <small>
                   {viewerState === "authenticated"
-                    ? "Gunakan points sebagai potongan. Points baru didapat setelah transaksi berhasil."
-                    : "Login untuk mengumpulkan dan menggunakan Lacte Points."}
+                    ? "Tukar points biar totalnya turun. Points baru masuk setelah transaksi kamu sukses."
+                    : "Login dulu biar points kamu numpuk dan bisa dipakai."}
                 </small>
               </div>
             </div>
 
             {viewerState === "authenticated" ? (
               pointsLoading ? (
-                <div className="points-checkout-loading">Memuat saldo points...</div>
+                <div className="points-checkout-loading">
+                  Ngambil saldo points…
+                </div>
               ) : pointsSummary ? (
                 <div className="points-checkout-card">
                   <div className="points-checkout-balance">
                     <div>
                       <small>Points tersedia</small>
-                      <strong>{pointsSummary.available.toLocaleString("id-ID")} pts</strong>
+                      <strong>
+                        {pointsSummary.available.toLocaleString("id-ID")} pts
+                      </strong>
                       <span>
-                        ≈ {formatIDR(pointsSummary.available * pointsSummary.rules.pointValueIdr)}
+                        ≈{" "}
+                        {formatIDR(
+                          pointsSummary.available *
+                            pointsSummary.rules.pointValueIdr,
+                        )}
                       </span>
                     </div>
                     <div className="points-earn-preview">
                       <small>Estimasi dari order ini</small>
-                      <strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong>
+                      <strong>
+                        +{pricing.pointsEarned.toLocaleString("id-ID")} pts
+                      </strong>
                       <span>masuk setelah status success</span>
                     </div>
                   </div>
@@ -1456,7 +1688,10 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                       />
                       <div className="points-redeem-actions">
                         <span>
-                          Maks. {maxPointsForOrder.toLocaleString("id-ID")} pts · {Math.round(pointsSummary.rules.maxRedeemRate * 100)}% subtotal
+                          Maks. {maxPointsForOrder.toLocaleString("id-ID")} pts
+                          ·{" "}
+                          {Math.round(pointsSummary.rules.maxRedeemRate * 100)}%
+                          subtotal
                         </span>
                         <button
                           type="button"
@@ -1468,20 +1703,24 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     </>
                   ) : (
                     <p className="points-checkout-note">
-                      Saldo belum mencapai minimum {pointsSummary.rules.minimumRedeem} points atau margin transaksi belum memungkinkan redemption.
+                      Points kamu belum bisa dipakai di transaksi ini — butuh
+                      minimal {pointsSummary.rules.minimumRedeem} points, atau
+                      nominalnya terlalu kecil. Naikkan nominalnya, ya.
                     </p>
                   )}
                 </div>
               ) : (
                 <p className="inline-message warning">
-                  {pointsError || "Lacte Points belum dapat dimuat."}
+                  {pointsError ||
+                    "Saldo Lacte Points gagal dimuat. Coba refresh halaman."}
                 </p>
               )
             ) : (
               <div className="points-guest-callout">
                 <span>N+</span>
                 <p>
-                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk ke akun ${BRAND.shortName} sebelum checkout untuk mulai mengumpulkan points.
+                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk dulu
+                  ke akun {BRAND.shortName} biar points kamu mulai numpuk.
                 </p>
               </div>
             )}
@@ -1491,127 +1730,196 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
           </div>
 
           <div className="checkout-rail">
-          <div className="form-block">
-            <div className="form-label">
-              <span className="step-number">4</span>
-              <div><strong>Metode pembayaran</strong><small>Pilih metode yang paling nyaman. Pembayaran diverifikasi otomatis sebelum pesanan diproses.</small></div>
-            </div>
-            <div className="payment-list">
-              {paymentMethods.map((method) => (
-                <label className={`payment-option ${paymentId === method.id ? "active" : ""}`} key={method.id}>
-                  <input checked={paymentId === method.id} name="payment" type="radio" value={method.id} onChange={() => setPaymentId(method.id)} />
-                  <span className="radio-dot" />
-                  <span><strong>{method.name}</strong><small>{method.detail}</small></span>
-                </label>
-              ))}
-            </div>
-
-            {isMerchantRetail ? (
-              <div className="merchant-picker form-block">
-                <div className="form-label">
-                  <span className="step-number">5</span>
-                  <div>
-                    <strong>Pilih toko</strong>
-                    <small>Anda membayar langsung ke toko ini. Lacte hanya meneruskan pesanan ke penyedia.</small>
-                  </div>
+            <div className="form-block">
+              <div className="form-label">
+                <span className="step-number">4</span>
+                <div>
+                  <strong>Metode pembayaran</strong>
+                  <small>
+                    Pilih metode yang paling nyaman. Pembayaran diverifikasi
+                    otomatis sebelum pesanan diproses.
+                  </small>
                 </div>
+              </div>
+              <div className="payment-list">
+                {paymentMethods.map((method) => (
+                  <label
+                    className={`payment-option ${paymentId === method.id ? "active" : ""}`}
+                    key={method.id}
+                  >
+                    <input
+                      checked={paymentId === method.id}
+                      name="payment"
+                      type="radio"
+                      value={method.id}
+                      onChange={() => setPaymentId(method.id)}
+                    />
+                    <span className="radio-dot" />
+                    <span>
+                      <strong>{method.name}</strong>
+                      <small>{method.detail}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
 
-                {!merchantList.length ? (
-                  <p className="inline-message warning">
-                    Belum ada toko yang menerima pembelian ritel. Pilih metode pembayaran lain.
-                  </p>
-                ) : (
-                  <div className="payment-list">
-                    {merchantList.map((merchant) => (
-                      <label
-                        className={`payment-option ${selectedMerchantId === merchant.id ? "active" : ""}`}
-                        key={merchant.id}
-                      >
-                        <input
-                          checked={selectedMerchantId === merchant.id}
-                          name="merchant"
-                          type="radio"
-                          value={merchant.id}
-                          onChange={() => setSelectedMerchantId(merchant.id)}
-                        />
-                        <span className="radio-dot" />
-                        <span>
-                          <strong>{merchant.name}</strong>
-                          {merchant.address ? <small>{merchant.address}</small> : null}
-                        </span>
-                      </label>
-                    ))}
+              {isMerchantRetail ? (
+                <div className="merchant-picker form-block">
+                  <div className="form-label">
+                    <span className="step-number">5</span>
+                    <div>
+                      <strong>Pilih toko</strong>
+                      <small>
+                        Kamu bayar langsung ke toko ini. Lacte cuma bantu
+                        teruskan pesanannya.
+                      </small>
+                    </div>
                   </div>
-                )}
-              </div>
-            ) : null}
-          </div>
 
-          <div className={`pricing-summary ${pricingLoading ? "is-loading" : ""}`}>
-            <div className="pricing-product-row">
-              <div><small>{selectedGame.shortName}</small><strong>{selectedPackage.label}</strong></div>
-              <div className="summary-reference">
-                {pricing.referencePrice > pricing.sellingPrice && <del>{formatIDR(pricing.referencePrice)}</del>}
-                {pricing.referenceDiscountPercent > 0 && <span>-{pricing.referenceDiscountPercent}%</span>}
-              </div>
+                  {!merchantList.length ? (
+                    <p className="inline-message warning">
+                      Belum ada toko yang bisa menerima pesanan ini. Pilih
+                      metode bayar lain dulu, ya.
+                    </p>
+                  ) : (
+                    <div className="payment-list">
+                      {merchantList.map((merchant) => (
+                        <label
+                          className={`payment-option ${selectedMerchantId === merchant.id ? "active" : ""}`}
+                          key={merchant.id}
+                        >
+                          <input
+                            checked={selectedMerchantId === merchant.id}
+                            name="merchant"
+                            type="radio"
+                            value={merchant.id}
+                            onChange={() => setSelectedMerchantId(merchant.id)}
+                          />
+                          <span className="radio-dot" />
+                          <span>
+                            <strong>{merchant.name}</strong>
+                            {merchant.address ? (
+                              <small>{merchant.address}</small>
+                            ) : null}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
-            <div className="summary-line"><span>Harga {BRAND.shortName}</span><strong>{formatIDR(pricing.sellingPrice)}</strong></div>
-            {pricing.promotionDiscount > 0 && (
-              <div className="summary-line discount"><span>Promo {pricing.promoCode}</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
-            )}
-            {pricing.referralDiscount > 0 && (
-              <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
-            )}
-            {pricing.pointsDiscount > 0 && (
-              <div className="summary-line points-benefit"><span>Lacte Points · {pricing.pointsRedeemed.toLocaleString("id-ID")} pts</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
-            )}
-            {viewerState === "authenticated" && pricing.pointsEarned > 0 && (
-              <div className="summary-line points-earn"><span>Points setelah success</span><strong>+{pricing.pointsEarned.toLocaleString("id-ID")} pts</strong></div>
-            )}
-            {/*
-             * SATU baris biaya, yang isinya berubah mengikuti metode pembayaran.
-             *
-             * Dulu ada dua baris: "Biaya pembayaran" yang selalu Rp0, dan
-             * "Biaya layanan toko" terpisah. Dua-duanya menampilkan biaya,
-             * jadi user melihat dua baris yang harus dijumlahkan sendiri - dan
-             * tidak ada yang memberi tahu baris mana yang sudah termasuk di
-             * total.
-             *
-             * Sekarang hanya satu baris. Metode biasa: biaya payment gateway.
-             * Jalur ritel: biaya layanan toko. Keduanya sudah termasuk di
-             * `finalPrice`, jadi user tidak perlu menghitung apa pun.
-             *
-             * Label "Biaya layanan toko" dipakai, bukan "Biaya pembayaran",
-             * karena uang itu benar-benar masuk ke merchant - bukan ke Lacte.
-             * Menyebutnya "biaya pembayaran" akan membuat user mengira Lacte
-             * yang menerimanya.
-             */}
-            {isMerchantRetail ? (
-              <div className="summary-line merchant-fee">
-                <span>
-                  Biaya layanan toko
-                  {selectedMerchant ? ` · ${selectedMerchant.name}` : ""}
-                </span>
-                <strong>{formatIDR(pricing.merchantServiceFee)}</strong>
+
+            <div
+              className={`pricing-summary ${pricingLoading ? "is-loading" : ""}`}
+            >
+              <div className="pricing-product-row">
+                <div>
+                  <small>{selectedGame.shortName}</small>
+                  <strong>{selectedPackage.label}</strong>
+                </div>
+                <div className="summary-reference">
+                  {pricing.referencePrice > pricing.sellingPrice && (
+                    <del>{formatIDR(pricing.referencePrice)}</del>
+                  )}
+                  {pricing.referenceDiscountPercent > 0 && (
+                    <span>-{pricing.referenceDiscountPercent}%</span>
+                  )}
+                </div>
               </div>
-            ) : (
               <div className="summary-line">
-                <span>Biaya pembayaran</span>
+                <span>Harga {BRAND.shortName}</span>
+                <strong>{formatIDR(pricing.sellingPrice)}</strong>
+              </div>
+              {pricing.promotionDiscount > 0 && (
+                <div className="summary-line discount">
+                  <span>Promo {pricing.promoCode}</span>
+                  <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
+                </div>
+              )}
+              {pricing.referralDiscount > 0 && (
+                <div className="summary-line referral-benefit">
+                  <span>Benefit referral {pricing.referralCode}</span>
+                  <strong>-{formatIDR(pricing.referralDiscount)}</strong>
+                </div>
+              )}
+              {pricing.pointsDiscount > 0 && (
+                <div className="summary-line points-benefit">
+                  <span>
+                    Lacte Points ·{" "}
+                    {pricing.pointsRedeemed.toLocaleString("id-ID")} pts
+                  </span>
+                  <strong>-{formatIDR(pricing.pointsDiscount)}</strong>
+                </div>
+              )}
+              {viewerState === "authenticated" && pricing.pointsEarned > 0 && (
+                <div className="summary-line points-earn">
+                  <span>Points setelah success</span>
+                  <strong>
+                    +{pricing.pointsEarned.toLocaleString("id-ID")} pts
+                  </strong>
+                </div>
+              )}
+              {/*
+               * SATU baris biaya, yang isinya berubah mengikuti metode pembayaran.
+               *
+               * Dulu ada dua baris: "Biaya pembayaran" yang selalu Rp0, dan
+               * "Biaya layanan toko" terpisah. Dua-duanya menampilkan biaya,
+               * jadi user melihat dua baris yang harus dijumlahkan sendiri - dan
+               * tidak ada yang memberi tahu baris mana yang sudah termasuk di
+               * total.
+               *
+               * Sekarang hanya satu baris. Metode biasa: biaya payment gateway.
+               * Jalur ritel: biaya layanan toko. Keduanya sudah termasuk di
+               * `finalPrice`, jadi user tidak perlu menghitung apa pun.
+               *
+               * Label "Biaya layanan toko" dipakai, bukan "Biaya pembayaran",
+               * karena uang itu benar-benar masuk ke merchant - bukan ke Lacte.
+               * Menyebutnya "biaya pembayaran" akan membuat user mengira Lacte
+               * yang menerimanya.
+               */}
+              {isMerchantRetail ? (
+                <div className="summary-line merchant-fee">
+                  <span>
+                    Biaya layanan toko
+                    {selectedMerchant ? ` · ${selectedMerchant.name}` : ""}
+                  </span>
+                  <strong>{formatIDR(pricing.merchantServiceFee)}</strong>
+                </div>
+              ) : (
+                <div className="summary-line">
+                  <span>Biaya pembayaran</span>
+                  <strong>
+                    {pricing.customerPaymentFee === 0
+                      ? "Rp0"
+                      : formatIDR(pricing.customerPaymentFee)}
+                  </strong>
+                </div>
+              )}
+              <div className="summary-total">
+                <span>Total</span>
                 <strong>
-                  {pricing.customerPaymentFee === 0
-                    ? "Rp0"
-                    : formatIDR(pricing.customerPaymentFee)}
+                  {pricingLoading
+                    ? "Menghitung..."
+                    : formatIDR(pricing.finalPrice)}
                 </strong>
               </div>
-            )}
-            <div className="summary-total"><span>Total</span><strong>{pricingLoading ? "Menghitung..." : formatIDR(pricing.finalPrice)}</strong></div>
-          </div>
+            </div>
 
-          <button className="primary-button full" disabled={isSubmitting || pricingLoading || Boolean(pricingError)} type="submit">
-            {pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"} <span aria-hidden="true">→</span>
-          </button>
+            <button
+              className="primary-button full"
+              disabled={isSubmitting || pricingLoading || Boolean(pricingError)}
+              type="submit"
+            >
+              {pricingLoading ? "Menghitung harga..." : "Lanjutkan pembayaran"}{" "}
+              <span aria-hidden="true">→</span>
+            </button>
           </div>
-          {notice && <p className="form-notice" role="status">{notice}</p>}
+          {notice && (
+            <p className="form-notice" role="status">
+              {notice}
+            </p>
+          )}
 
           {confirmOpen && pendingCheckout && (
             <div
@@ -1629,19 +1937,26 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                 onClick={(event) => event.stopPropagation()}
               >
                 <header className="checkout-confirm-head">
-                  <span className="checkout-confirm-head-icon" aria-hidden="true">
+                  <span
+                    className="checkout-confirm-head-icon"
+                    aria-hidden="true"
+                  >
                     ✓
                   </span>
                   <div className="checkout-confirm-head-copy">
                     <h3 id="checkout-confirm-title">Periksa transaksi kamu</h3>
-                    <p>Pastikan data tujuan sudah benar sebelum melanjutkan ke pembayaran.</p>
+                    <p>
+                      Sekali cek lagi — data ini yang dipakai buat kirim itemmu.
+                    </p>
                   </div>
                 </header>
 
                 <div className="checkout-confirm-list">
                   <div className="checkout-confirm-row">
                     <span>Produk</span>
-                    <strong>{selectedGame.name} · {selectedPackage.label}</strong>
+                    <strong>
+                      {selectedGame.name} · {selectedPackage.label}
+                    </strong>
                   </div>
                   <div className="checkout-confirm-row checkout-confirm-row-accent">
                     <span>User ID</span>
@@ -1660,7 +1975,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   <div className="checkout-confirm-row">
                     <span>Tujuan receipt</span>
                     <strong>
-                      {pendingCheckout.guestContact?.email ?? viewerEmail ?? "Email akun"}
+                      {pendingCheckout.guestContact?.email ??
+                        viewerEmail ??
+                        "Email akun"}
                     </strong>
                   </div>
                   {pendingCheckout.guestContact?.whatsapp && (
@@ -1684,7 +2001,9 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                   {pointsToRedeem > 0 && (
                     <div className="checkout-confirm-row">
                       <span>Lacte Points</span>
-                      <strong>{pointsToRedeem.toLocaleString("id-ID")} pts</strong>
+                      <strong>
+                        {pointsToRedeem.toLocaleString("id-ID")} pts
+                      </strong>
                     </div>
                   )}
                 </div>
@@ -1695,19 +2014,35 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     <strong>{formatIDR(pricing.sellingPrice)}</strong>
                   </div>
                   {pricing.promotionDiscount > 0 && (
-                    <div className="summary-line discount"><span>Promo {pricing.promoCode}</span><strong>-{formatIDR(pricing.promotionDiscount)}</strong></div>
+                    <div className="summary-line discount">
+                      <span>Promo {pricing.promoCode}</span>
+                      <strong>-{formatIDR(pricing.promotionDiscount)}</strong>
+                    </div>
                   )}
                   {pricing.referralDiscount > 0 && (
-                    <div className="summary-line referral-benefit"><span>Benefit referral {pricing.referralCode}</span><strong>-{formatIDR(pricing.referralDiscount)}</strong></div>
+                    <div className="summary-line referral-benefit">
+                      <span>Benefit referral {pricing.referralCode}</span>
+                      <strong>-{formatIDR(pricing.referralDiscount)}</strong>
+                    </div>
                   )}
                   {pricing.pointsDiscount > 0 && (
-                    <div className="summary-line points-benefit"><span>Lacte Points</span><strong>-{formatIDR(pricing.pointsDiscount)}</strong></div>
+                    <div className="summary-line points-benefit">
+                      <span>Lacte Points</span>
+                      <strong>-{formatIDR(pricing.pointsDiscount)}</strong>
+                    </div>
                   )}
                   <div className="summary-line">
                     <span>Biaya pembayaran</span>
-                    <strong>{pricing.customerPaymentFee === 0 ? "Rp0" : formatIDR(pricing.customerPaymentFee)}</strong>
+                    <strong>
+                      {pricing.customerPaymentFee === 0
+                        ? "Rp0"
+                        : formatIDR(pricing.customerPaymentFee)}
+                    </strong>
                   </div>
-                  <div className="summary-total"><span>Total dibayar</span><strong>{formatIDR(pricing.finalPrice)}</strong></div>
+                  <div className="summary-total">
+                    <span>Total dibayar</span>
+                    <strong>{formatIDR(pricing.finalPrice)}</strong>
+                  </div>
                 </div>
 
                 <footer className="checkout-confirm-actions">
@@ -1726,7 +2061,10 @@ const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
                     disabled={isSubmitting}
                     onClick={() => void confirmCheckout()}
                   >
-                    {isSubmitting ? "Membuat pembayaran..." : "Konfirmasi & bayar"} <span aria-hidden="true">→</span>
+                    {isSubmitting
+                      ? "Membuat pembayaran..."
+                      : "Konfirmasi & bayar"}{" "}
+                    <span aria-hidden="true">→</span>
                   </button>
                 </footer>
               </section>

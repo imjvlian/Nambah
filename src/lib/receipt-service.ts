@@ -110,18 +110,15 @@ function formatDate(value: string | null) {
 }
 
 async function getDelivery(orderId: string) {
-  const [row] = await supabaseSelect<ReceiptDeliveryRow>(
-    "receipt_deliveries",
-    {
-      select:
-        "id,order_id,channel,recipient,provider,status,provider_message_id,attempts,last_error,sent_at,created_at,updated_at",
-      filters: {
-        order_id: `eq.${orderId}`,
-        channel: "eq.email",
-      },
-      limit: 1,
+  const [row] = await supabaseSelect<ReceiptDeliveryRow>("receipt_deliveries", {
+    select:
+      "id,order_id,channel,recipient,provider,status,provider_message_id,attempts,last_error,sent_at,created_at,updated_at",
+    filters: {
+      order_id: `eq.${orderId}`,
+      channel: "eq.email",
     },
-  );
+    limit: 1,
+  });
   return row ?? null;
 }
 
@@ -171,40 +168,41 @@ export async function loadReceiptContext(orderId: string) {
   });
   if (!order) return null;
 
-  const [gameRows, productRows, paymentRows, supplierTxRows] = await Promise.all([
-    supabaseSelect<GameRow>("games", {
-      select: "id,name,short_name",
-      filters: { id: `eq.${order.game_id}` },
-      limit: 1,
-    }),
-    supabaseSelect<ProductRow>("products", {
-      select: "id,label",
-      filters: { id: `eq.${order.product_id}` },
-      limit: 1,
-    }),
-    supabaseSelect<PaymentMethodRow>("payment_methods", {
-      select: "id,name",
-      filters: { id: `eq.${order.payment_method_id}` },
-      limit: 1,
-    }),
-    /* SN (serial number) datang dari supplier, bukan dari tabel orders.
-     *
-     * `order: "created_at.desc"` itu penting: satu order bisa punya lebih
-     * dari satu baris `supplier_transactions` (mis. setelah resync atau
-     * percobaan ulang). Yang benar untuk ditampilkan adalah transaksi
-     * TERAKHIR — itulah SN yang dipakai untuk fulfill.
-     *
-     * Kalau baris terbaru punya `serial_number` null (mis. transaksi
-     * masih pending), receipt hanya akan menampilkan SN dari baris yang
-     * memang punya nilai. Receipt dikirim hanya untuk order `success`,
-     * jadi kasus itu seharusnya jarang. */
-    supabaseSelect<SupplierTxRow>("supplier_transactions", {
-      select: "serial_number",
-      filters: { order_id: `eq.${orderId}` },
-      order: "created_at.desc",
-      limit: 1,
-    }),
-  ]);
+  const [gameRows, productRows, paymentRows, supplierTxRows] =
+    await Promise.all([
+      supabaseSelect<GameRow>("games", {
+        select: "id,name,short_name",
+        filters: { id: `eq.${order.game_id}` },
+        limit: 1,
+      }),
+      supabaseSelect<ProductRow>("products", {
+        select: "id,label",
+        filters: { id: `eq.${order.product_id}` },
+        limit: 1,
+      }),
+      supabaseSelect<PaymentMethodRow>("payment_methods", {
+        select: "id,name",
+        filters: { id: `eq.${order.payment_method_id}` },
+        limit: 1,
+      }),
+      /* SN (serial number) datang dari supplier, bukan dari tabel orders.
+       *
+       * `order: "created_at.desc"` itu penting: satu order bisa punya lebih
+       * dari satu baris `supplier_transactions` (mis. setelah resync atau
+       * percobaan ulang). Yang benar untuk ditampilkan adalah transaksi
+       * TERAKHIR — itulah SN yang dipakai untuk fulfill.
+       *
+       * Kalau baris terbaru punya `serial_number` null (mis. transaksi
+       * masih pending), receipt hanya akan menampilkan SN dari baris yang
+       * memang punya nilai. Receipt dikirim hanya untuk order `success`,
+       * jadi kasus itu seharusnya jarang. */
+      supabaseSelect<SupplierTxRow>("supplier_transactions", {
+        select: "serial_number",
+        filters: { order_id: `eq.${orderId}` },
+        order: "created_at.desc",
+        limit: 1,
+      }),
+    ]);
 
   const game = gameRows[0];
   const product = productRows[0];
@@ -352,8 +350,8 @@ export function renderReceiptHtml(
            informasi yang dicari user paling pertama saat menanyakan
            "sudah masuk belum?" — bukan pembayaran atau tanggal. -->
       ${
-    serialNumber
-      ? `<tr>
+        serialNumber
+          ? `<tr>
         <td style="padding:10px 26px 4px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                  bgcolor="#161913" style="border-collapse:collapse;background:#161913;background-color:#161913;border-radius:12px;">
@@ -370,8 +368,8 @@ export function renderReceiptHtml(
           </table>
         </td>
       </tr>`
-      : ""
-  }
+          : ""
+      }
 
       <!-- ============ DETAIL ============ -->
       <tr>
@@ -534,7 +532,7 @@ export async function deliverSuccessReceipt(
   try {
     const result = await sendBrevoTransactionalEmail({
       to: recipient,
-      subject: `Receipt ${BRAND.shortName} · ${context.game.short_name} · ${orderId}`,
+      subject: `Top up ${context.game.short_name} kamu berhasil — ${orderId}`,
       htmlContent: renderReceiptHtml(context),
       tags: ["nambah-receipt", "order-success"],
     });
@@ -588,13 +586,15 @@ export async function deliverSuccessReceipt(
       await notifyReceiptDeliveryFailed(orderId, "email", message);
     } catch (alertError) {
       // Alert tidak boleh menutupi status kegagalan yang baru disimpan.
-      console.error(`Receipt Telegram alert failed for order ${orderId}`, alertError);
+      console.error(
+        `Receipt Telegram alert failed for order ${orderId}`,
+        alertError,
+      );
     }
 
     return { orderId, status: "failed" };
   }
 }
-
 
 function maskEmail(value: string) {
   const [local, domain] = value.split("@");

@@ -43,20 +43,21 @@ export function validateGuestReceiptContact(
 ): GuestReceiptContactResult {
   const email = normalizeReceiptEmail(emailValue);
   if (!email) {
-    return { ok: false, error: "Email receipt wajib diisi." };
+    return { ok: false, error: "Email struknya belum diisi." };
   }
   if (!isValidReceiptEmail(email)) {
-    return { ok: false, error: "Format email receipt tidak valid." };
+    return { ok: false, error: "Format emailnya belum benar." };
   }
 
   const whatsapp = normalizeReceiptWhatsapp(whatsappValue);
   if (!whatsapp) {
-    return { ok: false, error: "Nomor WhatsApp wajib diisi." };
+    return { ok: false, error: "Nomor WhatsApp-nya belum diisi." };
   }
   if (!isValidIndonesianWhatsapp(whatsapp)) {
     return {
       ok: false,
-      error: "Nomor WhatsApp tidak valid. Gunakan nomor Indonesia aktif, contoh 081234567890.",
+      error:
+        "Nomor WhatsApp-nya belum benar. Pakai nomor Indonesia aktif, contoh 081234567890.",
     };
   }
 

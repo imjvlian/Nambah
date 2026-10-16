@@ -44,15 +44,38 @@ type AffiliateRequestData = {
  * akan menyaring affiliate yang channel-nya tidak Anda pikirkan saat ini.
  */
 const LINK_FIELDS = [
-  { key: "instagram", label: "Instagram", placeholder: "instagram.com/namachannel", suggestions: ["instagram.com/"] },
-  { key: "tiktok", label: "TikTok", placeholder: "tiktok.com/@namachannel", suggestions: ["tiktok.com/@"] },
-  { key: "youtube", label: "YouTube", placeholder: "youtube.com/@namachannel", suggestions: ["youtube.com/@", "youtube.com/c/"] },
-  { key: "otherUrl", label: "Link lain", placeholder: "Facebook, Discord, Telegram, atau web kamu", suggestions: [] },
+  {
+    key: "instagram",
+    label: "Instagram",
+    placeholder: "instagram.com/namachannel",
+    suggestions: ["instagram.com/"],
+  },
+  {
+    key: "tiktok",
+    label: "TikTok",
+    placeholder: "tiktok.com/@namachannel",
+    suggestions: ["tiktok.com/@"],
+  },
+  {
+    key: "youtube",
+    label: "YouTube",
+    placeholder: "youtube.com/@namachannel",
+    suggestions: ["youtube.com/@", "youtube.com/c/"],
+  },
+  {
+    key: "otherUrl",
+    label: "Link lain",
+    placeholder: "Facebook, Discord, Telegram, atau web kamu",
+    suggestions: [],
+  },
 ] as const;
 
 type LinkKey = (typeof LINK_FIELDS)[number]["key"];
 
-const STATUS_TEXT: Record<string, { label: string; tone: string; note: string }> = {
+const STATUS_TEXT: Record<
+  string,
+  { label: string; tone: string; note: string }
+> = {
   pending: {
     label: "Menunggu ditinjau",
     tone: "wait",
@@ -119,7 +142,9 @@ function LinkFields({
             <input
               list={field.suggestions.length ? listId : undefined}
               value={draft[field.key as LinkKey]}
-              onChange={(event) => onChange({ ...draft, [field.key]: event.target.value })}
+              onChange={(event) =>
+                onChange({ ...draft, [field.key]: event.target.value })
+              }
               placeholder={field.placeholder}
               inputMode="url"
             />
@@ -226,7 +251,9 @@ export default function AffiliateJoinPanel() {
   }
 
   if (loading) {
-    return <div className="affiliate-join-loading">Memuat status pendaftaran...</div>;
+    return (
+      <div className="affiliate-join-loading">Memuat status pendaftaran...</div>
+    );
   }
 
   if (!data) {
@@ -235,12 +262,16 @@ export default function AffiliateJoinPanel() {
         <div className="account-section-head">
           <div>
             <span className="eyebrow">Afiliasi</span>
-            <h2>Jadi afiliasi ${BRAND.shortName}.</h2>
+            <h2>Jadi afiliasi {BRAND.shortName}.</h2>
           </div>
         </div>
         <div className="affiliate-join-body">
           <p>Login dulu untuk mendaftar menjadi afiliasi.</p>
-          <a className="primary-button" href="/login?next=%2Faccount" data-link="login">
+          <a
+            className="primary-button"
+            href="/login?next=%2Faccount"
+            data-link="login"
+          >
             Masuk ke akun <span>→</span>
           </a>
         </div>
@@ -277,10 +308,14 @@ export default function AffiliateJoinPanel() {
       <div className="account-section-head">
         <div>
           <span className="eyebrow">Afiliasi</span>
-          <h2>Jadi afiliasi ${BRAND.shortName}.</h2>
+          <h2>Jadi afiliasi {BRAND.shortName}.</h2>
         </div>
         {existing && (
-          <span className={"affiliate-join-status tone-" + (statusInfo?.tone ?? "wait")}>
+          <span
+            className={
+              "affiliate-join-status tone-" + (statusInfo?.tone ?? "wait")
+            }
+          >
             {statusInfo?.label ?? existing.status}
           </span>
         )}
@@ -313,7 +348,10 @@ export default function AffiliateJoinPanel() {
                   <input
                     value={draft.displayName}
                     onChange={(event) =>
-                      setDraft((current) => ({ ...current, displayName: event.target.value }))
+                      setDraft((current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
                     }
                     placeholder="Nama channel kamu"
                   />
@@ -324,7 +362,10 @@ export default function AffiliateJoinPanel() {
                     inputMode="tel"
                     value={draft.whatsapp}
                     onChange={(event) =>
-                      setDraft((current) => ({ ...current, whatsapp: event.target.value }))
+                      setDraft((current) => ({
+                        ...current,
+                        whatsapp: event.target.value,
+                      }))
                     }
                     placeholder="081234567890"
                   />
@@ -335,7 +376,10 @@ export default function AffiliateJoinPanel() {
                     rows={3}
                     value={draft.motivation}
                     onChange={(event) =>
-                      setDraft((current) => ({ ...current, motivation: event.target.value }))
+                      setDraft((current) => ({
+                        ...current,
+                        motivation: event.target.value,
+                      }))
                     }
                     placeholder="Di mana kamu mengiklankan? Berapa perkiraan orang yang lihat?"
                   />
@@ -343,7 +387,9 @@ export default function AffiliateJoinPanel() {
                 <LinkFields
                   draft={draft}
                   uid="ulang"
-                  onChange={(links) => setDraft((current) => ({ ...current, ...links }))}
+                  onChange={(links) =>
+                    setDraft((current) => ({ ...current, ...links }))
+                  }
                 />
                 <button type="submit" disabled={busy}>
                   {busy ? "Mengirim..." : "Ajukan lagi"}
@@ -355,8 +401,8 @@ export default function AffiliateJoinPanel() {
           <>
             <p>
               Daftar sebagai afiliasi, dapat komisi dari setiap order yang kamu
-              arahkan ke ${BRAND.shortName}. Rate komisinya ditentukan admin setelah
-              pengajuan kamu ditinjau.
+              arahkan ke {BRAND.shortName}. Rate komisinya ditentukan admin
+              setelah pengajuan kamu ditinjau.
             </p>
             <form onSubmit={submit} className="affiliate-join-form">
               <label>
@@ -364,7 +410,10 @@ export default function AffiliateJoinPanel() {
                 <input
                   value={draft.displayName}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, displayName: event.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
                   }
                   placeholder="Nama channel kamu"
                 />
@@ -375,7 +424,10 @@ export default function AffiliateJoinPanel() {
                   inputMode="tel"
                   value={draft.whatsapp}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, whatsapp: event.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      whatsapp: event.target.value,
+                    }))
                   }
                   placeholder="081234567890"
                 />
@@ -386,7 +438,10 @@ export default function AffiliateJoinPanel() {
                   rows={3}
                   value={draft.motivation}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, motivation: event.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      motivation: event.target.value,
+                    }))
                   }
                   placeholder="Di mana kamu mengiklankan? Berapa perkiraan orang yang lihat?"
                 />
@@ -394,7 +449,9 @@ export default function AffiliateJoinPanel() {
               <LinkFields
                 draft={draft}
                 uid="baru"
-                onChange={(links) => setDraft((current) => ({ ...current, ...links }))}
+                onChange={(links) =>
+                  setDraft((current) => ({ ...current, ...links }))
+                }
               />
               <button type="submit" disabled={busy || !hasAnyLink}>
                 {busy ? "Mengirim..." : "Ajukan jadi afiliasi"}

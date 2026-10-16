@@ -25,11 +25,28 @@ function searchableProductText(game: Game) {
 
 function categoryLabel(game: Game) {
   const text = searchableProductText(game);
-  if (game.category === "game" || /(diamond|uc\b|robux|genesis|mobile legends|free fire|pubg|valorant|genshin|honor of kings)/i.test(text)) return "Games";
-  if (/(pulsa|paket data|kuota|telkomsel|axis|xl\b|indosat|im3|tri\b|smartfren)/i.test(text)) return "Pulsa & Data";
-  if (/(dana\b|ovo\b|gopay|shopeepay|linkaja|e-wallet|e-money)/i.test(text)) return "E-Wallet";
+  if (
+    game.category === "game" ||
+    /(diamond|uc\b|robux|genesis|mobile legends|free fire|pubg|valorant|genshin|honor of kings)/i.test(
+      text,
+    )
+  )
+    return "Games";
+  if (
+    /(pulsa|paket data|kuota|telkomsel|axis|xl\b|indosat|im3|tri\b|smartfren)/i.test(
+      text,
+    )
+  )
+    return "Pulsa & Data";
+  if (/(dana\b|ovo\b|gopay|shopeepay|linkaja|e-wallet|e-money)/i.test(text))
+    return "E-Wallet";
   if (/(pln|token listrik)/i.test(text)) return "PLN";
-  if (/(netflix|spotify|vidio|youtube premium|subscription|langganan|canva|capcut)/i.test(text)) return "Langganan";
+  if (
+    /(netflix|spotify|vidio|youtube premium|subscription|langganan|canva|capcut)/i.test(
+      text,
+    )
+  )
+    return "Langganan";
   return "Voucher & Digital";
 }
 
@@ -75,28 +92,49 @@ export default async function ProductPage({
             <img
               src={productArtwork.src}
               alt={productArtwork.alt}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
             />
           ) : (
             game.initials
           )}
         </div>
         <div className="product-hero-copy">
-          <a className="product-back-link" href="/">← Kembali ke katalog</a>
+          <a className="product-back-link" href="/">
+            ← Kembali ke katalog
+          </a>
           <span className="eyebrow">{category}</span>
           <h1>{game.name}</h1>
-          <p>{game.shortName} · Top up melalui {BRAND.shortName} dengan alur transaksi yang singkat dan jelas.</p>
+          <p>
+            {game.shortName} · Top up di {BRAND.shortName} — singkat, jelas,
+            langsung beres.
+          </p>
           <div className="product-trust-row" aria-label="Keunggulan transaksi">
-            <span><b>01</b> Proses cepat</span>
-            <span><b>02</b> Tersedia 24/7</span>
-            <span><b>03</b> Pembayaran aman</span>
+            <span>
+              <b>01</b> Proses cepat
+            </span>
+            <span>
+              <b>02</b> Tersedia 24/7
+            </span>
+            <span>
+              <b>03</b> Pembayaran aman
+            </span>
           </div>
         </div>
       </section>
 
       <div className="product-tab-wrap">
-        <nav className="shell product-tabs" aria-label="Navigasi halaman produk">
-          <a className="active" href="#transaction">Transaksi</a>
+        <nav
+          className="shell product-tabs"
+          aria-label="Navigasi halaman produk"
+        >
+          <a className="active" href="#transaction">
+            Transaksi
+          </a>
           <a href="#description">Keterangan</a>
         </nav>
       </div>
@@ -105,9 +143,12 @@ export default async function ProductPage({
         <div className="product-flow-heading">
           <div>
             <span className="eyebrow">Top up</span>
-            <h2>Selesaikan transaksi.</h2>
+            <h2>Top up sekarang.</h2>
           </div>
-          <p>Isi data tujuan, pilih nominal, tentukan pembayaran, lalu cek total sebelum lanjut.</p>
+          <p>
+            Isi ID akun kamu, pilih nominal, bayar. Totalnya kelihatan sebelum
+            kamu lanjut.
+          </p>
         </div>
 
         <TopupExperience
@@ -125,15 +166,36 @@ export default async function ProductPage({
           <span className="eyebrow">Keterangan</span>
           <h2>Top up {game.name}</h2>
           <p>
-            Pilih nominal yang tersedia, masukkan data akun atau tujuan dengan benar, lalu lanjutkan ke pembayaran. Harga final tetap divalidasi oleh ${BRAND.shortName} sebelum order dibuat.
+            Pilih nominal yang tersedia, masukkan data akun atau tujuan dengan
+            benar, lalu lanjutkan ke pembayaran. Harga final selalu dicek ulang
+            oleh {BRAND.shortName} sebelum order dibuat.
           </p>
         </div>
 
         <div className="product-how-grid">
-          <article><span>01</span><strong>Masukkan data</strong><p>Isi ID akun dan Server / Zone bila produk membutuhkannya.</p></article>
-          <article><span>02</span><strong>Pilih nominal</strong><p>Pilih paket sesuai kebutuhan dan cek harga yang tampil.</p></article>
-          <article><span>03</span><strong>Pilih pembayaran</strong><p>Tentukan metode pembayaran yang tersedia untuk transaksi.</p></article>
-          <article><span>04</span><strong>Bayar & pantau</strong><p>Selesaikan pembayaran lalu pantau status order dari halaman transaksi.</p></article>
+          <article>
+            <span>01</span>
+            <strong>Masukkan data</strong>
+            <p>Isi ID akun dan Server / Zone bila produk membutuhkannya.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <strong>Pilih nominal</strong>
+            <p>Pilih paket sesuai kebutuhan dan cek harga yang tampil.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <strong>Pilih pembayaran</strong>
+            <p>Tentukan metode pembayaran yang tersedia untuk transaksi.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <strong>Bayar & pantau</strong>
+            <p>
+              Selesaikan pembayaran lalu pantau status order dari halaman
+              transaksi.
+            </p>
+          </article>
         </div>
       </section>
 
@@ -145,15 +207,24 @@ export default async function ProductPage({
         <div className="product-faq-list">
           <details>
             <summary>Data akun apa yang harus diisi?</summary>
-            <p>Ikuti field yang tampil pada form. Untuk game tertentu ${BRAND.shortName} meminta User ID dan Server / Zone ID.</p>
+            <p>
+              Ikuti field yang tampil pada form. Untuk game tertentu{" "}
+              {BRAND.shortName} minta User ID dan Server / Zone ID.
+            </p>
           </details>
           <details>
             <summary>Kapan harga final ditentukan?</summary>
-            <p>Harga dihitung ulang oleh backend saat pilihan produk, promo, referral, dan metode pembayaran berubah.</p>
+            <p>
+              Harga selalu dihitung ulang setiap kali kamu ganti nominal, promo,
+              referral, atau metode bayar.
+            </p>
           </details>
           <details>
             <summary>Bagaimana mengecek status transaksi?</summary>
-            <p>Setelah pembayaran dibuat, ${BRAND.shortName} mengarahkan kamu ke halaman order untuk melihat status pembayaran dan proses transaksi.</p>
+            <p>
+              Setelah bayar, {BRAND.shortName} langsung membawa kamu ke halaman
+              order — statusnya update otomatis.
+            </p>
           </details>
         </div>
       </section>

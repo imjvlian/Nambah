@@ -20,7 +20,10 @@ export default async function Home() {
       <SiteHeader className="home-v2-header home-market-header">
         <BrandLogo href="#top" size="md" variant="horizontal" />
 
-        <nav className="desktop-nav home-market-nav" aria-label="Navigasi utama">
+        <nav
+          className="desktop-nav home-market-nav"
+          aria-label="Navigasi utama"
+        >
           <a href="#catalog-start">Top Up</a>
           <a href="#popular">Populer</a>
           <a href="#how-it-works">Cara Kerja</a>
@@ -38,22 +41,37 @@ export default async function Home() {
       <PromoPopup />
       <FlashSaleStrip />
 
-      <section className="shell home-trust-strip" aria-label="Keunggulan layanan">
+      <section
+        className="shell home-trust-strip"
+        aria-label="Keunggulan layanan"
+      >
         <article>
           <span>01</span>
-          <div><strong>Proses cepat</strong><small>Flow top up dibuat sesingkat mungkin.</small></div>
+          <div>
+            <strong>Proses cepat</strong>
+            <small>Top up cuma butuh beberapa klik.</small>
+          </div>
         </article>
         <article>
           <span>02</span>
-          <div><strong>Tersedia 24/7</strong><small>Pilih produk kapan pun kamu butuh.</small></div>
+          <div>
+            <strong>Buka 24/7</strong>
+            <small>Malam minggu pun tetap bisa top up.</small>
+          </div>
         </article>
         <article>
           <span>03</span>
-          <div><strong>Pembayaran aman</strong><small>Harga divalidasi sebelum checkout.</small></div>
+          <div>
+            <strong>Pembayaran aman</strong>
+            <small>Harga selalu dicek ulang sebelum kamu bayar.</small>
+          </div>
         </article>
         <article>
           <span>04</span>
-          <div><strong>Status terlacak</strong><small>Proses transaksi tetap transparan.</small></div>
+          <div>
+            <strong>Status terlacak</strong>
+            <small>Lihat progres pesananmu tanpa perlu nanya CS.</small>
+          </div>
         </article>
       </section>
 
@@ -75,17 +93,19 @@ export default async function Home() {
           <article>
             <span>01</span>
             <h3>Pilih produk</h3>
-            <p>Cari game, pulsa, voucher, atau produk digital yang kamu butuhkan.</p>
+            <p>
+              Cari game, pulsa, voucher, atau produk digital yang kamu butuhkan.
+            </p>
           </article>
           <article>
             <span>02</span>
-            <h3>Isi data</h3>
-            <p>Masukkan data tujuan lalu pilih nominal yang tersedia.</p>
+            <h3>Isi data akun</h3>
+            <p>Ketik ID akun kamu, terus pilih nominal yang kamu mau.</p>
           </article>
           <article>
             <span>03</span>
             <h3>Bayar & beres</h3>
-            <p>Pembayaran terkonfirmasi lalu transaksi diproses secara otomatis.</p>
+            <p>Sekali bayar, item langsung dikirim otomatis ke akunmu.</p>
           </article>
         </div>
       </section>

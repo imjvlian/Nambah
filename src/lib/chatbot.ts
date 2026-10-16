@@ -3,8 +3,7 @@ import { BRAND } from "@/lib/brand";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
-const GEMINI_MODEL =
-  process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 const GEMINI_API_KEY =
   process.env.GEMINI_API_KEY?.trim() ||
   process.env.GOOGLE_API_KEY?.trim() ||
@@ -141,18 +140,18 @@ const SUPPORT_CONTACT =
 const FAQ: Array<{ keywords: RegExp; answer: string }> = [
   {
     keywords: /\b(halo|hai|hi|hello|pagi|siang|sore|malam)\b/i,
-    answer:
-      `Halo! Aku ${BRAND.shortName} Assistant. Bisa bantu cek status order, info produk & harga, cara pembayaran, atau arahkan ke admin. Mau tanya apa?`,
+    answer: `Halo! Aku Nana, asisten ${BRAND.shortName}. Bisa bantu cek status order, info produk & harga, cara pembayaran, atau sambungin kamu ke admin. Mau tanya apa?`,
   },
   {
     keywords: /(cara|bagaimana).*(top ?up|isi|beli)|^top ?up/i,
     answer:
-      "Cara top up: 1) Pilih game/produk, 2) isi ID akun tujuan (perhatikan 1 atau 2 kolom sesuai game), 3) pilih nominal dan metode pembayaran, 4) selesaikan pembayaran. Pesanan diproses otomatis setelah pembayaran terkonfirmasi.",
+      "Gampang: 1) pilih game/produk, 2) isi ID akun kamu (beberapa game minta Server/Zone juga), 3) pilih nominal + metode bayar, 4) bayar. Begitu bayar masuk, pesanan langsung diproses otomatis.",
   },
   {
-    keywords: /(bayar|pembayaran|qris|transfer|e-?wallet|va\b|virtual account)/i,
+    keywords:
+      /(bayar|pembayaran|qris|transfer|e-?wallet|va\b|virtual account)/i,
     answer:
-      "Pembayaran dilakukan di halaman order setelah checkout — tersedia beberapa metode (QRIS, e-wallet, transfer bank). Pembayaran terverifikasi otomatis, jadi setelah bayar kamu tinggal menunggu pesanan diproses.",
+      "Bayarnya di halaman order setelah checkout. Ada QRIS, e-wallet, dan transfer bank. Setelah bayar, verifikasi jalan otomatis — kamu tinggal tunggu.",
   },
   {
     keywords: /(lama|berapa lama|belum masuk|lambat|stuck|proses terus)/i,
@@ -198,7 +197,9 @@ async function fallbackReply(input: {
     return `Ini sebagian produk yang tersedia:\n${catalog}\n\nUntuk harga lengkap dan promo terkini, buka halaman utama dan pilih produknya.`;
   }
 
-  if (/(admin|cs|customer service|hubungi|kontak|manusia|komplain)/i.test(text)) {
+  if (
+    /(admin|cs|customer service|hubungi|kontak|manusia|komplain)/i.test(text)
+  ) {
     return contactAnswer();
   }
 
@@ -219,7 +220,7 @@ function buildSystemPrompt(input: {
   loggedIn: boolean;
 }) {
   return [
-    `Kamu adalah ${BRAND.shortName} Assistant, customer service digital untuk ${BRAND.name} — platform top up game, pulsa, dan e-money di Indonesia.`,
+    `Kamu adalah Nana, asisten digital untuk ${BRAND.name} — platform top up game, pulsa, dan e-money di Indonesia.`,
     "",
     "Aturan wajib:",
     "- Jawab dalam Bahasa Indonesia yang ramah dan ringkas (idealnya maksimal 4 kalimat).",
@@ -275,7 +276,10 @@ async function generateGeminiReply(input: {
 
     if (!response.ok) {
       const body = await response.text();
-      console.error(`Gemini generateContent gagal (${response.status})`, body.slice(0, 300));
+      console.error(
+        `Gemini generateContent gagal (${response.status})`,
+        body.slice(0, 300),
+      );
       return null;
     }
 

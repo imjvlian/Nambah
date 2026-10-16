@@ -38,9 +38,12 @@ export default function ProductRatingRail({ gameId }: { gameId: string }) {
 
     void (async () => {
       try {
-        const response = await fetch(`/api/games/${encodeURIComponent(gameId)}/reviews`, {
-          headers: { Accept: "application/json" },
-        });
+        const response = await fetch(
+          `/api/games/${encodeURIComponent(gameId)}/reviews`,
+          {
+            headers: { Accept: "application/json" },
+          },
+        );
         if (!response.ok) return;
         const payload = (await response.json()) as GameRating;
         if (active) setData(payload);
@@ -75,8 +78,8 @@ export default function ProductRatingRail({ gameId }: { gameId: string }) {
 
       {total === 0 ? (
         <p className="rating-empty">
-          Belum ada ulasan untuk produk ini. Ulasan ditulis sendiri oleh pembeli
-          setelah transaksinya selesai.
+          Belum ada ulasan. Semua ulasan di sini cuma dari pembeli yang
+          transaksinya benar-benar selesai.
         </p>
       ) : (
         <>
@@ -85,7 +88,10 @@ export default function ProductRatingRail({ gameId }: { gameId: string }) {
             <div>
               <span className="rating-head-stars" aria-hidden="true">
                 {[1, 2, 3, 4, 5].map((value) => (
-                  <b key={value} className={(data?.average ?? 0) >= value - 0.5 ? "on" : ""}>
+                  <b
+                    key={value}
+                    className={(data?.average ?? 0) >= value - 0.5 ? "on" : ""}
+                  >
                     ★
                   </b>
                 ))}
@@ -102,7 +108,10 @@ export default function ProductRatingRail({ gameId }: { gameId: string }) {
                 <div className="rating-bar" key={star}>
                   <span>{star}★</span>
                   <span className="rating-bar-track">
-                    <span className="rating-bar-fill" style={{ width: `${percent}%` }} />
+                    <span
+                      className="rating-bar-fill"
+                      style={{ width: `${percent}%` }}
+                    />
                   </span>
                   <small>{count}</small>
                 </div>
@@ -114,7 +123,10 @@ export default function ProductRatingRail({ gameId }: { gameId: string }) {
             <ul className="rating-highlights">
               {data.highlights.map((item, index) => (
                 <li key={`${item.createdAt}-${index}`}>
-                  <span className="rating-highlight-stars" aria-label={`${item.rating} dari 5`}>
+                  <span
+                    className="rating-highlight-stars"
+                    aria-label={`${item.rating} dari 5`}
+                  >
                     <b>{"★".repeat(item.rating)}</b>
                     <span>{"★".repeat(5 - item.rating)}</span>
                   </span>

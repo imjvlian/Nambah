@@ -65,12 +65,12 @@ const CATEGORY_META: Record<
   },
   voucher: {
     label: "Voucher",
-    description: "Gift card, wallet, dan voucher digital",
+    description: "Gift card dan voucher digital",
     order: 50,
   },
   digital: {
     label: "Produk Digital",
-    description: "Produk digital lainnya yang tersedia",
+    description: "Tagihan dan produk digital lainnya",
     order: 90,
   },
 };
@@ -170,7 +170,10 @@ function buildCategories(games: Game[]): CatalogCategory[] {
 
   return Array.from(counts.entries())
     .map(([id, count]) => ({ id, count, ...CATEGORY_META[id] }))
-    .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, "id"));
+    .sort(
+      (left, right) =>
+        left.order - right.order || left.label.localeCompare(right.label, "id"),
+    );
 }
 
 function popularityScore(game: Game) {
@@ -199,7 +202,12 @@ function ProductArtworkMark({
           src={artwork.src}
           alt={artwork.alt}
           loading="lazy"
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
         />
       ) : (
         game.initials
@@ -214,9 +222,8 @@ export default function CategorizedTopupExperience({
 }: CategorizedTopupExperienceProps) {
   const router = useRouter();
   const categories = useMemo(() => buildCategories(games), [games]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<CatalogCategoryId>(
-    categories[0]?.id ?? "games",
-  );
+  const [selectedCategoryId, setSelectedCategoryId] =
+    useState<CatalogCategoryId>(categories[0]?.id ?? "games");
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -226,17 +233,21 @@ export default function CategorizedTopupExperience({
   }, [categories, selectedCategoryId]);
 
   const selectedCategory =
-    categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
+    categories.find((category) => category.id === selectedCategoryId) ??
+    categories[0];
 
   const categoryGames = useMemo(
-    () => games.filter((game) => getCatalogCategoryId(game) === selectedCategoryId),
+    () =>
+      games.filter((game) => getCatalogCategoryId(game) === selectedCategoryId),
     [games, selectedCategoryId],
   );
 
   const normalizedQuery = query.trim().toLowerCase();
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
-    return games.filter((game) => searchableGameText(game).toLowerCase().includes(normalizedQuery));
+    return games.filter((game) =>
+      searchableGameText(game).toLowerCase().includes(normalizedQuery),
+    );
   }, [games, normalizedQuery]);
 
   const popularGames = useMemo(
@@ -246,7 +257,8 @@ export default function CategorizedTopupExperience({
         .filter((item) => item.score > 0)
         .sort(
           (left, right) =>
-            right.score - left.score || left.game.name.localeCompare(right.game.name, "id"),
+            right.score - left.score ||
+            left.game.name.localeCompare(right.game.name, "id"),
         )
         .slice(0, 8)
         .map((item) => item.game),
@@ -273,7 +285,9 @@ export default function CategorizedTopupExperience({
         </div>
 
         <label className="home-search-box">
-          <span className="home-search-icon" aria-hidden="true">⌕</span>
+          <span className="home-search-icon" aria-hidden="true">
+            ⌕
+          </span>
           <input
             aria-label="Cari produk"
             type="search"
@@ -282,18 +296,28 @@ export default function CategorizedTopupExperience({
             onChange={(event) => setQuery(event.target.value)}
           />
           {query && (
-            <button type="button" onClick={() => setQuery("")} aria-label="Hapus pencarian">×</button>
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Hapus pencarian"
+            >
+              ×
+            </button>
           )}
         </label>
       </section>
 
       {!normalizedQuery && popularGames.length > 0 && (
-        <section className="home-popular-section" id="popular" aria-labelledby="popular-title">
+        <section
+          className="home-popular-section"
+          id="popular"
+          aria-labelledby="popular-title"
+        >
           <div className="home-section-heading">
             <div>
               <span className="eyebrow">Paling dicari</span>
               <strong id="popular-title">Populer Sekarang</strong>
-              <small>Shortcut ke produk yang paling sering dipilih.</small>
+              <small>Produk yang paling sering dibeli orang lain.</small>
             </div>
             <span>{popularGames.length} pilihan</span>
           </div>
@@ -302,8 +326,15 @@ export default function CategorizedTopupExperience({
             {popularGames.map((game, index) => {
               const category = CATEGORY_META[getCatalogCategoryId(game)];
               return (
-                <button className="home-popular-card" key={game.id} type="button" onClick={() => openProduct(game)}>
-                  <span className="home-popular-rank">{String(index + 1).padStart(2, "0")}</span>
+                <button
+                  className="home-popular-card"
+                  key={game.id}
+                  type="button"
+                  onClick={() => openProduct(game)}
+                >
+                  <span className="home-popular-rank">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   <ProductArtworkMark
                     game={game}
                     artwork={artworkByGameId[game.id]}
@@ -313,7 +344,9 @@ export default function CategorizedTopupExperience({
                     <strong>{game.name}</strong>
                     <small>{category.label}</small>
                   </span>
-                  <span className="home-popular-arrow" aria-hidden="true">↗</span>
+                  <span className="home-popular-arrow" aria-hidden="true">
+                    ↗
+                  </span>
                 </button>
               );
             })}
@@ -332,7 +365,11 @@ export default function CategorizedTopupExperience({
             <span>{categories.length} kategori</span>
           </div>
 
-          <div className="catalog-category-tabs" role="tablist" aria-label="Pilih kategori produk">
+          <div
+            className="catalog-category-tabs"
+            role="tablist"
+            aria-label="Pilih kategori produk"
+          >
             {categories.map((category) => (
               <button
                 className={selectedCategoryId === category.id ? "active" : ""}
@@ -354,8 +391,14 @@ export default function CategorizedTopupExperience({
       <section className="home-catalog-results-heading" aria-live="polite">
         <div>
           <span className="eyebrow">Produk</span>
-          <strong>{normalizedQuery ? "Hasil pencarian" : selectedCategory.label}</strong>
-          <small>{normalizedQuery ? `Hasil untuk “${query.trim()}”` : selectedCategory.description}</small>
+          <strong>
+            {normalizedQuery ? "Hasil pencarian" : selectedCategory.label}
+          </strong>
+          <small>
+            {normalizedQuery
+              ? `Hasil untuk “${query.trim()}”`
+              : selectedCategory.description}
+          </small>
         </div>
         <span>{visibleGames.length} produk</span>
       </section>
@@ -366,7 +409,12 @@ export default function CategorizedTopupExperience({
             {visibleGames.map((game) => {
               const category = CATEGORY_META[getCatalogCategoryId(game)];
               return (
-                <button className="game-card" key={game.id} type="button" onClick={() => openProduct(game)}>
+                <button
+                  className="game-card"
+                  key={game.id}
+                  type="button"
+                  onClick={() => openProduct(game)}
+                >
                   <ProductArtworkMark
                     game={game}
                     artwork={artworkByGameId[game.id]}
@@ -376,14 +424,19 @@ export default function CategorizedTopupExperience({
                     <strong>{game.name}</strong>
                     <small>{category.label}</small>
                   </span>
-                  <span className="card-arrow" aria-hidden="true">↗</span>
+                  <span className="card-arrow" aria-hidden="true">
+                    ↗
+                  </span>
                 </button>
               );
             })}
           </div>
         </section>
       ) : (
-        <div className="empty-state home-search-empty">Tidak ada produk yang cocok. Coba nama game, operator, e-wallet, atau voucher lain.</div>
+        <div className="empty-state home-search-empty">
+          Hmm, “{query.trim()}” tidak ketemu. Coba kata lain — nama game,
+          operator, atau e-wallet.
+        </div>
       )}
     </>
   );
