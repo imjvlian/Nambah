@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { supabaseSelectAll, supabaseUpdate } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -52,7 +53,10 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw) body = JSON.parse(raw) as CleanupBody;
   } catch {
-    return Response.json({ error: "Request clean katalog tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request clean katalog tidak valid." },
+      { status: 400 },
+    );
   }
 
   const dryRun = body.dryRun !== false;
@@ -86,11 +90,15 @@ export async function POST(request: Request) {
     // Punya mapping aktif dari supplier mana pun = masih bisa dibeli.
     const activeMappingProductIds = new Set(
       supplierProducts
-        .filter((row) => Boolean(row.supplier_sku?.trim()) && row.active === true)
+        .filter(
+          (row) => Boolean(row.supplier_sku?.trim()) && row.active === true,
+        )
         .map((row) => row.product_id),
     );
 
-    const orphanProducts = products.filter((product) => !mappedProductIds.has(product.id));
+    const orphanProducts = products.filter(
+      (product) => !mappedProductIds.has(product.id),
+    );
     const activeOrphans = orphanProducts.filter((product) => product.active);
     /*
      * "Mati": terpetakan, tapi SEMUA mapping-nya nonaktif - SKU-nya
@@ -100,9 +108,12 @@ export async function POST(request: Request) {
      */
     const unavailableProducts = products.filter(
       (product) =>
-        mappedProductIds.has(product.id) && !activeMappingProductIds.has(product.id),
+        mappedProductIds.has(product.id) &&
+        !activeMappingProductIds.has(product.id),
     );
-    const activeUnavailable = unavailableProducts.filter((product) => product.active);
+    const activeUnavailable = unavailableProducts.filter(
+      (product) => product.active,
+    );
     const activeMappedByGame = new Set(
       products
         .filter((product) => product.active && mappedProductIds.has(product.id))
@@ -160,6 +171,21 @@ export async function POST(request: Request) {
       }
     }
 
+    await auditAdminAction(request, {
+      action: "catalog.cleanup",
+      targetType: "catalog",
+      targetId: null,
+      metadata: {
+        dryRun,
+        includeUnavailable,
+        orphanProducts: orphanProducts.length,
+        activeOrphans: activeOrphans.length,
+        unavailableProducts: unavailableProducts.length,
+        activeUnavailable: activeUnavailable.length,
+        gamesToDisable: gamesToDisable.length,
+      },
+    });
+
     return Response.json({
       mode: dryRun ? "preview" : "applied",
       summary: {
@@ -193,6 +219,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Admin catalog cleanup failed", error);
-    return Response.json({ error: "Clean produk tanpa mapping gagal dijalankan." }, { status: 502 });
+    return Response.json(
+      { error: "Clean produk tanpa mapping gagal dijalankan." },
+      { status: 502 },
+    );
   }
 }

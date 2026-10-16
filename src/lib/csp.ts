@@ -21,7 +21,7 @@ export function contentSecurityPolicy(nonce: string): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https://res.cloudinary.com https://*.googleusercontent.com https://*.ggpht.com",
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
     isProduction

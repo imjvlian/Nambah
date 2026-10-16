@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { syncCatalogWithSupplier } from "@/lib/digiflazz/catalog-sync";
 import {
   supabaseInsert,
@@ -56,17 +57,20 @@ async function loadLatestCatalogRows(latestScanAt: string) {
   let offset = 0;
 
   while (true) {
-    const page = await supabaseSelectPage<SupplierCatalogRow>("supplier_catalog_items", {
-      select:
-        "supplier_sku,product_name,brand,type,supplier_cost,buyer_active,seller_active,stock,unlimited_stock,last_seen_at",
-      filters: {
-        supplier_id: "eq.digiflazz",
-        last_seen_at: `eq.${latestScanAt}`,
+    const page = await supabaseSelectPage<SupplierCatalogRow>(
+      "supplier_catalog_items",
+      {
+        select:
+          "supplier_sku,product_name,brand,type,supplier_cost,buyer_active,seller_active,stock,unlimited_stock,last_seen_at",
+        filters: {
+          supplier_id: "eq.digiflazz",
+          last_seen_at: `eq.${latestScanAt}`,
+        },
+        order: "supplier_sku.asc",
+        limit: batchSize,
+        offset,
       },
-      order: "supplier_sku.asc",
-      limit: batchSize,
-      offset,
-    });
+    );
 
     rows.push(...page.data);
     offset += page.data.length;
@@ -111,46 +115,55 @@ export async function POST(request: Request) {
     const raw = await request.text();
     body = raw ? (JSON.parse(raw) as SyncBody) : {};
   } catch {
-    return Response.json({ error: "Request sinkronisasi tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request sinkronisasi tidak valid." },
+      { status: 400 },
+    );
   }
 
   const requestedProductIds = Array.from(
-    new Set((body.productIds ?? []).map((value) => value.trim()).filter(Boolean)),
+    new Set(
+      (body.productIds ?? []).map((value) => value.trim()).filter(Boolean),
+    ),
   );
 
   if (requestedProductIds.length > 100) {
-    return Response.json({ error: "Maksimal 100 productId per sinkronisasi." }, { status: 400 });
+    return Response.json(
+      { error: "Maksimal 100 productId per sinkronisasi." },
+      { status: 400 },
+    );
   }
 
   const dryRun = body.dryRun === true;
 
   try {
-    const [supplierRows, productRows, pricingRows, latestScanRows] = await Promise.all([
-      // Keduanya melewati 1000 baris. Kalau terpotong, mapping di baris 1001+
-      // tidak pernah disinkronkan sehingga flag active-nya basi — SKU yang
-      // sudah dihapus Digiflazz tetap terlihat "aktif".
-      supabaseSelectAll<SupplierProductRow>("supplier_products", {
-        select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
-        filters: {
-          supplier_id: "eq.digiflazz",
-          supplier_sku: "not.is.null",
-        },
-      }),
-      supabaseSelectAll<ProductRow>("products", {
-        select: "id,game_id,label,note,selling_price,reference_price,active",
-      }),
-      supabaseSelect<PricingRuleRow>("pricing_rules", {
-        select: "minimum_nambah_profit",
-        filters: { id: "eq.default" },
-        limit: 1,
-      }),
-      supabaseSelect<{ last_seen_at: string }>("supplier_catalog_items", {
-        select: "last_seen_at",
-        filters: { supplier_id: "eq.digiflazz" },
-        order: "last_seen_at.desc",
-        limit: 1,
-      }),
-    ]);
+    const [supplierRows, productRows, pricingRows, latestScanRows] =
+      await Promise.all([
+        // Keduanya melewati 1000 baris. Kalau terpotong, mapping di baris 1001+
+        // tidak pernah disinkronkan sehingga flag active-nya basi — SKU yang
+        // sudah dihapus Digiflazz tetap terlihat "aktif".
+        supabaseSelectAll<SupplierProductRow>("supplier_products", {
+          select: "product_id,supplier_sku,supplier_cost,active,last_synced_at",
+          filters: {
+            supplier_id: "eq.digiflazz",
+            supplier_sku: "not.is.null",
+          },
+        }),
+        supabaseSelectAll<ProductRow>("products", {
+          select: "id,game_id,label,note,selling_price,reference_price,active",
+        }),
+        supabaseSelect<PricingRuleRow>("pricing_rules", {
+          select: "minimum_nambah_profit",
+          filters: { id: "eq.default" },
+          limit: 1,
+        }),
+        supabaseSelect<{ last_seen_at: string }>("supplier_catalog_items", {
+          select: "last_seen_at",
+          filters: { supplier_id: "eq.digiflazz" },
+          order: "last_seen_at.desc",
+          limit: 1,
+        }),
+      ]);
 
     const latestScanAt = latestScanRows[0]?.last_seen_at ?? null;
     if (!latestScanAt) {
@@ -164,7 +177,9 @@ export async function POST(request: Request) {
     }
 
     const selectedRows = requestedProductIds.length
-      ? supplierRows.filter((row) => requestedProductIds.includes(row.product_id))
+      ? supplierRows.filter((row) =>
+          requestedProductIds.includes(row.product_id),
+        )
       : supplierRows;
 
     if (selectedRows.length === 0) {
@@ -183,7 +198,9 @@ export async function POST(request: Request) {
     const supplierItems = new Map(
       catalogRows.map((item) => [item.supplier_sku.toUpperCase(), item]),
     );
-    const minimumNambahProfit = Number(pricingRows[0]?.minimum_nambah_profit ?? 500);
+    const minimumNambahProfit = Number(
+      pricingRows[0]?.minimum_nambah_profit ?? 500,
+    );
     const syncedAt = new Date().toISOString();
 
     const results = selectedRows.map((row) => {
@@ -222,11 +239,14 @@ export async function POST(request: Request) {
       const currentCost = Number(item.supplier_cost);
       const active = supplierItemIsAvailable(item);
       const stock = item.stock === null ? null : Number(item.stock);
-      const stockAvailable = Boolean(item.unlimited_stock) || stock === null || stock > 0;
+      const stockAvailable =
+        Boolean(item.unlimited_stock) || stock === null || stock > 0;
       const canonicalLabel = cleanProductLabel(item.product_name, item.brand);
       const note = canonicalNote(item);
       const sellingPriceBefore = product ? Number(product.selling_price) : null;
-      const minimumSellingPrice = roundUpToHundred(currentCost + minimumNambahProfit);
+      const minimumSellingPrice = roundUpToHundred(
+        currentCost + minimumNambahProfit,
+      );
       const sellingPrice =
         sellingPriceBefore === null
           ? minimumSellingPrice
@@ -255,7 +275,8 @@ export async function POST(request: Request) {
         sellingPriceBefore,
         sellingPrice,
         referencePrice,
-        priceRaised: sellingPriceBefore !== null && sellingPrice > sellingPriceBefore,
+        priceRaised:
+          sellingPriceBefore !== null && sellingPrice > sellingPriceBefore,
         grossMarginBeforePaymentFees: grossMargin,
         minimumProfitBuffer: grossMargin - minimumNambahProfit,
         stock,
@@ -380,6 +401,32 @@ export async function POST(request: Request) {
       }
     }
 
+    await auditAdminAction(request, {
+      action: "digiflazz.sync_prices",
+      targetType: "supplier_catalog",
+      targetId: requestedProductIds.length
+        ? requestedProductIds.join(",")
+        : "all",
+      metadata: {
+        dryRun,
+        mapped: selectedRows.length,
+        found: foundResults.length,
+        missing: missingResults.length,
+        costChanged: foundResults.filter((item) => item.costChanged).length,
+        priceRaised: foundResults.filter((item) => item.priceRaised).length,
+        activated: foundResults.filter(
+          (item) =>
+            item.active &&
+            (!item.activeBefore || item.productActiveBefore === false),
+        ).length,
+        deactivated: results.filter(
+          (item) =>
+            !item.active &&
+            (item.activeBefore || item.productActiveBefore === true),
+        ).length,
+      },
+    });
+
     return Response.json({
       mode: dryRun ? "dry-run" : "applied",
       source: "supplier_catalog_cache",
@@ -391,18 +438,26 @@ export async function POST(request: Request) {
         found: foundResults.length,
         missing: missingResults.length,
         costChanged: foundResults.filter((item) => item.costChanged).length,
-        relabeled: foundResults.filter((item) => item.labelChanged || item.noteChanged).length,
+        relabeled: foundResults.filter(
+          (item) => item.labelChanged || item.noteChanged,
+        ).length,
         priceRaised: foundResults.filter((item) => item.priceRaised).length,
         activated: foundResults.filter(
-          (item) => item.active && (!item.activeBefore || item.productActiveBefore === false),
+          (item) =>
+            item.active &&
+            (!item.activeBefore || item.productActiveBefore === false),
         ).length,
         deactivated: results.filter(
-          (item) => !item.active && (item.activeBefore || item.productActiveBefore === true),
+          (item) =>
+            !item.active &&
+            (item.activeBefore || item.productActiveBefore === true),
         ).length,
         unavailable: foundResults.filter((item) => !item.active).length,
         outOfStock: foundResults.filter((item) => !item.stockAvailable).length,
         orphanedMappings: results.filter((item) => item.productMissing).length,
-        thinBaseMargin: foundResults.filter((item) => item.minimumProfitBuffer < 0).length,
+        thinBaseMargin: foundResults.filter(
+          (item) => item.minimumProfitBuffer < 0,
+        ).length,
       },
       // Rekonsiliasi katalog memakai implementasi yang sama dengan tombol
       // sinkron katalog, jadi hasil kedua tool ini tidak akan berbeda.

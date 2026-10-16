@@ -10,6 +10,7 @@ test("production CSP uses a nonce and does not allow unsafe-inline scripts", () 
   assert.match(csp, /script-src 'self' 'nonce-test-nonce' 'strict-dynamic'/);
   assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
   assert.doesNotMatch(csp, /app\.sandbox\.midtrans\.com/);
+  assert.doesNotMatch(csp, /img-src[^;]*https:(?!\/\/)/);
 });
 
 test("development CSP still allows inline scripts and eval", () => {

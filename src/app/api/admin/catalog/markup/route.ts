@@ -1,5 +1,10 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
-import { supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/supabase/server";
+import { auditAdminAction } from "@/lib/admin-audit";
+import {
+  supabaseSelect,
+  supabaseSelectAll,
+  supabaseUpdate,
+} from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -34,7 +39,12 @@ type MarkupBody = {
 };
 
 function validPercent(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 500;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 500
+  );
 }
 
 function roundUpToHundred(value: number) {
@@ -57,7 +67,10 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as MarkupBody;
   } catch {
-    return Response.json({ error: "Request auto mark-up tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request auto mark-up tidak valid." },
+      { status: 400 },
+    );
   }
 
   const dryRun = body.dryRun !== false;
@@ -66,7 +79,10 @@ export async function POST(request: Request) {
   const gameId = body.gameId?.trim() || null;
   const scope: MarkupScope = body.scope ?? "ready";
 
-  if (!validPercent(sellingMarkupPercent) || !validPercent(referenceMarkupPercent)) {
+  if (
+    !validPercent(sellingMarkupPercent) ||
+    !validPercent(referenceMarkupPercent)
+  ) {
     return Response.json(
       { error: "Mark-up harus berupa angka 0 sampai 500 persen." },
       { status: 400 },
@@ -74,7 +90,10 @@ export async function POST(request: Request) {
   }
 
   if (!["ready", "active-mapped", "mapped"].includes(scope)) {
-    return Response.json({ error: "Scope auto mark-up tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Scope auto mark-up tidak valid." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -97,8 +116,13 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    const minimumProfit = Math.max(0, Number(pricingRules[0]?.minimum_nambah_profit ?? 500));
-    const supplierByProduct = new Map(supplierProducts.map((row) => [row.product_id, row]));
+    const minimumProfit = Math.max(
+      0,
+      Number(pricingRules[0]?.minimum_nambah_profit ?? 500),
+    );
+    const supplierByProduct = new Map(
+      supplierProducts.map((row) => [row.product_id, row]),
+    );
 
     const changes = products
       .filter((product) => {
@@ -114,7 +138,9 @@ export async function POST(request: Request) {
         const cost = Number(supplier.supplier_cost);
         if (!Number.isFinite(cost) || cost < 0) return null;
 
-        const percentagePrice = roundUpToHundred(cost * (1 + sellingMarkupPercent / 100));
+        const percentagePrice = roundUpToHundred(
+          cost * (1 + sellingMarkupPercent / 100),
+        );
         const minimumSafePrice = roundUpToHundred(cost + minimumProfit);
         const sellingPrice = Math.max(100, percentagePrice, minimumSafePrice);
         const referencePrice = Math.max(
@@ -160,6 +186,20 @@ export async function POST(request: Request) {
       }
     }
 
+    await auditAdminAction(request, {
+      action: "catalog.auto_markup",
+      targetType: "catalog",
+      targetId: gameId ?? scope,
+      metadata: {
+        dryRun,
+        sellingMarkupPercent,
+        referenceMarkupPercent,
+        scope,
+        eligible: changes.length,
+        changed: changed.length,
+      },
+    });
+
     return Response.json({
       mode: dryRun ? "preview" : "applied",
       rules: {
@@ -179,6 +219,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Admin auto markup failed", error);
-    return Response.json({ error: "Auto mark-up harga gagal dijalankan." }, { status: 502 });
+    return Response.json(
+      { error: "Auto mark-up harga gagal dijalankan." },
+      { status: 502 },
+    );
   }
 }

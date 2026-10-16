@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
 import { BRAND } from "@/lib/brand";
 
@@ -35,9 +36,21 @@ export async function POST(request: Request) {
         parseMode: "HTML",
       },
     );
+    await auditAdminAction(request, {
+      action: "telegram.test",
+      targetType: "telegram",
+      targetId: null,
+      metadata: {
+        sent: result.sent,
+      },
+    });
+
     return Response.json(result);
   } catch (error) {
     console.error("Telegram test failed", error);
-    return Response.json({ error: "Tes Telegram gagal dikirim." }, { status: 502 });
+    return Response.json(
+      { error: "Tes Telegram gagal dikirim." },
+      { status: 502 },
+    );
   }
 }

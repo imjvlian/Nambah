@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import {
   supabaseInsert,
   supabaseSelect,
@@ -92,7 +93,9 @@ function normalizeText(value: string) {
 }
 
 function slugify(value: string) {
-  return normalizeText(value).replace(/\s+/g, "-").replace(/^-+|-+$/g, "");
+  return normalizeText(value)
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function titleCase(value: string) {
@@ -106,7 +109,8 @@ function titleCase(value: string) {
 
 function makeInitials(value: string) {
   const words = value.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return `${words[0]![0] ?? ""}${words[1]![0] ?? ""}`.toUpperCase();
+  if (words.length >= 2)
+    return `${words[0]![0] ?? ""}${words[1]![0] ?? ""}`.toUpperCase();
   return value.slice(0, 2).toUpperCase();
 }
 
@@ -122,7 +126,9 @@ function inferCategory(value: string): "game" | "voucher" {
 
 function inferRequiresServer(brand: string) {
   const normalized = normalizeText(brand);
-  return ["mobile legends", "genshin impact"].some((name) => normalized.includes(name));
+  return ["mobile legends", "genshin impact"].some((name) =>
+    normalized.includes(name),
+  );
 }
 
 function cleanProductLabel(productName: string, brand: string) {
@@ -139,7 +145,10 @@ function roundUpToHundred(value: number) {
 
 function makeProductId(supplierSku: string) {
   const slug = slugify(supplierSku).slice(0, 36) || "sku";
-  const digest = createHash("sha1").update(supplierSku).digest("hex").slice(0, 10);
+  const digest = createHash("sha1")
+    .update(supplierSku)
+    .digest("hex")
+    .slice(0, 10);
   return `df-${slug}-${digest}`;
 }
 
@@ -205,38 +214,52 @@ function parsePublicationRequest(value: unknown): PublicationRequest {
   }
 
   const item = value as { supplierSku?: unknown; published?: unknown };
-  const supplierSku = typeof item.supplierSku === "string" ? item.supplierSku.trim() : "";
+  const supplierSku =
+    typeof item.supplierSku === "string" ? item.supplierSku.trim() : "";
   if (!supplierSku) throw new PublicationError("supplierSku wajib diisi.");
   if (typeof item.published !== "boolean") {
-    throw new PublicationError(`Status tampil ${supplierSku} harus berupa boolean.`);
+    throw new PublicationError(
+      `Status tampil ${supplierSku} harus berupa boolean.`,
+    );
   }
 
   return { supplierSku, published: item.published };
 }
 
-async function applyPublication(input: PublicationRequest): Promise<PublicationResult> {
-  const [item] = await supabaseSelect<SupplierCatalogRow>("supplier_catalog_items", {
-    select:
-      "supplier_sku,product_name,category,brand,type,seller_name,supplier_cost,buyer_active,seller_active,last_seen_at",
-    filters: {
-      supplier_id: "eq.digiflazz",
-      supplier_sku: `eq.${input.supplierSku}`,
+async function applyPublication(
+  input: PublicationRequest,
+): Promise<PublicationResult> {
+  const [item] = await supabaseSelect<SupplierCatalogRow>(
+    "supplier_catalog_items",
+    {
+      select:
+        "supplier_sku,product_name,category,brand,type,seller_name,supplier_cost,buyer_active,seller_active,last_seen_at",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        supplier_sku: `eq.${input.supplierSku}`,
+      },
+      limit: 1,
     },
-    limit: 1,
-  });
+  );
 
   if (!item) {
-    throw new PublicationError("SKU tidak ditemukan pada katalog Digiflazz hasil scan.", 404);
+    throw new PublicationError(
+      "SKU tidak ditemukan pada katalog Digiflazz hasil scan.",
+      404,
+    );
   }
 
-  const [existingMapping] = await supabaseSelect<SupplierProductRow>("supplier_products", {
-    select: "product_id,supplier_sku,supplier_cost,active",
-    filters: {
-      supplier_id: "eq.digiflazz",
-      supplier_sku: `eq.${item.supplier_sku}`,
+  const [existingMapping] = await supabaseSelect<SupplierProductRow>(
+    "supplier_products",
+    {
+      select: "product_id,supplier_sku,supplier_cost,active",
+      filters: {
+        supplier_id: "eq.digiflazz",
+        supplier_sku: `eq.${item.supplier_sku}`,
+      },
+      limit: 1,
     },
-    limit: 1,
-  });
+  );
 
   if (!input.published) {
     if (!existingMapping) {
@@ -276,7 +299,8 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
       limit: 1,
     }),
     supabaseSelect<GameRow>("games", {
-      select: "id,name,short_name,category,accent,initials,requires_server,active",
+      select:
+        "id,name,short_name,category,accent,initials,requires_server,active",
     }),
   ]);
 
@@ -287,17 +311,27 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
 
   if (existingMapping) {
     const [product] = await supabaseSelect<ProductRow>("products", {
-      select: "id,game_id,label,selling_price,reference_price,active,internal_sku",
+      select:
+        "id,game_id,label,selling_price,reference_price,active,internal_sku",
       filters: { id: `eq.${existingMapping.product_id}` },
       limit: 1,
     });
 
     if (!product) {
-      throw new PublicationError(`Mapping supplier ada tetapi produk ${BRAND.shortName} tidak ditemukan.`, 409);
+      throw new PublicationError(
+        `Mapping supplier ada tetapi produk ${BRAND.shortName} tidak ditemukan.`,
+        409,
+      );
     }
 
-    const nextSellingPrice = Math.max(Number(product.selling_price), minimumSellingPrice);
-    const nextReferencePrice = Math.max(Number(product.reference_price), nextSellingPrice);
+    const nextSellingPrice = Math.max(
+      Number(product.selling_price),
+      minimumSellingPrice,
+    );
+    const nextReferencePrice = Math.max(
+      Number(product.reference_price),
+      nextSellingPrice,
+    );
 
     /*
      * Publish ulang produk lama: SKU internal yang kosong ikut diisi,
@@ -398,7 +432,8 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
 
   const productId = makeProductId(item.supplier_sku);
   const [existingProduct] = await supabaseSelect<ProductRow>("products", {
-    select: "id,game_id,label,selling_price,reference_price,active,internal_sku",
+    select:
+      "id,game_id,label,selling_price,reference_price,active,internal_sku",
     filters: { id: `eq.${productId}` },
     limit: 1,
   });
@@ -423,12 +458,18 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
       reference_price: minimumSellingPrice,
       active: true,
       internal_sku: internalSku,
-      sort_order: Math.min(2_000_000_000, Math.max(0, Math.round(supplierCost))),
+      sort_order: Math.min(
+        2_000_000_000,
+        Math.max(0, Math.round(supplierCost)),
+      ),
       created_at: now,
       updated_at: now,
     });
   } else {
-    const nextSellingPrice = Math.max(Number(existingProduct.selling_price), minimumSellingPrice);
+    const nextSellingPrice = Math.max(
+      Number(existingProduct.selling_price),
+      minimumSellingPrice,
+    );
     /*
      * Produk lama yang belum punya SKU internal diisi DI SINI, bukan
      * hanya di jalur sync - dua jalur ini berdiri sendiri, dan operator
@@ -450,7 +491,10 @@ async function applyPublication(input: PublicationRequest): Promise<PublicationR
       {
         active: true,
         selling_price: nextSellingPrice,
-        reference_price: Math.max(Number(existingProduct.reference_price), nextSellingPrice),
+        reference_price: Math.max(
+          Number(existingProduct.reference_price),
+          nextSellingPrice,
+        ),
         updated_at: now,
         ...isiInternalSku,
       },
@@ -496,7 +540,10 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Request publish katalog tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request publish katalog tidak valid." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -504,14 +551,20 @@ export async function POST(request: Request) {
       throw new PublicationError("Request publish katalog tidak valid.");
     }
 
-    const payload = body as { items?: unknown; supplierSku?: unknown; published?: unknown };
+    const payload = body as {
+      items?: unknown;
+      supplierSku?: unknown;
+      published?: unknown;
+    };
 
     if (Array.isArray(payload.items)) {
       if (payload.items.length === 0) {
         throw new PublicationError("Daftar perubahan publish kosong.");
       }
       if (payload.items.length > 100) {
-        throw new PublicationError("Maksimal 100 perubahan publish per request.");
+        throw new PublicationError(
+          "Maksimal 100 perubahan publish per request.",
+        );
       }
 
       const deduped = new Map<string, PublicationRequest>();
@@ -528,7 +581,11 @@ export async function POST(request: Request) {
       for (const item of deduped.values()) {
         try {
           const publication = await applyPublication(item);
-          results.push({ supplierSku: item.supplierSku, ok: true, publication });
+          results.push({
+            supplierSku: item.supplierSku,
+            ok: true,
+            publication,
+          });
         } catch (error) {
           if (error instanceof PublicationError) {
             results.push({
@@ -538,7 +595,11 @@ export async function POST(request: Request) {
               status: error.status,
             });
           } else {
-            console.error("Digiflazz catalog batch publish item failed", item.supplierSku, error);
+            console.error(
+              "Digiflazz catalog batch publish item failed",
+              item.supplierSku,
+              error,
+            );
             results.push({
               supplierSku: item.supplierSku,
               ok: false,
@@ -550,17 +611,38 @@ export async function POST(request: Request) {
       }
 
       const successful = results.filter(
-        (result): result is Extract<(typeof results)[number], { ok: true }> => result.ok,
+        (result): result is Extract<(typeof results)[number], { ok: true }> =>
+          result.ok,
       );
+
+      await auditAdminAction(request, {
+        action: "digiflazz.catalog_publish_batch",
+        targetType: "supplier_catalog",
+        targetId: Array.from(deduped.keys()).join(","),
+        metadata: {
+          requested: results.length,
+          succeeded: successful.length,
+          failed: results.length - successful.length,
+          published: successful.filter((result) => result.publication.published)
+            .length,
+          hidden: successful.filter((result) => !result.publication.published)
+            .length,
+          created: successful.filter((result) => result.publication.created)
+            .length,
+        },
+      });
 
       return Response.json({
         summary: {
           requested: results.length,
           succeeded: successful.length,
           failed: results.length - successful.length,
-          published: successful.filter((result) => result.publication.published).length,
-          hidden: successful.filter((result) => !result.publication.published).length,
-          created: successful.filter((result) => result.publication.created).length,
+          published: successful.filter((result) => result.publication.published)
+            .length,
+          hidden: successful.filter((result) => !result.publication.published)
+            .length,
+          created: successful.filter((result) => result.publication.created)
+            .length,
         },
         results,
       });
@@ -568,6 +650,22 @@ export async function POST(request: Request) {
 
     const single = parsePublicationRequest(payload);
     const publication = await applyPublication(single);
+
+    await auditAdminAction(request, {
+      action: "digiflazz.catalog_publish",
+      targetType: "supplier_catalog",
+      targetId: single.supplierSku,
+      metadata: {
+        published: publication.published,
+        created: publication.created,
+        productId: publication.productId,
+        gameId: publication.gameId ?? null,
+        gameName: publication.gameName ?? null,
+        sellingPrice: publication.sellingPrice ?? null,
+        referencePrice: publication.referencePrice ?? null,
+      },
+    });
+
     return Response.json({ publication });
   } catch (error) {
     if (error instanceof PublicationError) {

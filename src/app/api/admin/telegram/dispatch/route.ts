@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { drainTelegramQueue } from "@/lib/telegram";
 
 export const runtime = "nodejs";
@@ -18,7 +19,19 @@ export async function POST(request: Request) {
   try {
     const limitParam = new URL(request.url).searchParams.get("limit");
     const limit = Math.min(Math.max(Number(limitParam ?? 20) || 20, 1), 50);
-    return Response.json(await drainTelegramQueue(limit));
+    const result = await drainTelegramQueue(limit);
+
+    await auditAdminAction(request, {
+      action: "telegram.dispatch",
+      targetType: "telegram_queue",
+      targetId: null,
+      metadata: {
+        limit,
+        result,
+      },
+    });
+
+    return Response.json(result);
   } catch (error) {
     console.error("Manual Telegram dispatch failed", error);
     return Response.json({ error: "Antrean gagal diproses." }, { status: 502 });

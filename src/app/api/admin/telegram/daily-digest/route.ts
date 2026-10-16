@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import {
   buildDailyDigest,
   formatDailyDigest,
@@ -41,7 +42,10 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Daily digest preview failed", error);
-    return Response.json({ error: "Digest tidak dapat dihitung." }, { status: 502 });
+    return Response.json(
+      { error: "Digest tidak dapat dihitung." },
+      { status: 502 },
+    );
   }
 }
 
@@ -63,6 +67,17 @@ export async function POST(request: Request) {
     const result = await sendDailyDigest({
       dateKey,
       force: params.get("force") === "1",
+    });
+
+    await auditAdminAction(request, {
+      action: "telegram.daily_digest_send",
+      targetType: "telegram_digest",
+      targetId: dateKey,
+      metadata: {
+        force: params.get("force") === "1",
+        sent: result.sent,
+        reason: result.reason ?? null,
+      },
     });
 
     return Response.json({

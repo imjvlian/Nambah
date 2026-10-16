@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/admin-api";
+import { auditAdminAction } from "@/lib/admin-audit";
 import { checkAllSupplierBalances } from "@/lib/supplier-balance";
 
 export const runtime = "nodejs";
@@ -29,14 +30,33 @@ export async function POST(request: Request) {
       notify = body.notify === true;
     }
   } catch {
-    return Response.json({ error: "Request cek saldo tidak valid." }, { status: 400 });
+    return Response.json(
+      { error: "Request cek saldo tidak valid." },
+      { status: 400 },
+    );
   }
 
   try {
     const result = await checkAllSupplierBalances({ source: "manual", notify });
+
+    await auditAdminAction(request, {
+      action: "supplier.balance_check",
+      targetType: "supplier_balance",
+      targetId: "all",
+      metadata: {
+        notify,
+        checked: result.checked,
+        ok: result.results.filter((item) => item.ok).length,
+        failed: result.results.filter((item) => !item.ok).length,
+      },
+    });
+
     return Response.json(result);
   } catch (error) {
     console.error("Supplier balance check failed", error);
-    return Response.json({ error: "Cek saldo supplier gagal dijalankan." }, { status: 502 });
+    return Response.json(
+      { error: "Cek saldo supplier gagal dijalankan." },
+      { status: 502 },
+    );
   }
 }
