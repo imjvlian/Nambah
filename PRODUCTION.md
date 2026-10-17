@@ -249,6 +249,7 @@ Jadwal ada di `deploy/systemd/install-timers.sh` (lihat §4):
 | `/api/cron/points-expiry` | `30 0 * * *` | Expiry poin |
 | `/api/cron/telegram-dispatch` | `* * * * *` | Drain antrean notifikasi Telegram |
 | `/api/cron/daily-digest` | `1 0 * * *` | Digest harian 08:00 WIB |
+| `/api/cron/supplier-price-sync` | `23 * * * *` | Sinkron harga modal supplier (guard >±10% + notifikasi Telegram) |
 
 Untuk memastikan cron benar-benar berjalan (bukan hanya terdaftar):
 

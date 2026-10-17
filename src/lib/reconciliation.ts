@@ -1,4 +1,6 @@
 import { purgeExpiredAccountChecks } from "@/lib/account-check-cache";
+import { MelostoreSupplierClient } from "@/lib/suppliers/melostore-client";
+import { MelostoreStatusService } from "@/lib/suppliers/melostore-status";
 import {
   runDigiflazzPrepaidTransaction,
   runDigiflazzTestTransaction,
@@ -413,6 +415,91 @@ export async function runNambahReconciliation(input?: {
               });
             })();
       const applied = await applyDigiflazzTransactionStatus(supplierResult);
+
+      if (applied.supplierTransactionStatus === "pending") {
+        result.supplier.stillPending += 1;
+      } else if (
+        applied.supplierTransactionStatus === "success" ||
+        applied.supplierTransactionStatus === "failed"
+      ) {
+        result.supplier.applied += 1;
+      } else {
+        result.supplier.skipped += 1;
+      }
+    } catch (error) {
+      result.supplier.failed += 1;
+      issue(result, "supplier", transaction.request_ref, error);
+    }
+  }
+
+  /*
+   * Polling status Melostore (fix 17 Okt 2026): sweep di atas hanya
+   * mengenal digiflazz. Baris melostore pending hanya bisa diselesaikan
+   * webhook - kalau callback tidak sampai, order menggantung selamanya
+   * meski transaksinya sudah final di sisi supplier. Polling memakai
+   * fetchTransactionStatus (dulu dead code) dan penerapan statusnya
+   * lewat MelostoreStatusService.apply yang sama dengan webhook, jadi
+   * tidak ada jalur kebenaran kedua.
+   *
+   * Catatan mode: digiflazz-test mengirim sandbox_mode:true ke Melostore;
+   * transaksi sandbox tetap bisa di-query lewat buyer_trx_id. Kalau GET
+   * menolak sandbox di kemudian hari, tiap tick hanya menghasilkan issue
+   * yang terlihat - bukan kegagalan senyap.
+   */
+  const pendingMelostore = await supabaseSelect<{
+    order_id: string;
+    request_ref: string;
+  }>(
+    "supplier_transactions",
+    {
+      select: "order_id,request_ref",
+      filters: {
+        supplier_id: "eq.melostore",
+        status: "eq.pending",
+        updated_at: `lt.${before(MIN_ORDER_AGE_MS)}`,
+      },
+      order: "updated_at.asc",
+      limit,
+    },
+  );
+
+  for (const transaction of pendingMelostore) {
+    result.supplier.checked += 1;
+
+    if (
+      fulfillmentMode !== "digiflazz-test" &&
+      fulfillmentMode !== "digiflazz-live"
+    ) {
+      result.supplier.skipped += 1;
+      continue;
+    }
+
+    try {
+      const client = new MelostoreSupplierClient();
+      if (!client.isConfigured()) {
+        result.supplier.skipped += 1;
+        continue;
+      }
+
+      const polled = await client.fetchTransactionStatus(
+        transaction.request_ref,
+      );
+      if (!polled) {
+        result.supplier.stillPending += 1;
+        continue;
+      }
+
+      const applied = await MelostoreStatusService.apply({
+        requestRef: transaction.request_ref,
+        status: polled.status,
+        transactionId: polled.transactionId,
+        serialNumber: polled.serialNumber,
+        charged: polled.charged,
+        message: polled.message,
+        errorCode: polled.errorCode,
+        requiresAction: false,
+        eventKey: `poll:${transaction.request_ref}:${polled.status}`,
+      });
 
       if (applied.supplierTransactionStatus === "pending") {
         result.supplier.stillPending += 1;

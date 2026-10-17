@@ -182,6 +182,39 @@ export async function notifyOrderStuck(orderId: string, stuckMinutes: number) {
 }
 
 /**
+ * Saldo H2H supplier habis saat dispatch order (402 / 4020).
+ *
+ * Ini kondisi keuangan yang TIDAK menggagalkan order - retry cron akan
+ * berhasil begitu saldo diisi. Tanpa alert ini, keadaannya jadi outage
+ * senyap: setiap order gagal dispatch dengan pesan yang sama, dan tidak
+ * ada notifikasi yang menyebut penyebabnya.
+ *
+ * Dedupe per jam per supplier - kalau dua order melostore kena dalam jam
+ * yang sama, satu pesan cukup; top-up saldo menyelesaikan keduanya.
+ */
+export async function notifySupplierDispatchBalanceDepleted(
+  supplierId: string,
+  orderId: string,
+) {
+  if (!isTelegramConfigured()) {
+    return { queued: false as const, reason: "not-configured" as const };
+  }
+
+  const text = [
+    "<b>Saldo supplier habis saat dispatch</b>",
+    `Supplier: ${escapeTelegramHtml(supplierId)}`,
+    `Order <code>${escapeTelegramHtml(orderId)}</code> ditahan - retry otomatis berlanjut sampai saldo diisi.`,
+    "Isi saldo supplier di dashboard, atau order baru akan ikut tertahan.",
+  ].join("\n");
+
+  return enqueueTelegramMessage(text, {
+    kind: "ops",
+    dedupeKey: `dispatch-balance:${supplierId}:${Math.floor(Date.now() / 3_600_000)}`,
+    payload: { supplierId, orderId },
+  });
+}
+
+/**
  * Refund selesai diproses.
  *
  * Ini alert operasional, bukan bukti refund ke user. Nominal dan provider

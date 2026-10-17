@@ -22,6 +22,7 @@ import { deliverSuccessReceipt } from "@/lib/receipt-service";
 import {
   notifyFulfillmentFailed,
   notifyFulfillmentSucceeded,
+  notifySupplierDispatchBalanceDepleted,
 } from "@/lib/telegram-alerts";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import {
@@ -272,14 +273,17 @@ async function getLiveDispatchConfig(
   };
 }
 
-async function getSupplierTransaction(requestRef: string) {
+async function getSupplierTransaction(
+  requestRef: string,
+  supplierId: string = "digiflazz",
+) {
   const [transaction] = await supabaseSelect<SupplierTransactionRow>(
     "supplier_transactions",
     {
       select:
         "id,order_id,supplier_id,product_id,request_ref,supplier_transaction_id,supplier_sku,target,cost,status,message,serial_number,created_at,updated_at",
       filters: {
-        supplier_id: "eq.digiflazz",
+        supplier_id: `eq.${supplierId}`,
         request_ref: `eq.${requestRef}`,
       },
       limit: 1,
@@ -744,6 +748,70 @@ async function getGenericDispatchConfig(
   };
 }
 
+type SupplierDispatchClassification = {
+  /** true = retry tidak akan sembuh; order harus digagalkan supaya refund jalan. */
+  terminal: boolean;
+  alert: "balance-depleted" | null;
+};
+
+/**
+ * Klasifikasi kegagalan dispatch supplier (jalur generik/Melostore).
+ *
+ * Duck-typing terhadap SupplierError (code/retryable) supaya tidak
+ * menambah import-cycle; strukturnya stabil di src/lib/suppliers/types.ts.
+ *
+ * Kasus nyata yang membentuk aturan ini (17 Okt 2026): order ditolak
+ * MAX_PRICE_TOO_LOW (harga supplier naik setelah checkout) lalu menggantung
+ * berjam-jam di status processing - retried tiap 5 menit dengan hasil sama,
+ * karena tidak ada yang membedakan "coba lagi nanti" dari "tidak akan
+ * pernah berhasil".
+ */
+function classifySupplierDispatchError(
+  error: unknown,
+): SupplierDispatchClassification {
+  const supplierCode =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const retryable =
+    error && typeof error === "object" && "retryable" in error
+      ? Boolean((error as { retryable?: unknown }).retryable)
+      : false;
+  const isSupplierError =
+    error && typeof error === "object" && "supplierId" in error;
+
+  // Harga berubah setelah checkout: tidak akan sembuh dengan retry -
+  // pelanggan harus di-refund, bukan ditunda.
+  if (
+    supplierCode === "MAX_PRICE_TOO_LOW" ||
+    supplierCode === "PROVIDER_PRICE_CHANGED" ||
+    /naik setelah checkout/i.test(message)
+  ) {
+    return { terminal: true, alert: null };
+  }
+
+  // Saldo H2H habis: BUKAN terminal - top-up saldo membuat retry berikutnya
+  // berhasil. Alert supaya outage ini tidak senyap.
+  if (supplierCode === "4020" || /tidak mencukupi/i.test(message)) {
+    return { terminal: false, alert: "balance-depleted" };
+  }
+
+  if (retryable) {
+    return { terminal: false, alert: null };
+  }
+
+  // SupplierError non-retryable tak dikenal (validasi ditolak, SKU hilang):
+  // gagalkan order - jangan biarkan pelanggan menggantung menunggu sesuatu
+  // yang tidak akan sembuh dengan retry.
+  if (isSupplierError) {
+    return { terminal: true, alert: null };
+  }
+
+  // Error non-supplier (jaringan, timeout, abort): retryable default.
+  return { terminal: false, alert: null };
+}
+
 /**
  * Eksekusi order lewat kontrak supplier bersama.
  *
@@ -768,19 +836,20 @@ async function fulfillViaSupplierClient(
     );
   }
 
-  const existing = await getSupplierTransaction(requestRef);
-  if (existing?.supplier_transaction_id) {
+  const existing = await getSupplierTransaction(requestRef, client.id);
+  if (existing?.supplier_transaction_id || existing?.status === "failed") {
     /*
-     * Sudah pernah dikirim. Supplier memakai `requestRef` sebagai
-     * idempotency key, jadi mengirim ulang tidak akan menggandakan top
-     * up - tapi tetap tidak perlu dilakukan.
+     * Sudah pernah dikirim (transaction id tercatat), atau percobaan
+     * sebelumnya mencatat kegagalan terminal. Supplier memakai
+     * `requestRef` sebagai idempotency key, jadi mengirim ulang tidak
+     * akan menggandakan top up - tapi tetap tidak perlu dilakukan.
      */
     await markOrderProcessing(order);
     return {
       mode,
       orderId: order.id,
       requestRef,
-      status: "pending",
+      status: existing.status === "failed" ? "failed" : "pending",
       source: "local",
       supplier: client.id,
     };
@@ -788,61 +857,131 @@ async function fulfillViaSupplierClient(
 
   await markOrderProcessing(order);
 
-  const config = await getGenericDispatchConfig(order, client.id, mode);
-  const now = new Date().toISOString();
+  try {
+    const config = await getGenericDispatchConfig(order, client.id, mode);
+    const now = new Date().toISOString();
 
-  await supabaseUpsert<SupplierTransactionRow>(
-    "supplier_transactions",
-    {
-      order_id: order.id,
-      supplier_id: client.id,
-      product_id: order.product_id,
-      request_ref: requestRef,
-      supplier_transaction_id: null,
-      supplier_sku: config.supplierSku,
-      target: config.customerNo,
-      cost: config.maxPrice,
-      status: "pending",
-      message: `queued:${mode}`,
-      serial_number: null,
-      created_at: now,
-      updated_at: now,
-    },
-    { onConflict: "supplier_id,request_ref" },
-  );
+    /*
+     * ignore-duplicates: retry reconcile tiap 5 menit tidak boleh menimpa
+     * baris yang sudah ada. Versi lama memakai merge-duplicates, yang
+     * mereset `supplier_transaction_id` ke null di setiap retry - dan
+     * karena getSupplierTransaction dulu hardcode digiflazz, gate di atas
+     * tidak pernah menahan retry order melostore. Di live, kombinasi itu
+     * berarti transaksi bisa terkirim BERULANG ke supplier.
+     */
+    await supabaseUpsert<SupplierTransactionRow>(
+      "supplier_transactions",
+      {
+        order_id: order.id,
+        supplier_id: client.id,
+        product_id: order.product_id,
+        request_ref: requestRef,
+        supplier_transaction_id: null,
+        supplier_sku: config.supplierSku,
+        target: config.customerNo,
+        cost: config.maxPrice,
+        status: "pending",
+        message: `queued:${mode}`,
+        serial_number: null,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        onConflict: "supplier_id,request_ref",
+        prefer: "resolution=ignore-duplicates,return=representation",
+      },
+    );
 
-  const result = await client.runTransaction({
-    requestRef,
-    sku: config.supplierSku,
-    target: order.target_user_id,
-    zone: order.target_server_id,
-    maxPrice: config.maxPrice,
-    environment: mode === "digiflazz-test" ? "sandbox" : "live",
-  });
+    const result = await client.runTransaction({
+      requestRef,
+      sku: config.supplierSku,
+      target: order.target_user_id,
+      zone: order.target_server_id,
+      maxPrice: config.maxPrice,
+      environment: mode === "digiflazz-test" ? "sandbox" : "live",
+    });
 
-  await supabaseUpdate(
-    "supplier_transactions",
-    {
-      supplier_transaction_id: result.transactionId ?? null,
-      supplier_sku: config.supplierSku,
-      target: config.customerNo,
-      cost: result.charged || config.maxPrice,
+    await supabaseUpdate(
+      "supplier_transactions",
+      {
+        supplier_transaction_id: result.transactionId ?? null,
+        supplier_sku: config.supplierSku,
+        target: config.customerNo,
+        cost: result.charged || config.maxPrice,
+        status: result.status,
+        message: `${client.id}: ${result.message}`,
+        serial_number: result.serialNumber,
+        updated_at: now,
+      },
+      { filters: { supplier_id: `eq.${client.id}`, request_ref: `eq.${requestRef}` } },
+    );
+
+    return {
+      mode,
+      orderId: order.id,
+      requestRef,
       status: result.status,
-      message: `${client.id}: ${result.message}`,
-      serial_number: result.serialNumber,
-      updated_at: now,
-    },
-    { filters: { supplier_id: `eq.${client.id}`, request_ref: `eq.${requestRef}` } },
-  );
+      source: "local",
+      supplier: client.id,
+    };
+  } catch (error) {
+    const classification = classifySupplierDispatchError(error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown supplier dispatch error.";
 
-  return {
-    mode,
-    orderId: order.id,
-    requestRef,
-    status: result.status,
-    source: "local",
-    supplier: client.id,
-  };
+    /*
+     * Pola dispatch_error yang sama dengan jalur Digiflazz. Tanpa ini,
+     * kegagalan transaksi hanya hidup di log server dan row tampak
+     * "pending" selamanya (kasus MAX_PRICE_TOO_LOW 17 Okt 2026).
+     */
+    try {
+      await supabaseUpdate(
+        "supplier_transactions",
+        {
+          status: classification.terminal ? "failed" : "pending",
+          message: `dispatch_error:${message.slice(0, 480)}`,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          filters: {
+            supplier_id: `eq.${client.id}`,
+            request_ref: `eq.${requestRef}`,
+          },
+        },
+      );
+    } catch (writeError) {
+      console.error(
+        `Gagal mencatat dispatch_error ${client.id} ${requestRef}`,
+        writeError,
+      );
+    }
+
+    if (classification.alert === "balance-depleted") {
+      try {
+        await notifySupplierDispatchBalanceDepleted(client.id, order.id);
+      } catch (alertError) {
+        console.error(
+          "Alert saldo supplier saat dispatch gagal dikirim",
+          alertError,
+        );
+      }
+    }
+
+    if (classification.terminal) {
+      /*
+       * Error terminal tidak akan sembuh dengan retry. Pelanggan tidak
+       * boleh menunggu selamanya hanya karena harga supplier naik atau
+       * request ditolak supplier - gagalkan order supaya jalur refund
+       * bergerak. finalizeOrder CAS-nya status in.(paid,processing),
+       * jadi aman dipanggil ulang dari retry maupun jalur cepat webhook.
+       */
+      await finalizeOrder(order.id, "failed");
+    }
+
+    throw error;
+  }
 }
 
 /**

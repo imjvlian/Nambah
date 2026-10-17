@@ -1,4 +1,5 @@
 import { fulfillPaidOrder } from "@/lib/fulfillment";
+import { gatewayTimeToUtcIso } from "@/lib/gateway-time";
 import {
   getMidtransEnvironment,
   type MidtransStatusPayload,
@@ -463,7 +464,7 @@ export async function applyMidtransStatus(
       orderStatus === "paid" &&
       (order.status === "pending_payment" || order.status === null)
     ) {
-      updatePayload.paid_at = payload.settlement_time ?? now;
+      updatePayload.paid_at = gatewayTimeToUtcIso(payload.settlement_time) ?? now;
     }
     updatePayload.updated_at = now;
   } else {
@@ -479,7 +480,9 @@ export async function applyMidtransStatus(
       payment_type: payload.payment_type ?? null,
       fraud_status: payload.fraud_status ?? null,
       ...(signatureVerified ? { signature_verified_at: now } : {}),
-      ...(paid ? { paid_at: payload.settlement_time ?? now } : {}),
+      ...(paid
+        ? { paid_at: gatewayTimeToUtcIso(payload.settlement_time) ?? now }
+        : {}),
       updated_at: now,
     },
     {
@@ -502,7 +505,8 @@ export async function applyMidtransStatus(
           updated_at: timestamp,
         };
         if (nextStatus === "paid") {
-          orderUpdatePayload.paid_at = payload.settlement_time ?? timestamp;
+          orderUpdatePayload.paid_at =
+            gatewayTimeToUtcIso(payload.settlement_time) ?? timestamp;
         }
         if (isTerminalStatus(nextStatus)) {
           orderUpdatePayload.terminal_at = timestamp;
@@ -673,7 +677,9 @@ export async function applyDokuStatus(
     payment_type: input.paymentType ?? "qris",
     fraud_status: null,
     ...(signatureVerified ? { signature_verified_at: now } : {}),
-    ...(paid ? { paid_at: input.paidTime ?? now } : {}),
+    ...(paid
+      ? { paid_at: gatewayTimeToUtcIso(input.paidTime) ?? now }
+      : {}),
     updated_at: now,
   };
 
@@ -727,7 +733,8 @@ export async function applyDokuStatus(
           status_changed_at: timestamp,
         };
         if (nextStatus === "paid") {
-          orderUpdatePayload.paid_at = input.paidTime ?? timestamp;
+          orderUpdatePayload.paid_at =
+            gatewayTimeToUtcIso(input.paidTime) ?? timestamp;
         }
         if (isTerminalStatus(nextStatus)) {
           orderUpdatePayload.terminal_at = timestamp;
@@ -878,7 +885,9 @@ export async function applyPaylabsStatus(
     payment_type: input.paymentType ?? null,
     fraud_status: null,
     ...(signatureVerified ? { signature_verified_at: now } : {}),
-    ...(paid ? { paid_at: input.paidTime ?? now } : {}),
+    ...(paid
+      ? { paid_at: gatewayTimeToUtcIso(input.paidTime) ?? now }
+      : {}),
     updated_at: now,
   };
 
@@ -931,7 +940,8 @@ export async function applyPaylabsStatus(
           status_changed_at: timestamp,
         };
         if (nextStatus === "paid") {
-          orderUpdatePayload.paid_at = input.paidTime ?? timestamp;
+          orderUpdatePayload.paid_at =
+            gatewayTimeToUtcIso(input.paidTime) ?? timestamp;
         }
         if (isTerminalStatus(nextStatus)) {
           orderUpdatePayload.terminal_at = timestamp;
