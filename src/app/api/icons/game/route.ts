@@ -101,22 +101,31 @@ function compact(value: string) {
   return normalize(value).replace(/\s+/g, "");
 }
 
+const XML_ESCAPE: Record<string, string> = {
+  "&": "&" + "amp;",
+  "<": "&" + "lt;",
+  ">": "&" + "gt;",
+  '"': "&" + "quot;",
+  "'": "&" + "apos;",
+};
+
 function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+  return value.replace(/[&<>"']/g, (char) => XML_ESCAPE[char] ?? char);
 }
 
+const HTML_DECODE: Record<string, string> = {
+  ["&" + "amp;"]: "&",
+  ["&" + "quot;"]: '"',
+  ["&" + "#39;"]: "'",
+  ["&" + "lt;"]: "<",
+  ["&" + "gt;"]: ">",
+};
+
 function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+  return value.replace(
+    new RegExp("&" + "[a-z#0-9]+;", "gi"),
+    (entity) => HTML_DECODE[entity] ?? entity,
+  );
 }
 
 function initials(value: string) {
@@ -332,14 +341,66 @@ async function findSoftwareIcon(name: string) {
   return `${ICONIFY_ICON_URL}/${encodeURIComponent(prefix)}/${encodeURIComponent(iconName)}.svg`;
 }
 
-function redirectToIcon(iconUrl: string, source: string) {
-  return NextResponse.redirect(iconUrl, {
-    status: 307,
-    headers: {
-      "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
-      "X-Nambah-Icon-Source": source,
-    },
-  });
+/*
+ * PROXY, BUKAN REDIRECT — mengapa:
+ *
+ * Sampai 17 Okt 2026 route ini membalas 307 ke *.mzstatic.com (App Store),
+ * play-lh.googleusercontent.com, atau api.iconify.design. Pemerketatan CSP
+ * img-src (P0 security batch 5) melarang sebagian domain itu, dan browser
+ * memeriksa CSP SETELAH redirect — hasilnya tile icon kosong diam-diam
+ * untuk semua game yang tidak punya artwork manifest lokal.
+ *
+ * Proxy membuat browser hanya pernah memuat URL same-origin
+ * (`/api/icons/game?...`), jadi:
+ *   1. CSP tidak perlu meng-whitelist domain icon pihak ketiga — malah
+ *      makin ketat;
+ *   2. kelas bug "domain baru lupa di-whitelist" tertutup permanen;
+ *   3. fallback SVG inisial (same-origin) selalu bisa mengecat — tile
+ *      tidak pernah blank lagi.
+ *
+ * Pertahanan proxy: URL target selalu dibangun route ini sendiri
+ * (bukan dari klien — bukan open proxy), timeout 10 detik, content-type
+ * wajib image/*, dan ukuran dibatasi MAX_ICON_BYTES.
+ */
+const PROXY_TIMEOUT_MS = 10_000;
+const MAX_ICON_BYTES = 2 * 1024 * 1024;
+
+async function proxyIcon(iconUrl: string, source: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+
+  try {
+    const upstream = await fetch(iconUrl, {
+      headers: { Accept: "image/*" },
+      next: { revalidate: CACHE_SECONDS },
+      signal: controller.signal,
+    });
+    if (!upstream.ok) return null;
+
+    const contentType = upstream.headers.get("Content-Type") ?? "";
+    if (!/^image\//i.test(contentType)) return null;
+
+    const declaredLength = Number(upstream.headers.get("Content-Length") ?? "");
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_ICON_BYTES) {
+      return null;
+    }
+
+    const bytes = await upstream.arrayBuffer();
+    if (bytes.byteLength > MAX_ICON_BYTES) return null;
+
+    return new NextResponse(bytes, {
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
+        "X-Nambah-Icon-Source": source,
+      },
+    });
+  } catch (error) {
+    console.warn("Game icon proxy failed", source, error);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function GET(request: Request) {
@@ -356,14 +417,25 @@ export async function GET(request: Request) {
   }
 
   try {
-    const appStoreIcon = await findAppStoreIcon(name);
-    if (appStoreIcon) return redirectToIcon(appStoreIcon, "app-store");
+    const candidates: Array<{
+      find: () => Promise<string | null>;
+      source: string;
+    }> = [
+      { find: () => findAppStoreIcon(name), source: "app-store" },
+      { find: () => findPlayStoreIcon(name), source: "play-store" },
+      { find: () => findSoftwareIcon(name), source: "software-icon" },
+    ];
 
-    const playStoreIcon = await findPlayStoreIcon(name);
-    if (playStoreIcon) return redirectToIcon(playStoreIcon, "play-store");
+    for (const candidate of candidates) {
+      const iconUrl = await candidate.find();
+      if (!iconUrl) continue;
 
-    const softwareIcon = await findSoftwareIcon(name);
-    if (softwareIcon) return redirectToIcon(softwareIcon, "software-icon");
+      const proxied = await proxyIcon(iconUrl, candidate.source);
+      if (proxied) return proxied;
+
+      // Upstream gagal (timeout / tipe salah / terlalu besar) — lanjut ke
+      // kandidat berikutnya. Yang penting respons AKHIR selalu mengecat.
+    }
   } catch (error) {
     console.warn("Game icon lookup failed", name, error);
   }
