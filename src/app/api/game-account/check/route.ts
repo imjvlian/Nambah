@@ -42,7 +42,7 @@ type CachedAccount = {
   server: string;
   region: string | null;
   countryCode: string | null;
-  source: "volsever" | "mimih";
+  source: "volsever" | "mimih" | "melostore";
   expiresAt: number;
 };
 

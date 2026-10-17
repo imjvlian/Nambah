@@ -23,7 +23,7 @@ export const DEFAULT_VOLSEVER_ROUTES: Readonly<Record<string, string>> = {
   "fc-mobile": "ea-sports-fc-mobile-indonesia",
   "heroes-evolved": "heroes-evolved",
   "honkai-star-rail": "honkai-star-rail",
-  "league-of-legends": "league-of-legends",
+  "league-of-legends-pc": "league-of-legends",
   "league-of-legends-wild-rift": "league-of-legends-wild-rift",
   "legends-of-runeterra": "legends-of-runeterra",
   "valorant": "valorant-indonesia",

@@ -111,6 +111,227 @@ export function isMelostoreConfigured(): boolean {
   return Boolean(apiKey && secretKey);
 }
 
+// ---------------------------------------------------------------------------
+// Cek nickname (account verification) — dipakai gerbang checkout (P0,
+// jawaban atas penolakan merchant DOKU), bukan katalog.
+//
+// Section ini sengaja TIDAK memakai `requestOnce`: helper itu melempar
+// untuk semua non-2xx dan kehilangan status code, padahal kontrak
+// check-nickname justru tri-state yang bersih lewat status code:
+//   200 data.username terisi = akun ada
+//   404                      = akun tidak ada
+//   402                      = saldo cek habis
+//   429                      = limit tercapai
+//   401/403                  = kredensial / IP
+//   sisanya                  = gangguan provider
+// ---------------------------------------------------------------------------
+
+const ACCOUNT_CHECK_TIMEOUT_MS = 10_000;
+
+type AccountCheckHttpResult = {
+  httpStatus: number;
+  body: MelostoreEnvelope<Record<string, unknown>> | null;
+};
+
+async function melostoreAccountCheckRequest(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<AccountCheckHttpResult> {
+  const { apiKey, secretKey } = getConfig();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ACCOUNT_CHECK_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+        "X-Secret-Key": secretKey,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+    let parsed: MelostoreEnvelope<Record<string, unknown>> | null = null;
+    try {
+      parsed = raw
+        ? (JSON.parse(raw) as MelostoreEnvelope<Record<string, unknown>>)
+        : null;
+    } catch {
+      parsed = null;
+    }
+
+    return { httpStatus: response.status, body: parsed };
+  } catch {
+    /*
+     * Timeout, DNS, koneksi putus — semua jadi status 0. Tidak ada satu pun
+     * yang boleh melempar ke pemanggil: gerbang checkout memakai hasil ini
+     * untuk memutuskan allow/block, dan exception akan mematikan checkout.
+     */
+    return { httpStatus: 0, body: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export type MelostoreCheckUnavailableReason =
+  | "provider-error"
+  | "rate-limited"
+  | "insufficient-balance"
+  | "auth";
+
+export type MelostoreCheckOutcome =
+  | { outcome: "verified"; username: string }
+  | { outcome: "invalid" }
+  | { outcome: "unavailable"; reason: MelostoreCheckUnavailableReason };
+
+function mapAccountCheckOutcome(
+  httpStatus: number,
+  data: Record<string, unknown> | null | undefined,
+): MelostoreCheckOutcome {
+  if (httpStatus === 200) {
+    const username =
+      data && typeof data.username === "string" ? data.username.trim() : "";
+    return username
+      ? { outcome: "verified", username }
+      : { outcome: "unavailable", reason: "provider-error" };
+  }
+  if (httpStatus === 404) return { outcome: "invalid" };
+  if (httpStatus === 402) {
+    return { outcome: "unavailable", reason: "insufficient-balance" };
+  }
+  if (httpStatus === 401 || httpStatus === 403) {
+    return { outcome: "unavailable", reason: "auth" };
+  }
+  if (httpStatus === 429) {
+    return { outcome: "unavailable", reason: "rate-limited" };
+  }
+  return { outcome: "unavailable", reason: "provider-error" };
+}
+
+export async function checkMelostoreNickname(input: {
+  gameCode: string;
+  userId: string;
+  zoneId?: string | null;
+}): Promise<MelostoreCheckOutcome> {
+  const { apiKey, secretKey } = getConfig();
+  if (!apiKey || !secretKey) {
+    // Pemanggil sudah mengecek isMelostoreConfigured(); ini pertahanan
+    // terakhir kalau ada jalur baru yang lupa mengecek.
+    return { outcome: "unavailable", reason: "auth" };
+  }
+
+  const { httpStatus, body } = await melostoreAccountCheckRequest(
+    "/check-nickname",
+    {
+      game_code: input.gameCode,
+      customer_target: input.userId,
+      ...(input.zoneId ? { customer_target_zone: input.zoneId } : {}),
+    },
+  );
+
+  return mapAccountCheckOutcome(httpStatus, body?.data);
+}
+
+export type MelostorePurchaseLimitResult =
+  | {
+      outcome: "verified";
+      username: string;
+      weeklyPass: Array<{ packageCode: string; limitReached: boolean }>;
+      doubleDiamondsEligible: boolean | null;
+    }
+  | { outcome: "invalid" }
+  | { outcome: "unavailable"; reason: MelostoreCheckUnavailableReason };
+
+/**
+ * Cek khusus MLBB: memverifikasi nickname SEKALIGUS mengembalikan status
+ * weekly pass + double diamonds — satu panggilan, satu biaya.
+ *
+ * JANGAN memanggil `checkMelostoreNickname` juga untuk order yang sama:
+ * dua-duanya berbagi jatah biaya cek, jadi itu berarti membayar dua kali
+ * untuk satu order.
+ */
+export async function checkMelostorePurchaseLimit(input: {
+  userId: string;
+  zoneId: string;
+}): Promise<MelostorePurchaseLimitResult> {
+  const { apiKey, secretKey } = getConfig();
+  if (!apiKey || !secretKey) {
+    return { outcome: "unavailable", reason: "auth" };
+  }
+
+  const { httpStatus, body } = await melostoreAccountCheckRequest(
+    "/mobile-legends/purchase-limit",
+    {
+      customer_target: input.userId,
+      customer_target_zone: input.zoneId,
+    },
+  );
+
+  if (httpStatus === 200) {
+    const data =
+      body?.data && typeof body.data === "object"
+        ? (body.data as Record<string, unknown>)
+        : null;
+    const username =
+      data && typeof data.username === "string" ? data.username.trim() : "";
+    if (!username) {
+      return { outcome: "unavailable", reason: "provider-error" };
+    }
+
+    const weeklyPassRaw =
+      data?.weekly_pass && typeof data.weekly_pass === "object"
+        ? (data.weekly_pass as Record<string, unknown>)
+        : null;
+    const items = Array.isArray(weeklyPassRaw?.items)
+      ? weeklyPassRaw.items
+      : [];
+    const fallbackLimitReached = weeklyPassRaw?.limit_reached === true;
+
+    const weeklyPass = items.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const record = item as Record<string, unknown>;
+      if (typeof record.package_code !== "string" || !record.package_code) {
+        return [];
+      }
+      return [
+        {
+          packageCode: record.package_code,
+          limitReached:
+            typeof record.limit_reached === "boolean"
+              ? record.limit_reached
+              : fallbackLimitReached,
+        },
+      ];
+    });
+
+    const doubleDiamondsRaw =
+      data?.double_diamonds && typeof data.double_diamonds === "object"
+        ? (data.double_diamonds as Record<string, unknown>)
+        : null;
+    const doubleDiamondsEligible =
+      typeof doubleDiamondsRaw?.eligible === "boolean"
+        ? doubleDiamondsRaw.eligible
+        : null;
+
+    return {
+      outcome: "verified",
+      username,
+      weeklyPass,
+      doubleDiamondsEligible,
+    };
+  }
+
+  const mapped = mapAccountCheckOutcome(httpStatus, body?.data);
+  return mapped.outcome === "verified"
+    ? { outcome: "unavailable", reason: "provider-error" }
+    : mapped;
+}
+
 function requireApiConfig() {
   const config = getConfig();
   if (!config.apiKey || !config.secretKey) {

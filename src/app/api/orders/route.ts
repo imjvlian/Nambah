@@ -42,6 +42,9 @@ import { rateLimitResponse } from "@/lib/rate-limit";
 import { reservePromotionForOrder } from "@/lib/promotion-service";
 import { cancelOrderWithCleanup } from "@/lib/order-cancellation";
 import { getPublicOrder } from "@/lib/order-service";
+import { getAccountVerificationMode } from "@/lib/account-verification-settings";
+import { verifyOrderAccount } from "@/lib/account-verification";
+import { decideAccountGate } from "@/lib/account-verification-policy";
 import {
   createOrderAccessCookie,
   createOrderAccessCredential,
@@ -485,6 +488,40 @@ export async function POST(request: Request) {
     return Response.json({ error: supplierSelection.detail }, { status: 409 });
   }
 
+  /*
+   * GERBANG VERIFIKASI AKUN (P0 — jawaban atas penolakan merchant DOKU:
+   * "transaksi Top Up Game masih dapat diproses meskipun User ID Game
+   * yang dimasukkan tidak valid").
+   *
+   * Ditempatkan SETELAH pemilihan supplier supaya `supplierTerpilih.sku`
+   * tersedia untuk kontrol weekly pass MLBB, dan SEBELUM insert order +
+   * reservasi apa pun — tidak ada efek irreversibel sebelum ID dinyatakan
+   * valid. Mode `off`/`log` tidak pernah menolak order (kolom audit tetap
+   * terisi); `enforce` menolak ID invalid (422) dan gangguan provider
+   * (503). Kill-switch: PUT /api/admin/account-verification.
+   */
+  const verificationMode = await getAccountVerificationMode();
+  const accountVerification = await verifyOrderAccount({
+    gameId: gameConfig.id,
+    gameName: gameConfig.name,
+    gameShortName: gameConfig.short_name,
+    requiresServer: gameConfig.requires_server,
+    userId: account.userId,
+    serverId: account.serverId,
+    supplierSku: supplierTerpilih.sku,
+    mode: verificationMode,
+  });
+  const verificationGate = decideAccountGate(
+    accountVerification,
+    verificationMode,
+  );
+  if (!verificationGate.allowed) {
+    return Response.json(
+      { error: verificationGate.error },
+      { status: verificationGate.status },
+    );
+  }
+
   // Pembuatan order di bawah ini adalah saga 6 langkah, bukan transaksi: ada
   // panggilan ke Midtrans di tengah-tengahnya, jadi membungkusnya dalam DB
   // transaction tidak mungkin. Kalau proses mati (timeout, cold start, deploy)
@@ -556,6 +593,12 @@ export async function POST(request: Request) {
       expires_at: expiresAt,
       status_changed_at: now,
       terminal_at: null,
+      // Jejak audit verifikasi akun (migrasi 054) — bukti untuk DOKU.
+      account_verification_status: accountVerification.status,
+      account_check_provider: accountVerification.provider,
+      account_nickname: accountVerification.nickname,
+      account_region: accountVerification.region,
+      account_verified_at: accountVerification.checkedAt,
     });
 
     /*

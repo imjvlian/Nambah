@@ -267,6 +267,10 @@ export const ROUTES_INTENTIONALLY_CLOSED: ReadonlyArray<
   ],
   ["/api/admin/readiness", "Sistem - pemeriksaan konfigurasi produksi"],
   ["/api/admin/payment-settings", "Sistem - konfigurasi payment gateway"],
+  [
+    "/api/admin/account-verification",
+    "Sistem - kill-switch gate verifikasi akun, satu kelas dengan payment-settings",
+  ],
   ["/api/admin/supplier-balance", "Sistem - pemeriksaan saldo supplier manual"],
   ["/api/admin/operations/health", "Alat - Operations Center"],
   ["/api/admin/test-lab", "Alat - laboratorium uji fulfilment"],

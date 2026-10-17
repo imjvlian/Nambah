@@ -30,7 +30,7 @@ const CONFLICT_KEY = "game_id,user_id,server_id";
  */
 export const ACCOUNT_CHECK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-export type AccountCheckProvider = "volsever" | "mimih";
+export type AccountCheckProvider = "volsever" | "mimih" | "melostore";
 
 export type CachedAccountCheck = {
   nickname: string;

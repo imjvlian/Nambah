@@ -69,14 +69,13 @@ test("auto-check jalan untuk game tanpa kolom server", () => {
 });
 
 test("auto-check hanya untuk game yang punya route Volsever", () => {
-  // Enam game lain punya checker tapi route-nya belum ada. Setelah perbaikan,
+  // Lima game lain punya checker tapi route-nya belum ada. Setelah perbaikan,
   // auto-check untuk mereka tetap tidak aktif — bukan karena bug, tapi karena
   // tidak ada provider untuk dipanggil.
   const tanpaRoute = [
     "aniimo",
     "free-fire",
     "free-fire-max",
-    "league-of-legends-pc",
     "marvel-rivals",
     "point-blank",
   ];

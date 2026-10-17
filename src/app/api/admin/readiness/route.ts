@@ -9,6 +9,13 @@ import {
   resolveVolseverRoute,
   UNKNOWN_VOLSEVER_ROUTES,
 } from "@/lib/volsever/games";
+import { isMelostoreConfigured } from "@/lib/suppliers/melostore-client";
+import { getAccountVerificationMode } from "@/lib/account-verification-settings";
+import {
+  getMelostoreGameCode,
+  isResidualUnverifiableGame,
+  melostoreCodeRequiresZone,
+} from "@/lib/melostore-game-codes";
 
 export const runtime = "nodejs";
 
@@ -200,6 +207,29 @@ export async function GET(request: Request) {
     if (route) checkerRouted += 1;
   }
   const checkerGap = checkerChecked - checkerRouted;
+
+  // Cakupan gerbang verifikasi akun (gate checkout — jawaban DOKU).
+  //
+  // Populasi yang dihitung sama dengan checker di atas: hanya game aktif
+  // yang punya checker. Game residual yang diterima tertulis (keputusan
+  // owner 17 Okt 2026) TIDAK dihitung sebagai gap. Yang dihitung: game
+  // checker tanpa pemetaan Melostore, atau code-nya menuntut zone yang
+  // form Nambah tidak kumpulkan.
+  const verificationMode = await getAccountVerificationMode();
+  const verificationGaps: string[] = [];
+  let verificationCovered = 0;
+  for (const game of activeGames) {
+    const schema = getGameAccountSchema(game);
+    if (!schema.checker) continue;
+
+    const code = getMelostoreGameCode(game.id);
+    if (code && (!melostoreCodeRequiresZone(code) || Boolean(schema.server))) {
+      verificationCovered += 1;
+      continue;
+    }
+    if (!code && isResidualUnverifiableGame(game.id)) continue;
+    verificationGaps.push(game.id);
+  }
 
   const checks: Check[] = [
     {
@@ -402,6 +432,28 @@ export async function GET(request: Request) {
           ? "warning"
           : "pass",
       detail: checkerGapDescription(checkerGap, checkerRouted, checkerChecked),
+    },
+    {
+      id: "account-verification-gate",
+      label: "Account verification gate (DOKU)",
+      scope: "production",
+      // Fail-open + alarm (keputusan 1 & 3, 17 Okt 2026): gate yang belum
+      // siap tidak boleh menjatuhkan checkout — tapi juga tidak boleh
+      // diam-diam dianggap siap.
+      status: !isMelostoreConfigured()
+        ? "warning"
+        : verificationMode === "off"
+          ? "warning"
+          : verificationGaps.length > 0
+            ? "warning"
+            : "pass",
+      detail: !isMelostoreConfigured()
+        ? "MELOSTORE_API_KEY / MELOSTORE_SECRET_KEY belum diisi — gate fail-open, order tidak diverifikasi."
+        : verificationMode === "off"
+          ? `Mode gate: off. ${verificationCovered} game siap diverifikasi. Aktifkan mode 'log' (shadow) dulu, lalu 'enforce' lewat /api/admin/account-verification.`
+          : verificationGaps.length > 0
+            ? `Mode ${verificationMode}, tapi ${verificationGaps.length} game checker belum ter-cover (fail-open): ${verificationGaps.slice(0, 10).join(", ")}.`
+            : `Mode ${verificationMode}; ${verificationCovered} game checker ter-cover Melostore.`,
     },
   ];
 
