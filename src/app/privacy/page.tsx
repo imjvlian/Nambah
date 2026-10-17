@@ -8,6 +8,16 @@ export const metadata: Metadata = {
     `Bagaimana ${BRAND.name} mengumpulkan, menggunakan, dan melindungi data pribadi kamu.`,
 };
 
+/*
+ * WAJIB force-dynamic - root layout memuat `<ChatWidget />` yang client, dan
+ * CSP production memakai nonce per-request (lihat `src/lib/csp.ts`). Tanpa
+ * baris ini HTML di-prerender tanpa nonce, browser menolak script, dan widget
+ * chat mati. Isi dokumen tetap terbaca, tapi halaman tidak berfungsi utuh -
+ * dan itu bukan kondisi yang layak dibiarkan di halaman yang disorot audit.
+ * Penjelasan lengkap di `src/app/admin/page.tsx`.
+ */
+export const dynamic = "force-dynamic";
+
 export default function PrivacyPage() {
   return (
     <LegalShell

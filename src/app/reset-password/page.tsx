@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/*
+ * WAJIB force-dynamic - `<ResetPasswordForm />` adalah client component, dan
+ * CSP production memakai nonce per-request (lihat `src/lib/csp.ts`). HTML yang
+ * di-prerender tidak punya nonce, jadi browser menolak semua script dan form
+ * tidak akan pernah berfungsi. Penjelasan lengkap di `src/app/admin/page.tsx`.
+ */
+export const dynamic = "force-dynamic";
+
 export default function ResetPasswordPage() {
   return (
     <main className="auth-page">

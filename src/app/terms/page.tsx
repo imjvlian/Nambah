@@ -8,6 +8,14 @@ export const metadata: Metadata = {
     `Syarat dan ketentuan penggunaan layanan top up digital ${BRAND.shortName}.`,
 };
 
+/*
+ * WAJIB force-dynamic - root layout memuat `<ChatWidget />` yang client, dan
+ * CSP production memakai nonce per-request (lihat `src/lib/csp.ts`). Tanpa
+ * baris ini HTML di-prerender tanpa nonce, browser menolak script, dan widget
+ * chat mati. Penjelasan lengkap di `src/app/admin/page.tsx`.
+ */
+export const dynamic = "force-dynamic";
+
 export default function TermsPage() {
   return (
     <LegalShell

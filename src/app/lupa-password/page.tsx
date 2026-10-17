@@ -11,6 +11,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/*
+ * WAJIB force-dynamic - `<ForgotPasswordForm />` dan `<AuthCaptchaProvider />`
+ * keduanya client. CSP production memakai nonce per-request (lihat
+ * `src/lib/csp.ts`); HTML yang di-prerender tidak punya nonce sehingga browser
+ * menolak semua script, dan form plus CAPTCHA tidak akan pernah berfungsi.
+ * Penjelasan lengkap di `src/app/admin/page.tsx`.
+ */
+export const dynamic = "force-dynamic";
+
 export default function ForgotPasswordPage() {
   return (
     <main className="auth-page">

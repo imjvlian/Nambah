@@ -100,6 +100,61 @@ export const viewport: Viewport = {
   themeColor: BRAND.themeColor,
 };
 
+/**
+ * SELURUH APLIKASI WAJIB DIRENDER DINAMIS. Baris ini bukan pilihan gaya -
+ * ini syarat agar Content-Security-Policy di `src/lib/csp.ts` berfungsi.
+ *
+ * MASALAHNYA
+ *
+ * CSP production memakai nonce BARU setiap request:
+ *
+ *   script-src 'self' 'nonce-<uuid>' 'strict-dynamic'
+ *
+ * Noncenya dibuat di `src/middleware.ts` lalu dikirim sebagai header `x-nonce`.
+ * Next.js hanya bisa menempelkan nonce itu ke tag <script> SAAT merender
+ * permintaan - tidak saat build.
+ *
+ * Halaman yang di-prerender (`○` di output build) selesai di titik itu:
+ * HTML-nya sudah dibakar saat `npm run build`, saat tidak ada request dan
+ * tidak ada nonce. Ketika permintaan datang, middleware tetap memasang CSP
+ * yang menuntut `nonce-<uuid>`, sementara tag <script> di HTML itu tidak punya
+ * nonce sama sekali. Browser menolak SEMUA script.
+ *
+ * Dan `'strict-dynamic'` menutup jalan keluar: di CSP3 perintah itu
+ * mengabaikan `'self'` beserta daftar host, jadi hanya nonce atau hash yang
+ * bisa memuat script.
+ *
+ * GEJALANYA
+ *
+ * Halaman tetap menampilkan teks hasil SSR, tapi tidak pernah interaktif.
+ * Untuk halaman admin itu berarti tersangkut di "Memuat ..." selamanya.
+ * Ditemukan di production pada Oktober 2026: seluruh JS di /admin tertandai
+ * `(blocked:csp)` di DevTools.
+ *
+ * KENAPA DI SINI, BUKAN DI SETIAP PAGE
+ *
+ * `dynamic` diwarisi ke semua segment turunan. Satu baris di root menutup
+ * semua halaman yang ada sekarang DAN setiap halaman yang akan ditambahkan
+ * nanti - termasuk halaman yang mungkin masih punya bug yang sama tanpa
+ * disadari.
+ *
+ * Halaman yang benar-benar butuh ini tetap declare `force-dynamic` eksplisit
+ * di page-nya sendiri (lihat `src/app/admin/page.tsx`) supaya niatnya terlihat
+ * saat dibaca, dan supaya menghapus baris di satu tempat tidak diam-diam
+ * mematikan kontrol ini.
+ *
+ * TIDAK berlaku untuk `robots.ts` dan `sitemap.ts` - keduanya route handler,
+ * bukan page, jadi tidak pernah memakai layout ini.
+ *
+ * CATATAN PERFORMA
+ *
+ * Dynamic bukan berarti lambat. `force-dynamic` mengatur caching HALAMAN,
+ * bukan caching DATA. `getPublicCatalog()` tetap bisa di-cache lewat
+ * `revalidate` atau `unstable_cache` - datanya di-cache, pertanyaannya tetap
+ * dirender per request supaya nonce-nya benar.
+ */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
