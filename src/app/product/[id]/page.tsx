@@ -5,7 +5,7 @@ import TopupExperience from "@/components/TopupExperience";
 import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
 import ProductRatingRail from "@/components/ProductRatingRail";
-import { getPublicCatalog } from "@/lib/catalog-repository";
+import { getCachedPublicCatalog } from "@/lib/catalog-cache";
 import type { Game } from "@/lib/catalog";
 import {
   resolveProductAsset,
@@ -56,7 +56,7 @@ export default async function ProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const catalog = await getPublicCatalog();
+  const catalog = await getCachedPublicCatalog();
   const productId = decodeURIComponent(id);
   const game = catalog.games.find((item) => item.id === productId);
 

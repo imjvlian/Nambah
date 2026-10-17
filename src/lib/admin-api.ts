@@ -1,9 +1,25 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { canAccessRoute } from "@/lib/admin-scope";
+import { canAccessRoute, routeScopeFor } from "@/lib/admin-scope";
+import { invalidatePublicCatalog } from "@/lib/cache-invalidation";
 
 export const ADMIN_SESSION_COOKIE = "nambah_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 2 * 60 * 60;
+
+/**
+ * Metode HTTP yang bisa mengubah data.
+ *
+ * Dipakai `authorizeAdminRequest` untuk memutuskan apakah request admin
+ * sebaiknya membuang cache etalase. `GET`/`HEAD`/`OPTIONS` sengaja tidak ada:
+ * dashboard admin mempolling endpoint baca secara berkala, dan membiarkan
+ * polling ikut membuang cache akan membuatnya tidak pernah bekerja.
+ */
+const MUTATING_METHODS: ReadonlySet<string> = new Set([
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+]);
 
 export type AdminPrincipal = {
   mode: "account" | "legacy";
@@ -219,7 +235,9 @@ export function authorizeAdminRequest(
    * membuka data secara tidak sengaja; paling buruk operator superadmin
    * yang menemukan endpoint barunya masih perlu satu entri peta.
    */
-  if (!canAccessRoute(principal.role, new URL(request.url).pathname)) {
+  const pathname = new URL(request.url).pathname;
+
+  if (!canAccessRoute(principal.role, pathname)) {
     return {
       ok: false as const,
       response: Response.json(
@@ -227,6 +245,44 @@ export function authorizeAdminRequest(
         { status: 403 },
       ),
     };
+  }
+
+  /*
+   * Penginvalidan cache etalase publik.
+   *
+   * `getCachedPublicCatalog()` di `src/lib/catalog-cache.ts` menyimpan katalog
+   * 60 detik supaya homepage dan halaman produk tidak query database tiap
+   * request. Setelah mutasi katalog, entri itu harus dibuang, kalau tidak admin
+   * akan melihat etalase masih menampilkan harga lama selama TTL.
+   *
+   * Dua syarat, keduanya wajib:
+   *
+   *   - SCOPE `katalog`. Kalau semua POST admin ikut membuang cache, maka
+   *     memproses refund atau mengirim ulang receipt akan ikut membuat
+   *     etalase publik ter-cold-start untuk alasan yang tidak ada hubungannya.
+   *   - METHOD yang bermutasi. Dashboard admin melakukan polling GET ke
+   *     `/api/admin/overview`, `/api/admin/orders`, dan friends secara
+   *     berkala. Tanpa syarat ini, admin yang cuma membuka dasbor akan
+   *     menghapus cache katalog terus-menerus - jadi cache itu praktis tidak
+   *     pernah bekerja selama ada admin yang-login.
+   *
+   * Pemanggilan terjadi SEBELUM handler mengubah data, dan itu disengaja.
+   * Setelah invalidate, entri kosong; penulisan berikutannya mengisi
+   * database; pembacaan publik berikutnya mengambil data baru dan meng-cache
+   * ulang. Aman karena tidak ada route admin yang membaca
+   * `getCachedPublicCatalog()` - semuanya membaca lewat `supabaseSelect*`
+   * langsung ke database, jadi tidak ada yang bisa mem-cache nilai basi di
+   * antara invalidate dan tulis.
+   *
+   * Route katalog yang baru otomatis ikut ter-cover begitu prefiksnya masuk
+   * `ROUTE_SCOPE` dengan scope `katalog` - tidak ada daftar kedua yang harus
+   * dijaga sinkron.
+   */
+  if (
+    routeScopeFor(pathname) === "katalog" &&
+    MUTATING_METHODS.has(request.method.toUpperCase())
+  ) {
+    invalidatePublicCatalog();
   }
 
   return { ok: true as const, principal };

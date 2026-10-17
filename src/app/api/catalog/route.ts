@@ -1,8 +1,8 @@
-import { getPublicCatalog } from "@/lib/catalog-repository";
+import { getCachedPublicCatalog } from "@/lib/catalog-cache";
 
 export async function GET() {
   try {
-    const catalog = await getPublicCatalog();
+    const catalog = await getCachedPublicCatalog();
 
     return Response.json({
       games: catalog.games,

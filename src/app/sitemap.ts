@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/brand";
-import { getPublicCatalog } from "@/lib/catalog-repository";
+import { getCachedPublicCatalog } from "@/lib/catalog-cache";
 
 const BASE_URL = siteUrl();
 
@@ -18,7 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let productRoutes: MetadataRoute.Sitemap = [];
   try {
-    const catalog = await getPublicCatalog();
+    const catalog = await getCachedPublicCatalog();
     productRoutes = catalog.games.map((game) => ({
       url: `${BASE_URL}/product/${encodeURIComponent(game.id)}`,
       lastModified: now,

@@ -32,6 +32,18 @@ export function resolve(specifier, context, nextResolve) {
     return nextResolve(pathToFileURL(withExtension(target)).href, context);
   }
 
+  // Subpath Next.js tanpa ekstensi, misalnya `next/cache`. Kode aplikasi boleh
+  // menuliskannya begitu karena bundler Next me-resolve-nya; resolver Node tidak,
+  // karena package `next` tidak punya peta `exports` untuk `./cache`. File-nya
+  // sendiri ada sebagai `next/cache.js`, jadi kita arahkan ke sana.
+  //
+  // Tanpa aturan ini, modul apa pun yang mengimpor `next/cache` akan gagal
+  // dimuat di test dengan ERR_MODULE_NOT_FOUND - termasuk file di `src/lib`
+  // yang diuji secara tidak langsung.
+  if (/^next(\/[a-z0-9-]+)+$/i.test(specifier)) {
+    return nextResolve(`${specifier}.js`, context);
+  }
+
   return nextResolve(specifier, context);
 }
 

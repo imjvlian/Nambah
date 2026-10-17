@@ -6,11 +6,11 @@ import PromoPopup from "@/components/PromoPopup";
 import SiteFooter from "@/components/SiteFooter";
 import SiteHeader from "@/components/SiteHeader";
 import BrandLogo from "@/components/BrandLogo";
-import { getPublicCatalog } from "@/lib/catalog-repository";
+import { getCachedPublicCatalog } from "@/lib/catalog-cache";
 import { resolveProductCover } from "@/lib/product-asset-resolver";
 
 export default async function Home() {
-  const catalog = await getPublicCatalog();
+  const catalog = await getCachedPublicCatalog();
   const artworkByGameId = Object.fromEntries(
     catalog.games.map((game) => [game.id, resolveProductCover(game)]),
   );

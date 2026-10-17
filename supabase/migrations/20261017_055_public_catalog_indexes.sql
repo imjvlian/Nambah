@@ -1,0 +1,50 @@
+-- Nambah — index untuk query katalog publik.
+--
+-- LATAR BELAKANG
+--
+-- `getPublicCatalog()` di `src/lib/catalog-repository.ts` menghitung urutan
+-- "Produk Populer" dengan satu query:
+--
+--   select product_id
+--     from orders
+--    where status in ('paid','processing','success')
+--    order by created_at desc
+--    limit 1000
+--
+-- Seribu baris diunduh ke runtime Node, lalu dipetakan menjadi peta frekuensi.
+-- Efek sampingnya: satu page view homepage berarti lima perjalanan ke
+-- PostgREST, dan yang termahal adalah yang ini.
+--
+-- Cache di `src/lib/catalog-cache.ts` sudah membuat query ini berjalan paling
+-- sering satu kali per 60 detik. Tapi `orders` adalah tabel yang hanya bertambah
+-- dan tidak pernah dikecilkan. Tanpa index, setiap cache miss akan memindai
+-- seluruh tabel lalu mengurutkannya - dan lama-lama itu akan terasa sebagai
+-- halaman lambat, bukan sebagai cache miss yang biasa.
+--
+-- INDEX YANG DIBUAT
+--
+-- Partial index dengan urutan DESC, supaya Postgres bisa membaca langsung dari
+-- ujung terbaru dan berhenti setelah 1000 baris. Tidak perlu sort, dan baris
+-- `pending_payment` tidak pernah disentuh sama sekali.
+--
+-- `pending_payment` sengaja tidak ada di predikat. Baris itu memang tidak
+-- pernah dihitung, jadi tidak ada gunanya menyimpan salinannya di index - dan
+-- kolom yang tidak ada di sini juga tidak menambah write amplification pada
+-- setiap order baru yang masuk.
+--
+-- SEBELUM MENERAPKAN
+--
+--   create index concurrently ...;
+--
+-- bisa lebih baik untuk tabel besar tanpa lock tulis, tapi tidak bisa jalan di
+-- dalam transaksi - dan migrasi ini jalan di dalam satu. Kalau `orders` sudah
+-- ratusan ribu baris, jalankan `create index concurrently` manual lebih dulu,
+-- lalu migrasi ini akan dilewati oleh `if not exists`.
+--
+-- MIGRASI INI AMAN DIJALANKAN ULANG
+--
+-- Sepenuhnya `if not exists`, tidak mengubah data, tidak mengubah constraint.
+
+create index if not exists orders_public_popularity_idx
+  on public.orders (created_at desc)
+  where status in ('paid', 'processing', 'success');
