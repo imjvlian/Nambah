@@ -128,12 +128,18 @@ export function decideAccountGate(
 export function decideMlbbPurchaseLimit(input: {
   supplierSku: string | null;
   weeklyPass: ReadonlyArray<{ packageCode: string; limitReached: boolean }>;
+  doubleDiamonds: ReadonlyArray<{
+    packageCode: string;
+    limitReached: boolean;
+  }>;
   doubleDiamondsEligible: boolean | null;
 }):
   | { ok: true; warn?: "sku-not-in-limit-response" }
   | { ok: false; reason: AccountVerificationLimitReason } {
-  const { supplierSku, weeklyPass, doubleDiamondsEligible } = input;
+  const { supplierSku, weeklyPass, doubleDiamonds, doubleDiamondsEligible } =
+    input;
 
+  // (1) Weekly pass: SKU kita ada di daftar dan limitnya tercapai.
   if (
     supplierSku &&
     weeklyPass.some(
@@ -143,11 +149,35 @@ export function decideMlbbPurchaseLimit(input: {
     return { ok: false, reason: "weekly-pass" };
   }
 
-  if (doubleDiamondsEligible === false) {
-    return { ok: false, reason: "double-diamonds" };
+  /*
+   * (2) Double diamonds — HANYA untuk SKU yang memang paket Double
+   * Diamonds. BUKAN blokir blanket.
+   *
+   * Bug 17 Okt 2026 (kasus nyata akun xeesoxee): versi pertama memblokir
+   * SEMUA order MLBB saat `eligible === false`. Akun yang mencoba beli WDP
+   * (weekly_pass semua false) ditolak hanya karena eligible false —
+   * padahal itu status NORMAL untuk akun yang sudah klaim bonus DD
+   * periode ini. Diamond biasa dan WDP tidak ada hubungannya dengan DD.
+   */
+  if (
+    supplierSku &&
+    doubleDiamonds.some((item) => item.packageCode === supplierSku)
+  ) {
+    const ddItem = doubleDiamonds.find(
+      (item) => item.packageCode === supplierSku,
+    );
+    if (doubleDiamondsEligible === false || ddItem?.limitReached === true) {
+      return { ok: false, reason: "double-diamonds" };
+    }
   }
 
-  if (supplierSku && !weeklyPass.some((item) => item.packageCode === supplierSku)) {
+  // (3) SKU tidak dikenal di salah satu daftar pun: allow + warn,
+  // bukan block — lubang fail-open yang wajib dipantau (readiness/log).
+  if (
+    supplierSku &&
+    !weeklyPass.some((item) => item.packageCode === supplierSku) &&
+    !doubleDiamonds.some((item) => item.packageCode === supplierSku)
+  ) {
     return { ok: true, warn: "sku-not-in-limit-response" };
   }
 

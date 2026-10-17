@@ -242,6 +242,7 @@ export type MelostorePurchaseLimitResult =
       outcome: "verified";
       username: string;
       weeklyPass: Array<{ packageCode: string; limitReached: boolean }>;
+      doubleDiamonds: Array<{ packageCode: string; limitReached: boolean }>;
       doubleDiamondsEligible: boolean | null;
     }
   | { outcome: "invalid" }
@@ -317,11 +318,34 @@ export async function checkMelostorePurchaseLimit(input: {
       typeof doubleDiamondsRaw?.eligible === "boolean"
         ? doubleDiamondsRaw.eligible
         : null;
+    /*
+     * Respons asli (kasus 17 Okt 2026, akun xeesoxee): double_diamonds
+     * juga punya items[] per-SKU, sama seperti weekly_pass —
+     * double-diamonds-50/150/250/500 dengan limit_reached masing-masing.
+     * Blokir DD harus per produk, jadi items-nya ikut diparse.
+     */
+    const ddItems = Array.isArray(doubleDiamondsRaw?.items)
+      ? doubleDiamondsRaw.items
+      : [];
+    const doubleDiamonds = ddItems.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const record = item as Record<string, unknown>;
+      if (typeof record.package_code !== "string" || !record.package_code) {
+        return [];
+      }
+      return [
+        {
+          packageCode: record.package_code,
+          limitReached: record.limit_reached === true,
+        },
+      ];
+    });
 
     return {
       outcome: "verified",
       username,
       weeklyPass,
+      doubleDiamonds,
       doubleDiamondsEligible,
     };
   }

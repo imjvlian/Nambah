@@ -204,6 +204,7 @@ export async function verifyOrderAccount(input: {
         const decision = decideMlbbPurchaseLimit({
           supplierSku: input.supplierSku ?? null,
           weeklyPass: result.weeklyPass,
+          doubleDiamonds: result.doubleDiamonds,
           doubleDiamondsEligible: result.doubleDiamondsEligible,
         });
 

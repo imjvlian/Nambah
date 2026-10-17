@@ -233,7 +233,13 @@ test("purchase-limit: 200 mem-parsing username, weekly_pass, double_diamonds", a
             { package_code: "MLBB_WDP_50" },
           ],
         },
-        double_diamonds: { eligible: true },
+        double_diamonds: {
+          eligible: false,
+          items: [
+            { package_code: "double-diamonds-50", limit_reached: true },
+            { package_code: "double-diamonds-150", limit_reached: true },
+          ],
+        },
       },
     });
   });
@@ -252,7 +258,11 @@ test("purchase-limit: 200 mem-parsing username, weekly_pass, double_diamonds", a
         // Item tanpa limit_reached jatuh ke nilai top-level (false).
         { packageCode: "MLBB_WDP_50", limitReached: false },
       ]);
-      assert.equal(result.doubleDiamondsEligible, true);
+      assert.equal(result.doubleDiamondsEligible, false);
+      assert.deepEqual(result.doubleDiamonds, [
+        { packageCode: "double-diamonds-50", limitReached: true },
+        { packageCode: "double-diamonds-150", limitReached: true },
+      ]);
     }
   } finally {
     restore();
@@ -278,6 +288,7 @@ test("purchase-limit: field double_diamonds absen -> null, bukan false", async (
     if (result.outcome === "verified") {
       assert.equal(result.doubleDiamondsEligible, null);
       assert.deepEqual(result.weeklyPass, []);
+      assert.deepEqual(result.doubleDiamonds, []);
     }
   } finally {
     restore();

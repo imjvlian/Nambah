@@ -103,11 +103,12 @@ test("mode enforce: limit_blocked MLBB punya pesan per alasan", () => {
 
 test("MLBB policy: weekly pass limit reached untuk SKU kita memblokir", () => {
   const result = decideMlbbPurchaseLimit({
-    supplierSku: "MLBB_WDP_100",
+    supplierSku: "weekly-pass",
     weeklyPass: [
-      { packageCode: "MLBB_WDP_50", limitReached: false },
-      { packageCode: "MLBB_WDP_100", limitReached: true },
+      { packageCode: "weekly-pass-new", limitReached: false },
+      { packageCode: "weekly-pass", limitReached: true },
     ],
+    doubleDiamonds: [],
     doubleDiamondsEligible: true,
   });
   assert.deepEqual(result, { ok: false, reason: "weekly-pass" });
@@ -115,8 +116,9 @@ test("MLBB policy: weekly pass limit reached untuk SKU kita memblokir", () => {
 
 test("MLBB policy: SKU lain yang limit-reached tidak memblokir SKU kita", () => {
   const result = decideMlbbPurchaseLimit({
-    supplierSku: "MLBB_WDP_100",
-    weeklyPass: [{ packageCode: "MLBB_WDP_50", limitReached: true }],
+    supplierSku: "weekly-pass",
+    weeklyPass: [{ packageCode: "weekly-pass-new", limitReached: true }],
+    doubleDiamonds: [],
     doubleDiamondsEligible: true,
   });
   // SKU kita memang tidak muncul di response, jadi warn-nya absah.
@@ -126,19 +128,75 @@ test("MLBB policy: SKU lain yang limit-reached tidak memblokir SKU kita", () => 
   });
 });
 
-test("MLBB policy: double_diamonds.eligible false memblokir", () => {
+test("REGRESI xeesoxee: eligible false TIDAK memblokir pembelian non-Double Diamonds", () => {
+  // Kasus nyata 17 Okt 2026: akun dengan eligible false + weekly_pass
+  // semua false mencoba beli WDP dan salah ditolak aturan blanket versi
+  // pertama. Eligible false = sudah klaim bonus periode ini — status
+  // normal yang tidak boleh menyentuh WDP maupun diamond biasa.
   const result = decideMlbbPurchaseLimit({
-    supplierSku: "MLBB_WDP_100",
-    weeklyPass: [{ packageCode: "MLBB_WDP_100", limitReached: false }],
+    supplierSku: "weekly-pass",
+    weeklyPass: [{ packageCode: "weekly-pass", limitReached: false }],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-50", limitReached: true },
+    ],
+    doubleDiamondsEligible: false,
+  });
+  assert.deepEqual(result, { ok: true });
+});
+
+test("MLBB policy: SKU Double Diamonds + eligible false memblokir", () => {
+  const result = decideMlbbPurchaseLimit({
+    supplierSku: "double-diamonds-50",
+    weeklyPass: [{ packageCode: "weekly-pass", limitReached: false }],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-50", limitReached: true },
+    ],
     doubleDiamondsEligible: false,
   });
   assert.deepEqual(result, { ok: false, reason: "double-diamonds" });
 });
 
+test("MLBB policy: SKU DD + eligible false walau limit_reached-nya false tetap memblokir", () => {
+  const result = decideMlbbPurchaseLimit({
+    supplierSku: "double-diamonds-150",
+    weeklyPass: [],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-150", limitReached: false },
+    ],
+    doubleDiamondsEligible: false,
+  });
+  assert.deepEqual(result, { ok: false, reason: "double-diamonds" });
+});
+
+test("MLBB policy: SKU DD + eligible true + limit_reached true memblokir", () => {
+  const result = decideMlbbPurchaseLimit({
+    supplierSku: "double-diamonds-250",
+    weeklyPass: [],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-250", limitReached: true },
+    ],
+    doubleDiamondsEligible: true,
+  });
+  assert.deepEqual(result, { ok: false, reason: "double-diamonds" });
+});
+
+test("MLBB policy: SKU DD + eligible true + limit_reached false lolos", () => {
+  const result = decideMlbbPurchaseLimit({
+    supplierSku: "double-diamonds-500",
+    weeklyPass: [],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-500", limitReached: false },
+    ],
+    doubleDiamondsEligible: true,
+  });
+  assert.deepEqual(result, { ok: true });
+});
+
 test("MLBB policy: field double_diamonds absennya (null) tidak memblokir", () => {
   const result = decideMlbbPurchaseLimit({
-    supplierSku: "MLBB_WDP_100",
-    weeklyPass: [{ packageCode: "MLBB_WDP_100", limitReached: false }],
+    supplierSku: "weekly-pass",
+    weeklyPass: [{ packageCode: "weekly-pass", limitReached: false }],
+    doubleDiamonds: [],
     doubleDiamondsEligible: null,
   });
   assert.deepEqual(result, { ok: true });
@@ -146,8 +204,11 @@ test("MLBB policy: field double_diamonds absennya (null) tidak memblokir", () =>
 
 test("MLBB policy: SKU tidak muncul di response -> allow + warn (fail-open terpantau)", () => {
   const result = decideMlbbPurchaseLimit({
-    supplierSku: "MLBB_TIDAK_ADA",
-    weeklyPass: [{ packageCode: "MLBB_WDP_100", limitReached: true }],
+    supplierSku: "SKU-BARU-BELUM-DIDAFTARKAN",
+    weeklyPass: [{ packageCode: "weekly-pass", limitReached: true }],
+    doubleDiamonds: [
+      { packageCode: "double-diamonds-50", limitReached: true },
+    ],
     doubleDiamondsEligible: true,
   });
   assert.deepEqual(result, {
@@ -161,6 +222,7 @@ test("MLBB policy: tanpa SKU (flow test) atau response kosong tidak meledak", ()
     decideMlbbPurchaseLimit({
       supplierSku: null,
       weeklyPass: [],
+      doubleDiamonds: [],
       doubleDiamondsEligible: true,
     }),
     { ok: true },
@@ -169,6 +231,7 @@ test("MLBB policy: tanpa SKU (flow test) atau response kosong tidak meledak", ()
   const warn = decideMlbbPurchaseLimit({
     supplierSku: "-",
     weeklyPass: [],
+    doubleDiamonds: [],
     doubleDiamondsEligible: null,
   });
   assert.deepEqual(warn, { ok: true, warn: "sku-not-in-limit-response" });
