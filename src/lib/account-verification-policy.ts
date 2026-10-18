@@ -63,16 +63,16 @@ export type GateDecision =
   | { allowed: false; status: 422 | 503; error: string };
 
 export const INVALID_ACCOUNT_MESSAGE =
-  "User ID game kamu tidak ditemukan. Periksa kembali User ID dan Zone/Server ID kamu, lalu coba lagi.";
+  "User ID game Anda tidak ditemukan. Periksa kembali User ID dan Zone/Server ID Anda, lalu coba lagi.";
 
 export const VERIFICATION_UNAVAILABLE_MESSAGE =
-  "Verifikasi akun game sedang tidak bisa dilakukan. Coba lagi beberapa saat, ya.";
+  "Verifikasi akun game sedang tidak dapat dilakukan. Silakan coba lagi beberapa saat.";
 
 export const WEEKLY_PASS_LIMIT_MESSAGE =
-  "Pembelian Weekly Pass untuk akun ini sudah mencapai batasnya. Coba lagi setelah batasnya di-reset oleh game.";
+  "Pembelian Weekly Diamond Pass untuk akun ini sudah mencapai batas periode berjalan. Silakan coba lagi setelah batas di-reset.";
 
 export const DOUBLE_DIAMONDS_INELIGIBLE_MESSAGE =
-  "Akun kamu belum eligible untuk bonus Double Diamonds event ini, jadi pembeliannya tidak bisa dilanjutkan.";
+  "Akun Anda sudah pernah mengambil bonus Double Diamonds, sehingga pembelian paket ini tidak dapat dilanjutkan.";
 
 export function decideAccountGate(
   result: AccountVerificationResult,

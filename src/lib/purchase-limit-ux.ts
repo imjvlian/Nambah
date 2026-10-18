@@ -86,17 +86,40 @@ export function summarizePurchaseLimit(
 }
 
 /**
- * Kandidat popup: hanya label paket MLBB yang menyerupai item limited.
+ * Keluarga label item sekali-per-akun tanpa verifikasi supplier:
+ * First Top Up (MLBB dan game Moonton lain) / First Recharge (Magic Chess
+ * Go Go) / varian Indonesianya. Istilah owner 18 Okt 2026: "Double Diamond
+ * = first top up kalau MLBB, first recharge kalau Magic Chess Go Go" —
+ * jenis item yang sama, mekanisme klaim sekali-per-akun yang sama.
  *
- * Heuristik ini HANYA pemicu panggilan lookup — kebenaran tetap di server,
- * yang mencocokkan productId dengan supplier_sku di tabel supplier_products
- * lalu mengeceknya lewat policy yang sama dengan gate checkout. Salah
- * detak paling parahnya satu request cache-only yang terbuang.
+ * Pola ini KETAT dan tidak menyertakan WDP/Double Diamonds: item yang
+ * statusnya bisa diverifikasi supplier ditangani jalur data
+ * (eligible/limit_blocked), bukan consent.
+ */
+const ONCE_PER_ACCOUNT_LABEL_PATTERN =
+  /(first\s*top\s*up|first\s*topup|first\s*recharge|first\s*purchase|top\s*up\s*pertama|topup\s*pertama|pengisian\s*pertama)/i;
+
+export function isOncePerAccountLabel(label: string): boolean {
+  return ONCE_PER_ACCOUNT_LABEL_PATTERN.test(String(label ?? ""));
+}
+
+/**
+ * Kandidat popup: pemicu lookup di frontend.
+ *
+ * (1) Item sekali-per-akun (First Top Up / First Recharge) di game apa
+ *     pun — tanpa data supplier, keputusannya jatuh ke consent pembeli.
+ * (2) WDP / Double Diamonds MLBB — punya data verifikasi supplier.
+ *
+ * Heuristik ini HANYA pemicu panggilan lookup — kebenaran tetap di
+ * server, yang mengklasifikasi ulang: eligible / limit_blocked /
+ * unknown / consent-required / bukan limited. Salah deteksi paling
+ * parahnya satu request cache-only yang terbuang.
  */
 export function isLimitedPackageCandidate(
   gameId: string,
   label: string,
 ): boolean {
+  if (isOncePerAccountLabel(label)) return true;
   if (gameId !== "mobile-legends") return false;
   return /(weekly|double\s*diamond|2x)/i.test(label);
 }

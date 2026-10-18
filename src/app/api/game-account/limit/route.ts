@@ -6,6 +6,7 @@ import {
 } from "@/lib/game-account";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
+import { isOncePerAccountLabel } from "@/lib/purchase-limit-ux";
 import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
@@ -13,19 +14,31 @@ export const runtime = "nodejs";
 const MLBB_GAME_ID = "mobile-legends";
 
 /**
- * Lookup eligibility item limited (0.9a) — CACHE-ONLY, aturan RPM.
+ * Lookup eligibility item limited — CACHE-ONLY, aturan RPM.
  *
- * Endpoint ini TIDAK PERNAH memanggil Melostore. Satu-satunya sumber data
- * adalah kolom purchase_limit di account_check_cache — diisi maksimal satu
- * kali per 24 jam per akun oleh cek akun UI atau gate checkout. Kalau
- * datanya belum ada, jawabannya "unknown" — bukan cek baru. Popup & banner
- * membaca gratis; jatah 40 cek gratis/hari Melostore tetap utuh.
+ * Endpoint ini TIDAK PERNAH memanggil Melostore. Klasifikasinya:
  *
- * Server-lah yang mencocokkan productId -> supplier_sku (supplier_products);
- * supplier_sku tidak pernah terekspos ke browser. Keputusan limit memakai
- * decideMlbbPurchaseLimit — policy yang sama persis dengan gate checkout,
- * jadi popup tidak pernah menjanjikan sesuatu yang gate tolak (atau
- * sebaliknya).
+ * - eligible         — data purchase-limit (cache) menyatakan akun masih
+ *                     bisa membeli. Popup tidak muncul.
+ * - limit_blocked    — data supplier menyatakan limit tercapai (WDP /
+ *                     Double Diamonds MLBB). Order PASTI ditolak gate,
+ *                     jadi popup tidak menawarkan tombol lanjutkan
+ *                     (keputusan owner: lanjutkan hanya untuk yang masih
+ *                     mungkin dibeli).
+ * - unknown          — item terverifikasi-supplier tapi data akun belum
+ *                     pernah diambil; UI mengarahkan cek User ID dulu.
+ * - consent-required — item sekali-per-akun TANPA sumber verifikasi
+ *                     supplier (First Top Up / First Recharge; untuk
+ *                     MLBB, item Double Diamonds yang belum terpetakan
+ *                     ke Melostore). Bisa jadi bisa dibeli — pembeli
+ *                     yang mengonfirmasi lewat popup consent.
+ * - limited: false  — bukan item limited.
+ *
+ * Server-lah yang mengklasifikasi lewat supplier_sku (item MLBB terpeta)
+ * dan label produk (keluarga sekali-per-akun); keduanya tidak pernah
+ * terekspos ke browser. Keputusan limit memakai decideMlbbPurchaseLimit —
+ * policy yang sama persis dengan gate checkout, jadi popup tidak pernah
+ * menjanjikan sesuatu yang gate tolak (atau sebaliknya).
  */
 export async function GET(request: Request) {
   const durableLimit = await rateLimitResponse(request, {
@@ -53,12 +66,6 @@ export async function GET(request: Request) {
       { error: "Parameter tidak lengkap." },
       { status: 400 },
     );
-  }
-
-  // Satu-satunya game dengan data purchase-limit saat ini. Game lain
-  // dijawab langsung tanpa menyentuh DB — bukan limited.
-  if (gameId !== MLBB_GAME_ID) {
-    return Response.json({ limited: false });
   }
 
   const [game] = await supabaseSelect<{
@@ -92,10 +99,20 @@ export async function GET(request: Request) {
     return Response.json({ error: account.error }, { status: 400 });
   }
 
-  /*
-   * Produk ini "limited" hanya kalau mapping Melostore-nya memang paket
-   * WDP / Double Diamonds. Pencocokan SKU ke supplier adanya di server.
-   */
+  const [product] = await supabaseSelect<{ label: string }>("products", {
+    select: "label",
+    // id + game_id sekaligus memastikan produk ini memang milik game itu.
+    filters: {
+      id: `eq.${productId}`,
+      game_id: `eq.${gameId}`,
+      active: "eq.true",
+    },
+    limit: 1,
+  });
+  if (!product) {
+    return Response.json({ limited: false });
+  }
+
   const [mapping] = await supabaseSelect<{ supplier_sku: string | null }>(
     "supplier_products",
     {
@@ -109,34 +126,66 @@ export async function GET(request: Request) {
     },
   );
   const supplierSku = mapping?.supplier_sku?.trim() ?? "";
-  if (!supplierSku || !/^(weekly-pass|double-diamonds)/.test(supplierSku)) {
-    return Response.json({ limited: false });
-  }
 
-  const cached = await readCachedAccountCheck(
-    gameId,
-    account.userId,
-    account.serverId,
-  );
-  const purchaseLimit = cached?.purchaseLimit ?? null;
-  if (!purchaseLimit) {
-    return Response.json({ limited: true, status: "unknown" });
-  }
+  /*
+   * (1) Item terverifikasi-supplier: WDP / Double Diamonds MLBB yang
+   * terpetakan ke Melostore. Data purchase-limit dibaca dari cache —
+   * gratis, tanpa memanggil Melostore (jatah 40 cek gratis/hari
+   * tetap utuh).
+   */
+  const supplierVerified =
+    gameId === MLBB_GAME_ID &&
+    Boolean(supplierSku) &&
+    /^(weekly-pass|double-diamonds)/.test(supplierSku);
 
-  const decision = decideMlbbPurchaseLimit({
-    supplierSku,
-    weeklyPass: purchaseLimit.weeklyPass,
-    doubleDiamonds: purchaseLimit.doubleDiamonds,
-    doubleDiamondsEligible: purchaseLimit.doubleDiamondsEligible,
-  });
+  if (supplierVerified) {
+    const cached = await readCachedAccountCheck(
+      gameId,
+      account.userId,
+      account.serverId,
+    );
+    const purchaseLimit = cached?.purchaseLimit ?? null;
+    if (!purchaseLimit) {
+      return Response.json({ limited: true, status: "unknown" });
+    }
 
-  if (!decision.ok) {
-    return Response.json({
-      limited: true,
-      status: "limit_blocked",
-      reason: decision.reason,
+    const decision = decideMlbbPurchaseLimit({
+      supplierSku,
+      weeklyPass: purchaseLimit.weeklyPass,
+      doubleDiamonds: purchaseLimit.doubleDiamonds,
+      doubleDiamondsEligible: purchaseLimit.doubleDiamondsEligible,
     });
+
+    if (!decision.ok) {
+      return Response.json({
+        limited: true,
+        status: "limit_blocked",
+        reason: decision.reason,
+      });
+    }
+
+    return Response.json({ limited: true, status: "eligible" });
   }
 
-  return Response.json({ limited: true, status: "eligible" });
+  /*
+   * (2) Item sekali-per-akun tanpa sumber verifikasi supplier.
+   *
+   * Melostore tidak menyediakan purchase-limit untuk game selain MLBB,
+   * dan bonus First Top Up MLBB hanya terverifikasi kalau produknya
+   * terpetakan ke SKU double-diamonds-* (di atas). Untuk sisanya —
+   * First Recharge Magic Chess, FTU yang baru terpetakan Digiflazz,
+   * DD MLBB yang belum terpetakan — tidak ada pihak yang bisa
+   * memastikan kecuali pembeli sendiri, jadi jawabannya consent.
+   * Order tetap dijaga: klaim ganda ditolak supplier -> gagal rapi ->
+   * refund.
+   */
+  const sekaliPerAkun =
+    isOncePerAccountLabel(product.label) ||
+    (gameId === MLBB_GAME_ID && /double\s*diamond/i.test(product.label));
+
+  if (sekaliPerAkun) {
+    return Response.json({ limited: true, status: "consent-required" });
+  }
+
+  return Response.json({ limited: false });
 }

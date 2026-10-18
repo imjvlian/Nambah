@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   isLimitedPackageCandidate,
+  isOncePerAccountLabel,
   parsePublicPurchaseLimit,
   summarizePurchaseLimit,
 } from "../src/lib/purchase-limit-ux.ts";
@@ -56,13 +57,21 @@ test("parsePublicPurchaseLimit: payload valid diparse, sampah ditolak null", () 
   assert.equal(parsePublicPurchaseLimit(null), null);
 });
 
-test("isLimitedPackageCandidate: hanya paket WDP/DD milik MLBB", () => {
+test("isLimitedPackageCandidate: pemicu = sekali-per-akun (semua game) + WDP/DD MLBB", () => {
   assert.equal(
     isLimitedPackageCandidate("mobile-legends", "Weekly Diamond Pass 2x"),
     true,
   );
   assert.equal(
     isLimitedPackageCandidate("mobile-legends", "Double Diamonds 150"),
+    true,
+  );
+  assert.equal(
+    isLimitedPackageCandidate("magic-chess", "First Recharge 300 Diamonds"),
+    true,
+  );
+  assert.equal(
+    isLimitedPackageCandidate("mobile-legends", "First Top Up 50+Bonus Diamonds"),
     true,
   );
   assert.equal(isLimitedPackageCandidate("mobile-legends", "86 Diamonds"), false);
@@ -119,4 +128,49 @@ test("popup item limited ada di TopupExperience", () => {
   assert.ok(ui.includes("/api/game-account/limit"));
   assert.ok(ui.includes("isLimitedPackageCandidate"));
   assert.ok(ui.includes("limit-popup-title"));
+});
+
+test("isOncePerAccountLabel: keluarga First Top Up / First Recharge", () => {
+  assert.equal(isOncePerAccountLabel("First Top Up 50+Bonus Diamonds"), true);
+  assert.equal(isOncePerAccountLabel("First Recharge 300 Diamonds"), true);
+  assert.equal(isOncePerAccountLabel("First Purchase Bonus"), true);
+  assert.equal(isOncePerAccountLabel("Top Up Pertama 100"), true);
+  assert.equal(isOncePerAccountLabel("86 Diamonds"), false);
+  assert.equal(isOncePerAccountLabel("Weekly Diamond Pass"), false);
+  // DD ditangani jalur data supplier (eligible/limit_blocked), bukan consent.
+  assert.equal(isOncePerAccountLabel("Double Diamonds 150"), false);
+});
+
+test("endpoint limit mengklasifikasi consent-required dari label produk", () => {
+  const route = readFileSync("src/app/api/game-account/limit/route.ts", "utf8");
+  assert.ok(route.includes("consent-required"));
+  assert.ok(route.includes("isOncePerAccountLabel"));
+  assert.ok(
+    !route.includes("checkMelostorePurchaseLimit"),
+    "endpoint wajib cache-only — popup tidak boleh membakar jatah cek (aturan RPM)",
+  );
+});
+
+test("popup penolakan tanpa tombol lanjutkan; consent meminta konfirmasi", () => {
+  const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
+  assert.ok(ui.includes("consent-required"));
+  assert.ok(ui.includes("Akun saya belum pernah top up — lanjutkan"));
+  assert.ok(ui.includes("Silakan pilih paket lain"));
+  assert.ok(
+    !ui.includes("Tetap lanjut"),
+    "order yang pasti ditolak tidak boleh ditawari tombol lanjutkan",
+  );
+});
+
+test("pesan gate verifikasi memakai register formal (Anda)", () => {
+  const policy = readFileSync(
+    "src/lib/account-verification-policy.ts",
+    "utf8",
+  );
+  assert.ok(policy.includes("User ID game Anda tidak ditemukan"));
+  assert.ok(policy.includes("Silakan coba lagi beberapa saat"));
+  assert.ok(
+    !policy.includes("User ID game kamu"),
+    "register lama (kamu) tidak boleh kembali di pesan gate",
+  );
 });
