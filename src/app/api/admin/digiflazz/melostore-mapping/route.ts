@@ -13,6 +13,7 @@ import {
   internalSkuWithSuffix,
 } from "@/lib/internal-sku";
 import { mergeMelostoreViaInternalSku } from "@/lib/suppliers/merge-internal-sku";
+import { gameCocokUntukProduk } from "@/lib/suppliers/saran-sku";
 
 export const runtime = "nodejs";
 
@@ -97,6 +98,78 @@ export async function GET(request: Request) {
   const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
   const gameFilter = (url.searchParams.get("game") ?? "").trim();
   const onlyUnmapped = url.searchParams.get("unmapped") === "1";
+
+  /*
+   * PENCARIAN SKU SERVER-SIDE (18 Okt 2026).
+   *
+   * Katalog Melostore 21.947 SKU tidak boleh dikirim utuh ke browser lagi
+   * (beberapa MB per buka seksi + memfilter 20 ribu baris di client
+   * membuat panel pemetaan menggantung). Dropdown memanggil endpoint ini
+   * dengan debounce; saran tanpa ketik datang dari rows[].candidates.
+   *
+   * Saringan game tetap dijalankan server lewat policy yang sama dengan
+   * UI lama (gameCocokUntukProduk) - pencarian manual bukan pintu masuk
+   * barang game salah.
+   */
+  const cariSku = (url.searchParams.get("cariSku") ?? "").trim();
+  if (cariSku) {
+    const cariGame = (url.searchParams.get("game") ?? "").trim();
+    // Istilah masuk filter ilike PostgREST: buang karakter struktural.
+    const istilah = cariSku.replace(/[(),*%\\]/g, " ").trim().slice(0, 80);
+    if (!istilah) return Response.json({ hasil: [] });
+
+    const rows = await supabaseSelect<{
+      supplier_sku: string;
+      product_name: string;
+      supplier_cost: number | string;
+      brand: string | null;
+    }>("supplier_catalog_items", {
+      select: "supplier_sku,product_name,supplier_cost,brand",
+      filters: {
+        supplier_id: "eq.melostore",
+        buyer_active: "eq.true",
+      },
+      query: {
+        or: `(supplier_sku.ilike.*${istilah}*,product_name.ilike.*${istilah}*)`,
+      },
+      order: "product_name.asc",
+      limit: 400,
+    });
+
+    let hasil = rows.map((row) => ({
+      sku: row.supplier_sku,
+      name: row.product_name,
+      cost: Number(row.supplier_cost),
+      brand: row.brand?.trim() || null,
+    }));
+
+    if (cariGame) {
+      const [game] = await supabaseSelect<{
+        id: string;
+        name: string;
+        short_name: string;
+      }>("games", {
+        select: "id,name,short_name",
+        filters: { id: `eq.${cariGame}`, active: "eq.true" },
+        limit: 1,
+      });
+      if (game) {
+        hasil = hasil.filter((item) =>
+          gameCocokUntukProduk(
+            {
+              gameId: game.id,
+              gameName: game.name,
+              gameShortName: game.short_name,
+              label: istilah,
+            },
+            item,
+          ),
+        );
+      }
+    }
+
+    return Response.json({ hasil: hasil.slice(0, 30) });
+  }
 
   /*
    * Melempar katalog lengkap (10.000 SKU) ke browser adalah kesalahan.
@@ -275,12 +348,17 @@ export async function GET(request: Request) {
       name: b.product_name,
       cost: Number(b.supplier_cost),
     })),
-    melostore: meloCatalog.map((s) => ({
-      sku: s.sku,
-      name: s.name,
-      cost: s.price,
-      brand: s.brand,
-    })),
+    /*
+     * Katalog Melostore TIDAK dikirim utuh lagi (21.947 SKU = beberapa MB
+     * per buka seksi). Pencarian berpindah ke endpoint cariSku di atas;
+     * saran per produk tetap tersedia lewat rows[].candidates.
+     */
+    melostore: [] as Array<{
+      sku: string;
+      name: string;
+      cost: number;
+      brand: string | null;
+    }>,
   };
 
   return Response.json({

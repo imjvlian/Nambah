@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatIDR, suggestPriceFromCost } from "@/lib/pricing";
 import { compareCatalogItems, extractNominalAmount } from "@/lib/nominal-sort";
 import AdminCatalogTools from "@/components/AdminCatalogTools";
@@ -619,11 +619,6 @@ import ReportRangePicker, {
 } from "@/components/admin/ReportRangePicker";
 import CollapsiblePanel from "@/components/admin/CollapsiblePanel";
 import DateTimePicker from "@/components/admin/DateTimePicker";
-import {
-  gabungkanKandidat,
-  gameCocokUntukProduk,
-  urutkanKandidatMelostore,
-} from "@/lib/suppliers/saran-sku";
 import { generateInternalSku } from "@/lib/internal-sku";
 
 export { NAV, NAV_GROUPS };
@@ -1267,6 +1262,30 @@ export default function AdminDashboard() {
   >({});
   const [melostoreCari, setMelostoreCari] = useState<Record<string, string>>({});
   const [melostoreTerbuka, setMelostoreTerbuka] = useState<Record<string, boolean>>({});
+  /*
+   * Hasil pencarian SKU Melostore dari server (debounce 350 ms) dan
+   * kandidat per produk dari rows[].candidates. Katalog 21.947 SKU tidak
+   * lagi dikirim utuh ke browser - yang dikirim hanya hasil pencarian
+   * (maks 30 item) dan saran per produk.
+   */
+  const [melostoreHasil, setMelostoreHasil] = useState<
+    Record<
+      string,
+      Array<{ sku: string; name: string; cost: number; brand: string | null }>
+    >
+  >({});
+  const [melostoreMencari, setMelostoreMencari] = useState<
+    Record<string, boolean>
+  >({});
+  const [melostoreKandidat, setMelostoreKandidat] = useState<
+    Record<string, Array<{ sku: string; name: string; cost: number }>>
+  >({});
+  const [supplierKandidatTermuat, setSupplierKandidatTermuat] =
+    useState(false);
+  const melostoreCariTimerRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
+  const melostoreCariSeqRef = useRef<Record<string, number>>({});
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [mappingFilter, setMappingFilter] = useState("all");
@@ -2338,7 +2357,7 @@ const txDataStamp = txRange.preset
      */
     if (
       (section === "catalog" || section === "supplier") &&
-      supplierCatalog.melostore.length === 0
+      !supplierKandidatTermuat
     ) {
       void muatKandidatSupplier().catch(() => {
         /* Gagal memuat kandidat bukan alasan menggagalkan seksi katalog -
@@ -3010,56 +3029,121 @@ const txDataStamp = txRange.preset
         throw new Error(data.error ?? "Kandidat supplier gagal dimuat.");
       }
       const data = (await response.json()) as {
-        rows: Array<{ productId: string; mappedSku: string | null; autoSku: string | null }>;
-        supplier: { configured: boolean; catalogSize: number; error: string | null };
+        rows: Array<{
+          productId: string;
+          mappedSku: string | null;
+          autoSku: string | null;
+          candidates: Array<{ sku: string; name: string; cost: number }>;
+        }>;
+        supplier: {
+          configured: boolean;
+          catalogSize: number;
+          error: string | null;
+        };
         options: {
           digiflazz: Array<{ sku: string; name: string; cost: number }>;
-          melostore: Array<{
+        };
+      };
+
+      /*
+       * Katalog Melostore TIDAK lagi dikirim utuh (21.947 SKU = beberapa
+       * MB per buka seksi). Pencarian berpindah ke server (cariSku);
+       * saran tanpa ketik memakai candidates per produk dari rows.
+       */
+      setSupplierCatalog({
+        digiflazz: data.options?.digiflazz ?? [],
+        melostore: [],
+        error: data.supplier.error ?? null,
+      });
+
+      /*
+       * Pick diisi dari mapping yang BENAR-BENAR TERSIMPAN saja.
+       * AutoSku adalah SARAN, bukan keadaan database.
+       */
+      const pick: Record<string, string> = {};
+      const tersimpan: Record<string, string | null> = {};
+      const kandidat: Record<
+        string,
+        Array<{ sku: string; name: string; cost: number }>
+      > = {};
+      for (const row of data.rows) {
+        tersimpan[row.productId] = row.mappedSku;
+        if (row.mappedSku) pick[row.productId] = row.mappedSku;
+        if (row.candidates?.length) kandidat[row.productId] = row.candidates;
+      }
+      setMelostorePick(pick);
+      setMelostoreTersimpan(tersimpan);
+      setMelostoreKandidat(kandidat);
+      setSupplierKandidatTermuat(true);
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Kandidat supplier gagal dimuat.",
+      );
+    }
+  }
+
+  /**
+   * Cari SKU Melostore di server dengan debounce 350 ms. Katalog 21.947
+   * SKU membuat pencarian sisi-client tidak layak; server juga menjaga
+   * saringan game (gameCocokUntukProduk) supaya pencarian manual tidak
+   * menjadi pintu masuk barang game salah.
+   */
+  function jadwalCariMelostore(
+    productId: string,
+    gameId: string,
+    teks: string,
+  ) {
+    const timers = melostoreCariTimerRef.current;
+    if (timers[productId]) clearTimeout(timers[productId]);
+
+    const istilah = teks.trim();
+    if (!istilah) {
+      setMelostoreHasil((current) => ({ ...current, [productId]: [] }));
+      setMelostoreMencari((current) => ({
+        ...current,
+        [productId]: false,
+      }));
+      return;
+    }
+
+    setMelostoreMencari((current) => ({ ...current, [productId]: true }));
+    const seq = (melostoreCariSeqRef.current[productId] ?? 0) + 1;
+    melostoreCariSeqRef.current[productId] = seq;
+
+    timers[productId] = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ cariSku: istilah, game: gameId });
+        const response = await fetch(
+          "/api/admin/digiflazz/melostore-mapping?" + params.toString(),
+        );
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          hasil?: Array<{
             sku: string;
             name: string;
             cost: number;
             brand: string | null;
           }>;
         };
-      };
-
-      /*
-       * Daftar SKU per supplier diisi dari `options` - katalog yang
-       * ter-cache di supplier_catalog_items. Tanpa ini, state supplierCatalog
-       * tetap kosong dan combobox tidak punya apa pun untuk dicari:
-       * itulah penyebab "SKU Melostore tidak ada di dropdown".
-       */
-      setSupplierCatalog({
-        digiflazz: data.options?.digiflazz ?? [],
-        melostore: data.options?.melostore ?? [],
-        error: data.supplier.error ?? null,
-      });
-
-      /*
-       * Pick diisi dari mapping yang BENAR-BENAR TERSIMPAN saja.
-       * AutoSku adalah SARAN untuk combobox, bukan keadaan database -
-       * memasukkannya ke pick berarti membuka halaman sudah mengubah
-       * mapping begitu operator menekan Simpan.
-       */
-      const pick: Record<string, string> = {};
-      const tersimpan: Record<string, string | null> = {};
-      for (const row of data.rows) {
-        tersimpan[row.productId] = row.mappedSku;
-        if (row.mappedSku) pick[row.productId] = row.mappedSku;
+        if (melostoreCariSeqRef.current[productId] !== seq) return;
+        setMelostoreHasil((current) => ({
+          ...current,
+          [productId]: data.hasil ?? [],
+        }));
+      } catch {
+        /* Pencarian opsional: gagal = operator tinggal mengetik ulang. */
+      } finally {
+        if (melostoreCariSeqRef.current[productId] === seq) {
+          setMelostoreMencari((current) => ({
+            ...current,
+            [productId]: false,
+          }));
+        }
       }
-      setMelostorePick(pick);
-      setMelostoreTersimpan(tersimpan);
-      /* Katalog supplier diisi dari options (sudah di-cache di DB) */
-      setSupplierCatalog({
-        digiflazz: data.options?.digiflazz ?? [],
-        melostore: data.options?.melostore ?? [],
-        error: data.supplier?.error ?? null,
-      });
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Kandidat supplier gagal dimuat.");
-    }
+    }, 350);
   }
-
   /**
    * Simpan satu baris katalog: produk (label/harga/status) DAN pemetaan
    * Melostore kalau pilihannya berubah.
@@ -4193,12 +4277,11 @@ const txDataStamp = txRange.preset
                          *    25 baris per halaman, sisanya di belakang
                          *    pagination.
                          *
-                         * 2. Dropdown Melostore 7.000-an <option> per baris
-                         *    = jutaan node DOM. Sekarang combobox pencarian:
-                         *    kandidat dihitung per produk yang DIBUKA
-                         *    lewat urutkanKandidatMelostore (Cocok + 
-                         *    Mendekati), dan mengetik mencari seluruh
-                         *    katalog dengan maksimal 30 hasil.
+                         * 2. Dropdown Melostore 21.947 SKU yang dikirim utuh
+                              ke browser = beberapa MB per buka seksi. Sekarang
+                              pencarian berjalan di server (cariSku, hasil maks 30)
+                              dengan saringan game di server; tanpa ketik, saran
+                              datang dari candidates per produk (rows).
                          *
                          * Kolom Digiflazz tampil saja - pengubahan
                          * mappingnya lewat halaman Katalog Digiflazz yang
@@ -4387,72 +4470,56 @@ const txDataStamp = txRange.preset
                                 autoFocus
                                 value={melostoreCari[product.id] ?? ""}
                                 placeholder="Cari SKU atau nama..."
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                  const teksBaru = event.target.value;
                                   setMelostoreCari((current) => ({
                                     ...current,
-                                    [product.id]: event.target.value,
-                                  }))
-                                }
+                                    [product.id]: teksBaru,
+                                  }));
+                                  jadwalCariMelostore(product.id, product.gameId, teksBaru);
+                                }}
                               />
                               <div className="admin-sku-combo-list">
                                 {(() => {
-                                  const teks = (melostoreCari[product.id] ?? "")
-                                    .trim()
-                                    .toLowerCase();
+                                  const teks = (melostoreCari[product.id] ?? "").trim();
 
                                   /*
-                                   * Identitas game produk ini baris - dipakai
-                                   * saran DAN hasil ketik, supaya SKU game lain
-                                   * tidak pernah ditawarkan lewat jalur mana pun.
+                                   * Pencarian dijalankan di SERVER (cariSku) sejak katalog
+                                   * melampaui 21.000 SKU - memfilter 20 ribu baris di browser
+                                   * membuat panel pemetaan menggantung. Tanpa ketik: kandidat
+                                   * label-sama per produk dari rows (server), bukan pindai
+                                   * katalog penuh.
                                    */
-                                  const identitasProduk = {
-                                    gameId: product.gameId,
-                                    gameName: product.gameName,
-                                    gameShortName: product.gameShortName,
-                                    label: draft.label,
-                                  };
+                                  const kandidat: Array<{
+                                    sku: string;
+                                    name: string;
+                                    cost: number;
+                                    region: string | null;
+                                  }> = teks
+                                    ? (melostoreHasil[product.id] ?? []).map((item) => ({
+                                      sku: item.sku,
+                                      name: item.name,
+                                      cost: item.cost,
+                                      region: null,
+                                    }))
+                                    : (melostoreKandidat[product.id] ?? []).map((item) => ({
+                                      sku: item.sku,
+                                      name: item.name,
+                                      cost: item.cost,
+                                      region: null,
+                                    }));
 
-                                  /*
-                                   * Tanpa ketik: saran per produk (Cocok +
-                                   * Mendekati) - nominal sama dan game sama
-                                   * (prefiks, atau brand untuk game tanpa
-                                   * prefiks). Dengan ketik: cari katalog
-                                   * penuh TETAPI tetap disaring game yang sama -
-                                   * pencarian manual bukan pintu masuk barang
-                                   * game salah.
-                                   */
-                                  const kandidat = teks
-                                    ? supplierCatalog.melostore
-                                        .filter((item) =>
-                                          gameCocokUntukProduk(identitasProduk, item),
-                                        )
-                                        .filter(
-                                          (item) =>
-                                            item.sku.toLowerCase().includes(teks) ||
-                                            item.name.toLowerCase().includes(teks),
-                                        )
-                                        .map((item) => ({
-                                          ...item,
-                                          exact: false,
-                                          sameGame: false,
-                                          sameNominal: false,
-                                          region: null,
-                                        }))
-                                        .slice(0, 30)
-                                    : gabungkanKandidat(
-                                        urutkanKandidatMelostore(
-                                          identitasProduk,
-                                          supplierCatalog.melostore.map(
-                                            (item) => ({
-                                              ...item,
-                                              exact: false,
-                                              sameGame: false,
-                                              sameNominal: false,
-                                              region: null,
-                                            }),
-                                          ),
-                                        ),
-                                      );
+                                  if (
+                                    teks &&
+                                    melostoreMencari[product.id] &&
+                                    kandidat.length === 0
+                                  ) {
+                                    return (
+                                      <small className="admin-sku-combo-kosong">
+                                        Mencari SKU...
+                                      </small>
+                                    );
+                                  }
 
                                   if (kandidat.length === 0) {
                                     return (
@@ -4468,10 +4535,7 @@ const txDataStamp = txRange.preset
                                     <button
                                       key={item.sku}
                                       type="button"
-                                      className={
-                                        "admin-sku-combo-item" +
-                                        (item.exact ? " exact" : "")
-                                      }
+                                      className="admin-sku-combo-item"
                                       onClick={() => {
                                         updateDraft(product.id, {});
                                         setMelostorePick((current) => ({
@@ -4491,7 +4555,6 @@ const txDataStamp = txRange.preset
                                     >
                                       <span className="admin-sku-combo-sku">
                                         {item.sku}
-                                        {item.region ? ` (${item.region})` : ""}
                                       </span>
                                       <span className="admin-sku-combo-nama">
                                         {item.name} - {formatIDR(item.cost)}

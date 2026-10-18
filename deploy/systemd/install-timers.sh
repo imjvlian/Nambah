@@ -35,6 +35,7 @@ points-expiry|*-*-* 00:30:00 UTC|30 0 * * *|Expiry poin
 telegram-dispatch|*-*-* *:*:0/1:00 UTC|* * * * *|Drain antrean notifikasi Telegram
 daily-digest|*-*-* 01:00:00 UTC|1 0 * * *|Digest harian (08:00 WIB)
 supplier-price-sync|*-*-* *:23:00:00 UTC|23 * * * *|Sinkron harga supplier (guard >±10% + notifikasi Telegram)
+melostore-maintenance|*-*-* *:41:00:00 UTC|41 * * * *|Maintenance Melostore (scan katalog saat basi + saldo)
 EOF
 
 RUN_SCRIPT="${APP_DIR}/deploy/systemd/nambah-cron-run.sh"

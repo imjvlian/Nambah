@@ -39,8 +39,25 @@ const PAGE_SIZE = 500;
  * dan memicu 429 di tengah jalan - dan setelah 429 terjadi, data yang
  * sudah terkumpul jadi tidak bisa disimpan, karena tidak ada tempat untuk
  * mengisinya sementara.
+ *
+ * Katalog nyata Melostore 21.947 SKU = 44 halaman (18 Okt 2026). Cap lama
+ * (20 halaman = 10.000 SKU) memotong lebih dari separuh katalog secara
+ * diam-diam - dan scan-nya tercatat "success". 60 halaman = 30.000 SKU,
+ * memberi ruang tumbuh.
  */
-const MAX_PAGES = 20;
+const MAX_PAGES = 60;
+
+/**
+ * Jeda antar halaman katalog. 44 halaman tanpa jeda = 44 request beruntun,
+ * dan jatah katalog 20 request/menit habis di halaman ke-21. Jeda 4 detik
+ * = +-15 request/menit, scan penuh +-3 menit; requestWithRetry menyambut
+ * 429 yang lolos dengan backoff.
+ */
+const PAGE_DELAY_MS = 4_000;
+
+async function tundaAntarHalaman() {
+  await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY_MS));
+}
 
 const SUPPLIER_ID = "melostore";
 
@@ -542,6 +559,13 @@ export type MelostoreScanOutcome = {
   forms: Record<string, MelostoreInquiryForm>;
   pagesTotal: number;
   pagesFailed: number;
+  /**
+   * True kalau scan berhenti karena cap MAX_PAGES padahal katalog masih
+   * punya halaman berikutnya. Ini PARSIAL yang selama ini tampak seperti
+   * sukses - pemanggil wajib memperlakukannya seperti pagesFailed > 0:
+   * jangan menonaktifkan baris yang tidak pernah terbaca.
+   */
+  truncated: boolean;
   /** Pesan per halaman yang gagal, untuk dicatat ke jejak scan. */
   errors: string[];
 };
@@ -642,6 +666,7 @@ export class MelostoreSupplierClient implements SupplierClient {
     let cursor: string | null = null;
     let pages = 0;
     let pagesFailed = 0;
+    let truncated = false;
     const errors: string[] = [];
 
     while (pages < MAX_PAGES) {
@@ -653,7 +678,7 @@ export class MelostoreSupplierClient implements SupplierClient {
       let nextCursor: string | null = null;
       let hasMore = false;
       try {
-        const body = await requestOnce<
+        const body = await requestWithRetry<
           MelostoreEnvelope<MelostazzPriceItem[]> & {
             meta?: {
               pagination?: { next_cursor?: string | null; has_more?: boolean };
@@ -732,6 +757,21 @@ export class MelostoreSupplierClient implements SupplierClient {
       pages += 1;
 
       if (!hasMore || !nextCursor || nextCursor === cursor) break;
+      if (pages >= MAX_PAGES) {
+        /*
+         * Cap tercapai padahal masih ada halaman berikutnya: scan ini
+         * PARSIAL, bukan sukses. Tanpa penanda ini, lebih dari separuh
+         * katalog menghilang diam-diam (kasus nyata 18 Okt 2026:
+         * 21.947 SKU vs cap lama 10.000) dan baris yang tidak pernah
+         * terbaca ikut dinonaktifkan.
+         */
+        truncated = true;
+        errors.push(
+          `Scan terpotong di batas ${MAX_PAGES} halaman padahal katalog masih memiliki halaman berikutnya - perbesar MAX_PAGES.`,
+        );
+        break;
+      }
+      await tundaAntarHalaman();
       cursor = nextCursor;
     }
 
@@ -751,6 +791,7 @@ export class MelostoreSupplierClient implements SupplierClient {
       forms,
       pagesTotal: pages,
       pagesFailed,
+      truncated,
       errors,
     };
   }
@@ -865,6 +906,8 @@ export class MelostoreSupplierClient implements SupplierClient {
       pages += 1;
 
       if (!pagination?.has_more || !next || next === cursor) break;
+      if (pages >= MAX_PAGES) break;
+      await tundaAntarHalaman();
       cursor = next;
     }
 

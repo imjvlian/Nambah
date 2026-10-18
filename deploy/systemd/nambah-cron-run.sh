@@ -15,7 +15,8 @@ if [[ -z "$JOB" ]]; then
   echo "Pakai: $0 <nama-job> [key=value ...]" >&2
   echo "Job yang tersedia:" >&2
   echo "  reconcile, operations-health, supplier-balance," >&2
-  echo "  financial-reconcile, points-expiry, telegram-dispatch, daily-digest" >&2
+  echo "  financial-reconcile, points-expiry, telegram-dispatch, daily-digest," >&2
+  echo "  supplier-price-sync, melostore-maintenance" >&2
   echo "  (digiflazz-balance masih tersedia sebagai endpoint lama)" >&2
   exit 64
 fi

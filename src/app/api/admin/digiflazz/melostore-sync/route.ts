@@ -2,6 +2,7 @@ import { authorizeAdminRequest } from "@/lib/admin-api";
 import { authorizeCronRequest } from "@/lib/cron-api";
 import { MelostoreSupplierClient } from "@/lib/suppliers/melostore-client";
 import { mergeMelostoreViaInternalSku } from "@/lib/suppliers/merge-internal-sku";
+import { bacaHargaMelostoreDariCache } from "@/lib/supplier-price-sync";
 import {
   bukaScanRun,
   riwayatScan,
@@ -182,7 +183,7 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "balance") return syncBalance(client);
-  if (body.action === "catalog") return syncCatalogCosts(client);
+  if (body.action === "catalog") return syncCatalogCosts();
   if (body.action === "cache-catalog")
     return cacheMelostoreCatalog(client, auth.principal.userId);
 
@@ -248,7 +249,7 @@ async function syncBalance(client: MelostoreSupplierClient) {
   });
 }
 
-async function syncCatalogCosts(client: MelostoreSupplierClient) {
+async function syncCatalogCosts() {
   /*
    * supabaseSelectAll: mapping bisa melewati 1.000 baris, dan PostgREST
    * memotong `supabaseSelect` di sana apa pun limit-nya. Yang terpotong
@@ -274,21 +275,22 @@ async function syncCatalogCosts(client: MelostoreSupplierClient) {
     );
   }
 
-  let quotes;
-  try {
-    quotes = await client.fetchQuotes();
-  } catch (error) {
+  /*
+   * Harga dibaca dari CACHE katalog, bukan tarikan live: katalog nyata
+   * 21.947 SKU = 44 halaman berpacing +-3 menit, dan tombol admin harus
+   * cepat. Cache dijaga segar oleh scan maintenance terjadwal.
+   */
+  const { prices: priceBySku, cacheEmpty } = await bacaHargaMelostoreDariCache();
+  if (cacheEmpty) {
     return Response.json(
       {
         error:
-          "Gagal menarik katalog: " +
-          (error instanceof Error ? error.message : "tidak diketahui"),
+          "Cache katalog Melostore kosong. Jalankan \"Cache katalog\" di panel sinkronisasi dulu.",
       },
-      { status: 502 },
+      { status: 409 },
     );
   }
 
-  const priceBySku = new Map(quotes.map((q) => [q.sku, q.cost] as const));
   const now = new Date().toISOString();
 
   let updated = 0;
@@ -535,7 +537,7 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
     let mappingDipatikan = 0;
     let mappingDiaktifkan = 0;
     const statusScan: "success" | "partial" =
-      hasil.pagesFailed > 0 ? "partial" : "success";
+      hasil.pagesFailed > 0 || hasil.truncated ? "partial" : "success";
 
     if (statusScan === "success") {
       const skuTersimpan = new Set(hasil.items.map((item) => item.sku));
@@ -674,6 +676,7 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
         status: statusScan,
         pages: hasil.pagesTotal,
         pagesFailed: hasil.pagesFailed,
+        truncated: hasil.truncated,
       },
       cached: baris.length,
       baru,
@@ -686,7 +689,9 @@ async function cacheMelostoreCatalog(client: MelostoreSupplierClient, triggeredB
       autoMerge,
       message:
         (statusScan === "partial"
-          ? `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
+          ? hasil.truncated && hasil.pagesFailed === 0
+            ? "Scan PARSIAL (terpotong di batas halaman - katalog lebih besar dari cap): "
+            : `Scan PARSIAL (${hasil.pagesFailed} halaman gagal): `
           : "") +
         `${baris.length} SKU, ${baru} baru, ${berubah} diperbarui` +
         (statusScan === "success" ? `, ${ditandai} ditandai nonaktif.` : ".") +

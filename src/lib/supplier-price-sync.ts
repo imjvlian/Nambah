@@ -2,10 +2,8 @@ import {
   getDigiflazzPrepaidPriceList,
   isDigiflazzConfigured,
 } from "@/lib/digiflazz/client";
-import {
-  MelostoreSupplierClient,
-  isMelostoreConfigured,
-} from "@/lib/suppliers/melostore-client";
+import { isMelostoreConfigured } from "@/lib/suppliers/melostore-client";
+import { riwayatScan } from "@/lib/suppliers/scan-runs";
 import { classifyCostUpdate } from "@/lib/cost-update-guard";
 import {
   enqueueTelegramMessage,
@@ -45,6 +43,8 @@ export type SupplierCostSyncEntry = {
   held: number;
   missingFromCatalog: number;
   heldSamples: Array<{ sku: string; from: number; to: number }>;
+  /** SKU terpetakan yang status-nya nonaktif di katalog supplier. */
+  inactiveInSupplier: number;
   skippedReason: string | null;
   error: string | null;
 };
@@ -69,6 +69,7 @@ function emptyEntry(supplierId: "digiflazz" | "melostore"): SupplierCostSyncEntr
     held: 0,
     missingFromCatalog: 0,
     heldSamples: [],
+    inactiveInSupplier: 0,
     skippedReason: null,
     error: null,
   };
@@ -166,18 +167,63 @@ async function digiflazzPrices(): Promise<Map<string, number>> {
   return prices;
 }
 
-async function melostorePrices(
-  client: MelostoreSupplierClient,
-): Promise<Map<string, number>> {
-  const quotes = await client.fetchQuotes();
+/**
+ * Harga Melostore dari CACHE katalog, terfilter ke SKU yang dipetakan
+ * ("katalog yang aktif dijual") - bukan katalog live.
+ *
+ * Katalog nyata 21.947 SKU: tarikan live = 44 halaman berpacing +-3 menit.
+ * Cache dijaga segar oleh scan maintenance terjadwal, jadi pemakaian API
+ * katalog turun dari 44 halaman/jam menjadi +-44 halaman/HARI. Perlindungan
+ * harga sesungguhnya tidak berubah: harga beku di checkout, max_price saat
+ * dispatch, dan klasifikasi terminal harga-naik + refund tetap memakai
+ * harga live per order.
+ */
+export async function bacaHargaMelostoreDariCache(): Promise<{
+  prices: Map<string, number>;
+  inactive: number;
+  cacheEmpty: boolean;
+}> {
+  const mappings = await supabaseSelectAll<{
+    supplier_sku: string | null;
+  }>("supplier_products", {
+    select: "supplier_sku",
+    filters: { supplier_id: "eq.melostore" },
+  });
+
+  const skus = [
+    ...new Set(
+      mappings
+        .map((row) => row.supplier_sku?.trim())
+        .filter((sku): sku is string => Boolean(sku)),
+    ),
+  ];
+
   const prices = new Map<string, number>();
-  for (const quote of quotes) {
-    const cost = Number(quote.cost);
-    if (quote.sku && Number.isFinite(cost) && cost >= 0) {
-      prices.set(quote.sku, Math.round(cost));
+  if (skus.length === 0) {
+    return { prices, inactive: 0, cacheEmpty: false };
+  }
+
+  let inactive = 0;
+  for (let i = 0; i < skus.length; i += 200) {
+    const batch = skus.slice(i, i + 200);
+    const rows = await supabaseSelectAll<{
+      supplier_sku: string;
+      supplier_cost: number | string;
+      buyer_active: boolean;
+    }>("supplier_catalog_items", {
+      select: "supplier_sku,supplier_cost,buyer_active",
+      filters: {
+        supplier_id: "eq.melostore",
+        supplier_sku: `in.(${batch.map((s) => `"${s}"`).join(",")})`,
+      },
+    });
+    for (const row of rows) {
+      prices.set(row.supplier_sku, Math.round(Number(row.supplier_cost)));
+      if (!row.buyer_active) inactive += 1;
     }
   }
-  return prices;
+
+  return { prices, inactive, cacheEmpty: prices.size === 0 };
 }
 
 async function maybeNotifyPriceSync(
@@ -207,6 +253,9 @@ async function maybeNotifyPriceSync(
       `${entry.unchanged} tetap`,
     ];
     if (entry.held > 0) parts.push(`${entry.held} DITAHAN guard >±10%`);
+    if (entry.inactiveInSupplier > 0) {
+      parts.push(`${entry.inactiveInSupplier} SKU nonaktif di supplier`);
+    }
     if (entry.missingFromCatalog > 0) {
       parts.push(`${entry.missingFromCatalog} tidak ada di katalog`);
     }
@@ -266,10 +315,27 @@ export async function syncSupplierPrices(): Promise<SupplierPriceSyncReport> {
     if (!isMelostoreConfigured()) {
       melostoreEntry.skippedReason = "kredensial Melostore belum diisi";
     } else {
-      melostoreEntry = await syncCostsForSupplier(
-        "melostore",
-        await melostorePrices(new MelostoreSupplierClient()),
-      );
+      const { prices, inactive, cacheEmpty } =
+        await bacaHargaMelostoreDariCache();
+
+      melostoreEntry = await syncCostsForSupplier("melostore", prices);
+      melostoreEntry.inactiveInSupplier = inactive;
+
+      if (cacheEmpty) {
+        melostoreEntry.error =
+          "Cache katalog Melostore kosong - jalankan scan katalog sekali di panel Katalog Melostore; setelah itu timer melostore-maintenance menjaganya segar.";
+      } else {
+        const runs = await riwayatScan("melostore", 5);
+        const lastSuccess =
+          runs.find((run) => run.status === "success")?.finished_at ?? null;
+        const usiaMs = lastSuccess
+          ? Date.now() - Date.parse(lastSuccess)
+          : Number.POSITIVE_INFINITY;
+        if (!Number.isFinite(usiaMs) || usiaMs > 48 * 3_600_000) {
+          melostoreEntry.error =
+            `Cache katalog basi (scan sukses terakhir: ${lastSuccess ?? "tidak pernah"}) - cek timer melostore-maintenance.`;
+        }
+      }
     }
   } catch (error) {
     melostoreEntry.error =
