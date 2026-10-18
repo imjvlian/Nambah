@@ -28,16 +28,21 @@ export const runtime = "nodejs";
  * menjanjikan sesuatu yang gate tolak.
  *
  * Status respons:
- * - eligible           : masih bisa dibeli. Popup tidak muncul.
+ * - eligible           : bonus tersedia (FTU/sku DD) — tidak ada popup.
  * - limit_blocked      : terverifikasi supplier — order pasti ditolak.
+ * - slot-confirm       : WDP slot masih tersedia, tapi angka X/10 hanya
+ *                        terlihat in-game dan slot dibagi semua varian
+ *                        (1x/2x/3x) — pembeli memastikan sendiri.
  * - previously-purchased: riwayat Nambah menunjukkan item sekali-selamanya
  *                        ini sudah dibeli — pasti gagal.
  * - recently-purchased : riwayat dalam periode (7/31 hari) — mungkin
  *                        sudah reset, keputusan di tangan pembeli.
+ * - period-confirm     : periodik tanpa riwayat Nambah — tetap
+ *                        dikonfirmasi, karena pembelian di TOKO LAIN
+ *                        tidak terlihat dari riwayat kita.
  * - consent-required   : sekali-per-akun tanpa data — pembeli memastikan.
  * - unknown            : data akun belum ada di cache; cek User ID dulu.
- * - limited: false     : bukan item limited (termasuk periodik tanpa
- *                        riwayat — pembelian berulang adalah kasus normal).
+ * - limited: false     : bukan item limited.
  */
 export async function GET(request: Request) {
   const durableLimit = await rateLimitResponse(request, {
@@ -170,6 +175,17 @@ export async function GET(request: Request) {
       });
     }
 
+    /*
+     * WDP (varian 1x/2x/3x): slot 10 DIBAGI semua varian, dan data
+     * supplier hanya boolean "masih bisa / tidak bisa" — angka X/10
+     * hanya terlihat in-game. Pembeli diminta memastikan slotnya
+     * sendiri lewat popup konfirmasi (keputusan owner 20 Okt: popup
+     * selalu muncul untuk item limited).
+     */
+    if (cls.kind === "supplier-weekly-pass") {
+      return Response.json({ limited: true, status: "slot-confirm" });
+    }
+
     return Response.json({ limited: true, status: "eligible" });
   }
 
@@ -224,7 +240,17 @@ export async function GET(request: Request) {
     });
   }
 
-  return Response.json({ limited: false });
+  /*
+   * Tanpa riwayat Nambah pun, item ini tetap satu-per-periode per akun —
+   * dan pembelian di TOKO LAIN tidak terlihat dari riwayat kita. Popup
+   * konfirmasi selalu muncul; pembeli memastikan sendiri status
+   * periode berjalannya (keputusan owner 20 Okt).
+   */
+  return Response.json({
+    limited: true,
+    status: "period-confirm",
+    windowDays: cls.windowDays,
+  });
 }
 
 /**

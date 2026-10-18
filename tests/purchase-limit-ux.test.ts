@@ -220,6 +220,8 @@ test("popupButtonsFor: single-button hanya untuk yang pasti gagal", () => {
   assert.equal(popupButtonsFor("unknown"), "single-primary");
   assert.equal(popupButtonsFor("recently-purchased"), "safe-continue");
   assert.equal(popupButtonsFor("consent-required"), "cancel-continue");
+  assert.equal(popupButtonsFor("period-confirm"), "cancel-continue");
+  assert.equal(popupButtonsFor("slot-confirm"), "cancel-continue");
 });
 
 test("formatRelativeDays: tanggal nyata untuk penilaian reset periode", () => {
@@ -300,6 +302,8 @@ test("endpoint limit: alias + riwayat, cache-only tanpa Melostore", () => {
   assert.ok(route.includes("consent-required"));
   assert.ok(route.includes("recently-purchased"));
   assert.ok(route.includes("previously-purchased"));
+  assert.ok(route.includes("period-confirm"));
+  assert.ok(route.includes("slot-confirm"));
   // Riwayat: status success saja — pembelian gagal/refund tidak memblokir.
   assert.ok(route.includes('status: "eq.success"'));
   assert.ok(
@@ -317,6 +321,8 @@ test("popup: tombol lanjutkan hanya untuk yang masih mungkin dibeli", () => {
   assert.ok(ui.includes("Tetap lanjutkan"));
   assert.ok(ui.includes("Pilih paket lain"));
   assert.ok(ui.includes("Akun saya belum pernah top up — lanjutkan"));
+  assert.ok(ui.includes("Belum beli periode ini — lanjutkan"));
+  assert.ok(ui.includes("Slot saya tersedia — lanjutkan"));
   assert.ok(ui.includes("Cek dulu di game"));
   assert.ok(ui.includes("checkout-confirm-note"));
   assert.ok(ui.includes("popupButtonsFor"));

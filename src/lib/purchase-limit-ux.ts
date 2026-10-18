@@ -235,14 +235,20 @@ export type LimitPopupStatus =
   | "limit_blocked"
   | "previously-purchased"
   | "recently-purchased"
+  | "period-confirm"
+  | "slot-confirm"
   | "consent-required"
   | "unknown";
 
 /**
- * Set tombol per status (keputusan owner 19 Okt 2026):
+ * Set tombol per status (keputusan owner 19-20 Okt 2026):
  * - "single-primary" : order PASTI gagal (terverifikasi supplier atau
  *                      riwayat sekali-selamanya) — tanpa tombol lanjutkan.
- * - "cancel-continue": consent — lanjutkan adalah jawaban pembeli.
+ * - "cancel-continue": konfirmasi pembeli — consent (FTU), period-confirm
+ *                      (pack mingguan/bulanan — pembelian di toko lain
+ *                      tidak terlihat dari riwayat kita), slot-confirm
+ *                      (WDP — slot 10 dibagi semua varian 1x/2x/3x dan
+ *                      angka X/10 hanya terlihat in-game).
  * - "safe-continue"  : riwayat menunjukkan baru beli, tapi hari reset
  *                      periode tidak bisa dipastikan — lanjutkan tetap
  *                      tersedia sebagai tombol sekunder.
@@ -255,6 +261,8 @@ export type PopupButtonSet =
 export function popupButtonsFor(status: LimitPopupStatus): PopupButtonSet {
   switch (status) {
     case "consent-required":
+    case "period-confirm":
+    case "slot-confirm":
       return "cancel-continue";
     case "recently-purchased":
       return "safe-continue";

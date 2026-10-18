@@ -75,7 +75,7 @@ type UsernameCheckState = {
 };
 
 /**
- * Popup item limited — lima situasi, ditentukan server:
+ * Popup item limited — tujuh situasi, ditentukan server:
  *
  * - limit_blocked       : data supplier menyatakan limit tercapai (slot
  *                         WDP penuh, atau bonus DD sudah diambil). Order
@@ -86,6 +86,12 @@ type UsernameCheckState = {
  * - recently-purchased  : riwayat dalam periode (mingguan/bulanan); hari
  *                         reset game tidak bisa dipastikan, jadi
  *                         "Tetap lanjutkan" tetap tersedia.
+ * - period-confirm      : periodik tanpa riwayat Nambah — tetap
+ *                         dikonfirmasi, karena pembelian di toko lain
+ *                         tidak terlihat dari riwayat kita.
+ * - slot-confirm        : WDP slot tersedia, tapi angka X/10 hanya
+ *                         terlihat in-game dan slot dibagi semua varian
+ *                         (1x/2x/3x) — pembeli memastikan sendiri.
  * - consent-required    : sekali-per-akun tanpa data — pembeli yang
  *                         mengonfirmasi, sekali per paket per sesi.
  * - unknown             : data akun belum ada di cache; isi & cek
@@ -98,6 +104,8 @@ type LimitPopupState = {
   reason?: "weekly-pass" | "double-diamonds";
   scope?: "any-purchase" | "this-product";
   lastPurchasedAt?: string | null;
+  /** Jendela periode (7/31 hari) — untuk copy minggu vs bulan. */
+  windowDays?: number;
 };
 
 /**
@@ -152,6 +160,29 @@ function limitPopupCopy(state: LimitPopupState, nickname?: string) {
       cekLine:
         "Cek dulu di game: banner paket ini di dalam game menampilkan status periode berjalan.",
       primary: "Pilih paket lain",
+    };
+  }
+
+  if (state.status === "period-confirm") {
+    const periode = state.windowDays === 31 ? "bulan" : "minggu";
+    return {
+      icon: "info" as const,
+      title: `Pembelian sekali per ${periode}`,
+      body: `Paket ini hanya dapat dibeli satu kali per ${periode} untuk tiap akun — termasuk pembelian melalui toko lain. Pastikan Anda belum membelinya pada periode berjalan; jika sudah, order akan ditolak otomatis dan dana dikembalikan 100%. Lanjutkan pembelian?`,
+      cekLine:
+        "Belum yakin? Cek dulu di game: banner paket ini di dalam game menampilkan status periode berjalan.",
+      primary: "Belum beli periode ini — lanjutkan",
+    };
+  }
+
+  if (state.status === "slot-confirm") {
+    return {
+      icon: "info" as const,
+      title: "Pastikan slot WDP Anda tersedia",
+      body: "Weekly Diamond Pass dapat ditumpuk hingga maksimum 10 aktif per akun — dan batas yang sama berlaku untuk semua varian (1x, 2x, 3x). Pembelian baru akan menumpuk pass aktif Anda. Lanjutkan pembelian?",
+      cekLine:
+        "Cek dulu di game: buka menu Diamond → bagian Weekly Diamond Pass — jumlah pass aktif (maks. 10) tertera di sana.",
+      primary: "Slot saya tersedia — lanjutkan",
     };
   }
 
@@ -489,6 +520,7 @@ export default function TopupExperience({
         reason?: LimitPopupState["reason"];
         scope?: "any-purchase" | "this-product";
         lastPurchasedAt?: string | null;
+        windowDays?: number;
       };
       if (selectedPackageIdRef.current !== item.id) return;
 
@@ -516,6 +548,23 @@ export default function TopupExperience({
           packageLabel: item.label,
           status: "recently-purchased",
           lastPurchasedAt: data.lastPurchasedAt ?? null,
+        });
+      } else if (
+        data.limited &&
+        (data.status === "period-confirm" || data.status === "slot-confirm")
+      ) {
+        /*
+         * Konfirmasi selalu muncul untuk item limited (keputusan owner
+         * 20 Okt): pembelian di toko lain tidak terlihat dari data
+         * mana pun — pembeli yang memastikan. Sekali per paket per
+         * sesi, seperti consent.
+         */
+        if (consentedPackages[item.id]) return;
+        setLimitPopup({
+          packageId: item.id,
+          packageLabel: item.label,
+          status: data.status,
+          windowDays: data.windowDays,
         });
       } else if (data.limited && data.status === "consent-required") {
         // Consent sekali per paket per sesi — paket yang sudah
