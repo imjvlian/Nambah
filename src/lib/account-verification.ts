@@ -208,6 +208,33 @@ export async function verifyOrderAccount(input: {
           doubleDiamondsEligible: result.doubleDiamondsEligible,
         });
 
+        /*
+         * Data limit ikut masuk cache (kolom purchase_limit, migrasi 056)
+         * untuk SEMUA hasil verified — termasuk yang akhirnya
+         * limit_blocked. Dengan begitu popup & banner 0.9a membacanya
+         * gratis, dan kasus seperti xeesoxee tidak perlu cek kedua untuk
+         * tahu status WDP-nya.
+         */
+        try {
+          await writeCachedAccountCheck({
+            gameId: input.gameId,
+            userId: input.userId,
+            serverId: input.serverId,
+            nickname: result.username,
+            provider: "melostore",
+            purchaseLimit: {
+              weeklyPass: result.weeklyPass,
+              doubleDiamonds: result.doubleDiamonds,
+              doubleDiamondsEligible: result.doubleDiamondsEligible,
+            },
+          });
+        } catch (error) {
+          console.error(
+            "[account-verification] cache write gagal — verifikasi tetap valid",
+            error,
+          );
+        }
+
         if (!decision.ok) {
           return {
             status: "limit_blocked",
@@ -222,21 +249,6 @@ export async function verifyOrderAccount(input: {
         if (decision.warn === "sku-not-in-limit-response") {
           console.warn(
             `[account-verification] SKU MLBB "${input.supplierSku}" tidak muncul di response purchase-limit — kontrol weekly pass tidak berfungsi untuk order ini. Periksa supplier_products.`,
-          );
-        }
-
-        try {
-          await writeCachedAccountCheck({
-            gameId: input.gameId,
-            userId: input.userId,
-            serverId: input.serverId,
-            nickname: result.username,
-            provider: "melostore",
-          });
-        } catch (error) {
-          console.error(
-            "[account-verification] cache write gagal — verifikasi tetap valid",
-            error,
           );
         }
 

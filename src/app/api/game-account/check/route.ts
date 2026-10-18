@@ -11,6 +11,11 @@ import {
   resolveVolseverRoute,
 } from "@/lib/volsever/games";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import {
+  checkMelostorePurchaseLimit,
+  isMelostoreConfigured,
+} from "@/lib/suppliers/melostore-client";
+import type { PublicPurchaseLimit } from "@/lib/purchase-limit-ux";
 import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
@@ -44,6 +49,7 @@ type CachedAccount = {
   countryCode: string | null;
   source: "volsever" | "mimih" | "melostore";
   expiresAt: number;
+  purchaseLimit?: PublicPurchaseLimit | null;
 };
 
 type PendingAccount = {
@@ -319,18 +325,30 @@ export async function POST(request: Request) {
   // bertahan lintas cold start dan dibagi antar instance).
   const cacheKey = `${game.id}:${userId}:${serverId ?? ""}`;
   const inMemory = accountCache.get(cacheKey);
-  if (inMemory && inMemory.expiresAt > Date.now()) {
+  /*
+   * MLBB butuh data purchase-limit di response, bukan cuma nickname —
+   * baris memory tanpa data itu tidak cukup untuk banner/popup, jadi
+   * turun ke cek Melostore (yang sekaligus menyegarkan keduanya).
+   */
+  if (
+    inMemory &&
+    inMemory.expiresAt > Date.now() &&
+    (!isMobileLegends || inMemory.purchaseLimit)
+  ) {
     return Response.json({
       nickname: inMemory.nickname,
       server: inMemory.server,
       region: inMemory.region,
       verified: true,
+      ...(isMobileLegends && inMemory.purchaseLimit
+        ? { purchaseLimit: inMemory.purchaseLimit }
+        : {}),
     });
   }
   if (inMemory) accountCache.delete(cacheKey);
 
   const stored = await readCachedAccountCheck(game.id, userId, serverId);
-  if (stored) {
+  if (stored && (!isMobileLegends || stored.purchaseLimit)) {
     // Warm L1 supaya request berikutnya di instance ini tidak perlu query DB.
     accountCache.set(cacheKey, {
       nickname: stored.nickname,
@@ -338,6 +356,7 @@ export async function POST(request: Request) {
       region: stored.region,
       countryCode: null,
       source: stored.provider,
+      ...(stored.purchaseLimit ? { purchaseLimit: stored.purchaseLimit } : {}),
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
@@ -346,6 +365,9 @@ export async function POST(request: Request) {
       server: stored.server ?? serverId ?? null,
       region: stored.region,
       verified: true,
+      ...(isMobileLegends && stored.purchaseLimit
+        ? { purchaseLimit: stored.purchaseLimit }
+        : {}),
     });
   }
 
@@ -365,6 +387,73 @@ export async function POST(request: Request) {
       { error: "Terlalu banyak pengecekan akun. Coba lagi beberapa menit." },
       { status: 429 },
     );
+  }
+
+  /*
+   * (0.9a) Jalur MLBB utama: purchase-limit Melostore — satu panggilan
+   * memverifikasi nickname SEKALIGUS mengambil status WDP / Double
+   * Diamonds. Data limit ikut ke cache (purchase_limit, migrasi 056) dan
+   * ke response (banner advisory), jadi popup saat paket dipilih tinggal
+   * membaca cache — gratis. Kalau Melostore sedang tidak tersedia, jalur
+   * Volsever/Mimih di bawah tetap jalan supaya cek nickname tidak mati.
+   */
+  if (isMobileLegends && serverId && isMelostoreConfigured()) {
+    try {
+      const limit = await checkMelostorePurchaseLimit({
+        userId,
+        zoneId: serverId,
+      });
+
+      if (limit.outcome === "verified") {
+        const purchaseLimit: PublicPurchaseLimit = {
+          weeklyPass: limit.weeklyPass,
+          doubleDiamonds: limit.doubleDiamonds,
+          doubleDiamondsEligible: limit.doubleDiamondsEligible,
+        };
+
+        accountCache.set(cacheKey, {
+          nickname: limit.username,
+          server: serverId,
+          region: null,
+          countryCode: null,
+          source: "melostore",
+          purchaseLimit,
+          expiresAt: Date.now() + CACHE_TTL_MS,
+        });
+
+        await writeCachedAccountCheck({
+          gameId: game.id,
+          userId,
+          serverId,
+          nickname: limit.username,
+          resolvedServer: serverId,
+          provider: "melostore",
+          purchaseLimit,
+        });
+
+        return Response.json({
+          nickname: limit.username,
+          server: serverId,
+          region: null,
+          verified: true,
+          purchaseLimit,
+        });
+      }
+
+      if (limit.outcome === "invalid") {
+        return Response.json(
+          {
+            error: "User ID / Zone ID tidak ditemukan. Periksa kembali data akun.",
+            source: "melostore",
+          },
+          { status: 422 },
+        );
+      }
+
+      // unavailable (rate limit/saldo/gangguan) -> jalur lama di bawah.
+    } catch (error) {
+      console.error("Melostore purchase-limit checker failed", error);
+    }
   }
 
   let volseverUnavailable = false;

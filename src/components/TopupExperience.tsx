@@ -19,6 +19,12 @@ import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
 import { sortNominalItems } from "@/lib/nominal-sort";
 import { validateGuestReceiptContact } from "@/lib/customer-contact";
 import {
+  isLimitedPackageCandidate,
+  parsePublicPurchaseLimit,
+  summarizePurchaseLimit,
+  type PublicPurchaseLimit,
+} from "@/lib/purchase-limit-ux";
+import {
   createPublicPricingFallback,
   type PublicPricingResult,
 } from "@/lib/public-pricing";
@@ -62,6 +68,19 @@ type UsernameCheckState = {
   server?: string;
   region?: string | null;
   message?: string;
+  purchaseLimit?: PublicPurchaseLimit | null;
+};
+
+/**
+ * Popup item limited (0.9a): muncul saat paket WDP / Double Diamonds
+ * dipilih dan datanya menyatakan limit tercapai — atau datanya belum ada
+ * sama sekali. Paket yang masih eligible tidak memunculkan apa pun.
+ */
+type LimitPopupState = {
+  packageId: string;
+  packageLabel: string;
+  status: "limit_blocked" | "unknown";
+  reason?: "weekly-pass" | "double-diamonds";
 };
 type NominalSectionId =
   "special" | "first-top-up" | "weekly-monthly" | "top-up";
@@ -284,7 +303,11 @@ export default function TopupExperience({
   const [viewerEmail, setViewerEmail] = useState("");
   const [pendingCheckout, setPendingCheckout] =
     useState<PendingCheckout | null>(null);
+  const [limitPopup, setLimitPopup] = useState<LimitPopupState | null>(null);
   const confirmCloseRef = useRef<HTMLButtonElement | null>(null);
+  // Guard race popup: respons limit yang datang setelah paket berganti
+  // tidak boleh membuka popup untuk paket yang sudah tidak dipilih.
+  const selectedPackageIdRef = useRef(selectedPackageId);
 
   const filteredGames = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -315,6 +338,7 @@ export default function TopupExperience({
    */
   function selectPackage(item: Game["packages"][number]) {
     setSelectedPackageId(item.id);
+    selectedPackageIdRef.current = item.id;
     resetPricingMessages();
 
     const account = validateGameAccountTarget(selectedGame, userId, serverId);
@@ -326,10 +350,63 @@ export default function TopupExperience({
       return;
     }
 
+    void maybeCheckPurchaseLimit(item);
+
     promoSectionRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
     });
+  }
+
+  /**
+   * Popup item limited (0.9a): saat paket WDP / Double Diamonds dipilih,
+   * tanyakan status limit akun ke endpoint cache-only — gratis, tidak
+   * pernah memicu cek supplier baru (aturan RPM Melostore). Popup hanya
+   * muncul kalau datanya menyatakan limit tercapai, atau belum ada
+   * datanya sama sekali.
+   */
+  async function maybeCheckPurchaseLimit(item: Game["packages"][number]) {
+    if (!isLimitedPackageCandidate(selectedGame.id, item.label)) return;
+
+    const account = validateGameAccountTarget(selectedGame, userId, serverId);
+    if (!account.ok) return;
+
+    try {
+      const params = new URLSearchParams({
+        gameId: selectedGame.id,
+        userId: account.userId,
+        serverId: account.serverId ?? "",
+        productId: item.id,
+      });
+      const response = await fetch(
+        `/api/game-account/limit?${params.toString()}`,
+      );
+      if (!response.ok) return;
+
+      const data = (await response.json()) as {
+        limited?: boolean;
+        status?: string;
+        reason?: LimitPopupState["reason"];
+      };
+      if (selectedPackageIdRef.current !== item.id) return;
+
+      if (data.limited && data.status === "limit_blocked") {
+        setLimitPopup({
+          packageId: item.id,
+          packageLabel: item.label,
+          status: "limit_blocked",
+          reason: data.reason,
+        });
+      } else if (data.limited && data.status === "unknown") {
+        setLimitPopup({
+          packageId: item.id,
+          packageLabel: item.label,
+          status: "unknown",
+        });
+      }
+    } catch {
+      // Popup opsional: kalau lookup gagal, gate checkout tetap menjaga.
+    }
   }
 
   /**
@@ -753,6 +830,7 @@ export default function TopupExperience({
           pending?: boolean;
           verified?: boolean;
           localOnly?: boolean;
+          purchaseLimit?: unknown;
         };
 
         if (!mounted) return;
@@ -799,6 +877,7 @@ export default function TopupExperience({
             server: data.server ?? normalizedServerId,
             region: data.region ?? null,
             message: "Akun ditemukan.",
+            purchaseLimit: parsePublicPurchaseLimit(data.purchaseLimit),
           });
           return;
         }
@@ -842,10 +921,12 @@ export default function TopupExperience({
     const nextGame = games.find((game) => game.id === gameId) ?? defaultGame;
     setSelectedGameId(nextGame.id);
     setSelectedPackageId(nextGame.packages[0]!.id);
+    selectedPackageIdRef.current = nextGame.packages[0]!.id;
     setUserId("");
     setServerId("");
     setAccountError("");
     setUsernameCheck({ status: "idle" });
+    setLimitPopup(null);
     resetPricingMessages();
     requestAnimationFrame(() => {
       document
@@ -1320,6 +1401,11 @@ export default function TopupExperience({
                             .filter(Boolean)
                             .join(" · ")}
                         </small>
+                        {summarizePurchaseLimit(usernameCheck.purchaseLimit).map(
+                          (line) => (
+                            <small key={line}>{line}</small>
+                          ),
+                        )}
                       </span>
                     </>
                   ) : usernameCheck.status === "unavailable" ? (
@@ -1919,6 +2005,89 @@ export default function TopupExperience({
             <p className="form-notice" role="status">
               {notice}
             </p>
+          )}
+
+          {limitPopup && (
+            <div
+              className="checkout-confirm-backdrop"
+              role="presentation"
+              onClick={() => setLimitPopup(null)}
+            >
+              <section
+                className="checkout-confirm"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="limit-popup-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <header className="checkout-confirm-head">
+                  <span
+                    className="checkout-confirm-head-icon"
+                    aria-hidden="true"
+                  >
+                    ⚠
+                  </span>
+                  <div className="checkout-confirm-head-copy">
+                    <h3 id="limit-popup-title">
+                      {limitPopup.status === "limit_blocked"
+                        ? "Paket ini sudah dibeli"
+                        : "Status paket belum bisa dicek"}
+                    </h3>
+                    <p>
+                      {limitPopup.status === "limit_blocked"
+                        ? "Akun kamu sudah mencapai batas pembelian paket ini. Kalau tetap dilanjutkan ke pembayaran, ordernya akan ditolak saat checkout."
+                        : "Batas pembelian paket ini untuk akun kamu belum bisa dicek. Isi dan cek User ID dulu, atau lanjutkan — batasnya akan dikonfirmasi otomatis saat checkout."}
+                    </p>
+                  </div>
+                </header>
+
+                <div className="checkout-confirm-list">
+                  <div className="checkout-confirm-row">
+                    <span>Paket</span>
+                    <strong>{limitPopup.packageLabel}</strong>
+                  </div>
+                  {usernameCheck.nickname && (
+                    <div className="checkout-confirm-row checkout-confirm-row-accent">
+                      <span>Akun</span>
+                      <strong>{usernameCheck.nickname}</strong>
+                    </div>
+                  )}
+                  {limitPopup.status === "limit_blocked" && (
+                    <div className="checkout-confirm-row">
+                      <span>Alasan</span>
+                      <strong>
+                        {limitPopup.reason === "double-diamonds"
+                          ? "Bonus Double Diamonds sudah diklaim / limit tercapai"
+                          : "Weekly Diamond Pass sudah dibeli periode ini"}
+                      </strong>
+                    </div>
+                  )}
+                </div>
+
+                <footer className="checkout-confirm-actions">
+                  <button
+                    type="button"
+                    className="checkout-confirm-cancel"
+                    onClick={() => setLimitPopup(null)}
+                  >
+                    Pilih paket lain
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => {
+                      setLimitPopup(null);
+                      promoSectionRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "nearest",
+                      });
+                    }}
+                  >
+                    Tetap lanjut <span aria-hidden="true">→</span>
+                  </button>
+                </footer>
+              </section>
+            </div>
           )}
 
           {confirmOpen && pendingCheckout && (

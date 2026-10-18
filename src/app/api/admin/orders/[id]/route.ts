@@ -22,7 +22,7 @@ export async function GET(
       await Promise.all([
         supabaseSelect<Record<string, unknown>>("orders", {
           select:
-            "id,status,customer_user_id,receipt_email,receipt_whatsapp,target_user_id,target_server_id,reference_price,selling_price,supplier_cost,customer_payment_fee,merchant_payment_cost,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,net_profit_before_affiliate,affiliate_rate,affiliate_commission,nambah_profit,paid_at,fulfilled_at,created_at,updated_at,game:games(name,short_name),product:products(label),payment_method:payment_methods(name)",
+            "id,status,customer_user_id,receipt_email,receipt_whatsapp,target_user_id,target_server_id,reference_price,selling_price,supplier_cost,customer_payment_fee,merchant_payment_cost,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,net_profit_before_affiliate,affiliate_rate,affiliate_commission,nambah_profit,paid_at,fulfilled_at,created_at,updated_at,account_verification_status,account_check_provider,account_nickname,account_region,account_verified_at,account_limit_reason,game:games(name,short_name),product:products(label),payment_method:payment_methods(name)",
           filters: { id: "eq." + orderId },
           limit: 1,
         }),

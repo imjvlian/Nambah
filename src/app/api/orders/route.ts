@@ -599,6 +599,7 @@ export async function POST(request: Request) {
       account_nickname: accountVerification.nickname,
       account_region: accountVerification.region,
       account_verified_at: accountVerification.checkedAt,
+      account_limit_reason: accountVerification.limitReason ?? null,
     });
 
     /*

@@ -4,6 +4,10 @@ import {
   supabaseSelect,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import {
+  parsePublicPurchaseLimit,
+  type PublicPurchaseLimit,
+} from "@/lib/purchase-limit-ux";
 
 /**
  * Durable cache hasil pengecekan akun.
@@ -37,6 +41,13 @@ export type CachedAccountCheck = {
   server: string | null;
   region: string | null;
   provider: AccountCheckProvider;
+  /**
+   * Data purchase-limit MLBB (kolom purchase_limit, migrasi 056). Null untuk
+   * cek non-MLBB maupun cek MLBB yang datanya belum pernah diambil —
+   * popup/banner memperlakukan null sebagai "belum ada data", bukan
+   * "aman", dan tidak boleh memicu cek supplier baru.
+   */
+  purchaseLimit: PublicPurchaseLimit | null;
 };
 
 type AccountCheckCacheRow = {
@@ -44,6 +55,7 @@ type AccountCheckCacheRow = {
   resolved_server: string | null;
   region: string | null;
   provider: AccountCheckProvider;
+  purchase_limit: unknown;
   expires_at: string;
 };
 
@@ -63,7 +75,7 @@ export async function readCachedAccountCheck(
 
   try {
     const rows = await supabaseSelect<AccountCheckCacheRow>(TABLE, {
-      select: "nickname,resolved_server,region,provider,expires_at",
+      select: "nickname,resolved_server,region,provider,purchase_limit,expires_at",
       filters: {
         game_id: `eq.${gameId}`,
         user_id: `eq.${userId}`,
@@ -88,6 +100,7 @@ export async function readCachedAccountCheck(
       server: row.resolved_server || null,
       region: row.region?.trim() || null,
       provider: row.provider,
+      purchaseLimit: parsePublicPurchaseLimit(row.purchase_limit),
     };
   } catch (error) {
     // Cache read tidak boleh menghentikan pengecekan.
@@ -105,6 +118,7 @@ export async function writeCachedAccountCheck(input: {
   resolvedServer?: string | null;
   region?: string | null;
   provider: AccountCheckProvider;
+  purchaseLimit?: PublicPurchaseLimit;
 }) {
   if (!isSupabaseConfigured()) return;
 
@@ -126,6 +140,15 @@ export async function writeCachedAccountCheck(input: {
         provider: input.provider,
         checked_at: new Date(now).toISOString(),
         expires_at: new Date(now + ACCOUNT_CHECK_CACHE_TTL_MS).toISOString(),
+        /*
+         * Kolom ini HANYA disertakan saat datanya ada — upsert merge tidak
+         * menyentuh kolom yang dihilangkan, jadi cek nickname biasa
+         * (Volsever/Mimih) tidak pernah menghapus data limit yang sudah
+         * tersimpan untuk akun yang sama.
+         */
+        ...(input.purchaseLimit
+          ? { purchase_limit: input.purchaseLimit }
+          : {}),
       },
       { onConflict: CONFLICT_KEY },
     );
