@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   decideAccountGate,
+  decideMlbbLimitForClass,
   decideMlbbPurchaseLimit,
   DOUBLE_DIAMONDS_INELIGIBLE_MESSAGE,
   INVALID_ACCOUNT_MESSAGE,
@@ -235,4 +236,92 @@ test("MLBB policy: tanpa SKU (flow test) atau response kosong tidak meledak", ()
     doubleDiamondsEligible: null,
   });
   assert.deepEqual(warn, { ok: true, warn: "sku-not-in-limit-response" });
+});
+
+test("MLBB limit versi keluarga: WDP varian mana pun, slot dibagi", () => {
+  // REGRESI xeesoxee: weekly_pass dua-duanya false -> WDP tetap lolos.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-weekly-pass" },
+      weeklyPass: [
+        { packageCode: "weekly-pass", limitReached: false },
+        { packageCode: "weekly-pass-new", limitReached: false },
+      ],
+      doubleDiamonds: [],
+      doubleDiamondsEligible: false,
+    }),
+    { ok: true },
+  );
+  // Salah satu kode tercapai (10/10 penuh) -> semua varian terblokir.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-weekly-pass" },
+      weeklyPass: [
+        { packageCode: "weekly-pass", limitReached: false },
+        { packageCode: "weekly-pass-new", limitReached: true },
+      ],
+      doubleDiamonds: [],
+      doubleDiamondsEligible: true,
+    }),
+    { ok: false, reason: "weekly-pass" },
+  );
+  // Data kosong -> fail-open.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-weekly-pass" },
+      weeklyPass: [],
+      doubleDiamonds: [],
+      doubleDiamondsEligible: null,
+    }),
+    { ok: true },
+  );
+});
+
+test("MLBB limit versi keluarga: DD flag eligible akun-wide + per-item FTU", () => {
+  // eligible false -> blokir seluruh keluarga DD (bonus sudah dipakai).
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-double-diamonds", packageCode: null },
+      weeklyPass: [],
+      doubleDiamonds: [
+        { packageCode: "double-diamonds-50", limitReached: true },
+      ],
+      doubleDiamondsEligible: false,
+    }),
+    { ok: false, reason: "double-diamonds" },
+  );
+  // FTU (double-diamonds-50): eligible true tapi item reached -> blokir.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-double-diamonds", packageCode: "double-diamonds-50" },
+      weeklyPass: [],
+      doubleDiamonds: [
+        { packageCode: "double-diamonds-50", limitReached: true },
+      ],
+      doubleDiamondsEligible: true,
+    }),
+    { ok: false, reason: "double-diamonds" },
+  );
+  // eligible true + item tidak reached -> lolos.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-double-diamonds", packageCode: "double-diamonds-50" },
+      weeklyPass: [],
+      doubleDiamonds: [
+        { packageCode: "double-diamonds-50", limitReached: false },
+      ],
+      doubleDiamondsEligible: true,
+    }),
+    { ok: true },
+  );
+  // eligible null + tanpa kode -> fail-open.
+  assert.deepEqual(
+    decideMlbbLimitForClass({
+      cls: { kind: "supplier-double-diamonds", packageCode: null },
+      weeklyPass: [],
+      doubleDiamonds: [],
+      doubleDiamondsEligible: null,
+    }),
+    { ok: true },
+  );
 });

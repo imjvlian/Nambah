@@ -183,3 +183,57 @@ export function decideMlbbPurchaseLimit(input: {
 
   return { ok: true };
 }
+
+/**
+ * Keputusan limit MLBB versi KELUARGA (19 Okt 2026).
+ *
+ * Latar: SKU katalog Melostore (mlidwp-s1, mlid100d-s7, mlid…dd-…) tidak
+ * sama dengan package code respons (weekly-pass, double-diamonds-50) —
+ * pencocokan langsung di decideMlbbPurchaseLimit tidak pernah aktif
+ * untuk mapping nyata. Klasifikasi alias (purchase-limit-ux) menerjemahkan
+ * SKU ke kelas; fungsi ini memutuskan per kelas:
+ *
+ * - keluarga WDP (varian 1x/2x/3d): riset 19 Okt membuktikan WDP dapat
+ *   ditumpuk maksimum 10 aktif — limit tercapainya SALAH SATU kode
+ *   berarti slot habis untuk semua varian.
+ * - keluarga DD: flag `eligible` berlaku akun-wide (bonus sekali per
+ *   periode) + cek per-item untuk kode paket yang diketahui (FTU =
+ *   double-diamonds-50).
+ *
+ * Fail-open: data kosong/null tidak pernah memblokir — cermin perilaku
+ * decideMlbbPurchaseLimit yang sudah tervalidasi kasus xeesoxee.
+ */
+export type MlbbSupplierLimitClass =
+  | { kind: "supplier-weekly-pass" }
+  | { kind: "supplier-double-diamonds"; packageCode: string | null };
+
+export function decideMlbbLimitForClass(input: {
+  cls: MlbbSupplierLimitClass;
+  weeklyPass: ReadonlyArray<{ packageCode: string; limitReached: boolean }>;
+  doubleDiamonds: ReadonlyArray<{
+    packageCode: string;
+    limitReached: boolean;
+  }>;
+  doubleDiamondsEligible: boolean | null;
+}): { ok: true } | { ok: false; reason: AccountVerificationLimitReason } {
+  if (input.cls.kind === "supplier-weekly-pass") {
+    const tercapai = input.weeklyPass.find((item) => item.limitReached);
+    if (tercapai) return { ok: false, reason: "weekly-pass" };
+    return { ok: true };
+  }
+
+  if (input.doubleDiamondsEligible === false) {
+    return { ok: false, reason: "double-diamonds" };
+  }
+  if (input.cls.packageCode) {
+    // Hoist ke const: narrowing diskriminan tidak menembus closure callback.
+    const packageCode = input.cls.packageCode;
+    const item = input.doubleDiamonds.find(
+      (kandidat) => kandidat.packageCode === packageCode,
+    );
+    if (item?.limitReached) {
+      return { ok: false, reason: "double-diamonds" };
+    }
+  }
+  return { ok: true };
+}

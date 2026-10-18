@@ -356,6 +356,39 @@
   line-height: 1.45;
 }
 
+/*
+ * Aksen tingkat popup item limited: merah = order pasti gagal, kuning =
+ * riwayat menunjukkan baru beli (hari reset belum pasti), biru =
+ * consent, netral = info. Layout tidak tersentuh — hanya warna ikon.
+ */
+.checkout-confirm-head-icon.danger {
+  background: rgba(255, 99, 99, 0.12);
+  color: #ff6363;
+}
+
+.checkout-confirm-head-icon.warn {
+  background: rgba(255, 193, 69, 0.14);
+  color: #ffc145;
+}
+
+.checkout-confirm-head-icon.info {
+  background: rgba(120, 167, 255, 0.12);
+  color: #78a7ff;
+}
+
+.checkout-confirm-head-icon.neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: #858c80;
+}
+
+/* Baris "cek dulu di game" di bawah daftar konteks popup item limited. */
+.checkout-confirm-note {
+  margin: 10px 16px 0;
+  color: #858c80;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 /* Kartu data tujuan: label kiri, nilai kanan, dipisah hairline. */
 .checkout-confirm-list {
   min-height: 0;

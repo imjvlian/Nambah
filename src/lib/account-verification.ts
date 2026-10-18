@@ -14,7 +14,8 @@ import {
   isResidualUnverifiableGame,
   melostoreCodeRequiresZone,
 } from "@/lib/melostore-game-codes";
-import { decideMlbbPurchaseLimit } from "@/lib/account-verification-policy";
+import { decideMlbbLimitForClass } from "@/lib/account-verification-policy";
+import { classifyLimitedItem } from "@/lib/purchase-limit-ux";
 import type {
   AccountVerificationResult,
   AccountVerificationUnavailableReason,
@@ -201,12 +202,32 @@ export async function verifyOrderAccount(input: {
       });
 
       if (result.outcome === "verified") {
-        const decision = decideMlbbPurchaseLimit({
+        /*
+         * Alias SKU → kelas limit (19 Okt 2026): SKU katalog Melostore
+         * (mlidwp/mlidwdp2d/mlid100d/mlid…dd) TIDAK sama dengan package
+         * code respons purchase-limit (weekly-pass, double-diamonds-50) —
+         * pencocokan langsung lama tidak pernah aktif untuk mapping
+         * nyata. Klasifikasi menerjemahkan dulu, lalu keputusan keluarga
+         * memutuskan. Kelas non-supplier (consent/riwayat) bukan urusan
+         * gate — itu lapisan UX pra-pembelian.
+         */
+        const cls = classifyLimitedItem({
+          gameId: input.gameId,
           supplierSku: input.supplierSku ?? null,
-          weeklyPass: result.weeklyPass,
-          doubleDiamonds: result.doubleDiamonds,
-          doubleDiamondsEligible: result.doubleDiamondsEligible,
+          label: null,
         });
+
+        const decision =
+          cls &&
+          (cls.kind === "supplier-weekly-pass" ||
+            cls.kind === "supplier-double-diamonds")
+            ? decideMlbbLimitForClass({
+                cls,
+                weeklyPass: result.weeklyPass,
+                doubleDiamonds: result.doubleDiamonds,
+                doubleDiamondsEligible: result.doubleDiamondsEligible,
+              })
+            : { ok: true as const };
 
         /*
          * Data limit ikut masuk cache (kolom purchase_limit, migrasi 056)
@@ -244,12 +265,6 @@ export async function verifyOrderAccount(input: {
             checkedAt: nowIso(),
             limitReason: decision.reason,
           };
-        }
-
-        if (decision.warn === "sku-not-in-limit-response") {
-          console.warn(
-            `[account-verification] SKU MLBB "${input.supplierSku}" tidak muncul di response purchase-limit — kontrol weekly pass tidak berfungsi untuk order ini. Periksa supplier_products.`,
-          );
         }
 
         return {

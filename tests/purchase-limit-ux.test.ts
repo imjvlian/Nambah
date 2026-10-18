@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  classifyLimitedItem,
+  formatRelativeDays,
   isLimitedPackageCandidate,
   isOncePerAccountLabel,
   parsePublicPurchaseLimit,
+  popupButtonsFor,
   summarizePurchaseLimit,
 } from "../src/lib/purchase-limit-ux.ts";
 
@@ -57,31 +60,180 @@ test("parsePublicPurchaseLimit: payload valid diparse, sampah ditolak null", () 
   assert.equal(parsePublicPurchaseLimit(null), null);
 });
 
-test("isLimitedPackageCandidate: pemicu = sekali-per-akun (semua game) + WDP/DD MLBB", () => {
+test("isLimitedPackageCandidate: MLBB selalu; game lain via label limited", () => {
+  // MLBB selalu cek — identitas item limited (SKU dd) tidak terlihat dari label.
   assert.equal(
-    isLimitedPackageCandidate("mobile-legends", "Weekly Diamond Pass 2x"),
+    isLimitedPackageCandidate("mobile-legends", "86 Diamonds"),
     true,
   );
-  assert.equal(
-    isLimitedPackageCandidate("mobile-legends", "Double Diamonds 150"),
-    true,
-  );
+  assert.equal(isLimitedPackageCandidate("mobile-legends", "5 Diamond"), true);
+  // Game lain: label limited saja.
   assert.equal(
     isLimitedPackageCandidate("magic-chess", "First Recharge 300 Diamonds"),
     true,
   );
   assert.equal(
-    isLimitedPackageCandidate("mobile-legends", "First Top Up 50+Bonus Diamonds"),
+    isLimitedPackageCandidate("free-fire", "Weekly Membership"),
     true,
   );
-  assert.equal(isLimitedPackageCandidate("mobile-legends", "86 Diamonds"), false);
-  assert.equal(isLimitedPackageCandidate("free-fire", "Weekly Membership"), false);
+  assert.equal(
+    isLimitedPackageCandidate("honor-of-kings", "80 Tokens"),
+    false,
+  );
+  assert.equal(
+    isLimitedPackageCandidate("genshin-impact", "Blessing of the Welkin Moon"),
+    false,
+  );
+});
+
+test("classifyLimitedItem: alias SKU dari data mapping nyata", () => {
+  // Keluarga WDP (varian 1x/2x/3x).
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlidwp-s1",
+      label: "Weekly Diamond Pass",
+    }),
+    { kind: "supplier-weekly-pass" },
+  );
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlidwdp2d-s5",
+      label: "Weekly Diamond Pass 2x",
+    }),
+    { kind: "supplier-weekly-pass" },
+  );
+  // FTU = double-diamonds-50 (50 + bonus 50 = 100 total).
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlid100d-s7",
+      label: "First Top Up 50+Bonus Diamonds",
+    }),
+    { kind: "supplier-double-diamonds", packageCode: "double-diamonds-50" },
+  );
+  // SKU event DD — hanya flag eligible yang bisa memverifikasi.
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlid1136dd-s12a",
+      label: "1136 Diamond",
+    }),
+    { kind: "supplier-double-diamonds", packageCode: null },
+  );
+  // Diamond biasa — bukan limited.
+  assert.equal(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlid10d-s5",
+      label: "10 Diamond",
+    }),
+    null,
+  );
+  // Twilight Pass = sekali per akun selamanya (riset: bukan bulanan).
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlidtp-s7",
+      label: "Twilight Pass",
+    }),
+    { kind: "once-per-account", scope: "this-product" },
+  );
+  // Weekly Elite Pack & Monthly Elite Bundle.
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlglwep-s7",
+      label: "Weekly Elite Pack",
+    }),
+    { kind: "periodic", windowDays: 7 },
+  );
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: "mlidemb-s1",
+      label: "Monthly Elite Bundle",
+    }),
+    { kind: "periodic", windowDays: 31 },
+  );
+});
+
+test("classifyLimitedItem: fallback label + prioritas SKU atas label", () => {
+  // FTU tanpa mapping Melostore → consent (any-purchase).
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "magic-chess",
+      supplierSku: null,
+      label: "First Recharge 300 Diamonds",
+    }),
+    { kind: "once-per-account", scope: "any-purchase" },
+  );
+  // Periodik: jendela ditentukan label.
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "free-fire",
+      supplierSku: null,
+      label: "Weekly Membership",
+    }),
+    { kind: "periodic", windowDays: 7 },
+  );
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "free-fire",
+      supplierSku: null,
+      label: "Monthly Membership",
+    }),
+    { kind: "periodic", windowDays: 31 },
+  );
+  // Twilight via label.
+  assert.deepEqual(
+    classifyLimitedItem({
+      gameId: "mobile-legends",
+      supplierSku: null,
+      label: "Twilight Pass",
+    }),
+    { kind: "once-per-account", scope: "this-product" },
+  );
+  // SKU supplier mengalahkan label once-per-account: FTU MLBB → data
+  // supplier (bukan consent) — sesuai desain.
+  const ftu = classifyLimitedItem({
+    gameId: "mobile-legends",
+    supplierSku: "mlid100d-s7",
+    label: "First Top Up 50+Bonus Diamonds",
+  });
+  assert.equal(ftu?.kind, "supplier-double-diamonds");
+  // Bukan limited.
+  assert.equal(
+    classifyLimitedItem({
+      gameId: "free-fire",
+      supplierSku: null,
+      label: "50 Diamonds",
+    }),
+    null,
+  );
+});
+
+test("popupButtonsFor: single-button hanya untuk yang pasti gagal", () => {
+  assert.equal(popupButtonsFor("limit_blocked"), "single-primary");
+  assert.equal(popupButtonsFor("previously-purchased"), "single-primary");
+  assert.equal(popupButtonsFor("unknown"), "single-primary");
+  assert.equal(popupButtonsFor("recently-purchased"), "safe-continue");
+  assert.equal(popupButtonsFor("consent-required"), "cancel-continue");
+});
+
+test("formatRelativeDays: tanggal nyata untuk penilaian reset periode", () => {
+  assert.equal(formatRelativeDays(null), "");
+  assert.equal(formatRelativeDays("bukan-tanggal"), "");
+  const tigaHari = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  assert.match(formatRelativeDays(tigaHari), /^3 hari lalu \(.+\)$/);
+  assert.match(formatRelativeDays(new Date().toISOString()), /^hari ini/);
 });
 
 test("endpoint limit cache-only: tidak pernah memanggil Melostore", () => {
   const route = readFileSync("src/app/api/game-account/limit/route.ts", "utf8");
   assert.ok(route.includes("readCachedAccountCheck"));
-  assert.ok(route.includes("decideMlbbPurchaseLimit"));
+  assert.ok(route.includes("decideMlbbLimitForClass"));
   assert.ok(route.includes("rateLimitResponse"));
   assert.ok(
     !route.includes("checkMelostorePurchaseLimit"),
@@ -141,25 +293,33 @@ test("isOncePerAccountLabel: keluarga First Top Up / First Recharge", () => {
   assert.equal(isOncePerAccountLabel("Double Diamonds 150"), false);
 });
 
-test("endpoint limit mengklasifikasi consent-required dari label produk", () => {
+test("endpoint limit: alias + riwayat, cache-only tanpa Melostore", () => {
   const route = readFileSync("src/app/api/game-account/limit/route.ts", "utf8");
+  assert.ok(route.includes("classifyLimitedItem"));
+  assert.ok(route.includes("decideMlbbLimitForClass"));
   assert.ok(route.includes("consent-required"));
-  assert.ok(route.includes("isOncePerAccountLabel"));
+  assert.ok(route.includes("recently-purchased"));
+  assert.ok(route.includes("previously-purchased"));
+  // Riwayat: status success saja — pembelian gagal/refund tidak memblokir.
+  assert.ok(route.includes('status: "eq.success"'));
   assert.ok(
     !route.includes("checkMelostorePurchaseLimit"),
     "endpoint wajib cache-only — popup tidak boleh membakar jatah cek (aturan RPM)",
   );
 });
 
-test("popup penolakan tanpa tombol lanjutkan; consent meminta konfirmasi", () => {
+test("popup: tombol lanjutkan hanya untuk yang masih mungkin dibeli", () => {
   const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
-  assert.ok(ui.includes("consent-required"));
+  // "Tetap lanjutkan" hanya milik recently-purchased (hari reset periode
+  // tidak bisa dipastikan). Keputusan set-tombol per status dijaga murni
+  // lewat popupButtonsFor di test terpisah.
+  assert.ok(ui.includes("recently-purchased"));
+  assert.ok(ui.includes("Tetap lanjutkan"));
+  assert.ok(ui.includes("Pilih paket lain"));
   assert.ok(ui.includes("Akun saya belum pernah top up — lanjutkan"));
-  assert.ok(ui.includes("Silakan pilih paket lain"));
-  assert.ok(
-    !ui.includes("Tetap lanjut"),
-    "order yang pasti ditolak tidak boleh ditawari tombol lanjutkan",
-  );
+  assert.ok(ui.includes("Cek dulu di game"));
+  assert.ok(ui.includes("checkout-confirm-note"));
+  assert.ok(ui.includes("popupButtonsFor"));
 });
 
 test("pesan gate verifikasi memakai register formal (Anda)", () => {

@@ -19,9 +19,12 @@ import { formatIDR, getReferenceDiscountPercent } from "@/lib/pricing";
 import { sortNominalItems } from "@/lib/nominal-sort";
 import { validateGuestReceiptContact } from "@/lib/customer-contact";
 import {
+  formatRelativeDays,
   isLimitedPackageCandidate,
   parsePublicPurchaseLimit,
+  popupButtonsFor,
   summarizePurchaseLimit,
+  type LimitPopupStatus,
   type PublicPurchaseLimit,
 } from "@/lib/purchase-limit-ux";
 import {
@@ -72,53 +75,103 @@ type UsernameCheckState = {
 };
 
 /**
- * Popup item limited: muncul saat paket sekali-per-akun dipilih.
+ * Popup item limited — lima situasi, ditentukan server:
  *
- * - limit_blocked    — data supplier menyatakan limit tercapai (WDP /
- *                     Double Diamonds MLBB). Order pasti ditolak gate,
- *                     jadi popup TIDAK menawarkan tombol lanjutkan
- *                     (keputusan owner: lanjutkan hanya untuk yang
- *                     masih mungkin dibeli).
- * - consent-required — item sekali-per-akun tanpa data supplier (First
- *                     Top Up / First Recharge). Masih mungkin dibeli,
- *                     jadi pembeli yang mengonfirmasi lewat tombol
- *                     consent, sekali per paket per sesi.
- * - unknown          — item terverifikasi-supplier tapi data akun belum
- *                     ada di cache; arahkan isi & cek User ID dulu.
+ * - limit_blocked       : data supplier menyatakan limit tercapai (slot
+ *                         WDP penuh, atau bonus DD sudah diambil). Order
+ *                         pasti ditolak gate — tanpa tombol lanjutkan.
+ * - previously-purchased: riwayat Nambah menunjukkan item sekali-selamanya
+ *                         ini sudah dibeli (Twilight Pass; FTU ketika akun
+ *                         sudah tercatat top up) — tanpa tombol lanjutkan.
+ * - recently-purchased  : riwayat dalam periode (mingguan/bulanan); hari
+ *                         reset game tidak bisa dipastikan, jadi
+ *                         "Tetap lanjutkan" tetap tersedia.
+ * - consent-required    : sekali-per-akun tanpa data — pembeli yang
+ *                         mengonfirmasi, sekali per paket per sesi.
+ * - unknown             : data akun belum ada di cache; isi & cek
+ *                         User ID dulu.
  */
 type LimitPopupState = {
   packageId: string;
   packageLabel: string;
-  status: "limit_blocked" | "consent-required" | "unknown";
+  status: LimitPopupStatus;
   reason?: "weekly-pass" | "double-diamonds";
+  scope?: "any-purchase" | "this-product";
+  lastPurchasedAt?: string | null;
 };
 
 /**
- * Copy popup item limited — register formal "Anda", tanpa jargon internal.
- * Murni supaya bisa diperiksa tanpa me-render komponen.
+ * Copy popup item limited — register formal "Anda", tanpa jargon
+ * internal, plus baris "cek dulu di game" (metode terverifikasi dari
+ * riset web 19 Okt 2026). Murni supaya bisa diperiksa tanpa me-render
+ * komponen.
  */
 function limitPopupCopy(state: LimitPopupState, nickname?: string) {
   const akun = nickname ? `Akun ${nickname}` : "Akun ini";
+  const tanggal = formatRelativeDays(state.lastPurchasedAt);
+
   if (state.status === "limit_blocked") {
     return state.reason === "double-diamonds"
       ? {
+          icon: "danger" as const,
           title: "Bonus sudah pernah diambil",
-          body: `${akun} sudah pernah mengambil bonus Double Diamonds. Paket ini hanya dapat dibeli sekali per akun, sehingga pembelian tidak dapat dilanjutkan. Silakan pilih paket lain.`,
+          body: `${akun} sudah pernah mengambil bonus Double Diamonds — bonusnya hanya berlaku satu kali per periode per akun, sehingga pembelian tidak dapat dilanjutkan. Silakan pilih paket lain.`,
+          cekLine:
+            "Cek dulu di game: buka Pengaturan → Record → Activity Record untuk melihat riwayat top up Anda.",
+          primary: "Pilih paket lain",
         }
       : {
-          title: "Weekly Diamond Pass sudah dibeli",
-          body: `${akun} sudah memiliki Weekly Diamond Pass untuk periode berjalan. Pembelian baru tidak dapat diproses hingga batas di-reset minggu depan. Silakan pilih paket lain.`,
+          icon: "danger" as const,
+          title: "Slot Weekly Diamond Pass penuh",
+          body: `${akun} sudah memiliki maksimum Weekly Diamond Pass aktif — pass dapat ditumpuk hingga 10, dan pembelian baru tidak dapat diproses hingga salah satu pass aktif berakhir. Silakan pilih paket lain.`,
+          cekLine:
+            "Cek dulu di game: buka menu Diamond → bagian Weekly Diamond Pass — jumlah pass aktif (maks. 10) tertera di sana.",
+          primary: "Pilih paket lain",
         };
   }
-  if (state.status === "consent-required") {
+
+  if (state.status === "previously-purchased") {
     return {
-      title: "Pembelian sekali per akun",
-      body: "Paket bonus ini hanya berlaku untuk akun yang belum pernah melakukan top up. Jika akun Anda sudah pernah top up di mana pun, bonus tidak akan dikirim dan pembelian dibatalkan secara otomatis — dana dikembalikan 100%. Lanjutkan pembelian?",
+      icon: "danger" as const,
+      title: "Paket ini sudah pernah dibeli",
+      body:
+        state.scope === "any-purchase"
+          ? `${akun} tercatat sudah pernah melakukan top up${tanggal ? ` (terakhir ${tanggal})` : ""}, sedangkan paket bonus ini hanya berlaku untuk akun yang belum pernah top up. Silakan pilih paket lain.`
+          : `${akun} tercatat sudah membeli paket ini${tanggal ? ` pada ${tanggal}` : ""}, dan paket ini hanya dapat dibeli satu kali untuk tiap akun. Silakan pilih paket lain.`,
+      cekLine:
+        "Cek dulu di game: buka Pengaturan → Record → Activity Record untuk memastikan status pembelian Anda.",
+      primary: "Pilih paket lain",
     };
   }
+
+  if (state.status === "recently-purchased") {
+    return {
+      icon: "warn" as const,
+      title: "Paket ini tercatat sudah dibeli",
+      body: `Pembelian paket ini tercatat ${tanggal || "baru-baru ini"} untuk akun yang sama. Jika periode pembelian sudah direset oleh game, Anda bisa melanjutkan — jika belum, order akan ditolak otomatis dan dana dikembalikan 100%.`,
+      cekLine:
+        "Cek dulu di game: banner paket ini di dalam game menampilkan status periode berjalan.",
+      primary: "Pilih paket lain",
+    };
+  }
+
+  if (state.status === "consent-required") {
+    return {
+      icon: "info" as const,
+      title: "Pembelian sekali per akun",
+      body: "Paket bonus ini hanya berlaku untuk akun yang belum pernah melakukan top up. Jika akun Anda sudah pernah top up di mana pun, bonus tidak akan dikirim dan pembelian dibatalkan secara otomatis — dana dikembalikan 100%. Lanjutkan pembelian?",
+      cekLine:
+        "Belum yakin? Cek dulu di game: buka Pengaturan → Record → Activity Record — kalau belum ada riwayat top up, akun Anda masih berhak atas bonus.",
+      primary: "Akun saya belum pernah top up — lanjutkan",
+    };
+  }
+
   return {
+    icon: "neutral" as const,
     title: "Status pembelian belum dapat diperiksa",
     body: "Masukkan User ID Anda dan tunggu hingga pemeriksaan akun selesai, agar kami dapat memastikan paket ini dapat dibeli.",
+    cekLine: null,
+    primary: "Mengerti",
   };
 }
 type NominalSectionId =
@@ -432,8 +485,10 @@ export default function TopupExperience({
 
       const data = (await response.json()) as {
         limited?: boolean;
-        status?: string;
+        status?: LimitPopupStatus;
         reason?: LimitPopupState["reason"];
+        scope?: "any-purchase" | "this-product";
+        lastPurchasedAt?: string | null;
       };
       if (selectedPackageIdRef.current !== item.id) return;
 
@@ -443,6 +498,24 @@ export default function TopupExperience({
           packageLabel: item.label,
           status: "limit_blocked",
           reason: data.reason,
+        });
+      } else if (data.limited && data.status === "previously-purchased") {
+        setLimitPopup({
+          packageId: item.id,
+          packageLabel: item.label,
+          status: "previously-purchased",
+          scope: data.scope,
+          lastPurchasedAt: data.lastPurchasedAt ?? null,
+        });
+      } else if (data.limited && data.status === "recently-purchased") {
+        // Lanjut yang sudah dipilih pengguna untuk paket ini tidak
+        // ditanya ulang di sesi halaman yang sama.
+        if (consentedPackages[item.id]) return;
+        setLimitPopup({
+          packageId: item.id,
+          packageLabel: item.label,
+          status: "recently-purchased",
+          lastPurchasedAt: data.lastPurchasedAt ?? null,
         });
       } else if (data.limited && data.status === "consent-required") {
         // Consent sekali per paket per sesi — paket yang sudah
@@ -2063,96 +2136,132 @@ export default function TopupExperience({
             </p>
           )}
 
-          {limitPopup && (
-            <div
-              className="checkout-confirm-backdrop"
-              role="presentation"
-              onClick={() => setLimitPopup(null)}
-            >
-              <section
-                className="checkout-confirm"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="limit-popup-title"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <header className="checkout-confirm-head">
-                  <span
-                    className="checkout-confirm-head-icon"
-                    aria-hidden="true"
+          {limitPopup &&
+            (() => {
+              const copy = limitPopupCopy(limitPopup, usernameCheck.nickname);
+              const tombol = popupButtonsFor(limitPopup.status);
+              return (
+                <div
+                  className="checkout-confirm-backdrop"
+                  role="presentation"
+                  onClick={() => setLimitPopup(null)}
+                >
+                  <section
+                    className="checkout-confirm"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="limit-popup-title"
+                    onClick={(event) => event.stopPropagation()}
                   >
-                    ⚠
-                  </span>
-                  <div className="checkout-confirm-head-copy">
-                    <h3 id="limit-popup-title">
-                      {limitPopupCopy(limitPopup, usernameCheck.nickname).title}
-                    </h3>
-                    <p>
-                      {limitPopupCopy(limitPopup, usernameCheck.nickname).body}
-                    </p>
-                  </div>
-                </header>
+                    <header className="checkout-confirm-head">
+                      <span
+                        className={`checkout-confirm-head-icon ${copy.icon}`}
+                        aria-hidden="true"
+                      >
+                        ⚠
+                      </span>
+                      <div className="checkout-confirm-head-copy">
+                        <h3 id="limit-popup-title">{copy.title}</h3>
+                        <p>{copy.body}</p>
+                      </div>
+                    </header>
 
-                <div className="checkout-confirm-list">
-                  <div className="checkout-confirm-row">
-                    <span>Paket</span>
-                    <strong>{limitPopup.packageLabel}</strong>
-                  </div>
+                    <div className="checkout-confirm-list">
+                      <div className="checkout-confirm-row">
+                        <span>Paket</span>
+                        <strong>{limitPopup.packageLabel}</strong>
+                      </div>
+                      {usernameCheck.nickname && (
+                        <div className="checkout-confirm-row checkout-confirm-row-accent">
+                          <span>Akun</span>
+                          <strong>{usernameCheck.nickname}</strong>
+                        </div>
+                      )}
+                      {limitPopup.lastPurchasedAt && (
+                        <div className="checkout-confirm-row">
+                          <span>Terakhir dibeli</span>
+                          <strong>
+                            {formatRelativeDays(limitPopup.lastPurchasedAt)}
+                          </strong>
+                        </div>
+                      )}
+                    </div>
+
+                    {copy.cekLine && (
+                      <p className="checkout-confirm-note">
+                        <small>{copy.cekLine}</small>
+                      </p>
+                    )}
+
+                    <footer className="checkout-confirm-actions">
+                      {tombol === "cancel-continue" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="checkout-confirm-cancel"
+                            onClick={() => setLimitPopup(null)}
+                          >
+                            Batalkan
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => {
+                              setConsentedPackages((current) => ({
+                                ...current,
+                                [limitPopup.packageId]: true,
+                              }));
+                              setLimitPopup(null);
+                              promoSectionRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "nearest",
+                              });
+                            }}
+                          >
+                            {copy.primary}
+                          </button>
+                        </>
+                      ) : tombol === "safe-continue" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => setLimitPopup(null)}
+                          >
+                            {copy.primary}
+                          </button>
+                          <button
+                            type="button"
+                            className="checkout-confirm-cancel"
+                            onClick={() => {
+                              setConsentedPackages((current) => ({
+                                ...current,
+                                [limitPopup.packageId]: true,
+                              }));
+                              setLimitPopup(null);
+                              promoSectionRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "nearest",
+                              });
+                            }}
+                          >
+                            Tetap lanjutkan
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="primary-button"
+                          onClick={() => setLimitPopup(null)}
+                        >
+                          {copy.primary}
+                        </button>
+                      )}
+                    </footer>
+                  </section>
                 </div>
-
-                <footer className="checkout-confirm-actions">
-                  {limitPopup.status === "consent-required" ? (
-                    <>
-                      <button
-                        type="button"
-                        className="checkout-confirm-cancel"
-                        onClick={() => setLimitPopup(null)}
-                      >
-                        Batalkan
-                      </button>
-                      <button
-                        type="button"
-                        className="primary-button"
-                        onClick={() => {
-                          setConsentedPackages((current) => ({
-                            ...current,
-                            [limitPopup.packageId]: true,
-                          }));
-                          setLimitPopup(null);
-                          promoSectionRef.current?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "nearest",
-                          });
-                        }}
-                      >
-                        Akun saya belum pernah top up — lanjutkan
-                      </button>
-                    </>
-                  ) : limitPopup.status === "limit_blocked" ? (
-                    /*
-                     * Order pasti ditolak gate: tanpa tombol lanjutkan —
-                     * lanjutkan hanya untuk yang masih mungkin dibeli.
-                     */
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={() => setLimitPopup(null)}
-                    >
-                      Pilih paket lain
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={() => setLimitPopup(null)}
-                    >
-                      Mengerti
-                    </button>
-                  )}
-                </footer>
-              </section>
-            </div>
-          )}
+              );
+            })()}
 
           {confirmOpen && pendingCheckout && (
             <div
