@@ -3,13 +3,15 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 /**
- * Guard test level-source untuk pengelompokan seksi nominal dan ikon
- * visual kind (perbaikan 20 Okt 2026, kasus MLBB):
+ * Guard test level-source untuk pengelompokan seksi nominal dan urutan
+ * ikon (perbaikan 20 Okt 2026, kasus MLBB):
  * - WDP/2x/3x dan Monthly/Weekly Elite Bundle harus masuk seksi
  *   "Paket Mingguan / Bulanan" (dulu: WDP masuk "Item Spesial",
  *   Monthly Elite Bundle jatuh ke "Top Up").
- * - First Top Up MLBB harus punya visual kind sendiri (dulu: glyph ◆
- *   karena labelnya menyebut "Diamonds").
+ * - Seksi mingguan/bulanan diurut per jenis: pass (WDP 1x -> 2x -> 3x)
+ *   dulu, lalu elite (mingguan -> bulanan).
+ * - FTU adalah item currency: glyph diamond, bukan visual kind
+ *   tersendiri (keputusan owner 20 Okt 2026).
  * - Twilight Pass tetap di "Item Spesial" (sekali per akun, bukan
  *   paket berulang).
  */
@@ -40,27 +42,30 @@ test("seksi mingguan/bulanan menampung WDP dan Elite Bundle", () => {
   assert.ok(fn.includes("monthly bundle"));
 });
 
-test("visual kind first-top-up dicek sebelum diamond", () => {
+test("FTU memakai glyph diamond (item currency) - keputusan owner 20 Okt", () => {
   const start = ui.indexOf("function getPackageVisualKind");
   const end = ui.indexOf('return "default";', start);
   assert.ok(start > 0 && end > start, "fungsi visual kind harus ada");
   const fn = ui.slice(start, end);
 
-  const ftu = fn.indexOf('return "first-top-up";');
-  const diamond = fn.indexOf('return "diamond";');
-  assert.ok(ftu > -1, "cabang first-top-up harus ada");
   assert.ok(
-    ftu < diamond,
-    "first top up harus dicek sebelum diamond - label FTU selalu menyebut nominal diamonds",
+    !fn.includes("first-top-up"),
+    "FTU bukan visual kind tersendiri - glyph diamond sudah tepat untuk item currency",
   );
-  assert.ok(fn.includes("first top up"));
-  assert.ok(fn.includes("first recharge"));
+  assert.ok(!ui.includes('return "1ST";'));
 });
 
-test("glyph 1ST + CSS kartu v4 untuk first-top-up", () => {
-  assert.ok(ui.includes('if (kind === "first-top-up") return "1ST";'));
-  const css = readFileSync("src/app/product-grouped-nominals.css", "utf8");
-  assert.ok(css.includes(".package-card-v4 .package-item-visual.first-top-up"));
+test("seksi mingguan/bulanan diurut per jenis: pass dulu, lalu elite", () => {
+  assert.ok(ui.includes("urutkanSeksiMingguanBulanan"));
+  // Diterapkan hanya untuk seksi mingguan/bulanan.
+  assert.ok(ui.includes('section.id === "weekly-monthly"'));
+  // Rank jenis: pass/card (dengan pengali 2x/3x) -> elite/epic
+  // (mingguan -> bulanan) -> sisanya.
+  assert.ok(ui.includes("/(pass|card)/"));
+  assert.ok(ui.includes("/3x/"));
+  assert.ok(ui.includes("/2x/"));
+  assert.ok(ui.includes("elite|epic"));
+  assert.ok(ui.includes("monthly|bulanan"));
 });
 
 test("Twilight Pass tetap di seksi Item Spesial", () => {

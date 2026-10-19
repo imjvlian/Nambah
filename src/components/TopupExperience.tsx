@@ -318,16 +318,10 @@ function isOnlyGroupNote(note?: string) {
 function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
   const text = `${game.name} ${item.label} ${item.note ?? ""}`.toLowerCase();
   /*
-   * First Top Up dicek SEBELUM diamond: label FTU selalu menyebut nominal
-   * diamonds ("First Top Up 50+Bonus Diamonds") - tanpa cabang ini semua
-   * FTU tampil sebagai diamond biasa (kasus MLBB, 20 Okt 2026).
+   * First Top Up adalah item currency (diamonds) - glyph diamond memang
+   * tepat untuknya (keputusan owner 20 Okt 2026). Tidak ada cabang
+   * khusus: labelnya menyebut "Diamonds" dan jatuh ke cabang diamond.
    */
-  if (
-    /(first top up|first topup|first recharge|top up pertama|topup pertama)/i.test(
-      text,
-    )
-  )
-    return "first-top-up";
   if (/(weekly|pass|membership|member|starlight|langganan)/i.test(text))
     return "pass";
   if (/(diamond|diamonds)/i.test(text)) return "diamond";
@@ -339,7 +333,6 @@ function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
 
 function packageVisualLabel(kind: ReturnType<typeof getPackageVisualKind>) {
   if (kind === "diamond") return "◆";
-  if (kind === "first-top-up") return "1ST";
   if (kind === "pass") return "PASS";
   if (kind === "uc") return "UC";
   if (kind === "robux") return "R$";
@@ -379,6 +372,35 @@ function getNominalSectionId(item: Game["packages"][number]): NominalSectionId {
   }
 
   return "top-up";
+}
+
+/*
+ * Urutan jenis di seksi mingguan/bulanan (permintaan owner 20 Okt 2026):
+ * pass dulu (WDP 1x -> 2x -> 3x), lalu Elite/Epic (mingguan -> bulanan),
+ * sisanya di belakang. Dalam satu jenis, urutan sortNominalItems
+ * dipertahankan (Array.sort stabil).
+ */
+function rankJenisMingguan(item: Game["packages"][number]): [number, number] {
+  const text = `${item.label}`.toLowerCase();
+  if (/(pass|card)/.test(text)) {
+    const pengali = /3x/.test(text) ? 2 : /2x/.test(text) ? 1 : 0;
+    return [0, pengali];
+  }
+  if (/(elite|epic)/.test(text)) {
+    return [1, /(monthly|bulanan)/.test(text) ? 1 : 0];
+  }
+  return [2, 0];
+}
+
+function urutkanSeksiMingguanBulanan(
+  items: Array<Game["packages"][number]>,
+): Array<Game["packages"][number]> {
+  return [...items].sort((a, b) => {
+    const [jenisA, subA] = rankJenisMingguan(a);
+    const [jenisB, subB] = rankJenisMingguan(b);
+    if (jenisA !== jenisB) return jenisA - jenisB;
+    return subA - subB;
+  });
 }
 
 export default function TopupExperience({
@@ -684,14 +706,20 @@ export default function TopupExperience({
 
   const nominalSections = useMemo(
     () =>
-      NOMINAL_SECTIONS.map((section) => ({
-        ...section,
-        items: sortNominalItems(
+      NOMINAL_SECTIONS.map((section) => {
+        const items = sortNominalItems(
           selectedGame.packages.filter(
             (item) => getNominalSectionId(item) === section.id,
           ),
-        ),
-      })).filter((section) => section.items.length > 0),
+        );
+        return {
+          ...section,
+          items:
+            section.id === "weekly-monthly"
+              ? urutkanSeksiMingguanBulanan(items)
+              : items,
+        };
+      }).filter((section) => section.items.length > 0),
     [selectedGame],
   );
 
