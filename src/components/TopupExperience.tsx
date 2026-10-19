@@ -456,6 +456,18 @@ export default function TopupExperience({
   const [selectedMerchantId, setSelectedMerchantId] = useState("");
   const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /*
+   * Kunci idempotensi checkout (P1.5): satu kunci untuk satu isi form.
+   * Bertahan lintas kegagalan (timeout -> coba lagi = kunci sama =
+   * server mengembalikan order yang sama, bukan order kedua),
+   * dirotasi saat isi form berubah, dibuang saat sukses.
+   */
+  const checkoutKeyRef = useRef<{ key: string; fingerprint: string } | null>(
+    null,
+  );
+  // Guard sinkron klik-ganda: `isSubmitting` baru efektif setelah render
+  // berikutnya - dua klik dalam satu frame sama-sama lolos tanpa ini.
+  const submittingRef = useRef(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [viewerEmail, setViewerEmail] = useState("");
   const [pendingCheckout, setPendingCheckout] =
@@ -1270,9 +1282,38 @@ export default function TopupExperience({
     setConfirmOpen(true);
   }
 
-  async function confirmCheckout() {
-    if (!pendingCheckout) return;
+  /*
+   * Sidik isi form checkout: kunci idempotensi dirotasi kalau isi form
+   * berubah, supaya coba ulang tidak pernah diarahkan ke order dengan
+   * isi lama (kasus: attempt pertama timeout padahal order berhasil
+   * dibuat, lalu user mengganti paket dan mencoba lagi).
+   */
+  function checkoutFingerprint(): string {
+    return JSON.stringify([
+      selectedGame.id,
+      selectedPackage.id,
+      paymentMethod.id,
+      pendingCheckout?.targetUserId ?? "",
+      pendingCheckout?.targetServerId ?? "",
+      pointsToRedeem,
+      appliedPromoCode,
+      appliedReferralCode,
+      selectedMerchantId,
+    ]);
+  }
 
+  async function confirmCheckout() {
+    if (!pendingCheckout || submittingRef.current) return;
+
+    const fingerprint = checkoutFingerprint();
+    if (
+      !checkoutKeyRef.current ||
+      checkoutKeyRef.current.fingerprint !== fingerprint
+    ) {
+      checkoutKeyRef.current = { key: crypto.randomUUID(), fingerprint };
+    }
+
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/orders", {
@@ -1288,6 +1329,7 @@ export default function TopupExperience({
           referralCode: appliedReferralCode,
           pointsToRedeem,
           merchantId: selectedMerchantId || undefined,
+          idempotencyKey: checkoutKeyRef.current.key,
           ...(pendingCheckout.guestContact
             ? {
                 receiptEmail: pendingCheckout.guestContact.email,
@@ -1306,6 +1348,9 @@ export default function TopupExperience({
       };
       if (!response.ok || !data.order) {
         // Tutup dialog supaya pesan error di form terlihat.
+        // Kunci idempotensi TIDAK dibuang: kalau order ternyata sudah
+        // berhasil dibuat di server (respons hilang di jalan), coba
+        // ulang dengan kunci sama akan menerima order itu kembali.
         setConfirmOpen(false);
         setNotice(
           data.error ?? "Aduh, pembayarannya gagal dibuat. Coba lagi ya.",
@@ -1335,11 +1380,15 @@ export default function TopupExperience({
       const tokenParam = data.accessToken
         ? `?access_token=${data.accessToken}`
         : "";
+      // Kunci dibuang saat sukses: pembelian berikutnya dengan isi form
+      // apapun adalah order baru yang sah, bukan replay.
+      checkoutKeyRef.current = null;
       router.push(`/order/${encodeURIComponent(data.order.id)}${tokenParam}`);
     } catch {
       setConfirmOpen(false);
       setNotice("Sebentar, servernya lagi ngambek. Coba lagi.");
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   }

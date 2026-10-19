@@ -80,6 +80,12 @@ type CreateOrderBody = {
    * server: nilai ini datang dari browser dan tidak boleh dipercaya.
    */
   merchantId?: string;
+  /*
+   * Kunci idempotensi checkout (P1.5): UUID buatan browser untuk satu
+   * rangkaian attempt terhadap isi form yang sama. Request ulang dengan
+   * kunci yang sama menerima order yang sudah dibuat, bukan order kedua.
+   */
+  idempotencyKey?: string;
 };
 
 type GameAccountRow = {
@@ -99,6 +105,63 @@ function createOrderId(now = new Date()) {
   const date = now.toISOString().slice(0, 10).replaceAll("-", "");
   const suffix = randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase();
   return `NBH-${date}-${suffix}`;
+}
+
+/*
+ * Status yang boleh dijawab ulang untuk kunci idempotensi yang sama.
+ * Order terminal/kedaluwarsa tidak pernah di-replay - pembayarannya
+ * sudah selesai atau sudah dibatalkan bersih oleh sweeper.
+ */
+const REPLAYABLE_ORDER_STATUSES = new Set(["pending_payment", "pending_merchant"]);
+
+function normalizeIdempotencyKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim();
+  return /^[A-Za-z0-9-]{8,64}$/.test(key) ? key : null;
+}
+
+/**
+ * Jawaban ulang untuk request dengan kunci idempotensi yang sudah dipakai:
+ * bentuk identik dengan respons sukses biasa, jadi client tidak perlu tahu
+ * bedanya - langsung diarahkan ke halaman order yang sama.
+ *
+ * Token akses baru wajib dimintakan: yang tersimpan di order hanya hashnya,
+ * token lama tidak bisa direkonstruksi. Menimpa hash aman - pemegang
+ * respons pertama sudah berpindah halaman, dan replay berasal dari browser
+ * yang sama (cookie ikut diperbarui di respons ini).
+ */
+async function replayOrderResponse(
+  orderId: string,
+  auth: Awaited<ReturnType<typeof resolveNambahAuth>>,
+) {
+  const access = createOrderAccessCredential();
+  await supabaseUpdate(
+    "orders",
+    { access_token_hash: access.tokenHash },
+    { filters: { id: `eq.${orderId}` } },
+  );
+
+  const order = await getPublicOrder(orderId);
+  if (!order) {
+    return Response.json(
+      { error: "Order tidak ditemukan. Silakan coba lagi." },
+      { status: 404 },
+    );
+  }
+
+  const responseHeaders = new Headers({
+    "Cache-Control": "private, no-store",
+  });
+  responseHeaders.append(
+    "Set-Cookie",
+    createOrderAccessCookie(orderId, access.token),
+  );
+  appendResolvedNambahAuthCookies(responseHeaders, auth);
+
+  return Response.json(
+    { order, accessToken: access.token },
+    { status: 200, headers: responseHeaders },
+  );
 }
 
 export async function POST(request: Request) {
@@ -152,6 +215,44 @@ export async function POST(request: Request) {
   const targetUserId = body.targetUserId ?? "";
   const targetServerId = body.targetServerId ?? "";
   const auth = await resolveNambahAuth(request);
+
+  /*
+   * IDEMPOTENSI CHECKOUT (P1.5) — dicek SEBELUM validasi apa pun.
+   *
+   * Klik ganda, retry jaringan, dan respons yang hilang ketika order
+   * ternyata sudah dibuat semuanya mengirim kunci yang sama. Order yang
+   * masih hidup dijawab ulang apa adanya; order yang sudah mati
+   * melepas kuncinya supaya attempt baru diproses normal.
+   *
+   * Sengaja ditempatkan sebelum validasi promo/points/persediaan dan
+   * sebelum gerbang verifikasi (yang membakar kuota cek supplier):
+   * kondisi-kondisi itu bisa berubah sejak attempt pertama, dan replay
+   * tidak boleh ditolak oleh keadaan yang sudah tidak berlaku — order
+   * lama memegang reservasinya sendiri.
+   */
+  const idempotencyKey = normalizeIdempotencyKey(body.idempotencyKey);
+  if (idempotencyKey) {
+    const [existing] = await supabaseSelect<{ id: string; status: string }>(
+      "orders",
+      {
+        select: "id,status",
+        filters: { checkout_key: `eq.${idempotencyKey}` },
+        limit: 1,
+      },
+    );
+    if (existing) {
+      if (REPLAYABLE_ORDER_STATUSES.has(existing.status)) {
+        return replayOrderResponse(existing.id, auth);
+      }
+      // Order dengan kunci ini sudah mati - lepaskan kuncinya supaya
+      // attempt baru boleh memakai kunci yang sama.
+      await supabaseUpdate(
+        "orders",
+        { checkout_key: null },
+        { filters: { id: `eq.${existing.id}` } },
+      );
+    }
+  }
 
   let receiptEmail = "";
   let receiptWhatsapp = "";
@@ -600,6 +701,11 @@ export async function POST(request: Request) {
       account_region: accountVerification.region,
       account_verified_at: accountVerification.checkedAt,
       account_limit_reason: accountVerification.limitReason ?? null,
+      /*
+       * Kunci idempotensi (migrasi 057): NULL untuk request tanpa kunci
+       * (klien lama) - unique index membolehkan banyak NULL.
+       */
+      checkout_key: idempotencyKey || null,
     });
 
     /*
@@ -826,6 +932,36 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Order creation failed", error);
+
+    /*
+     * Backstop race idempotensi (P1.5): dua POST bersamaan dengan kunci
+     * yang sama bisa dua-duanya lolos pre-check. Unique index memutus
+     * seri - yang kalah jatuh ke sini dan cukup diarahkan ke order
+     * pemenang, tanpa pernah menyentuh reservasi atau sesi pembayaran.
+     *
+     * Kegagalan langkah-langkah LAIN tidak salah jalur: order yang
+     * dibatalkan oleh kompensasi (snap_create_failed, dsb.) sudah tidak
+     * replayable, jadi lookup ini tidak menemukan apa pun dan error
+     * aslinya tetap mengalir ke respons 502 di bawah.
+     */
+    if (idempotencyKey) {
+      try {
+        const [winner] = await supabaseSelect<{ id: string; status: string }>(
+          "orders",
+          {
+            select: "id,status",
+            filters: { checkout_key: `eq.${idempotencyKey}` },
+            limit: 1,
+          },
+        );
+        if (winner && REPLAYABLE_ORDER_STATUSES.has(winner.status)) {
+          return replayOrderResponse(winner.id, auth);
+        }
+      } catch {
+        /* Kegagalan backstop tidak boleh menutupi error aslinya. */
+      }
+    }
+
     const detail = error instanceof Error ? error.message : "";
 
     /*
