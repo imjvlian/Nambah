@@ -317,6 +317,17 @@ function isOnlyGroupNote(note?: string) {
 
 function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
   const text = `${game.name} ${item.label} ${item.note ?? ""}`.toLowerCase();
+  /*
+   * First Top Up dicek SEBELUM diamond: label FTU selalu menyebut nominal
+   * diamonds ("First Top Up 50+Bonus Diamonds") - tanpa cabang ini semua
+   * FTU tampil sebagai diamond biasa (kasus MLBB, 20 Okt 2026).
+   */
+  if (
+    /(first top up|first topup|first recharge|top up pertama|topup pertama)/i.test(
+      text,
+    )
+  )
+    return "first-top-up";
   if (/(weekly|pass|membership|member|starlight|langganan)/i.test(text))
     return "pass";
   if (/(diamond|diamonds)/i.test(text)) return "diamond";
@@ -328,6 +339,7 @@ function getPackageVisualKind(game: Game, item: Game["packages"][number]) {
 
 function packageVisualLabel(kind: ReturnType<typeof getPackageVisualKind>) {
   if (kind === "diamond") return "◆";
+  if (kind === "first-top-up") return "1ST";
   if (kind === "pass") return "PASS";
   if (kind === "uc") return "UC";
   if (kind === "robux") return "R$";
@@ -351,7 +363,7 @@ function getNominalSectionId(item: Game["packages"][number]): NominalSectionId {
   }
 
   if (
-    /(weekly elite pack|monthly elite pack|weekly epic pack|monthly epic pack|weekly pack|monthly pack|weekly card|monthly card|paket mingguan|paket bulanan)/i.test(
+    /(weekly diamond pass|weekly elite|monthly elite|weekly epic|monthly epic|weekly pack|monthly pack|weekly bundle|monthly bundle|weekly card|monthly card|paket mingguan|paket bulanan|mingguan|bulanan)/i.test(
       text,
     )
   ) {

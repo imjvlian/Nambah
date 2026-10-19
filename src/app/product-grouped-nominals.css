@@ -194,6 +194,10 @@
   font-size: 8px !important;
 }
 
+.package-card-v4 .package-item-visual.first-top-up {
+  font-size: 8px !important;
+}
+
 .package-card-v4-body {
   grid-column: 2;
   grid-row: 1;
