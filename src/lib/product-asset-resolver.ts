@@ -472,17 +472,40 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
   const itemUnits = unitFamilies(label);
   const assetUnits = unitFamilies(alt);
 
+  /*
+   * First Top Up memakai artwork DIAMOND BIASA dengan nominal sama
+   * (keputusan owner 20 Okt 2026): "First Top Up 50+Bonus Diamonds"
+   * menampilkan artwork yang sama dengan produk diamond nominal
+   * tersebut. Nominal diambil dari firstTopUpTotal; aset artwork FTU
+   * khusus ("pengisian pertama" ala Codashop) sengaja TIDAK dipakai.
+   * Berlaku juga untuk nominal FTU lain di kemudian hari.
+   */
+  if (itemIntent === "first-top-up") {
+    if (assetIntent) return null;
+    const target = firstTopUpTotal(item.label);
+    if (target === null) return null;
+
+    if (typeof asset.denomination === "number") {
+      if (target !== asset.denomination) return null;
+      const altTokens = new Set(tokens(alt));
+      const overlap = tokens(label).filter((token) => altTokens.has(token)).length;
+      return 900 + overlap * 10;
+    }
+
+    if (assetNumbers.length === 0 || assetNumbers[0] !== target) return null;
+    if (!compatibleUnits(itemUnits, assetUnits)) return null;
+    const altTokens = new Set(tokens(alt));
+    const overlap = tokens(label).filter((token) => altTokens.has(token)).length;
+    return 500 + overlap * 10;
+  }
+
   // Special products are matched by their semantic intent first. A weekly
   // pass must never become a monthly pack, first-top-up bundle, etc.
   if (itemIntent || assetIntent) {
     if (!itemIntent || itemIntent !== assetIntent) return null;
     if (!compatibleUnits(itemUnits, assetUnits)) return null;
 
-    if (itemIntent === "first-top-up") {
-      const itemTotal = firstTopUpTotal(item.label);
-      const assetTotal = firstTopUpTotal(asset.alt);
-      if (itemTotal !== null && assetTotal !== null && itemTotal !== assetTotal) return null;
-    } else if (
+    if (
       itemNumbers.length > 0 &&
       assetNumbers.length > 0 &&
       !sameNumbers(itemNumbers, assetNumbers)
@@ -525,12 +548,23 @@ function scoreNominalAsset(item: GamePackage, asset: ProductAsset): number | nul
 
 function findRangeNominalAsset(product: ProductAssetEntry, item: GamePackage) {
   const label = normalize(item.label);
-  const target = primaryNumber(item.label);
+  const intent = specialIntent(label);
+  /*
+   * First Top Up ikut jalur nominal diamond biasa (keputusan owner 20
+   * Okt 2026): kalau tidak ada artwork dengan nominal persis sama, ia
+   * memakai representative range - identik dengan apa yang dirender
+   * produk diamond biasa nominal itu. Intent lain tetap hanya
+   * pencocokan semantik.
+   */
+  const target =
+    intent === "first-top-up"
+      ? firstTopUpTotal(item.label)
+      : primaryNumber(item.label);
   const itemUnits = unitFamilies(label);
 
   // Special products continue to use semantic matching only. Range fallback is
   // for ordinary denominations such as Diamonds, UC, Robux, Points and Crystals.
-  if (specialIntent(label) || target === null) return null;
+  if ((intent && intent !== "first-top-up") || target === null) return null;
 
   const itemTokens = new Set(tokens(label));
 

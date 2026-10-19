@@ -467,3 +467,52 @@ test("produk di luar daftar denomination tetap dapat gambar nearest", () => {
   });
   assert.ok(wuthering?.src.startsWith("/nambah-assets/"));
 });
+
+test("FTU memakai artwork diamond biasa dengan nominal sama (keputusan owner 20 Okt)", () => {
+  /*
+   * Regresi nyata: kartu "First Top Up 50+Bonus Diamonds" tampil dengan
+   * artwork FTU Codashop ("100 Diamonds (50+50) pengisian pertama!")
+   * lewat fallback, sementara produk "50 Diamond" tampil dengan artwork
+   * diamond biasa - dua item yang sama-sama diamonds terlihat seperti
+   * dua produk yang berbeda jenis. Aturan baru: FTU dirender persis
+   * seperti diamond biasa nominalnya (nominal FTU diambil dari
+   * firstTopUpTotal), termasuk saat nominalnya hanya tersedia sebagai
+   * representative range (50 -> aset 44, sama seperti "50 Diamond").
+   */
+  const biasa = resolveProductAsset(game("mobile-legends"), {
+    id: "x",
+    label: "50 Diamond",
+  });
+  const ftu = resolveProductAsset(game("mobile-legends"), {
+    id: "x",
+    label: "First Top Up 50+Bonus Diamonds",
+  });
+
+  assert.ok(biasa?.src, "produk diamond biasa harus dapat artwork");
+  assert.equal(
+    ftu?.src,
+    biasa?.src,
+    "FTU harus tampil dengan artwork yang sama dengan diamond biasa nominal sama",
+  );
+  // Bukan artwork FTU khusus Codashop - asset "pengisian pertama" memang
+  // ada di manifest dan dulunya menang lewat fallback pertama-asset.
+  assert.ok(
+    !/pengisian/i.test(ftu?.alt ?? ""),
+    "alt tidak boleh menyebut pengisian pertama",
+  );
+
+  // Nominal FTU lain di kemudian hari: aturan yang sama, bukan gambar FTU.
+  const ftuLain = resolveProductAsset(game("mobile-legends"), {
+    id: "x",
+    label: "First Top Up 85+Bonus Diamonds",
+  });
+  const biasaLain = resolveProductAsset(game("mobile-legends"), {
+    id: "x",
+    label: "85 Diamonds",
+  });
+  assert.equal(ftuLain?.src, biasaLain?.src);
+  assert.ok(
+    !/pengisian/i.test(ftuLain?.alt ?? ""),
+    "nominal FTU lain juga tidak boleh memakai artwork pengisian pertama",
+  );
+});
