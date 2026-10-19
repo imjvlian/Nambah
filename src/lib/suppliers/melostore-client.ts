@@ -202,7 +202,7 @@ export type MelostoreCheckUnavailableReason =
   | "auth";
 
 export type MelostoreCheckOutcome =
-  | { outcome: "verified"; username: string }
+  | { outcome: "verified"; username: string; region: string | null }
   | { outcome: "invalid" }
   | { outcome: "unavailable"; reason: MelostoreCheckUnavailableReason };
 
@@ -213,8 +213,17 @@ function mapAccountCheckOutcome(
   if (httpStatus === 200) {
     const username =
       data && typeof data.username === "string" ? data.username.trim() : "";
+    /*
+     * Region (mis. "ID", region_type "country") ikut respons check-nickname
+     * untuk game yang memilikinya — data yang sudah dibayar, jangan dibuang.
+     * Game tanpa konsep region tetap null.
+     */
+    const region =
+      data && typeof data.region === "string" && data.region.trim()
+        ? data.region.trim()
+        : null;
     return username
-      ? { outcome: "verified", username }
+      ? { outcome: "verified", username, region }
       : { outcome: "unavailable", reason: "provider-error" };
   }
   if (httpStatus === 404) return { outcome: "invalid" };
@@ -258,6 +267,8 @@ export type MelostorePurchaseLimitResult =
   | {
       outcome: "verified";
       username: string;
+      /** Region bila Melostore mengirimkannya (docs tidak menjanjikannya). */
+      region: string | null;
       weeklyPass: Array<{ packageCode: string; limitReached: boolean }>;
       doubleDiamonds: Array<{ packageCode: string; limitReached: boolean }>;
       doubleDiamondsEligible: boolean | null;
@@ -300,6 +311,16 @@ export async function checkMelostorePurchaseLimit(input: {
     if (!username) {
       return { outcome: "unavailable", reason: "provider-error" };
     }
+
+    /*
+     * Docs purchase-limit tidak menjanjikan region, tapi kalau Melostore
+     * mengirimkannya ia berharga untuk banner — parse defensif, tanpa
+     * pernah gagal karena bentuknya aneh.
+     */
+    const region =
+      data && typeof data.region === "string" && data.region.trim()
+        ? data.region.trim()
+        : null;
 
     const weeklyPassRaw =
       data?.weekly_pass && typeof data.weekly_pass === "object"
@@ -361,6 +382,7 @@ export async function checkMelostorePurchaseLimit(input: {
     return {
       outcome: "verified",
       username,
+      region,
       weeklyPass,
       doubleDiamonds,
       doubleDiamondsEligible,

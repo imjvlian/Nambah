@@ -63,7 +63,7 @@ test("200 dengan username = verified, body memakai nama field Melostore", async 
     );
     return jsonStatus(200, {
       success: true,
-      data: { username: "TimnasKita" },
+      data: { username: "TimnasKita", region: "ID", region_type: "country" },
     });
   });
 
@@ -73,7 +73,11 @@ test("200 dengan username = verified, body memakai nama field Melostore", async 
       userId: "12345678",
       zoneId: "1234",
     });
-    assert.deepEqual(result, { outcome: "verified", username: "TimnasKita" });
+    assert.deepEqual(result, {
+      outcome: "verified",
+      username: "TimnasKita",
+      region: "ID",
+    });
   } finally {
     restore();
     pulihkanEnv();
@@ -96,7 +100,12 @@ test("zone opsional: tanpa zoneId, field customer_target_zone tidak dikirim", as
       gameCode: "free-fire",
       userId: "12345678",
     });
-    assert.deepEqual(result, { outcome: "verified", username: "Joko" });
+    // Region absen dari respons -> null (bukan error, bukan string kosong).
+    assert.deepEqual(result, {
+      outcome: "verified",
+      username: "Joko",
+      region: null,
+    });
   } finally {
     restore();
     pulihkanEnv();
@@ -226,6 +235,9 @@ test("purchase-limit: 200 mem-parsing username, weekly_pass, double_diamonds", a
       success: true,
       data: {
         username: "TimnasKita",
+        // Docs tidak menjanjikan region di purchase-limit; parse-nya
+        // defensif - kalau dikirim, ia harus mengalir.
+        region: "ID",
         weekly_pass: {
           limit_reached: false,
           items: [
@@ -253,6 +265,7 @@ test("purchase-limit: 200 mem-parsing username, weekly_pass, double_diamonds", a
     assert.equal(result.outcome, "verified");
     if (result.outcome === "verified") {
       assert.equal(result.username, "TimnasKita");
+      assert.equal(result.region, "ID");
       assert.deepEqual(result.weeklyPass, [
         { packageCode: "MLBB_WDP_100", limitReached: true },
         // Item tanpa limit_reached jatuh ke nilai top-level (false).

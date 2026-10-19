@@ -138,3 +138,22 @@ test("engine tidak pernah memblokir MLBB lewat cache", () => {
   assert.ok(mlbbBranch > 0);
   assert.ok(cacheRead > mlbbBranch, "cache read harus setelah cabang MLBB");
 });
+
+test("region dari supplier mengalir ke hasil verifikasi + cache (tidak dibuang)", () => {
+  // Docs Melostore: check-nickname mengirim region (mis. "ID") untuk game
+  // yang memilikinya. Data ini sudah dibayar bersama ceknya - membuangnya
+  // berarti banner cek akun dan kolom audit account_region kosong melulu.
+  const engine = readFileSync("src/lib/account-verification.ts", "utf8");
+  assert.ok(
+    engine.includes("region: result.region"),
+    "hasil cek supplier harus membawa region ke hasil verifikasi",
+  );
+  const route = readFileSync(
+    "src/app/api/game-account/check/route.ts",
+    "utf8",
+  );
+  assert.ok(
+    route.includes("region: limit.region"),
+    "banner cek akun harus menerima region dari purchase-limit",
+  );
+});

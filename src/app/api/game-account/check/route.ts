@@ -414,7 +414,7 @@ export async function POST(request: Request) {
         accountCache.set(cacheKey, {
           nickname: limit.username,
           server: serverId,
-          region: null,
+          region: limit.region,
           countryCode: null,
           source: "melostore",
           purchaseLimit,
@@ -427,6 +427,7 @@ export async function POST(request: Request) {
           serverId,
           nickname: limit.username,
           resolvedServer: serverId,
+          region: limit.region,
           provider: "melostore",
           purchaseLimit,
         });
@@ -434,7 +435,7 @@ export async function POST(request: Request) {
         return Response.json({
           nickname: limit.username,
           server: serverId,
-          region: null,
+          region: limit.region,
           verified: true,
           purchaseLimit,
         });

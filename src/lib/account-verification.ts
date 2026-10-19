@@ -242,6 +242,7 @@ export async function verifyOrderAccount(input: {
             userId: input.userId,
             serverId: input.serverId,
             nickname: result.username,
+            region: result.region,
             provider: "melostore",
             purchaseLimit: {
               weeklyPass: result.weeklyPass,
@@ -261,7 +262,7 @@ export async function verifyOrderAccount(input: {
             status: "limit_blocked",
             provider: "melostore",
             nickname: result.username,
-            region: null,
+            region: result.region,
             checkedAt: nowIso(),
             limitReason: decision.reason,
           };
@@ -271,7 +272,7 @@ export async function verifyOrderAccount(input: {
           status: "verified",
           provider: "melostore",
           nickname: result.username,
-          region: null,
+          region: result.region,
           checkedAt: nowIso(),
         };
       }
@@ -319,6 +320,7 @@ export async function verifyOrderAccount(input: {
           userId: input.userId,
           serverId: input.serverId,
           nickname: result.username,
+          region: result.region,
           provider: "melostore",
         });
       } catch (error) {
@@ -332,7 +334,7 @@ export async function verifyOrderAccount(input: {
         status: "verified",
         provider: "melostore",
         nickname: result.username,
-        region: null,
+        region: result.region,
         checkedAt: nowIso(),
       };
     }
