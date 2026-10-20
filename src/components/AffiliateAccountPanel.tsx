@@ -31,6 +31,8 @@ type AffiliateData = {
     rejectionReason: string | null;
     externalReference: string | null;
   }>;
+  /** Minimal pencairan komisi (P1.4) - dari app_settings. */
+  minPayout?: number;
   error?: string;
 };
 
@@ -141,9 +143,12 @@ export default function AffiliateAccountPanel() {
   if (!data?.affiliate) return null;
 
   const affiliate = data.affiliate;
+  const minPayout = data.minPayout ?? 10000;
   const activeWithdrawal = data.withdrawals.find((item) =>
     item.status === "pending" || item.status === "approved",
   );
+  const amountValid =
+    Number(draft.amount) >= minPayout && Number(draft.amount) > 0;
 
   /*
   /*
@@ -222,13 +227,17 @@ export default function AffiliateAccountPanel() {
         </p>
       ) : null}
 
+      <p className="account-affiliate-link-warning">
+        Minimal pencairan komisi: {formatIDR(minPayout)}.
+      </p>
+
       <div className="account-profile-form">
         <label>
           <span>Nominal withdrawal</span>
           <input
             type="number"
-            min={1}
-            max={Math.max(1, affiliate.available)}
+            min={minPayout}
+            max={Math.max(minPayout, affiliate.available)}
             value={draft.amount}
             onChange={(event) =>
               setDraft((current) => ({ ...current, amount: event.target.value }))
@@ -277,6 +286,7 @@ export default function AffiliateAccountPanel() {
           disabled={
             busy === "request" ||
             affiliate.available <= 0 ||
+            !amountValid ||
             Boolean(activeWithdrawal)
           }
           onClick={() => void requestWithdrawal()}
@@ -285,7 +295,9 @@ export default function AffiliateAccountPanel() {
             ? "Mengirim..."
             : activeWithdrawal
               ? "Masih ada withdrawal aktif"
-              : "Ajukan withdrawal"}
+              : !amountValid
+                ? "Minimal " + formatIDR(minPayout)
+                : "Ajukan withdrawal"}
         </button>
       </div>
 

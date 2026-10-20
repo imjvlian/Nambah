@@ -4,7 +4,6 @@ import {
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
 import { supabaseRpc, supabaseSelect } from "@/lib/supabase/server";
-
 export const runtime = "nodejs";
 
 type AffiliateSummary = {
@@ -37,6 +36,26 @@ type WithdrawalRow = {
   external_reference: string | null;
 };
 
+/**
+ * Minimal pencairan komisi dari app_settings (P1.4) - sumber yang sama
+ * dengan yang dibaca RPC, jadi UI dan server tidak pernah berbeda
+ * pendapat. Gagal baca -> default 10000 (nilai bawaan migrasi 058).
+ */
+async function readMinPayout(): Promise<number> {
+  try {
+    const [row] = await supabaseSelect<{ value: unknown }>("app_settings", {
+      select: "value",
+      filters: { key: "eq.affiliate_min_payout" },
+      limit: 1,
+    });
+    const parsed = Number(row?.value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10000;
+  } catch (error) {
+    console.warn("Gagal membaca affiliate_min_payout, memakai default.", error);
+    return 10000;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await resolveNambahAuth(request);
@@ -53,7 +72,7 @@ export async function GET(request: Request) {
     );
 
     if (!summary?.affiliate) {
-      return Response.json({ affiliate: null, withdrawals: [] }, { headers });
+      return Response.json({ affiliate: null, withdrawals: [], minPayout: await readMinPayout() }, { headers });
     }
 
     const withdrawals = await supabaseSelect<WithdrawalRow>(
@@ -78,6 +97,11 @@ export async function GET(request: Request) {
           reserved: Number(summary.affiliate.reserved),
           withdrawn: Number(summary.affiliate.withdrawn),
         },
+        /*
+         * Minimal pencairan (P1.4) - dibaca dari app_settings supaya UI
+         * bisa menampilkan dan memvalidasinya tanpa deploy ulang.
+         */
+        minPayout: await readMinPayout(),
         withdrawals: withdrawals.map((row) => ({
           id: row.id,
           amount: Number(row.amount),

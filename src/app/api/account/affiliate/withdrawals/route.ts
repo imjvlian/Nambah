@@ -75,8 +75,19 @@ export async function POST(request: Request) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("Affiliate withdrawal request failed", error);
+    /*
+     * Semua raise exception di RPC ini sengaja berbahasa pelanggan
+     * ("Minimal pencairan komisi adalah Rp 10.000.", "Saldo affiliate
+     * tersedia tidak mencukupi.", dst) - pesannya diteruskan apa adanya,
+     * bukan ditelan jadi "gagal dibuat" yang tidak menjelaskan apa-apa.
+     */
+    const detail = error instanceof Error ? error.message : "";
     return Response.json(
-      { error: "Withdrawal gagal dibuat. Coba beberapa saat lagi." },
+      {
+        error: detail
+          ? "Pencairan gagal: " + detail
+          : "Withdrawal gagal dibuat. Coba beberapa saat lagi.",
+      },
       { status: 409 },
     );
   }

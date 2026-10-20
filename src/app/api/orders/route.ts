@@ -86,6 +86,12 @@ type CreateOrderBody = {
    * kunci yang sama menerima order yang sudah dibuat, bukan order kedua.
    */
   idempotencyKey?: string;
+  /*
+   * Consent Syarat & Ketentuan + Kebijakan Privasi (P1.3, UU PDP):
+   * wajib true untuk setiap order - timestamp persetujuannya dicatat di
+   * orders.terms_accepted_at.
+   */
+  termsAccepted?: boolean;
 };
 
 type GameAccountRow = {
@@ -256,6 +262,24 @@ export async function POST(request: Request) {
 
   let receiptEmail = "";
   let receiptWhatsapp = "";
+
+  /*
+   * CONSENT SYARAT & KETENTUAN + KEBIJAKAN PRIVASI (P1.3, UU PDP).
+   *
+   * Ditolak sebelum efek samping apa pun - persetujuan yang tidak
+   * diberikan tidak boleh menghasilkan order, dan timestamp-nya
+   * dicatat di orders.terms_accepted_at sebagai bukti persetujuan
+   * per transaksi.
+   */
+  if (!body.termsAccepted) {
+    return Response.json(
+      {
+        error:
+          "Silakan baca dan setujui Ketentuan Layanan serta Kebijakan Privasi dulu sebelum melanjutkan pembayaran.",
+      },
+      { status: 400 },
+    );
+  }
   if (auth.user) {
     receiptEmail = normalizeReceiptEmail(auth.user.email);
     if (!receiptEmail || !isValidReceiptEmail(receiptEmail)) {
@@ -300,7 +324,20 @@ export async function POST(request: Request) {
     paymentId: body.paymentId,
     promoCode: body.promoCode,
     referralCode: body.referralCode,
+    /*
+     * Kode dari cookie link /r/[code] - sekali polos ini tidak pernah
+     * dikirim, jadi komisi link tidak pernah mendarat di order. Dengan
+     * ini, jalur link benar-benar hidup DAN dilindungi anti
+     * self-referral di pricing-repository (P1.1/P1.2).
+     */
+    linkCode: readLinkReferralCode(request),
     userId: auth.user?.id ?? null,
+    /*
+     * Identitas kontak pembeli (receipt asli) - dasar pencocokan
+     * WhatsApp/email untuk anti self-referral.
+     */
+    buyerEmail: receiptEmail,
+    buyerWhatsapp: receiptWhatsapp,
   });
 
   if (!pricingContext.ok) {
@@ -706,6 +743,12 @@ export async function POST(request: Request) {
        * (klien lama) - unique index membolehkan banyak NULL.
        */
       checkout_key: idempotencyKey || null,
+      /*
+       * Bukti persetujuan Syarat & Ketentuan + Kebijakan Privasi per
+       * transaksi (P1.3, UU PDP) - gate sudah menolak order tanpa
+       * consent, jadi di sini selalu terisi.
+       */
+      terms_accepted_at: now,
     });
 
     /*

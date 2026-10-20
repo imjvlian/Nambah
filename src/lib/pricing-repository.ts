@@ -18,6 +18,7 @@ import {
 } from "@/lib/supplier-pricing";
 import { isSupabaseConfigured, supabaseSelect } from "@/lib/supabase/server";
 import { evaluateCooldown } from "@/lib/affiliate-attribution";
+import { normalizeReceiptWhatsapp } from "@/lib/customer-contact";
 
 type PricingRequest = {
   gameId?: string;
@@ -40,6 +41,13 @@ type PricingRequest = {
   linkCode?: string;
   /** Untuk penegakan batas pemakaian per akun (promo & referral). */
   userId?: string | null;
+  /*
+   * Identitas kontak pembeli (P1.1/P1.2 - anti self-referral). Hanya
+   * dikirim dari pembuatan order, yang punya receipt asli; preview tidak
+   * memilikinya sehingga cek kontak hanya efektif di titik penegakan.
+   */
+  buyerEmail?: string | null;
+  buyerWhatsapp?: string | null;
 };
 
 type PricingContext = {
@@ -144,6 +152,8 @@ type AffiliateRow = {
   max_user_benefit: number | string | null;
   stackable_with_promotions: boolean;
   status: "active" | "inactive" | "suspended";
+  /** Pemilik kode - dasar anti self-referral (P1.1). */
+  user_id: string | null;
 };
 
 function normalizeCode(value?: string) {
@@ -228,7 +238,61 @@ function isPromotionCurrentlyActive(promotion: PromotionRow) {
 export type LinkAffiliate = {
   code: string;
   commissionRate: number;
+  /** Pemilik kode - untuk anti self-referral (P1.1/P1.2). */
+  ownerUserId: string;
 };
+
+/**
+ * Apakah komisi ini akan mengalir ke pembeli itu sendiri (P1.1/P1.2).
+ *
+ * Tiga identitas yang dicocokkan, urut kekuatan:
+ * 1. user_id     - pembeli login dengan akun yang sama;
+ * 2. email       - ternormalisasi lowercase;
+ * 3. WhatsApp    - ternormalisasi format 62xxx (login beda akun /
+ *                 tamu dengan nomor yang sama).
+ *
+ * Tanpa identitas pembeli yang bisa dibandingkan -> false (order tetap
+ * boleh jalan; penegakan berikutnya ada di cek lain).
+ */
+async function affiliateOwnedByBuyer(
+  ownerUserId: string,
+  buyer: {
+    userId?: string | null;
+    email?: string | null;
+    whatsapp?: string | null;
+  },
+): Promise<boolean> {
+  if (buyer.userId && buyer.userId === ownerUserId) return true;
+
+  const email = (buyer.email ?? "").trim().toLowerCase();
+  const whatsapp = normalizeReceiptWhatsapp(buyer.whatsapp ?? "");
+  if (!email && !whatsapp) return false;
+
+  if (email) {
+    const [owner] = await supabaseSelect<{ email: string | null }>("users", {
+      select: "email",
+      filters: { id: `eq.${ownerUserId}` },
+      limit: 1,
+    });
+    const ownerEmail = owner?.email?.trim().toLowerCase() ?? "";
+    if (ownerEmail && ownerEmail === email) return true;
+  }
+
+  if (whatsapp) {
+    const [profile] = await supabaseSelect<{ whatsapp: string | null }>(
+      "customer_profiles",
+      {
+        select: "whatsapp",
+        filters: { user_id: `eq.${ownerUserId}` },
+        limit: 1,
+      },
+    );
+    const ownerWhatsapp = normalizeReceiptWhatsapp(profile?.whatsapp ?? "");
+    if (ownerWhatsapp && ownerWhatsapp === whatsapp) return true;
+  }
+
+  return false;
+}
 
 /**
  * Kapan user ini terakhir mendapat komisi dari kode affiliate ini.
@@ -290,6 +354,7 @@ export async function resolveActiveAffiliate(
   return {
     code: row.code,
     commissionRate: Math.max(0, Math.min(1, Number(row.commission_rate) || 0)),
+    ownerUserId: row.user_id,
   };
 }
 
@@ -379,7 +444,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
       referralCode
         ? supabaseSelect<AffiliateRow>("affiliates", {
             select:
-              "code,display_name,commission_rate,user_benefit_type,user_benefit_value,minimum_order,max_user_benefit,stackable_with_promotions,status",
+              "code,display_name,commission_rate,user_benefit_type,user_benefit_value,minimum_order,max_user_benefit,stackable_with_promotions,status,user_id",
             filters: { code: `eq.${referralCode}`, status: "eq.active" },
             limit: 1,
           })
@@ -448,6 +513,33 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
       return { ok: false, status: 400, error: "Kode referral tidak ditemukan." };
     }
 
+    /*
+     * ANTI SELF-REFERRAL (P1.1/P1.2).
+     *
+     * Kode referral diketik sendiri oleh pembeli - komisi ke akunnya
+     * sendiri adalah margin bocor murni: diskon referral untuk dirinya
+     * DAN komisi untuk dirinya, dari order yang sama. Ditolak eksplisit
+     * (409) supaya berulang kali mencoba tidak pernah menguntungkan.
+     *
+     * Identitas: user_id login dulu; email/WhatsApp ternormalisasi
+     * menutup celah "login dengan akun lain" (P1.2).
+     */
+    if (affiliateRow?.user_id) {
+      const milikSendiri = await affiliateOwnedByBuyer(affiliateRow.user_id, {
+        userId: request.userId,
+        email: request.buyerEmail,
+        whatsapp: request.buyerWhatsapp,
+      });
+      if (milikSendiri) {
+        return {
+          ok: false,
+          status: 409,
+          error:
+            "Kode referral ini milikmu sendiri - tidak bisa dipakai untuk ordermu.",
+        };
+      }
+    }
+
     // ── Kode link: komisi saja, tanpa diskon, tanpa blokir order ──────────
     //
     // Berbeda dari kode referral di bawah. Untuk kode link:
@@ -465,6 +557,23 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
     let linkAffiliate: LinkAffiliate | null = linkCode
       ? await resolveActiveAffiliate(linkCode)
       : null;
+
+    /*
+     * ANTI SELF-REFERRAL jalur link (P1.1/P1.2): klik link /r/ miliknya
+     * sendiri tidak boleh menghasilkan komisi ke diri sendiri. Kunci
+     * diputus SENYAP (linkAffiliate = null), order tetap jalan - link
+     * yang tidak valid memang tidak boleh terasa seperti layanan rusak.
+     */
+    if (linkAffiliate) {
+      const milikSendiri = await affiliateOwnedByBuyer(linkAffiliate.ownerUserId, {
+        userId: request.userId,
+        email: request.buyerEmail,
+        whatsapp: request.buyerWhatsapp,
+      });
+      if (milikSendiri) {
+        linkAffiliate = null;
+      }
+    }
 
     if (linkAffiliate && request.userId) {
       const lastCommissionedAt = await findLastCommissionedOrderAt(

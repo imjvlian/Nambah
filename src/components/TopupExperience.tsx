@@ -457,6 +457,13 @@ export default function TopupExperience({
   const [pricingLoading, setPricingLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   /*
+   * Persetujuan Syarat & Ketentuan + Kebijakan Privasi (P1.3, UU PDP).
+   * Sekali dicentang, tetap tercentang untuk sesi halaman ini -
+   * pelanggan berulang tidak ditanya lagi tiap order; gate tetap
+   * memeriksa nilai yang dikirim dan timestamp dicatat per order.
+   */
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  /*
    * Kunci idempotensi checkout (P1.5): satu kunci untuk satu isi form.
    * Bertahan lintas kegagalan (timeout -> coba lagi = kunci sama =
    * server mengembalikan order yang sama, bukan order kedua),
@@ -1330,6 +1337,7 @@ export default function TopupExperience({
           pointsToRedeem,
           merchantId: selectedMerchantId || undefined,
           idempotencyKey: checkoutKeyRef.current.key,
+          termsAccepted,
           ...(pendingCheckout.guestContact
             ? {
                 receiptEmail: pendingCheckout.guestContact.email,
@@ -2525,6 +2533,26 @@ export default function TopupExperience({
                   </div>
                 </div>
 
+                <label className="checkout-confirm-consent">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                    disabled={isSubmitting}
+                  />
+                  <span>
+                    Saya sudah membaca dan menyetujui{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer">
+                      Ketentuan Layanan
+                    </a>{" "}
+                    dan{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                      Kebijakan Privasi
+                    </a>
+                    .
+                  </span>
+                </label>
+
                 <footer className="checkout-confirm-actions">
                   <button
                     ref={confirmCloseRef}
@@ -2538,12 +2566,14 @@ export default function TopupExperience({
                   <button
                     type="button"
                     className="primary-button"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !termsAccepted}
                     onClick={() => void confirmCheckout()}
                   >
                     {isSubmitting
                       ? "Membuat pembayaran..."
-                      : "Konfirmasi & bayar"}{" "}
+                      : termsAccepted
+                        ? "Konfirmasi & bayar"
+                        : "Setujui dulu untuk lanjut"}{" "}
                     <span aria-hidden="true">→</span>
                   </button>
                 </footer>
