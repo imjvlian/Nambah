@@ -5,6 +5,7 @@ import {
   expectedPrefixes,
   isGameEligible,
   matchProductToSupplier,
+  brandCocokUntukGame,
   normalizeLabel,
   supplierPrefix,
   withSkuLabels,
@@ -94,6 +95,136 @@ test("pulsa dan e-wallet TIDAK diizinkan", () => {
 test("game tak dikenal tidak diizinkan dan tidak punya prefiks", () => {
   assert.equal(isGameEligible("game-yang-tidak-ada"), false);
   assert.deepEqual(expectedPrefixes("game-yang-tidak-ada"), []);
+});
+
+/* ==========================================================================
+   Magic Chess Go Go: allowlist dengan saringan BRAND (bukan prefiks).
+   ========================================================================== */
+
+test("magic-chess diizinkan; prefiks sengaja kosong - saringan via brand", () => {
+  assert.equal(isGameEligible("magic-chess"), true);
+  assert.deepEqual(
+    expectedPrefixes("magic-chess"),
+    [],
+    "prefiks belum terkonfirmasi dari data - tebakan dilarang",
+  );
+});
+
+test("magic-chess tanpa gameName tetap game-not-allowed (jalur lama aman)", () => {
+  const hasil = matchProductToSupplier(
+    produk("p-mcgg", "First Recharge 300 Diamonds", "magic-chess"),
+    [
+      {
+        supplierId: "melostore",
+        sku: "mcggfr300-s1",
+        cost: 1000,
+        stock: null,
+        skuLabel: "First Recharge 300 Diamonds",
+        brand: "Magic Chess Go Go",
+      },
+    ],
+  );
+  assert.equal(hasil.reason, "game-not-allowed");
+  assert.equal(hasil.supplierSku, null);
+});
+
+test("magic-chess auto-map via brand alias 'Magic Chess Go Go'", () => {
+  const hasil = matchProductToSupplier(
+    {
+      id: "p-mcgg",
+      label: "First Recharge 300 Diamonds",
+      gameId: "magic-chess",
+      // Nama baris games Nambah tidak harus persis sama dengan brand katalog.
+      gameName: "Magic Chess",
+    },
+    [
+      {
+        supplierId: "melostore",
+        sku: "mcggfr300-s1",
+        cost: 1000,
+        stock: null,
+        skuLabel: "First Recharge 300 Diamonds",
+        brand: "Magic Chess Go Go",
+      },
+    ],
+  );
+  assert.equal(hasil.confidence, "exact");
+  if (hasil.supplierSku !== null) {
+    assert.equal(hasil.supplierSku, "mcggfr300-s1");
+  }
+});
+
+test("brand game lain tidak menyusup lewat jalur brand", () => {
+  const hasil = matchProductToSupplier(
+    {
+      id: "p-mcgg",
+      label: "50 Diamonds",
+      gameId: "magic-chess",
+      gameName: "Magic Chess",
+    },
+    [
+      {
+        supplierId: "melostore",
+        sku: "ffid50d-s7",
+        cost: 1000,
+        stock: null,
+        skuLabel: "50 Diamonds",
+        brand: "Free Fire",
+      },
+    ],
+  );
+  // Label cocok tapi brand bukan milik game ini -> tidak ada kandidat,
+  // bukan pasangan salah.
+  assert.equal(hasil.confidence, "none");
+  assert.equal(hasil.supplierSku, null);
+});
+
+test("dua SKU brand sama -> ambiguous, bukan pilih termurah", () => {
+  const hasil = matchProductToSupplier(
+    {
+      id: "p-mcgg",
+      label: "50 Diamonds",
+      gameId: "magic-chess",
+      gameName: "Magic Chess",
+    },
+    [
+      {
+        supplierId: "melostore",
+        sku: "mcgg50d-s1",
+        cost: 900,
+        stock: null,
+        skuLabel: "50 Diamonds",
+        brand: "Magic Chess Go Go",
+      },
+      {
+        supplierId: "melostore",
+        sku: "mcgg50d-s2",
+        cost: 1200,
+        stock: null,
+        skuLabel: "50 Diamonds",
+        brand: "Magic Chess",
+      },
+    ],
+  );
+  assert.equal(hasil.confidence, "ambiguous");
+  assert.equal(hasil.supplierSku, null);
+});
+
+test("brandCocokUntukGame: nama game, short name, dan alias", () => {
+  const produk = {
+    id: "p",
+    label: "x",
+    gameId: "magic-chess",
+    gameName: "Magic Chess",
+    gameShortName: "MCGG",
+  };
+  assert.equal(brandCocokUntukGame("Magic Chess", produk), true);
+  assert.equal(brandCocokUntukGame("MCGG", produk), true);
+  assert.equal(brandCocokUntukGame("Magic Chess Go Go", produk), true);
+  assert.equal(brandCocokUntukGame("magic chess gogo", produk), true);
+  assert.equal(brandCocokUntukGame("Free Fire", produk), false);
+  assert.equal(brandCocokUntukGame(null, produk), false);
+  assert.equal(brandCocokUntukGame("", produk), false);
 });
 
 /* ==========================================================================

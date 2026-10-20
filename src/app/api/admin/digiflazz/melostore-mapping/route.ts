@@ -47,6 +47,7 @@ type ProductRow = {
 type GameRow = {
   id: string;
   name: string;
+  short_name: string;
 };
 
 type ExistingMapping = {
@@ -227,7 +228,7 @@ export async function GET(request: Request) {
       order: "label.asc",
     }),
     supabaseSelect<GameRow>("games", {
-      select: "id,name",
+      select: "id,name,short_name",
       filters: { active: "eq.true" },
       order: "name.asc",
       limit: 300,
@@ -245,6 +246,12 @@ export async function GET(request: Request) {
 
   const { matchProductToSupplier, isGameEligible, expectedPrefixes, normalizeLabel } =
     await import("@/lib/suppliers/match");
+
+  /*
+   * Nama game untuk saringan BRAND (magic-chess & game hasil "buat
+   * otomatis dari brand" tidak punya prefiks SKU yang dikenal).
+   */
+  const gameById = new Map(games.map((g) => [g.id, g] as const));
 
   const eligibleGames: GameOptions[] = games.map((g) => ({
     id: g.id,
@@ -289,17 +296,26 @@ export async function GET(request: Request) {
     const candidates = meloCatalog
       .filter((s) => normalizeLabel(s.name) === target)
       .slice(0, 8)
-      .map((s) => ({ sku: s.sku, name: s.name, cost: s.price }));
+      .map((s) => ({ sku: s.sku, name: s.name, cost: s.price, brand: s.brand }));
 
+    const gameRow = gameById.get(product.game_id);
     const auto = eligible
       ? matchProductToSupplier(
-          { id: product.id, label: product.label, gameId: product.game_id },
+          {
+            id: product.id,
+            label: product.label,
+            gameId: product.game_id,
+            ...(gameRow
+              ? { gameName: gameRow.name, gameShortName: gameRow.short_name }
+              : {}),
+          },
           candidates.map((c) => ({
             supplierId: "melostore" as const,
             sku: c.sku,
             cost: c.cost,
             stock: null,
             skuLabel: c.name,
+            brand: c.brand,
           })),
         )
       : null;
@@ -582,11 +598,12 @@ async function applyAutoMappings() {
       limit: 2000,
     }),
     supabaseSelect<GameRow>("games", {
-      select: "id,name",
+      select: "id,name,short_name",
       filters: { active: "eq.true" },
       limit: 300,
     }),
   ]);
+  const gameById = new Map(games.map((g) => [g.id, g] as const));
 
   const byLabel = new Map<string, ProductRow[]>();
   for (const p of products) {
@@ -622,14 +639,23 @@ async function applyAutoMappings() {
       continue;
     }
 
+    const gameRow = gameById.get(product.game_id);
     const hasil = matchProductToSupplier(
-      { id: product.id, label: product.label, gameId: product.game_id },
+      {
+        id: product.id,
+        label: product.label,
+        gameId: product.game_id,
+        ...(gameRow
+          ? { gameName: gameRow.name, gameShortName: gameRow.short_name }
+          : {}),
+      },
       quotes.map((q) => ({
         supplierId: "melostore" as const,
         sku: q.sku,
         cost: q.price,
         stock: null,
         skuLabel: q.name,
+        brand: q.brand,
       })),
     );
 

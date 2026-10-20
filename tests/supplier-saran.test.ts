@@ -294,3 +294,20 @@ test("gameCocokUntukProduk: saring hasil ketik per game", () => {
   );
   assert.equal(gameCocokUntukProduk(produkRoblox, { sku: "rgciid100800io-s7" }), false);
 });
+
+test("gameCocokUntukProduk: magic-chess lewat alias brand", () => {
+  const produkMcgg = { gameId: "magic-chess", gameName: "Magic Chess", label: "50 Squads" };
+  // Brand katalog Melostore "Magic Chess Go Go" cocok lewat alias walau
+  // nama baris games Nambah cuma "Magic Chess" - tanpa ini, hasil ketik
+  // untuk MCGG selalu kosong.
+  assert.equal(
+    gameCocokUntukProduk(produkMcgg, { sku: "mcgg50d-s1", brand: "Magic Chess Go Go" }),
+    true,
+  );
+  assert.equal(
+    gameCocokUntukProduk(produkMcgg, { sku: "mcgg50d-s1", brand: "Free Fire" }),
+    false,
+  );
+  // Tanpa brand dan tanpa prefiks -> tidak bisa diputuskan.
+  assert.equal(gameCocokUntukProduk(produkMcgg, { sku: "mcgg50d-s1" }), false);
+});

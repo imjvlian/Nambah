@@ -28,6 +28,7 @@
 
 import {
   expectedPrefixes,
+  GAME_BRAND_ALIASES,
   normalizeLabel,
   skuMulaiDenganPrefiks,
 } from "@/lib/suppliers/match";
@@ -144,7 +145,9 @@ export function gameCocokUntukProduk(
   for (const nama of [produk.gameName, produk.gameShortName]) {
     if (nama && normalizeText(nama) === targetBrand) return true;
   }
-  return false;
+  return (GAME_BRAND_ALIASES[produk.gameId] ?? []).some(
+    (alias) => normalizeText(alias) === targetBrand,
+  );
 }
 
 /**

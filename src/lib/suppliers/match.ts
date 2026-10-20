@@ -1,4 +1,5 @@
 import type { SupplierQuote } from "@/lib/suppliers/types";
+import { normalizeText } from "@/lib/game-defaults";
 
 /**
  * Pencocokan SKU supplier ke produk Nambah.
@@ -55,6 +56,13 @@ export type MatchableProduct = {
   id: string;
   label: string;
   gameId: string;
+  /**
+   * Nama + short name game Nambah — wajib untuk game yang saringannya
+   * lewat brand (magic-chess, game hasil "buat otomatis dari brand").
+   * Jalur prefiks tidak membutuhkannya.
+   */
+  gameName?: string;
+  gameShortName?: string;
 };
 
 /**
@@ -65,6 +73,10 @@ export type MatchableProduct = {
  * Melostore Armour punya SKU pulsa dengan struktur yang berbeda. Pilot
  * yang benar adalah game, di mana label dan prefiks SKU sama-sama punya
  * informasi yang cukup.
+ *
+ * Game TANPA prefiks SKU yang dikenal (magic-chess, hasil "buat otomatis
+ * dari brand"): saringan game-nya lewat BRAND katalog — lihat
+ * GAME_BRAND_ALIASES dan brandCocokUntukGame di bawah.
  */
 const GAME_ALLOWLIST = new Set([
   "mobile-legends",
@@ -74,6 +86,7 @@ const GAME_ALLOWLIST = new Set([
   "valorant",
   "genshin-impact",
   "honor-of-kings",
+  "magic-chess",
 ]);
 
 /**
@@ -153,9 +166,53 @@ export function expectedPrefixes(gameId: string): string[] {
       return ["genshin", "ys", "gi"];
     case "honor-of-kings":
       return ["hok", "hoking", "hokglobal"];
+    /*
+     * magic-chess: prefiks SKU Melostore-nya belum terkonfirmasi dari
+     * data - sengaja KOSONG, bukan tebakan. Saringan game-nya lewat
+     * brand (GAME_BRAND_ALIASES); prefiks bisa ditambahkan nanti tanpa
+     * mengubah perilaku brand.
+     */
+    case "magic-chess":
+      return [];
     default:
       return [];
   }
+}
+
+/**
+ * Alias brand katalog supplier untuk game yang saringannya TIDAK lewat
+ * prefiks SKU. Melostore menyebut game ini "Magic Chess Go Go";
+ * baris games Nambah bisa bernama apa pun saat dibuat - alias menutup
+ * semuanya tanpa menunggu prefiks SKU diketahui.
+ */
+export const GAME_BRAND_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "magic-chess": [
+    "magic chess go go",
+    "magic chess gogo",
+    "magic chess",
+    "mcgg",
+  ],
+};
+
+/**
+ * Apakah brand katalog cocok dengan game produk ini (jalur game tanpa
+ * prefiks SKU). Sama ketatnya dengan jalur prefiks: brand harus sama
+ * persis setelah normalisasi, dengan nama game/short name/alias —
+ * "Magic Chess Go Go" tidak akan pernah cocok dengan "Free Fire".
+ */
+export function brandCocokUntukGame(
+  brand: string | null | undefined,
+  product: MatchableProduct,
+): boolean {
+  const target = normalizeText(String(brand ?? ""));
+  if (!target) return false;
+
+  for (const nama of [product.gameName, product.gameShortName]) {
+    if (nama && normalizeText(nama) === target) return true;
+  }
+  return (GAME_BRAND_ALIASES[product.gameId] ?? []).some(
+    (alias) => normalizeText(alias) === target,
+  );
 }
 
 /**
@@ -213,7 +270,11 @@ export function isGameEligible(gameId: string): boolean {
  * mengambil data yang belum tentu ada. PencocokanQIbutuhkannya - jadi
  * label ditempelkan di sini, dari katalog lengkap yang sudah ada di memory.
  */
-export type LabeledQuote = SupplierQuote & { skuLabel?: string };
+export type LabeledQuote = SupplierQuote & {
+  skuLabel?: string;
+  /** Brand katalog — saringan game untuk product tanpa prefiks SKU. */
+  brand?: string | null;
+};
 
 export function withSkuLabels(
   quotes: readonly SupplierQuote[],
@@ -275,7 +336,15 @@ export function matchProductToSupplier(
   }
 
   const prefiks = expectedPrefixes(product.gameId);
-  if (prefiks.length === 0) {
+  /*
+   * Game allowlist TANPA prefiks SKU yang dikenal (magic-chess, game
+   * hasil "buat otomatis dari brand"): saringan game pindah ke BRAND
+   * katalog. Tanpa gameName pembanding, brand tidak mungkin dicocokkan -
+   * jalur lama tetap menolak supaya game tak dikenal tidak pernah
+   * auto-map.
+   */
+  const saringBrand = prefiks.length === 0;
+  if (saringBrand && !product.gameName) {
     return { ...kosong, reason: "game-not-allowed" };
   }
 
@@ -316,7 +385,9 @@ export function matchProductToSupplier(
     };
   }
 
-  const narrowed = byLabel.filter((q) => skuMulaiDenganPrefiks(q.sku, prefiks));
+  const narrowed = saringBrand
+    ? byLabel.filter((q) => brandCocokUntukGame(q.brand, product))
+    : byLabel.filter((q) => skuMulaiDenganPrefiks(q.sku, prefiks));
 
   if (narrowed.length === 0) {
     return {
