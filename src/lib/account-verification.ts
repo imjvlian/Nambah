@@ -10,6 +10,10 @@ import {
   type MelostoreCheckUnavailableReason,
 } from "@/lib/suppliers/melostore-client";
 import {
+  inquireDigiflazzPln,
+  isDigiflazzConfigured,
+} from "@/lib/digiflazz/client";
+import {
   getMelostoreGameCode,
   isResidualUnverifiableGame,
   melostoreCodeRequiresZone,
@@ -156,6 +160,94 @@ export async function verifyOrderAccount(input: {
   });
   if (!schema.checker) {
     return notRequired();
+  }
+
+  /*
+   * (2.5 PLN — P1.6, 21 Okt 2026) Inquiry Digiflazz: nomor pelanggan /
+   * ID meter dicek nama pelanggannya. Command "pln" bebas biaya dan
+   * tidak membuat transaksi. Salah nomor → invalid (ditolak sebelum
+   * bayar); gangguan jaringan → unavailable (fail-safe, bukan lolos).
+   *
+   * E-wallet TIDAK lewat sini: checker-nya "universal" sehingga jatuh
+   * ke jalur Melostore di bawah lewat MELOSTORE_GAME_CODES.
+   */
+  if (schema.checker === "pln") {
+    if (!isDigiflazzConfigured()) {
+      console.warn(
+        "[account-verification] DIGIFLAZZ_USERNAME / DIGIFLAZZ_API_KEY belum diisi — inquiry PLN tidak bisa dijalankan, gate fail-open.",
+      );
+      return {
+        status: "not_configured",
+        provider: null,
+        nickname: null,
+        region: null,
+        checkedAt: null,
+        alarm: "not-configured",
+      };
+    }
+
+    try {
+      const data = await inquireDigiflazzPln({
+        customerNo: input.userId,
+        refId: `nmb-pln-${input.userId}-${Date.now()}`,
+      });
+      const customerName = data?.customer_name?.trim() ?? "";
+      if (customerName) {
+        return {
+          status: "verified",
+          provider: "digiflazz",
+          nickname: customerName,
+          region: null,
+          checkedAt: nowIso(),
+        };
+      }
+      return {
+        status: "invalid",
+        provider: "digiflazz",
+        nickname: null,
+        region: null,
+        checkedAt: nowIso(),
+      };
+    } catch (error) {
+      const retryable =
+        error && typeof error === "object" && "retryable" in error
+          ? Boolean((error as { retryable?: unknown }).retryable)
+          : false;
+      const message = error instanceof Error ? error.message : "";
+      /*
+       * Galat konfigurasi (auth/IP) bukan salah nomor pelanggan —
+       * menandainya "invalid" berarti memblokir order pelanggan sah
+       * karena env kita sendiri bermasalah. Fail-safe: unavailable.
+       */
+      if (/auth|unauthorized|api key|whitelist|forbidden/i.test(message)) {
+        return {
+          status: "unavailable",
+          provider: "digiflazz",
+          nickname: null,
+          region: null,
+          checkedAt: nowIso(),
+          reason: "auth",
+        };
+      }
+      if (retryable) {
+        return {
+          status: "unavailable",
+          provider: "digiflazz",
+          nickname: null,
+          region: null,
+          checkedAt: nowIso(),
+          reason: "provider-error",
+        };
+      }
+      // Penolakan non-retryable dari inquiry = nomor pelanggan ditolak.
+      return {
+        status: "invalid",
+        provider: "digiflazz",
+        nickname: null,
+        region: null,
+        checkedAt: nowIso(),
+      };
+    }
   }
 
   // (3) + (4) Pemetaan Melostore.

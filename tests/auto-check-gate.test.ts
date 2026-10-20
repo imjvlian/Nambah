@@ -130,9 +130,10 @@ test("User ID tidak valid tetap menghentikan auto-check", () => {
 
 test("game tanpa checker tidak pernah auto-check", () => {
   // Tanpa route DAN tanpa checker (mis. voucher), tidak ada yang boleh
-  // dipanggil sama sekali.
+  // dipanggil sama sekali. PLN DIPINDAH dari daftar ini sejak P1.6 (21
+  // Okt 2026): checker-nya "pln" dan dicek via inquiry Digiflazz —
+  // lihat tests/nongame-verification.test.ts.
   for (const [id, name] of [
-    ["pln", "PLN"],
     ["xbox", "XBOX"],
     ["telkomsel", "TELKOMSEL"],
   ] as const) {

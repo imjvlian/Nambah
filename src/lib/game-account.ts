@@ -59,7 +59,7 @@ export type GameAccountSchema = {
     | "generic";
   user: AccountField;
   server?: AccountField;
-  checker: "mobile-legends" | "universal" | null;
+  checker: "mobile-legends" | "universal" | "pln" | null;
   helper: string;
 };
 
@@ -1059,11 +1059,38 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
-  // Pulsa operator, dompet digital, dan langganan yang terikat nomor HP.
-// Vidio masuk sini karena deskripsi Digiflazz-nya "Nomor tujuan diisi dengan
-// nomor hp yang terdaftar di Vidio" — bukan email.
+  /*
+   * E-wallet (P1.6, 21 Okt 2026): dompet digital yang nama pemiliknya
+   * bisa dicek via Melostore check-nickname (dana, gopay, ovo, shopeepay,
+   * linkaja, isaku — semua zone_required: false, dari endpoint publik
+   * /check-nickname/games). Checker "universal" + pemetaan
+   * MELOSTORE_GAME_CODES = gerbang verifikasi aktif: nomor tujuan yang
+   * tidak ditemukan ditolak sebelum bayar, dan banner menampilkan
+   * "a/n NAMA" pemilik akun.
+   */
   if (
-    /telkomsel|indosat|\bxl\b|axis|\btri\b|smartfren|by u|\bdana\b|go pay|gopay|\bovo\b|shopee pay|link aja|vidio/.test(
+    /\bdana\b|gopay|go pay|\bovo\b|shopeepay|shopee pay|linkaja|link aja|isaku|i saku/.test(
+      identity,
+    )
+  ) {
+    return {
+      kind: "phone",
+      user: PHONE_USER,
+      ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
+      checker: "universal",
+      helper:
+        "Masukkan nomor e-wallet tujuan yang aktif. Nama pemilik akun akan dicek otomatis.",
+    };
+  }
+
+  /*
+   * Pulsa operator dan langganan terikat nomor HP — TANPA checker: tidak
+   * ada cek nama pelanggan untuk nomor pulsa di provider mana pun.
+   * Vidio masuk sini karena deskripsi Digiflazz-nya "Nomor tujuan diisi
+   * dengan nomor hp yang terdaftar di Vidio" — bukan email.
+   */
+  if (
+    /telkomsel|indosat|\bxl\b|axis|\btri\b|smartfren|by u|vidio/.test(
       identity,
     )
   ) {
@@ -1076,8 +1103,26 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
     };
   }
 
-  // Tagihan: PLN, gas, TV berbayar — target nomor pelanggan numerik.
-  if (/pln|pertamina|k vision|kvision/.test(identity)) {
+  /*
+   * Tagihan PLN (P1.6, 21 Okt 2026): inquiry Digiflazz — nomor
+   * pelanggan / ID meter dicek nama pelanggannya sebelum bayar
+   * (command "pln", bebas biaya, tidak membuat transaksi). Diletakkan
+   * SEBELU cabang tagihan non-PLN supaya "pln" tidak tertelan.
+   */
+  if (/\bpln\b/.test(identity)) {
+    return {
+      kind: "numeric-bill",
+      user: BILL_USER,
+      ...(requiresServer ? { server: GENERIC_NUMERIC_SERVER } : {}),
+      checker: "pln",
+      helper:
+        "Masukkan nomor pelanggan / ID meter PLN. Nama pelanggan akan dicek otomatis.",
+    };
+  }
+
+  // Tagihan non-PLN: gas, TV berbayar — tanpa checker (inquiry Digiflazz
+  // hanya untuk PLN).
+  if (/pertamina|k vision|kvision/.test(identity)) {
     return {
       kind: "numeric-bill",
       user: BILL_USER,

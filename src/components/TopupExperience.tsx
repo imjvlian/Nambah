@@ -1679,10 +1679,20 @@ export default function TopupExperience({
                       </span>
                       <span className="account-check-copy">
                         <span>
-                          Akun kamu{" "}
-                          <strong>
-                            {usernameCheck.nickname ?? "terverifikasi"}
-                          </strong>
+                          {accountSchema.kind === "phone" ||
+                          accountSchema.kind === "numeric-bill" ? (
+                            <>
+                              a/n{" "}
+                              <strong>{usernameCheck.nickname}</strong>
+                            </>
+                          ) : (
+                            <>
+                              Akun kamu{" "}
+                              <strong>
+                                {usernameCheck.nickname ?? "terverifikasi"}
+                              </strong>
+                            </>
+                          )}
                           .
                         </span>
                         <small>
@@ -2327,7 +2337,7 @@ export default function TopupExperience({
                   <div className="checkout-confirm-head-copy">
                     <h3 id="rejection-popup-title">
                       {rejectionPopup.code === "invalid_account"
-                        ? "User ID tidak ditemukan"
+                        ? "Data tujuan tidak ditemukan"
                         : "Pembelian tidak bisa dilanjutkan"}
                     </h3>
                     <p>{rejectionPopup.message}</p>

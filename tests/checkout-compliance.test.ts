@@ -120,7 +120,7 @@ test("popup penolakan order: kode mesin + nickname di modal ringkasan (21 Okt)",
 
   // Popup penolakan di klien dengan CTA per kode.
   assert.ok(ui.includes("rejectionPopup"));
-  assert.ok(ui.includes("User ID tidak ditemukan"));
+  assert.ok(ui.includes("Data tujuan tidak ditemukan"));
   assert.ok(ui.includes("Perbaiki User ID"));
   assert.ok(ui.includes("Pembelian tidak bisa dilanjutkan"));
 

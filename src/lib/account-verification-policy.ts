@@ -38,7 +38,7 @@ export type AccountVerificationUnavailableReason =
 
 export type AccountVerificationLimitReason = "weekly-pass" | "double-diamonds";
 
-export type AccountVerificationProvider = "melostore" | "volsever" | "mimih";
+export type AccountVerificationProvider = "melostore" | "volsever" | "mimih" | "digiflazz";
 
 export type AccountVerificationResult = {
   status: AccountVerificationStatus;

@@ -303,6 +303,48 @@ export async function runDigiflazzTestTransaction(input: {
   });
 }
 
+export type DigiflazzPlnInquiryData = {
+  customer_name?: string | null;
+  idpln?: string | null;
+  power?: string | null;
+  segment?: string | null;
+  admin_biller?: number | string | null;
+  message?: string | null;
+};
+
+/**
+ * Inquiry PLN (P1.6, 21 Okt 2026): cek nomor pelanggan / ID meter →
+ * nama pelanggan.
+ *
+ * Command "pln" TIDAK membuat transaksi dan BEBAS BIAYA — hanya
+ * mengembalikan data pelanggan (nama, IDPLN, daya, segmen). Dipakai
+ * gerbang verifikasi untuk menampilkan "a/n NAMA" sebelum bayar dan
+ * menolak nomor pelanggan yang tidak ditemukan.
+ *
+ * Salah nomor → Digiflazz menolak (DigiflazzApiError non-retryable,
+ * pesan asli dari supplier). Gangguan jaringan → retryable. Pemanggil
+ * yang membedakan.
+ */
+export async function inquireDigiflazzPln(input: {
+  customerNo: string;
+  refId: string;
+}): Promise<DigiflazzPlnInquiryData | null> {
+  const { username, apiKey } = requireApiConfig();
+
+  const response = await postDigiflazz<{ data?: DigiflazzPlnInquiryData }>(
+    TRANSACTION_URL,
+    {
+      commands: "pln",
+      username,
+      customer_no: input.customerNo,
+      ref_id: input.refId,
+      sign: md5(`${username}${apiKey}${input.refId}`),
+    },
+  );
+
+  return response.data ?? null;
+}
+
 export function verifyDigiflazzWebhookSignature(rawBody: string, signatureHeader: string | null) {
   const { webhookSecret } = getConfig();
   if (!webhookSecret || !signatureHeader?.startsWith("sha1=")) return false;

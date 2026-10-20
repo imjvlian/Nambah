@@ -12,9 +12,15 @@ import {
 } from "@/lib/volsever/games";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import {
+  checkMelostoreNickname,
   checkMelostorePurchaseLimit,
   isMelostoreConfigured,
 } from "@/lib/suppliers/melostore-client";
+import {
+  inquireDigiflazzPln,
+  isDigiflazzConfigured,
+} from "@/lib/digiflazz/client";
+import { getMelostoreGameCode } from "@/lib/melostore-game-codes";
 import type { PublicPurchaseLimit } from "@/lib/purchase-limit-ux";
 import { BRAND } from "@/lib/brand";
 
@@ -372,6 +378,102 @@ export async function POST(request: Request) {
   }
 
   if (!routeSlug) {
+    /*
+     * P1.6 (21 Okt 2026): produk non-game yang TIDAK punya route
+     * Volsever. Tiga jalur sebelum menyerah ke localOnly:
+     *
+     * 1. PLN          → inquiry Digiflazz (bebas biaya) → nama pelanggan.
+     * 2. E-wallet     → Melostore check-nickname (dana/gopay/ovo/
+     *                   shopeepay/linkaja/isaku) → nama pemilik + cache.
+     * 3. Kalau keduanya gagal/tidak tersedia → localOnly seperti dulu.
+     */
+    if (schema.checker === "pln" && isDigiflazzConfigured()) {
+      try {
+        const data = await inquireDigiflazzPln({
+          customerNo: userId,
+          refId: `nmb-plnchk-${userId}-${Date.now()}`,
+        });
+        const customerName = data?.customer_name?.trim() ?? "";
+        if (customerName) {
+          return Response.json({
+            nickname: customerName,
+            server: serverId ?? null,
+            region: null,
+            verified: true,
+          });
+        }
+        return Response.json(
+          {
+            error:
+              "Nomor pelanggan tidak ditemukan. Periksa kembali nomor pelanggan / ID meter Anda.",
+            source: "digiflazz",
+          },
+          { status: 422 },
+        );
+      } catch (error) {
+        console.error("Digiflazz PLN inquiry failed", error);
+        // jatuh ke e-wallet/localOnly di bawah — bukan berhenti di sini.
+      }
+    }
+
+    const ewalletCode = getMelostoreGameCode(game.id);
+    if (
+      ewalletCode &&
+      schema.checker === "universal" &&
+      isMelostoreConfigured()
+    ) {
+      try {
+        const result = await checkMelostoreNickname({
+          gameCode: ewalletCode,
+          userId,
+          zoneId: serverId || null,
+        });
+
+        if (result.outcome === "verified") {
+          accountCache.set(cacheKey, {
+            nickname: result.username,
+            server: serverId ?? "",
+            region: result.region,
+            countryCode: null,
+            source: "melostore",
+            expiresAt: Date.now() + CACHE_TTL_MS,
+          });
+
+          await writeCachedAccountCheck({
+            gameId: game.id,
+            userId,
+            serverId,
+            nickname: result.username,
+            resolvedServer: serverId ?? null,
+            region: result.region,
+            provider: "melostore",
+          });
+
+          return Response.json({
+            nickname: result.username,
+            server: serverId ?? null,
+            region: result.region,
+            verified: true,
+          });
+        }
+
+        if (result.outcome === "invalid") {
+          return Response.json(
+            {
+              error:
+                "Nomor e-wallet tidak ditemukan. Periksa kembali nomor tujuan Anda.",
+              source: "melostore",
+            },
+            { status: 422 },
+          );
+        }
+
+        // unavailable (saldo cek habis / rate limit) → localOnly di bawah.
+      } catch (error) {
+        console.error("Melostore e-wallet checker failed", error);
+      }
+    }
+
     return Response.json({
       verified: false,
       localOnly: true,

@@ -11,7 +11,7 @@ import {
   isValidIndonesianWhatsapp,
   validateGuestReceiptContact,
 } from "@/lib/customer-contact";
-import { validateGameAccountTarget } from "@/lib/game-account";
+import { validateGameAccountTarget, getGameAccountSchema } from "@/lib/game-account";
 import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 import { allocateMerchantScanCode } from "@/lib/merchant-confirm";
 import { isFlowTestMode } from "@/lib/flow-test";
@@ -654,9 +654,30 @@ export async function POST(request: Request) {
     verificationMode,
   );
   if (!verificationGate.allowed) {
+    /*
+     * Pesan penolakan "invalid" menyesuaikan jenis produk (P1.6, 21 Okt):
+     * e-wallet/PLN tidak menyebut "User ID game" atau "Zone/Server" —
+     * pesan generik akan menyesatkan pembeli non-game.
+     */
+    let gateError = verificationGate.error;
+    if (accountVerification.status === "invalid") {
+      const schema = getGameAccountSchema({
+        id: gameConfig.id,
+        name: gameConfig.name,
+        shortName: gameConfig.short_name,
+        requiresServer: gameConfig.requires_server,
+      });
+      if (schema.kind === "phone") {
+        gateError =
+          "Nomor e-wallet Anda tidak ditemukan. Periksa kembali nomor tujuan Anda, lalu coba lagi.";
+      } else if (schema.kind === "numeric-bill") {
+        gateError =
+          "Nomor pelanggan Anda tidak ditemukan. Periksa kembali nomor pelanggan / ID meter Anda, lalu coba lagi.";
+      }
+    }
     return Response.json(
       {
-        error: verificationGate.error,
+        error: gateError,
         /*
          * Kode mesin untuk UI (21 Okt 2026): klien membedakan penolakan
          * "salah ID" (popup + arahkan perbaiki input) dan "limit" (popup)

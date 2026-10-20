@@ -72,6 +72,25 @@ export const MELOSTORE_GAME_CODES: Readonly<Record<string, string>> = {
   "where-winds-meet": "where-winds-meet",
   "wuthering-waves": "wuthering-waves",
   "zenless-zone-zero": "zenless-zone-zero",
+
+  /*
+   * ── E-wallet (P1.6, 21 Okt 2026) ──────────────────────────────────────
+   *
+   * Cek nama pemilik akun via check-nickname — sumber: endpoint publik
+   * /check-nickname/games (diambil 17 Okt 2026, 6 e-wallet): gopay,
+   * dana, ovo, shopeepay, isaku, linkaja. Semua zone_required: false.
+   *
+   * ID game Nambah: slug dari brand katalog (Digiflazz maupun
+   * Melostore) — "dana", "gopay", dst. "i-saku" dicover juga karena
+   * brand "i.saku" di-slugify jadi itu.
+   */
+  dana: "dana",
+  gopay: "gopay",
+  ovo: "ovo",
+  shopeepay: "shopeepay",
+  linkaja: "linkaja",
+  isaku: "isaku",
+  "i-saku": "isaku",
 };
 
 /**
