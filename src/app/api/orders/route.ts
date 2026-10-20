@@ -655,7 +655,18 @@ export async function POST(request: Request) {
   );
   if (!verificationGate.allowed) {
     return Response.json(
-      { error: verificationGate.error },
+      {
+        error: verificationGate.error,
+        /*
+         * Kode mesin untuk UI (21 Okt 2026): klien membedakan penolakan
+         * "salah ID" (popup + arahkan perbaiki input) dan "limit" (popup)
+         * dari error lain (notice biasa). Pesan tetap satu sumber.
+         */
+        code:
+          accountVerification.status === "invalid"
+            ? "invalid_account"
+            : accountVerification.status,
+      },
       { status: verificationGate.status },
     );
   }

@@ -105,3 +105,33 @@ test("min payout: endpoint summary + UI validasi + pesan RPC diteruskan", () => 
   // 'gagal dibuat' yang tidak menjelaskan apa-apa.
   assert.ok(withdrawalsRoute.includes("Pencairan gagal:"));
 });
+
+test("popup penolakan order: kode mesin + nickname di modal ringkasan (21 Okt)", () => {
+  /*
+   * Permintaan owner: transaksi yang ditolak karena salah ID harus
+   * tampil sebagai popup, bukan cuma notice kecil di form - dan modal
+   * "Periksa transaksi kamu" harus menampilkan nama akun hasil cek,
+   * konfirmasi terkuat bahwa ID-nya benar sebelum bayar.
+   */
+  assert.ok(
+    ordersRoute.includes("invalid_account"),
+    "gerbang verifikasi mengirim kode mesin supaya klien bisa membedakan",
+  );
+
+  // Popup penolakan di klien dengan CTA per kode.
+  assert.ok(ui.includes("rejectionPopup"));
+  assert.ok(ui.includes("User ID tidak ditemukan"));
+  assert.ok(ui.includes("Perbaiki User ID"));
+  assert.ok(ui.includes("Pembelian tidak bisa dilanjutkan"));
+
+  // Nama akun tampil di modal ringkasan pembayaran (bukan banner).
+  const modalStart = ui.indexOf('id="checkout-confirm-title"');
+  const modalEnd = ui.indexOf("checkout-confirm-totals", modalStart);
+  assert.ok(modalStart > -1 && modalEnd > modalStart);
+  const modal = ui.slice(modalStart, modalEnd);
+  assert.ok(
+    modal.includes("usernameCheck.nickname"),
+    "nama akun terverifikasi harus tampil di modal ringkasan",
+  );
+  assert.ok(modal.includes("Nama akun"));
+});

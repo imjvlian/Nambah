@@ -481,6 +481,14 @@ export default function TopupExperience({
     useState<PendingCheckout | null>(null);
   const [limitPopup, setLimitPopup] = useState<LimitPopupState | null>(null);
   /*
+   * Popup penolakan order dari gerbang verifikasi: salah ID (bisa
+   * diperbaiki pembeli) atau limit item — permintaan owner 21 Okt 2026.
+   */
+  const [rejectionPopup, setRejectionPopup] = useState<{
+    code: "invalid_account" | "limit_blocked";
+    message: string;
+  } | null>(null);
+  /*
    * Paket sekali-per-akun yang sudah dikonfirmasi pembeli di sesi ini.
    * Consent berlaku per paket per sesi halaman — paket lain tetap
    * ditanya, dan memuat ulang halaman menanyakan ulang.
@@ -1348,6 +1356,7 @@ export default function TopupExperience({
       });
       const data = (await response.json()) as {
         error?: string;
+        code?: string;
         order?: {
           id: string;
           payment?: { provider?: string; redirectUrl?: string | null };
@@ -1363,6 +1372,19 @@ export default function TopupExperience({
         setNotice(
           data.error ?? "Aduh, pembayarannya gagal dibuat. Coba lagi ya.",
         );
+        // Penolakan dengan penyebab jelas dari gerbang verifikasi:
+        // popup, bukan cuma notice kecil (permintaan owner 21 Okt).
+        if (
+          data.code === "invalid_account" ||
+          data.code === "limit_blocked"
+        ) {
+          setRejectionPopup({
+            code: data.code,
+            message:
+              data.error ??
+              "Pembayaran tidak dapat dilanjutkan. Silakan coba lagi.",
+          });
+        }
         return;
       }
       // Popup DOKU langsung dibuka dari gesture klik checkout (masih dalam
@@ -2282,6 +2304,64 @@ export default function TopupExperience({
             </p>
           )}
 
+          {rejectionPopup && (
+            <div
+              className="checkout-confirm-backdrop"
+              role="presentation"
+              onClick={() => setRejectionPopup(null)}
+            >
+              <section
+                className="checkout-confirm"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="rejection-popup-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <header className="checkout-confirm-head">
+                  <span
+                    className="checkout-confirm-head-icon danger"
+                    aria-hidden="true"
+                  >
+                    ✕
+                  </span>
+                  <div className="checkout-confirm-head-copy">
+                    <h3 id="rejection-popup-title">
+                      {rejectionPopup.code === "invalid_account"
+                        ? "User ID tidak ditemukan"
+                        : "Pembelian tidak bisa dilanjutkan"}
+                    </h3>
+                    <p>{rejectionPopup.message}</p>
+                  </div>
+                </header>
+
+                <footer className="checkout-confirm-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => {
+                      const harusPerbaikiId =
+                        rejectionPopup.code === "invalid_account";
+                      setRejectionPopup(null);
+                      if (harusPerbaikiId) {
+                        document
+                          .getElementById("account-data")
+                          ?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "nearest",
+                          });
+                      }
+                    }}
+                  >
+                    {rejectionPopup.code === "invalid_account"
+                      ? "Perbaiki User ID"
+                      : "Mengerti"}{" "}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </footer>
+              </section>
+            </div>
+          )}
+
           {limitPopup &&
             (() => {
               const copy = limitPopupCopy(limitPopup, usernameCheck.nickname);
@@ -2450,6 +2530,12 @@ export default function TopupExperience({
                     <span>User ID</span>
                     <strong>{pendingCheckout.targetUserId}</strong>
                   </div>
+                  {usernameCheck.nickname && (
+                    <div className="checkout-confirm-row">
+                      <span>Nama akun</span>
+                      <strong>{usernameCheck.nickname}</strong>
+                    </div>
+                  )}
                   {pendingCheckout.targetServerId && (
                     <div className="checkout-confirm-row">
                       <span>Server / Zone</span>
