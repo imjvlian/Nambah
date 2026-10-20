@@ -44,6 +44,30 @@ test("maintenance terjadwal: cron route + timer systemd", () => {
   assert.ok(timers.includes("melostore-maintenance"));
 });
 
+test("frekuensi cek saldo diturunkan: per jam + per 6 jam, bukan 15 menit", () => {
+  // Keputusan owner 20 Okt 2026: ~120 panggilan API/hari untuk cek saldo
+  // adalah derau di fase test. Selection tetap aman: saldo basi dijawab
+  // oleh reservasi + jalur gagal-dispatch (402 -> retry + alert).
+  // Naikkan lagi ke 15 menit hanya saat live dengan trafik (satu baris
+  // + jalankan ulang install-timers.sh).
+  const timers = readFileSync("deploy/systemd/install-timers.sh", "utf8");
+
+  assert.ok(
+    timers.includes("supplier-balance|*-*-* *:13:00:00 UTC|13 * * * *|"),
+    "supplier-balance harus per jam di menit 13",
+  );
+  assert.ok(
+    !timers.includes("supplier-balance|*-*-* *:0/15:00 UTC"),
+    "regresi ke 15 menit dilarang tanpa keputusan owner",
+  );
+  assert.ok(
+    timers.includes(
+      "melostore-maintenance|*-*-* 00/6:41:00 UTC|41 0/6 * * *|",
+    ),
+    "maintenance Melostore cukup per 6 jam - scan self-gate 20 jam",
+  );
+});
+
 test("cron harga membaca cache terfilter - bukan menarik katalog live", () => {
   const lib = readFileSync("src/lib/supplier-price-sync.ts", "utf8");
   assert.ok(lib.includes("bacaHargaMelostoreDariCache"));

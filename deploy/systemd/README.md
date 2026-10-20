@@ -77,12 +77,13 @@ sendiri dan berhenti dengan pesan error kalau `ExecStart`-nya tidak sesuai.
 | --- | --- | --- |
 | `reconcile` | setiap 5 menit | `*/5 * * * *` |
 | `operations-health` | setiap 10 menit | `*/10 * * * *` |
-| `supplier-balance` | setiap 15 menit | `*/15 * * * *` |
+| `supplier-balance` | menit 13 setiap jam | `13 * * * *` |
 | `financial-reconcile` | setiap jam, menit 7 | `7 * * * *` |
 | `points-expiry` | 00:30 setiap hari | `30 0 * * *` |
 | `telegram-dispatch` | setiap menit | `* * * * *` |
 | `daily-digest` | 01:00 setiap hari (08:00 WIB) | `1 0 * * *` |
 | `supplier-price-sync` | menit 23 setiap jam | `23 * * * *` |
+| `melostore-maintenance` | menit 41 setiap 6 jam | `41 0/6 * * *` |
 
 `supplier-balance` memanggil `/api/cron/supplier-balance`, yang mengecek **semua supplier** yang terdaftar (saat ini Digiflazz dan Melostore). Endpoint lama `/api/cron/digiflazz-balance` masih ada, tetapi tidak dijadwalkan lagi supaya tidak ada pemeriksaan ganda. `install-timers.sh` juga otomatis mematikan timer lama `digiflazz-balance` kalau masih aktif.
 

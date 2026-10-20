@@ -95,11 +95,13 @@ Penjadwalan ada di `deploy/systemd/`:
 ~~~text
 reconcile             setiap 5 menit
 operations-health     setiap 10 menit
-supplier-balance      setiap 15 menit
+supplier-balance      setiap jam (menit 13)
 financial-reconcile   setiap jam (menit 7)
 points-expiry         00:30 UTC setiap hari
 telegram-dispatch     setiap menit
 daily-digest          01:00 UTC = 08:00 WIB
+supplier-price-sync   setiap jam (menit 23)
+melostore-maintenance setiap 6 jam (menit 41)
 ~~~
 
 `supplier-balance` mengecek semua supplier sekaligus, termasuk Melostore, dan
@@ -244,12 +246,13 @@ Jadwal ada di `deploy/systemd/install-timers.sh` (lihat §4):
 | --- | --- | --- |
 | `/api/cron/reconcile` | `*/5 * * * *` | Sweep order kedaluwarsa, retry supplier & receipt, purge cache cek akun |
 | `/api/cron/operations-health` | `*/10 * * * *` | Deteksi incident + alert order nyangkut |
-| `/api/cron/digiflazz-balance` | `*/15 * * * *` | Pemantauan saldo Digiflazz |
+| `/api/cron/supplier-balance` | `13 * * * *` | Pemantauan saldo semua supplier (Digiflazz + Melostore) + alert Telegram |
 | `/api/cron/financial-reconcile` | `7 * * * *` | Rekonsiliasi keuangan (liabilitas points, promo, komisi) |
 | `/api/cron/points-expiry` | `30 0 * * *` | Expiry poin |
 | `/api/cron/telegram-dispatch` | `* * * * *` | Drain antrean notifikasi Telegram |
 | `/api/cron/daily-digest` | `1 0 * * *` | Digest harian 08:00 WIB |
 | `/api/cron/supplier-price-sync` | `23 * * * *` | Sinkron harga modal supplier (guard >±10% + notifikasi Telegram) |
+| `/api/cron/melostore-maintenance` | `41 0/6 * * *` | Maintenance Melostore (scan katalog saat basi + refresh saldo) |
 
 Untuk memastikan cron benar-benar berjalan (bukan hanya terdaftar):
 

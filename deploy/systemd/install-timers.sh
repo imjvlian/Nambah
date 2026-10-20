@@ -30,13 +30,13 @@ UNIT_DIR="${APP_DIR}/deploy/systemd"
 read -r -d '' JOBS <<'EOF' || true
 reconcile|*-*-* *:0/5:00 UTC|*/5 * * * *|Sweep order kedaluwarsa, retry supplier & receipt
 operations-health|*-*-* *:0/10:00 UTC|*/10 * * * *|Alert incident + order nyangkut
-supplier-balance|*-*-* *:0/15:00 UTC|*/15 * * * *|Cek saldo semua supplier (Digiflazz + Melostore)
+supplier-balance|*-*-* *:13:00:00 UTC|13 * * * *|Cek saldo semua supplier (Digiflazz + Melostore)
 financial-reconcile|*-*-* *:07:00:00 UTC|7 * * * *|Rekonsiliasi keuangan
 points-expiry|*-*-* 00:30:00 UTC|30 0 * * *|Expiry poin
 telegram-dispatch|*-*-* *:*:0/1:00 UTC|* * * * *|Drain antrean notifikasi Telegram
 daily-digest|*-*-* 01:00:00 UTC|1 0 * * *|Digest harian (08:00 WIB)
 supplier-price-sync|*-*-* *:23:00:00 UTC|23 * * * *|Sinkron harga supplier (guard >±10% + notifikasi Telegram)
-melostore-maintenance|*-*-* *:41:00:00 UTC|41 * * * *|Maintenance Melostore (scan katalog saat basi + saldo)
+melostore-maintenance|*-*-* 00/6:41:00 UTC|41 0/6 * * *|Maintenance Melostore (scan katalog saat basi + saldo)
 EOF
 
 RUN_SCRIPT="${APP_DIR}/deploy/systemd/nambah-cron-run.sh"
