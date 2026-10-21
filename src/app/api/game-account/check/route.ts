@@ -391,9 +391,8 @@ export async function POST(request: Request) {
       try {
         const data = await inquireDigiflazzPln({
           customerNo: userId,
-          refId: `nmb-plnchk-${userId}-${Date.now()}`,
         });
-        const customerName = data?.customer_name?.trim() ?? "";
+        const customerName = data?.name?.trim() ?? "";
         if (customerName) {
           return Response.json({
             nickname: customerName,
@@ -423,7 +422,11 @@ export async function POST(request: Request) {
             ? Boolean((error as { retryable?: unknown }).retryable)
             : false;
         const message = error instanceof Error ? error.message : "";
-        if (/auth|unauthorized|api key|whitelist|forbidden/i.test(message)) {
+        if (
+          /auth|unauthorized|api key|whitelist|forbidden|tidak kami kenali|ip anda/i.test(
+            message,
+          )
+        ) {
           return Response.json(
             {
               error: "Pengecekan PLN sedang tidak dapat dilakukan. Silakan coba lagi.",
@@ -506,7 +509,22 @@ export async function POST(request: Request) {
           );
         }
 
-        // unavailable (saldo cek habis / rate limit) → localOnly di bawah.
+        /*
+         * Unavailable (502/gangguan di sisi Melostore, saldo cek habis,
+         * rate limit) — jangan tampilkan "belum dikonfigurasi" yang
+         * menyesatkan: penyedianya memang sedang bermasalah.
+         */
+        return Response.json(
+          {
+            verified: false,
+            localOnly: true,
+            server: serverId ?? null,
+            message:
+              "Format nomor sudah benar. Pengecekan nama pemilik e-wallet sedang tidak tersedia — pastikan sekali lagi nomornya sebelum bayar.",
+            source: "melostore",
+            reason: result.reason,
+          },
+        );
       } catch (error) {
         console.error("Melostore e-wallet checker failed", error);
       }

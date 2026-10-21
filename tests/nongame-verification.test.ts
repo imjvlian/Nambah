@@ -91,11 +91,24 @@ test("pemetaan e-wallet: game code Melostore + tanpa zone", () => {
   }
 });
 
-test("digiflazz client: fungsi inquiry PLN dengan command pln", () => {
+test("digiflazz client: inquiry PLN pakai endpoint resmi /v1/inquiry-pln", () => {
   const client = readFileSync("src/lib/digiflazz/client.ts", "utf8");
   assert.ok(client.includes("export async function inquireDigiflazzPln"));
-  assert.ok(client.includes('commands: "pln"'));
-  assert.ok(client.includes("customer_name"), "nama pelanggan harus diparse");
+  // Docs resmi developer.digiflazz.com: endpoint /v1/inquiry-pln,
+  // sign md5(username + apiKey + customer_no), nama di data.name.
+  assert.ok(
+    client.includes("https://api.digiflazz.com/v1/inquiry-pln"),
+    "harus pakai endpoint inquiry-pln, bukan /v1/transaction + commands",
+  );
+  assert.ok(
+    !client.includes('commands: "pln"'),
+    "commands pln bukan bagian dari request inquiry-pln",
+  );
+  assert.ok(client.includes("name?: string | null"), "nama pelanggan harus diparse dari data.name");
+  assert.ok(
+    client.includes("${username}${apiKey}${input.customerNo}"),
+    "sign inquiry = md5(username + apiKey + customer_no)",
+  );
 });
 
 test("engine: cabang PLN sebelum jalur Melostore; e-wallet lewat universal", () => {

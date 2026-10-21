@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 const BALANCE_URL = "https://api.digiflazz.com/v1/cek-saldo";
 const PRICE_LIST_URL = "https://api.digiflazz.com/v1/price-list";
 const TRANSACTION_URL = "https://api.digiflazz.com/v1/transaction";
+const INQUIRY_PLN_URL = "https://api.digiflazz.com/v1/inquiry-pln";
 
 export type DigiflazzPriceItem = {
   product_name: string;
@@ -304,22 +305,28 @@ export async function runDigiflazzTestTransaction(input: {
 }
 
 export type DigiflazzPlnInquiryData = {
-  customer_name?: string | null;
-  idpln?: string | null;
-  power?: string | null;
-  segment?: string | null;
-  admin_biller?: number | string | null;
   message?: string | null;
+  status?: string | null;
+  rc?: string | null;
+  customer_no?: string | null;
+  meter_no?: string | null;
+  subscriber_id?: string | null;
+  name?: string | null;
+  segment_power?: string | null;
 };
 
 /**
  * Inquiry PLN (P1.6, 21 Okt 2026): cek nomor pelanggan / ID meter →
  * nama pelanggan.
  *
- * Command "pln" TIDAK membuat transaksi dan BEBAS BIAYA — hanya
- * mengembalikan data pelanggan (nama, IDPLN, daya, segmen). Dipakai
- * gerbang verifikasi untuk menampilkan "a/n NAMA" sebelum bayar dan
- * menolak nomor pelanggan yang tidak ditemukan.
+ * Endpoint resmi /v1/inquiry-pln (docs developer.digiflazz.com):
+ * body { username, customer_no, sign: md5(username + apiKey +
+ * customer_no) } — TANPA commands dan TANPA ref_id. Inquiry BEBAS
+ * BIAYA dan tidak membuat transaksi. Respons nama pelanggan ada di
+ * data.name (bukan customer_name).
+ *
+ * Dipakai gerbang verifikasi untuk menampilkan "a/n NAMA" sebelum
+ * bayar dan menolak nomor pelanggan yang tidak ditemukan.
  *
  * Salah nomor → Digiflazz menolak (DigiflazzApiError non-retryable,
  * pesan asli dari supplier). Gangguan jaringan → retryable. Pemanggil
@@ -327,18 +334,15 @@ export type DigiflazzPlnInquiryData = {
  */
 export async function inquireDigiflazzPln(input: {
   customerNo: string;
-  refId: string;
 }): Promise<DigiflazzPlnInquiryData | null> {
   const { username, apiKey } = requireApiConfig();
 
   const response = await postDigiflazz<{ data?: DigiflazzPlnInquiryData }>(
-    TRANSACTION_URL,
+    INQUIRY_PLN_URL,
     {
-      commands: "pln",
       username,
       customer_no: input.customerNo,
-      ref_id: input.refId,
-      sign: md5(`${username}${apiKey}${input.refId}`),
+      sign: md5(`${username}${apiKey}${input.customerNo}`),
     },
   );
 

@@ -189,9 +189,8 @@ export async function verifyOrderAccount(input: {
     try {
       const data = await inquireDigiflazzPln({
         customerNo: input.userId,
-        refId: `nmb-pln-${input.userId}-${Date.now()}`,
       });
-      const customerName = data?.customer_name?.trim() ?? "";
+      const customerName = data?.name?.trim() ?? "";
       if (customerName) {
         return {
           status: "verified",
@@ -215,11 +214,16 @@ export async function verifyOrderAccount(input: {
           : false;
       const message = error instanceof Error ? error.message : "";
       /*
-       * Galat konfigurasi (auth/IP) bukan salah nomor pelanggan —
-       * menandainya "invalid" berarti memblokir order pelanggan sah
-       * karena env kita sendiri bermasalah. Fail-safe: unavailable.
+       * Galat konfigurasi (auth/IP tidak dikenal) bukan salah nomor
+       * pelanggan — menandainya "invalid" berarti memblokir order
+       * pelanggan sah karena env kita sendiri bermasalah. Fail-safe:
+       * unavailable.
        */
-      if (/auth|unauthorized|api key|whitelist|forbidden/i.test(message)) {
+      if (
+        /auth|unauthorized|api key|whitelist|forbidden|tidak kami kenali|ip anda/i.test(
+          message,
+        )
+      ) {
         return {
           status: "unavailable",
           provider: "digiflazz",
