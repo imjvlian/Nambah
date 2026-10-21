@@ -412,7 +412,45 @@ export async function POST(request: Request) {
         );
       } catch (error) {
         console.error("Digiflazz PLN inquiry failed", error);
-        // jatuh ke e-wallet/localOnly di bawah — bukan berhenti di sini.
+        /*
+         * Salah nomor (penolakan non-retryable dari Digiflazz) harus
+         * terlihat sebagai ERROR NOMOR, bukan "belum dikonfigurasi" —
+         * pesan itu menyesatkan pelanggan yang nomornya salah format.
+         * Gangguan jaringan (retryable) -> 503 supaya jelas bedanya.
+         */
+        const retryable =
+          error && typeof error === "object" && "retryable" in error
+            ? Boolean((error as { retryable?: unknown }).retryable)
+            : false;
+        const message = error instanceof Error ? error.message : "";
+        if (/auth|unauthorized|api key|whitelist|forbidden/i.test(message)) {
+          return Response.json(
+            {
+              error: "Pengecekan PLN sedang tidak dapat dilakukan. Silakan coba lagi.",
+              retryable: true,
+              source: "digiflazz",
+            },
+            { status: 503 },
+          );
+        }
+        if (retryable) {
+          return Response.json(
+            {
+              error: "Pengecekan PLN sedang tidak dapat dilakukan. Silakan coba lagi.",
+              retryable: true,
+              source: "digiflazz",
+            },
+            { status: 503 },
+          );
+        }
+        return Response.json(
+          {
+            error:
+              "Nomor pelanggan tidak ditemukan. Periksa kembali nomor pelanggan / ID meter Anda.",
+            source: "digiflazz",
+          },
+          { status: 422 },
+        );
       }
     }
 

@@ -85,8 +85,15 @@ export const MELOSTORE_GAME_CODES: Readonly<Record<string, string>> = {
    * brand "i.saku" di-slugify jadi itu.
    */
   dana: "dana",
-  gopay: "gopay",
   ovo: "ovo",
+  /*
+   * ID game di database memakai tanda hubung (konfirmasi SQL owner 21
+   * Okt): "go-pay", "shopee-pay" — bukan slug satu kata. Keduanya
+   * dicover, plus varian satu kata untuk berjaga.
+   */
+  "go-pay": "gopay",
+  gopay: "gopay",
+  "shopee-pay": "shopeepay",
   shopeepay: "shopeepay",
   linkaja: "linkaja",
   isaku: "isaku",

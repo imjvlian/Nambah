@@ -71,8 +71,10 @@ test("schema PLN: checker pln; tagihan non-PLN tetap null", () => {
 
 test("pemetaan e-wallet: game code Melostore + tanpa zone", () => {
   assert.equal(getMelostoreGameCode("dana"), "dana");
+  assert.equal(getMelostoreGameCode("go-pay"), "gopay");
   assert.equal(getMelostoreGameCode("gopay"), "gopay");
   assert.equal(getMelostoreGameCode("ovo"), "ovo");
+  assert.equal(getMelostoreGameCode("shopee-pay"), "shopeepay");
   assert.equal(getMelostoreGameCode("shopeepay"), "shopeepay");
   assert.equal(getMelostoreGameCode("linkaja"), "linkaja");
   assert.equal(getMelostoreGameCode("isaku"), "isaku");
