@@ -3,7 +3,6 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 const BALANCE_URL = "https://api.digiflazz.com/v1/cek-saldo";
 const PRICE_LIST_URL = "https://api.digiflazz.com/v1/price-list";
 const TRANSACTION_URL = "https://api.digiflazz.com/v1/transaction";
-const INQUIRY_PLN_URL = "https://api.digiflazz.com/v1/inquiry-pln";
 
 export type DigiflazzPriceItem = {
   product_name: string;
@@ -312,6 +311,7 @@ export type DigiflazzPlnInquiryData = {
   meter_no?: string | null;
   subscriber_id?: string | null;
   name?: string | null;
+  customer_name?: string | null;
   segment_power?: string | null;
 };
 
@@ -319,34 +319,64 @@ export type DigiflazzPlnInquiryData = {
  * Inquiry PLN (P1.6, 21 Okt 2026): cek nomor pelanggan / ID meter →
  * nama pelanggan.
  *
- * Endpoint resmi /v1/inquiry-pln (docs developer.digiflazz.com):
- * body { username, customer_no, sign: md5(username + apiKey +
- * customer_no) } — TANPA commands dan TANPA ref_id. Inquiry BEBAS
- * BIAYA dan tidak membuat transaksi. Respons nama pelanggan ada di
- * data.name (bukan customer_name).
+ * Pola klasik yang diterima supplier (terverifikasi dari VPS,
+ * 22 Okt 2026): POST /v1/transaction dengan commands "pln-subscribe"
+ * dan sign konvensi transaksi md5(username + apiKey + ref_id) — pola
+ * yang dipakai merchant nyata (SDK PHP nurfaizfy di Packagist, npm
+ * digiflazz-sdk). Endpoint /v1/inquiry-pln beserta sign
+ * md5(username + apiKey + customer_no) yang tertulis di docs resmi
+ * justru ditolak rc 41 "Signature Anda salah" meski kuncinya valid.
  *
- * Dipakai gerbang verifikasi untuk menampilkan "a/n NAMA" sebelum
- * bayar dan menolak nomor pelanggan yang tidak ditemukan.
+ * Inquiry BEBAS BIAYA dan tidak membuat transaksi. Dipakai gerbang
+ * verifikasi untuk menampilkan "a/n NAMA" sebelum bayar dan menolak
+ * nomor pelanggan yang tidak ditemukan. Nama pelanggan diparse dari
+ * data.name ATAU data.customer_name (bentuk respons produksi belum
+ * terdokumentasi — keduanya ditolerir).
  *
- * Salah nomor → Digiflazz menolak (DigiflazzApiError non-retryable,
- * pesan asli dari supplier). Gangguan jaringan → retryable. Pemanggil
- * yang membedakan.
+ * Akun Digiflazz yang masih mode tes mengembalikan stub tanpa nama,
+ * rc, dan message — diperlakukan DigiflazzApiError retryable
+ * ("sedang tidak tersedia"), bukan "nomor tidak ditemukan", supaya
+ * pelanggan sah tidak ditolak permanen hanya karena akun supplier
+ * kita belum aktif produksi.
  */
 export async function inquireDigiflazzPln(input: {
   customerNo: string;
 }): Promise<DigiflazzPlnInquiryData | null> {
   const { username, apiKey } = requireApiConfig();
 
+  // ref_id harus unik per akun (rc 49 "Ref ID tidak unik") — timestamp + suffix acak.
+  const refId = `nmb-pln-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const response = await postDigiflazz<{ data?: DigiflazzPlnInquiryData }>(
-    INQUIRY_PLN_URL,
+    TRANSACTION_URL,
     {
+      commands: "pln-subscribe",
       username,
       customer_no: input.customerNo,
-      sign: md5(`${username}${apiKey}${input.customerNo}`),
+      ref_id: refId,
+      sign: md5(`${username}${apiKey}${refId}`),
     },
   );
 
-  return response.data ?? null;
+  const data = response.data ?? null;
+  if (!data) return null;
+
+  /*
+   * Stub akun mode tes: HTTP 200 tetapi nama, rc, dan message semua
+   * kosong (saldo placeholder 990000, tele/wa dummy). Bukan jawaban
+   * inquiry sungguhan — gagal-aman sebagai "tidak tersedia".
+   */
+  const name = String(data.name ?? data.customer_name ?? "").trim();
+  const rc = String(data.rc ?? "").trim();
+  const message = String(data.message ?? "").trim();
+  if (!name && !rc && !message) {
+    throw new DigiflazzApiError(
+      "Inquiry PLN tidak mengembalikan data (kemungkinan akun supplier masih mode tes).",
+      { retryable: true },
+    );
+  }
+
+  return data;
 }
 
 export function verifyDigiflazzWebhookSignature(rawBody: string, signatureHeader: string | null) {

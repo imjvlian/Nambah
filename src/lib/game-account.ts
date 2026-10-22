@@ -1106,7 +1106,7 @@ export function getGameAccountSchema(game: AccountGameDescriptor): GameAccountSc
   /*
    * Tagihan PLN (P1.6, 21 Okt 2026): inquiry Digiflazz — nomor
    * pelanggan / ID meter dicek nama pelanggannya sebelum bayar
-   * (command "pln", bebas biaya, tidak membuat transaksi). Diletakkan
+   * (command "pln-subscribe", bebas biaya, tidak membuat transaksi). Diletakkan
    * SEBELU cabang tagihan non-PLN supaya "pln" tidak tertelan.
    */
   if (/\bpln\b/.test(identity)) {

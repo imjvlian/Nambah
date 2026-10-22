@@ -164,7 +164,7 @@ export async function verifyOrderAccount(input: {
 
   /*
    * (2.5 PLN — P1.6, 21 Okt 2026) Inquiry Digiflazz: nomor pelanggan /
-   * ID meter dicek nama pelanggannya. Command "pln" bebas biaya dan
+   * ID meter dicek nama pelanggannya. Command "pln-subscribe" bebas biaya dan
    * tidak membuat transaksi. Salah nomor → invalid (ditolak sebelum
    * bayar); gangguan jaringan → unavailable (fail-safe, bukan lolos).
    *
@@ -190,7 +190,8 @@ export async function verifyOrderAccount(input: {
       const data = await inquireDigiflazzPln({
         customerNo: input.userId,
       });
-      const customerName = data?.name?.trim() ?? "";
+      const customerName =
+        data?.name?.trim() || data?.customer_name?.trim() || "";
       if (customerName) {
         return {
           status: "verified",

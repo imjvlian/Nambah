@@ -392,7 +392,8 @@ export async function POST(request: Request) {
         const data = await inquireDigiflazzPln({
           customerNo: userId,
         });
-        const customerName = data?.name?.trim() ?? "";
+        const customerName =
+          data?.name?.trim() || data?.customer_name?.trim() || "";
         if (customerName) {
           return Response.json({
             nickname: customerName,

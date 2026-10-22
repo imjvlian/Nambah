@@ -91,23 +91,39 @@ test("pemetaan e-wallet: game code Melostore + tanpa zone", () => {
   }
 });
 
-test("digiflazz client: inquiry PLN pakai endpoint resmi /v1/inquiry-pln", () => {
+test("digiflazz client: inquiry PLN via commands pln-subscribe (pola klasik)", () => {
   const client = readFileSync("src/lib/digiflazz/client.ts", "utf8");
   assert.ok(client.includes("export async function inquireDigiflazzPln"));
-  // Docs resmi developer.digiflazz.com: endpoint /v1/inquiry-pln,
-  // sign md5(username + apiKey + customer_no), nama di data.name.
+  /*
+   * Docs resmi /v1/inquiry-pln + sign md5(user+key+customer_no) terbukti
+   * ditolak supplier (rc 41 "Signature Anda salah") meski kunci valid —
+   * terverifikasi dari VPS 22 Okt 2026. Pola yang diterima: POST
+   * /v1/transaction + commands "pln-subscribe" + sign konvensi
+   * transaksi md5(username + apiKey + ref_id).
+   */
   assert.ok(
-    client.includes("https://api.digiflazz.com/v1/inquiry-pln"),
-    "harus pakai endpoint inquiry-pln, bukan /v1/transaction + commands",
+    client.includes('commands: "pln-subscribe"'),
+    "inquiry harus pakai command klasik pln-subscribe",
   );
   assert.ok(
-    !client.includes('commands: "pln"'),
-    "commands pln bukan bagian dari request inquiry-pln",
+    client.includes("${username}${apiKey}${refId}"),
+    "sign inquiry = md5(username + apiKey + ref_id) — konvensi transaksi",
   );
-  assert.ok(client.includes("name?: string | null"), "nama pelanggan harus diparse dari data.name");
   assert.ok(
-    client.includes("${username}${apiKey}${input.customerNo}"),
-    "sign inquiry = md5(username + apiKey + customer_no)",
+    client.includes("ref_id: refId"),
+    "request inquiry harus menyertakan ref_id yang unik",
+  );
+  assert.ok(
+    client.includes("name?: string | null"),
+    "nama pelanggan diparse dari data.name",
+  );
+  assert.ok(
+    client.includes("customer_name?: string | null"),
+    "toleran data.customer_name — bentuk respons produksi belum terdokumentasi",
+  );
+  assert.ok(
+    client.includes("mode tes"),
+    "respons stub (nama, rc, message kosong) harus retryable — bukan dianggap nomor tidak ditemukan",
   );
 });
 
