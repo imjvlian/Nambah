@@ -39,6 +39,7 @@ type DigestOrderRow = {
   supplier_cost: number | string;
   nambah_profit: number | string;
   affiliate_commission: number | string;
+  tier2_commission: number | string | null;
   promotion_discount: number | string;
   referral_discount: number | string;
   points_discount: number | string;
@@ -131,7 +132,7 @@ export async function buildDailyDigest(dateKey: string): Promise<DailyDigest> {
         "orders",
         {
           select:
-            "id,status,game_id,final_price,supplier_cost,nambah_profit,affiliate_commission,promotion_discount,referral_discount,points_discount",
+            "id,status,game_id,final_price,supplier_cost,nambah_profit,affiliate_commission,tier2_commission,promotion_discount,referral_discount,points_discount",
           query: windowQuery,
         },
         20_000,
@@ -195,7 +196,11 @@ export async function buildDailyDigest(dateKey: string): Promise<DailyDigest> {
     totals.revenue += revenue;
     totals.profit += n(order.nambah_profit);
     totals.supplierCost += n(order.supplier_cost);
-    totals.affiliateCommission += n(order.affiliate_commission);
+    // Komisi afiliasi = kedua tier (P2): tier-1 pemilik kode + tier-2 upline.
+    // nambah_profit sudah memotong keduanya, jadi total yang ini harus
+    // ikut memotong keduanya supaya laporan bisa direkonsiliasi.
+    totals.affiliateCommission +=
+      n(order.affiliate_commission) + n(order.tier2_commission);
     totals.promotionDiscount += n(order.promotion_discount);
     totals.referralDiscount += n(order.referral_discount);
     totals.pointsDiscount += n(order.points_discount);

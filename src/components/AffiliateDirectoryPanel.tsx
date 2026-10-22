@@ -43,6 +43,8 @@ type Affiliate = {
   stackableWithPromotions: boolean;
   status: string;
   createdAt: string;
+  /** Kode upline (tier-2) — null = tanpa upline. */
+  referredByCode: string | null;
 };
 
 type AffiliatePayload = {
@@ -81,6 +83,7 @@ function blankDraft() {
     userBenefitValue: "0",
     minimumOrder: "0",
     userId: "",
+    referredByCode: "",
     status: "active",
   };
 }
@@ -172,6 +175,7 @@ export default function AffiliateDirectoryPanel() {
       userBenefitValue: String(item.userBenefitValue),
       minimumOrder: String(item.minimumOrder),
       userId: item.userId ?? "",
+      referredByCode: item.referredByCode ?? "",
       status: item.status,
     });
     setNotice("");
@@ -234,6 +238,7 @@ export default function AffiliateDirectoryPanel() {
           userBenefitValue: Number(draft.userBenefitValue),
           minimumOrder: Number(draft.minimumOrder),
           status: draft.status,
+          referredByCode: draft.referredByCode || null,
         }),
       });
       const body = (await response.json()) as { error?: string };
@@ -425,22 +430,61 @@ export default function AffiliateDirectoryPanel() {
           </label>
 
           {editingCode ? (
-            <label className="acc-field">
-              <span>Status</span>
-              <select
-                value={draft.status}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, status: event.target.value }))
-                }
-              >
-                <option value="active">Aktif</option>
-                <option value="inactive">Nonaktif</option>
-                <option value="suspended">Ditangguhkan</option>
-              </select>
-              <small>
-                Nonaktif dan ditangguhkan membuat kode ditolak saat dibuka pembeli.
-              </small>
-            </label>
+            <>
+              <label className="acc-field">
+                <span>Status</span>
+                <select
+                  value={draft.status}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, status: event.target.value }))
+                  }
+                >
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                  <option value="suspended">Ditangguhkan</option>
+                </select>
+                <small>
+                  Nonaktif dan ditangguhkan membuat kode ditolak saat dibuka pembeli.
+                </small>
+              </label>
+
+              {/*
+               * Upline / tier-2 (P2): komisi 10% dari laba order yang
+               * masuk lewat kode mitra ini mengalir ke upline. First-touch
+               * cookie menangkap upline otomatis saat pendaftar simpan
+               * profil; kolom ini untuk rekrutan langsung dan koreksi.
+               */}
+              <label className="acc-field">
+                <span>Upline (komisi tier-2)</span>
+                <select
+                  value={draft.referredByCode}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      referredByCode: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Tanpa upline</option>
+                  {affiliates
+                    .filter(
+                      (item) =>
+                        item.code !== editingCode &&
+                        item.userId &&
+                        item.status === "active",
+                    )
+                    .map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.code} · {item.displayName}
+                      </option>
+                    ))}
+                </select>
+                <small>
+                  Upline menerima 10% dari laba order lewat kode mitra ini —
+                  dipotong dari bagian toko, bukan dari komisi mitra.
+                </small>
+              </label>
+            </>
           ) : (
             <label className="acc-field">
               <span>Hubungkan ke akun</span>
@@ -585,6 +629,12 @@ export default function AffiliateDirectoryPanel() {
                   {item.userId
                     ? (userNameById.get(item.userId) ?? item.userId)
                     : "Belum terhubung"}
+                  {item.referredByCode ? (
+                    <>
+                      {" · "}
+                      <em>upline: {item.referredByCode}</em>
+                    </>
+                  ) : null}
                 </span>
                 <strong>{Math.round(item.commissionRate * 100)}%</strong>
                 <span className={"acc-status " + item.status}>

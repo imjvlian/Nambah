@@ -33,6 +33,11 @@ type AffiliateData = {
   }>;
   /** Minimal pencairan komisi (P1.4) - dari app_settings. */
   minPayout?: number;
+  /**
+   * Rate komisi upline (P2) - hanya terisi kalau akun ini punya downline.
+   * Null = bukan upline; 0 = tier-2 dimatikan admin.
+   */
+  uplineRate?: number | null;
   error?: string;
 };
 
@@ -224,6 +229,15 @@ export default function AffiliateAccountPanel() {
         <p className="account-affiliate-link-warning">
           Komisi baru bisa dicairkan 3 hari setelah order sukses -
           {formatIDR(affiliate.maturing)} sedang dalam masa tunggu itu.
+        </p>
+      ) : null}
+
+      {data.uplineRate != null && data.uplineRate > 0 ? (
+        <p className="account-affiliate-link-warning">
+          Saldo komisi Anda juga bisa bertambah dari komisi upline
+          ({Math.round(data.uplineRate * 100)}% dari laba) setiap kali mitra
+          yang Anda arahkan mendapat order - dipotong dari bagian toko,
+          bukan dari komisi mitra tersebut.
         </p>
       ) : null}
 

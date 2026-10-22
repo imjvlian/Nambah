@@ -50,7 +50,7 @@ export async function getCashFlowReport(
       supabaseSelect<CashFlowOrder>("orders", {
         select:
           "id,status,payment_method_id,final_price,supplier_cost,nambah_profit," +
-          "promotion_discount,affiliate_commission,points_discount,referral_discount," +
+          "promotion_discount,affiliate_commission,tier2_commission,points_discount,referral_discount," +
           "merchant_id,service_fee_amount,merchant_payment_cost,created_at",
         filters: rangeToFilter(range, "created_at"),
         order: "created_at.asc",

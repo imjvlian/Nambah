@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
-    const [affiliates, commissions, withdrawals, allocations] =
+    const [affiliates, commissions, withdrawals, allocations, profiles] =
       await Promise.all([
         supabaseSelect<AffiliateRow>("affiliates", {
           select:
@@ -105,7 +105,33 @@ export async function GET(request: Request) {
           select: "withdrawal_id,commission_id,amount",
           limit: 10000,
         }),
+        /*
+         * Pohon upline (P2): referred_by_id hidup di profil pemilik kode,
+         * bukan di baris affiliates. Dibaca sekali di sini supaya tabel
+         * mitra bisa menampilkan "upline siapa" tanpa join per baris.
+         */
+        supabaseSelect<{
+          user_id: string;
+          referred_by_id: string | null;
+        }>("customer_profiles", {
+          select: "user_id,referred_by_id",
+          limit: 5000,
+        }),
       ]);
+
+    const affiliateCodeByUserId = new Map(
+      affiliates
+        .filter((row) => row.user_id)
+        .map((row) => [row.user_id as string, row.code]),
+    );
+    const referredByUserId = new Map(
+      profiles.map((row) => [row.user_id, row.referred_by_id]),
+    );
+    const uplineCodeFor = (userId: string | null) => {
+      if (!userId) return null;
+      const uplineUserId = referredByUserId.get(userId) ?? null;
+      return uplineUserId ? (affiliateCodeByUserId.get(uplineUserId) ?? null) : null;
+    };
 
     const withdrawalById = new Map(
       withdrawals.map((row) => [row.id, row]),
@@ -201,6 +227,7 @@ export async function GET(request: Request) {
         stackableWithPromotions: row.stackable_with_promotions,
         status: row.status,
         createdAt: row.created_at,
+        referredByCode: uplineCodeFor(row.user_id),
       })),
       commissions: commissions.slice(0, 200).map((row) => ({
         id: row.id,
@@ -522,7 +549,79 @@ export async function PATCH(request: Request) {
       updates.status = status;
     }
 
-    if (Object.keys(updates).length === 0) {
+    /*
+     * UPLINE / TIER-2 (P2): di-set lewat kode mitra upline, disimpan ke
+     * customer_profiles.referred_by_id milik PEMILIK kode ini — bukan ke
+     * baris affiliates. String kosong/null menghapus upline (koreksi salah
+     * set tidak bisa dilakukan lewat cookie first-touch, hanya di sini).
+     */
+    let uplineChanged = false;
+    if (body.referredByCode !== undefined) {
+      const [downline] = await supabaseSelect<{ user_id: string | null }>(
+        "affiliates",
+        { select: "user_id", filters: { code: `eq.${code}` }, limit: 1 },
+      );
+      if (!downline) {
+        return Response.json({ error: "Affiliate tidak ditemukan." }, { status: 404 });
+      }
+      if (!downline.user_id) {
+        return Response.json(
+          {
+            error:
+              "Hubungkan mitra ini ke akun dulu — upline disimpan di profil pemiliknya.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const rawUplineCode =
+        typeof body.referredByCode === "string" ? body.referredByCode.trim() : "";
+      const nowIso = new Date().toISOString();
+
+      if (!rawUplineCode) {
+        await supabaseUpdate(
+          "customer_profiles",
+          { referred_by_id: null, updated_at: nowIso },
+          { filters: { user_id: `eq.${downline.user_id}` } },
+        );
+        uplineChanged = true;
+      } else {
+        const uplineCode = normalizeCode(rawUplineCode);
+        const [upline] = await supabaseSelect<{ user_id: string | null }>(
+          "affiliates",
+          { select: "user_id", filters: { code: `eq.${uplineCode}` }, limit: 1 },
+        );
+        if (!upline?.user_id) {
+          return Response.json(
+            { error: `Kode upline ${uplineCode} tidak ditemukan atau tanpa pemilik.` },
+            { status: 400 },
+          );
+        }
+        if (upline.user_id === downline.user_id) {
+          return Response.json(
+            { error: "Mitra tidak bisa menjadi upline dirinya sendiri." },
+            { status: 400 },
+          );
+        }
+        // Profil pemilik bisa saja belum ada (belum pernah disimpan user) —
+        // upsert membuat baris minimalnya, sama seperti saat admin link akun.
+        await supabaseUpsert(
+          "customer_profiles",
+          {
+            user_id: downline.user_id,
+            referred_by_id: upline.user_id,
+            updated_at: nowIso,
+          },
+          {
+            onConflict: "user_id",
+            prefer: "resolution=merge-duplicates,return=representation",
+          },
+        );
+        uplineChanged = true;
+      }
+    }
+
+    if (Object.keys(updates).length === 0 && !uplineChanged) {
       return Response.json(
         { error: "Tidak ada perubahan yang dikirim." },
         { status: 400 },
@@ -541,7 +640,12 @@ export async function PATCH(request: Request) {
       action: "affiliate.update",
       targetType: "affiliate",
       targetId: code,
-      metadata: updates,
+      metadata: {
+        ...updates,
+        ...(body.referredByCode !== undefined
+          ? { referredByCode: body.referredByCode }
+          : {}),
+      },
     });
 
     return Response.json({ affiliate: { code }, updated: Object.keys(updates) });

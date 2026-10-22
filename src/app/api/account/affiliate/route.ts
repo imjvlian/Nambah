@@ -3,6 +3,7 @@ import {
   appendResolvedNambahAuthCookies,
   resolveNambahAuth,
 } from "@/lib/nambah-auth";
+import { getAffiliateTier2Rate } from "@/lib/affiliate-upline";
 import { supabaseRpc, supabaseSelect } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
@@ -72,8 +73,24 @@ export async function GET(request: Request) {
     );
 
     if (!summary?.affiliate) {
-      return Response.json({ affiliate: null, withdrawals: [], minPayout: await readMinPayout() }, { headers });
+      return Response.json({ affiliate: null, withdrawals: [], minPayout: await readMinPayout(), uplineRate: null }, { headers });
     }
+
+    /*
+     * Upline / tier-2 (P2): kalau akun ini memiliki downline (profil
+     * member dengan referred_by_id = dia), saldonya bisa memuat komisi
+     * upline. Rate dikirim supaya penjelasan di panel tidak basi saat
+     * admin mengubah angkanya di app_settings.
+     */
+    const [downlineProfile] = await supabaseSelect<{ user_id: string }>(
+      "customer_profiles",
+      {
+        select: "user_id",
+        filters: { referred_by_id: `eq.${auth.user.id}` },
+        limit: 1,
+      },
+    );
+    const uplineRate = downlineProfile ? await getAffiliateTier2Rate() : null;
 
     const withdrawals = await supabaseSelect<WithdrawalRow>(
       "affiliate_withdrawals",
@@ -102,6 +119,7 @@ export async function GET(request: Request) {
          * bisa menampilkan dan memvalidasinya tanpa deploy ulang.
          */
         minPayout: await readMinPayout(),
+        uplineRate,
         withdrawals: withdrawals.map((row) => ({
           id: row.id,
           amount: Number(row.amount),

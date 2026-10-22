@@ -67,6 +67,8 @@ export type TransactionRow = {
   nambah_profit: number | string;
   promotion_discount: number | string;
   affiliate_commission: number | string;
+  /** Komisi tier-2 upline (P2) — ikut dipotong dari nambah_profit. */
+  tier2_commission: number | string | null;
   points_discount: number | string;
   merchant_id: string | null;
   service_fee_amount: number | string | null;
@@ -359,6 +361,7 @@ export function transactionsToCsv(
     "Margin Lacte",
     "Diskon Promo",
     "Komisi Affiliate",
+    "Komisi Upline",
     "Diskon Points",
   ];
 
@@ -403,6 +406,7 @@ export function transactionsToCsv(
       unpaidRetail ? 0 : num(row.nambah_profit),
       num(row.promotion_discount),
       num(row.affiliate_commission),
+      num(row.tier2_commission),
       num(row.points_discount),
     ]
       .map(escape)

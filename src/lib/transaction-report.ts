@@ -64,6 +64,7 @@ function toTransactionRow(row: OrderRow): TransactionRow {
     nambah_profit: row.nambah_profit,
     promotion_discount: row.promotion_discount,
     affiliate_commission: row.affiliate_commission,
+    tier2_commission: row.tier2_commission,
     points_discount: row.points_discount,
     merchant_id: row.merchant_id,
     service_fee_amount: row.service_fee_amount,
@@ -83,7 +84,7 @@ function toTransactionRow(row: OrderRow): TransactionRow {
 
 const SELECT_COLUMNS =
   "id,game_id,created_at,status,payment_method_id,reference_price,selling_price,final_price," +
-  "supplier_cost,nambah_profit,promotion_discount,affiliate_commission," +
+  "supplier_cost,nambah_profit,promotion_discount,affiliate_commission,tier2_commission," +
   "points_discount,merchant_id,service_fee_amount,target_user_id,receivable_paid_at," +
   "game:games(name,short_name),product:products(label),payment:payment_methods(name)";
 

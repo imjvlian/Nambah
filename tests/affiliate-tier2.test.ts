@@ -275,3 +275,114 @@ test("captureReferredByFromCookieHeader: first-touch — upline lama tidak perna
     "profil yang sudah punya upline tidak ditimpa simpanan berikutnya",
   );
 });
+
+/*
+ * ── Commit 3: panel admin, penjelasan partner, laporan ─────────────────
+ */
+
+test("admin PATCH: set/clear upline lewat kode mitra, dengan guard", () => {
+  const route = readFileSync("src/app/api/admin/affiliates/route.ts", "utf8");
+
+  assert.ok(
+    route.includes("body.referredByCode !== undefined"),
+    "PATCH menerima referredByCode",
+  );
+  assert.ok(
+    route.includes("referred_by_id: upline.user_id"),
+    "upline ditulis ke customer_profiles pemilik kode (bukan baris affiliates)",
+  );
+  assert.ok(
+    route.includes("referred_by_id: null"),
+    "string kosong menghapus upline — koreksi salah set harus bisa",
+  );
+  assert.ok(
+    route.includes("upline.user_id === downline.user_id"),
+    "mitra tidak bisa jadi upline dirinya sendiri",
+  );
+  assert.ok(
+    route.includes("Hubungkan mitra ini ke akun dulu"),
+    "upline ditolak kalau mitra belum punya pemilik akun",
+  );
+  assert.ok(
+    route.indexOf("body.referredByCode !== undefined") <
+      route.indexOf("Object.keys(updates).length === 0 && !uplineChanged"),
+    "perubahan upline saja cukup — tidak butuh field affiliates lain",
+  );
+  assert.ok(
+    route.includes("referredByCode: uplineCodeFor(row.user_id)"),
+    "GET menampilkan upline per mitra",
+  );
+});
+
+test("panel admin: pilihan upline hanya mitra aktif lain + tampil di tabel", () => {
+  const panel = readFileSync(
+    "src/components/AffiliateDirectoryPanel.tsx",
+    "utf8",
+  );
+
+  assert.ok(
+    panel.includes("referredByCode: draft.referredByCode || null"),
+    "simpan perubahan mengirim referredByCode",
+  );
+  assert.ok(
+    panel.includes("item.code !== editingCode") &&
+      panel.includes('item.status === "active"'),
+    "pilihan upline mengecualikan diri sendiri dan mitra nonaktif",
+  );
+  assert.ok(
+    panel.includes("upline: {item.referredByCode}"),
+    "tabel menampilkan siapa upline mitra",
+  );
+});
+
+test("panel partner: uplineRate dari server menjustasikan komisi yang bukan dari kode sendiri", () => {
+  const route = readFileSync("src/app/api/account/affiliate/route.ts", "utf8");
+  const panel = readFileSync("src/components/AffiliateAccountPanel.tsx", "utf8");
+
+  assert.ok(
+    route.includes("referred_by_id: `eq.${auth.user.id}`"),
+    "deteksi downline: profil member yang mengarah ke akun ini",
+  );
+  assert.ok(
+    route.includes("uplineRate"),
+    "rate tier-2 dikirim ke panel",
+  );
+  assert.ok(
+    panel.includes("komisi upline"),
+    "penjelasan muncul untuk akun yang punya downline",
+  );
+});
+
+test("laporan: total komisi afiliasi memuat kedua tier", () => {
+  const digest = readFileSync("src/lib/daily-digest.ts", "utf8");
+  const cashflow = readFileSync("src/lib/cash-flow.ts", "utf8");
+  const cashflowRules = readFileSync("src/lib/cash-flow-rules.ts", "utf8");
+  const txn = readFileSync("src/lib/transaction-report.ts", "utf8");
+  const txnRules = readFileSync("src/lib/transaction-report-rules.ts", "utf8");
+
+  for (const [label, source] of [
+    ["daily-digest", digest],
+    ["cash-flow", cashflow],
+    ["transaction-report", txn],
+  ] as const) {
+    assert.ok(
+      source.includes("tier2_commission"),
+      `${label}: kolom tier-2 ikut diambil dari orders`,
+    );
+  }
+
+  assert.ok(
+    digest.includes("n(order.affiliate_commission) + n(order.tier2_commission)"),
+    "digest: total = tier-1 + tier-2",
+  );
+  assert.ok(
+    cashflowRules.includes(
+      "num(order.affiliate_commission) + num(order.tier2_commission)",
+    ),
+    "cash-flow: total = tier-1 + tier-2 (bisa direkonsiliasi dengan nambah_profit)",
+  );
+  assert.ok(
+    txnRules.includes('"Komisi Upline"'),
+    "CSV laporan transaksi punya kolom komisi upline sendiri",
+  );
+});

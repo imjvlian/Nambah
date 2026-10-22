@@ -49,6 +49,8 @@ export type CashFlowOrder = {
   nambah_profit: number | string;
   promotion_discount: number | string;
   affiliate_commission: number | string;
+  /** Komisi tier-2 upline (P2) — ikut dipotong dari nambah_profit. */
+  tier2_commission: number | string | null;
   points_discount: number | string;
   referral_discount: number | string;
   merchant_id: string | null;
@@ -393,7 +395,11 @@ export function buildCashFlowReport(input: {
         num(order.promotion_discount) +
         num(order.points_discount) +
         num(order.referral_discount);
-      totals.affiliateCommission += num(order.affiliate_commission);
+      // Komisi afiliasi = kedua tier (P2): pemilik kode + upline-nya.
+      // nambah_profit sudah memotong keduanya, jadi total ini harus ikut
+      // supaya laporan bisa direkonsiliasi.
+      totals.affiliateCommission +=
+        num(order.affiliate_commission) + num(order.tier2_commission);
     }
 
     const key = dayKey(order.created_at);
