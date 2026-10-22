@@ -22,6 +22,9 @@ type FinancialOrderRow = {
   net_profit_before_affiliate: number | string;
   affiliate_rate: number | string;
   affiliate_commission: number | string;
+  tier2_affiliate_code: string | null;
+  tier2_rate: number | string | null;
+  tier2_commission: number | string | null;
   nambah_profit: number | string;
   created_at: string;
   updated_at: string;
@@ -46,6 +49,7 @@ type SupplierRow = {
 };
 
 type CommissionRow = {
+  tier: number;
   status: string;
   amount: number | string;
   base_profit: number | string;
@@ -86,7 +90,7 @@ export async function reconcileOrderFinancial(
   const [orders, payments, suppliers, commissions] = await Promise.all([
     supabaseSelect<FinancialOrderRow>("orders", {
       select:
-        "id,status,affiliate_code,selling_price,supplier_cost,customer_payment_fee,merchant_payment_cost,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,net_profit_before_affiliate,affiliate_rate,affiliate_commission,nambah_profit,created_at,updated_at",
+        "id,status,affiliate_code,selling_price,supplier_cost,customer_payment_fee,merchant_payment_cost,promotion_discount,referral_discount,points_redeemed,points_discount,points_earned,final_price,net_profit_before_affiliate,affiliate_rate,affiliate_commission,tier2_affiliate_code,tier2_rate,tier2_commission,nambah_profit,created_at,updated_at",
       filters: { id: "eq." + orderId },
       limit: 1,
     }),
@@ -104,8 +108,9 @@ export async function reconcileOrderFinancial(
       limit: 10,
     }),
     supabaseSelect<CommissionRow>("commissions", {
-      select: "status,amount,base_profit,rate,updated_at",
+      select: "tier,status,amount,base_profit,rate,updated_at",
       filters: { order_id: "eq." + orderId },
+      order: "tier.asc",
       limit: 5,
     }).catch(() => []),
   ]);
@@ -144,8 +149,21 @@ export async function reconcileOrderFinancial(
     affiliateRate > 0
       ? Math.max(0, Math.floor(expectedNetProfit * affiliateRate))
       : 0;
+  /*
+   * Tier 2 / upline (P2): snapshot tier2_* di order adalah sumbernya.
+   * Tanpa kode upline tidak ada tier-2 — order pra-060 dan order tanpa
+   * upline semuanya jatuh ke 0 di sini, jadi cek nambah_profit lama
+   * tidak berubah untuk mereka.
+   */
+  const tier2Code = order.tier2_affiliate_code;
+  const tier2Rate = n(order.tier2_rate);
+  const tier2Commission = n(order.tier2_commission);
+  const expectedTier2Commission =
+    tier2Code && tier2Rate > 0
+      ? Math.max(0, Math.floor(expectedNetProfit * tier2Rate))
+      : 0;
   const expectedNambahProfit =
-    expectedNetProfit - expectedAffiliateCommission;
+    expectedNetProfit - expectedAffiliateCommission - expectedTier2Commission;
 
   if (pointsDiscount !== expectedPointsDiscount) {
     issues.push({
@@ -184,6 +202,25 @@ export async function reconcileOrderFinancial(
       message: "Affiliate commission frozen tidak cocok dengan rate/net profit.",
       expected: expectedAffiliateCommission,
       actual: affiliateCommission,
+    });
+  }
+
+  if (tier2Code && tier2Commission !== expectedTier2Commission) {
+    issues.push({
+      code: "tier2_commission_mismatch",
+      severity: "error",
+      message: "Komisi tier-2 (upline) frozen tidak cocok dengan rate/net profit.",
+      expected: expectedTier2Commission,
+      actual: tier2Commission,
+    });
+  }
+
+  if (tier2Code && !order.affiliate_code) {
+    issues.push({
+      code: "tier2_without_tier1",
+      severity: "error",
+      message:
+        "Order punya komisi tier-2 tanpa komisi tier-1 — snapshot tidak konsisten.",
     });
   }
 
@@ -307,6 +344,57 @@ export async function reconcileOrderFinancial(
     }
   }
 
+  /*
+   * Ledger tier-2 (P2): baris kedua milik upline — cek yang sama dengan
+   * tier-1, hanya berlaku kalau snapshot tier-2 ada. commissions diurut
+   * per tier (tier.asc), jadi index 1 selalu baris upline.
+   */
+  const tier2Ledger = commissions[1];
+  if (tier2Code && expectedTier2Commission > 0 && !tier2Ledger) {
+    issues.push({
+      code: "tier2_commission_missing",
+      severity: "error",
+      message: "Order memiliki komisi tier-2 tetapi ledger upline belum ada.",
+      expected: expectedTier2Commission,
+      actual: 0,
+    });
+  }
+
+  if (tier2Code && tier2Ledger) {
+    if (n(tier2Ledger.amount) !== expectedTier2Commission) {
+      issues.push({
+        code: "tier2_ledger_amount_mismatch",
+        severity: "error",
+        message: "Ledger komisi upline tidak sama dengan frozen tier-2 commission.",
+        expected: expectedTier2Commission,
+        actual: n(tier2Ledger.amount),
+      });
+    }
+
+    const expectedTier2Status =
+      order.status === "success"
+        ? "available"
+        : ["failed", "cancelled", "refunded"].includes(order.status)
+          ? "cancelled"
+          : ["paid", "processing"].includes(order.status)
+            ? "pending"
+            : null;
+
+    if (
+      expectedTier2Status &&
+      tier2Ledger.status !== expectedTier2Status &&
+      tier2Ledger.status !== "withdrawn"
+    ) {
+      issues.push({
+        code: "tier2_status_inconsistent",
+        severity: "warning",
+        message: "Ledger komisi upline belum mengikuti status order.",
+        expected: expectedTier2Status,
+        actual: tier2Ledger.status,
+      });
+    }
+  }
+
   const result: FinancialReconciliation["result"] = issues.some(
     (issue) => issue.severity === "error",
   )
@@ -322,6 +410,7 @@ export async function reconcileOrderFinancial(
     pointsLiability: expectedPointsLiability,
     netProfitBeforeAffiliate: expectedNetProfit,
     affiliateCommission: expectedAffiliateCommission,
+    tier2Commission: expectedTier2Commission,
     nambahProfit: expectedNambahProfit,
   };
   const actual = {
@@ -330,6 +419,7 @@ export async function reconcileOrderFinancial(
     finalPrice,
     netProfitBeforeAffiliate: n(order.net_profit_before_affiliate),
     affiliateCommission,
+    tier2Commission,
     nambahProfit: n(order.nambah_profit),
     paymentAmount: payment ? n(payment.amount) : null,
     paymentStatus: payment?.status ?? null,
@@ -337,6 +427,8 @@ export async function reconcileOrderFinancial(
     supplierStatus: supplier?.status ?? null,
     commissionAmount: commission ? n(commission.amount) : null,
     commissionStatus: commission?.status ?? null,
+    tier2LedgerAmount: tier2Ledger ? n(tier2Ledger.amount) : null,
+    tier2LedgerStatus: tier2Ledger?.status ?? null,
   };
 
   await supabaseUpsert(

@@ -11,6 +11,7 @@ import {
   supabaseSelect,
   supabaseUpsert,
 } from "@/lib/supabase/server";
+import { captureReferredByFromCookieHeader } from "@/lib/affiliate-upline";
 import { BRAND } from "@/lib/brand";
 
 export const runtime = "nodejs";
@@ -20,6 +21,7 @@ type ProfileRow = {
   display_name: string | null;
   whatsapp: string | null;
   preferred_receipt_channel: "email" | "whatsapp" | "both";
+  referred_by_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -111,6 +113,29 @@ export async function PATCH(request: Request) {
         ? body.preferredReceiptChannel
         : "email";
 
+    /*
+     * Atribusi upline (P2, 22 Okt 2026): penyimpanan profil adalah momen
+     * server pertama yang bisa menangkap "user ini datang dari link
+     * siapa" — cookie nambah_ref_code (30 hari, dipasang /r/[code]) ikut
+     * terkirim bersama request ini.
+     *
+     * First-touch menang: kolom hanya ditulis kalau profilnya belum punya
+     * upline. Kegagalan resolusi tidak boleh menggagalkan penyimpanan
+     * profil — referred_by_id cukup kosong, pohon bisa diisi admin.
+     */
+    const [existingProfile] = await supabaseSelect<ProfileRow>(
+      "customer_profiles",
+      {
+        select: "user_id,referred_by_id",
+        filters: { user_id: `eq.${auth.user.id}` },
+        limit: 1,
+      },
+    );
+    const referredByToWrite = await captureReferredByFromCookieHeader({
+      cookieHeader: request.headers.get("cookie"),
+      currentReferredBy: existingProfile?.referred_by_id ?? null,
+    });
+
     const now = new Date().toISOString();
     await supabaseUpsert(
       "customer_profiles",
@@ -120,6 +145,7 @@ export async function PATCH(request: Request) {
         whatsapp: whatsapp || null,
         preferred_receipt_channel: channel,
         updated_at: now,
+        ...(referredByToWrite ? { referred_by_id: referredByToWrite } : {}),
       },
       {
         onConflict: "user_id",

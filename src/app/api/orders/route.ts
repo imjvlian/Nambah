@@ -51,6 +51,7 @@ import {
 } from "@/lib/order-access";
 import { calculatePricing } from "@/lib/pricing";
 import { getPricingContext } from "@/lib/pricing-repository";
+import { resolveTier2ForOrder } from "@/lib/affiliate-upline";
 import {
   isSupabaseConfigured,
   supabaseInsert,
@@ -706,6 +707,30 @@ export async function POST(request: Request) {
   // `cancelOrderWithCleanup` — helper itu idempoten lewat compare-and-swap pada
   // `status`, jadi dipanggil dari jalur kompensasi maupun sweeper tidak akan
   // saling menimpa.
+
+  /*
+   * Komisi Tier 2 / upline (P2, 22 Okt 2026).
+   *
+   * Di-resolve SEKALI di sini dan dibekukan ke kolom tier2_* — pola snapshot
+   * yang sama dengan tier-1. commission-service membuat baris komisi kedua
+   * dari snapshot ini; rekonsiliasi memeriksa nambah_profit = netProfit -
+   * tier1 - tier2.
+   *
+   * Hanya dijalankan saat pembuatan order, bukan preview: tier-2 tidak
+   * terlihat pembeli, dan identitas kuitansi (email/WhatsApp) yang dipakai
+   * guard B5 baru lengkap di titik ini.
+   */
+  const tier2 = await resolveTier2ForOrder({
+    affiliateCode: pricing.affiliateCode,
+    tier1Commission: pricing.affiliateCommission,
+    netProfitBeforeAffiliate: pricing.netProfitBeforeAffiliate,
+    buyer: {
+      userId: auth.user?.id ?? null,
+      email: receiptEmail,
+      whatsapp: receiptWhatsapp,
+    },
+  });
+
   try {
     await supabaseInsert("orders", {
       id: orderId,
@@ -756,7 +781,12 @@ export async function POST(request: Request) {
       net_profit_before_affiliate: pricing.netProfitBeforeAffiliate,
       affiliate_rate: pricing.affiliateRate,
       affiliate_commission: pricing.affiliateCommission,
-      nambah_profit: pricing.nambahProfit,
+      // Snapshot tier-2 (P2): NULL = order tanpa upline/tier-2. nambah_profit
+      // memotong keduanya — toko tidak mencatat laba yang sudah dibayarkan.
+      tier2_affiliate_code: tier2?.code ?? null,
+      tier2_rate: tier2?.rate ?? null,
+      tier2_commission: tier2?.commission ?? null,
+      nambah_profit: pricing.nambahProfit - (tier2?.commission ?? 0),
       access_token_hash: access.tokenHash,
       created_at: now,
       updated_at: now,

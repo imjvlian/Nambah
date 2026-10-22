@@ -253,8 +253,12 @@ export type LinkAffiliate = {
  *
  * Tanpa identitas pembeli yang bisa dibandingkan -> false (order tetap
  * boleh jalan; penegakan berikutnya ada di cek lain).
+ *
+ * Diekspor untuk dipakai guard B5 tier-2 (affiliate-upline.ts): upline
+ * yang ternyata pembeli order itu sendiri tidak boleh menerima komisi
+ * upline dari pembeliannya sendiri.
  */
-async function affiliateOwnedByBuyer(
+export async function affiliateOwnedByBuyer(
   ownerUserId: string,
   buyer: {
     userId?: string | null;
