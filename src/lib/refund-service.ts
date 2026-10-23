@@ -6,7 +6,7 @@ import {
 import { markOrderRefunded } from "@/lib/order-service";
 import { refundDokuQrisPayment } from "@/lib/payments/doku";
 import { refundMidtransPayment } from "@/lib/payments/midtrans";
-import { notifyRefundProcessed } from "@/lib/telegram-alerts";
+import { notifyRefundProcessed, notifyRefundRequested } from "@/lib/telegram-alerts";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import { BRAND } from "@/lib/brand";
 import { formatIDR } from "@/lib/pricing";
@@ -302,6 +302,29 @@ export async function requestRefundForOrder(input: {
       error: "Permintaan refund gagal dibuat.",
       status: 502,
     };
+  }
+
+  /*
+   * P3.0: beri tahu ops SEGERA saat permintaan masuk. Tanpa ini admin
+   * hanya tahu kalau kebetulan membuka inspector — uang pelanggan
+   * menggantung sampai ada yang melihat.
+   *
+   * Best-effort: kegagalan antrean alert tidak boleh menggagalkan
+   * permintaan refund yang sudah tersimpan (dedupeKey meredam
+   * duplikat kalau pernah terkirim).
+   */
+  try {
+    await notifyRefundRequested({
+      orderId,
+      amount: Number(refund.amount),
+      reason: refund.reason,
+      requestedByAdmin: input.requestedByAdminUserId != null,
+    });
+  } catch (error) {
+    console.error(
+      `Refund-requested Telegram alert failed for order ${orderId}`,
+      error,
+    );
   }
 
   return {

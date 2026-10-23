@@ -147,3 +147,80 @@ test("failed refund status includes the original reason", () => {
   assert.match(text, /Refund gagal diproses/);
   assert.match(text, /Produk gagal terkirim/);
 });
+
+/*
+ * P3.0 (23 Okt 2026): admin harus tahu saat permintaan refund MASUK,
+ * bukan hanya saat kebetulan membuka inspector.
+ */
+
+test("P3.0: alert permintaan refund baru masuk antrean Telegram", () => {
+  const alerts = readFileSync("src/lib/telegram-alerts.ts", "utf8");
+
+  assert.ok(
+    alerts.includes("export async function notifyRefundRequested"),
+    "fungsi alert permintaan refund harus ada",
+  );
+  // Slice antar-marker: regex fungsi gampang berhenti di '}' penutup
+  // tipe parameter (kolom 0), jadi badan fungsi dibaca lewat batas eksplisit.
+  const start = alerts.indexOf("export async function notifyRefundRequested");
+  const end = alerts.indexOf("export async function notifyRefundProcessed");
+  assert.ok(start >= 0 && end > start, "badan fungsi notifyRefundRequested harus terbaca");
+  const fnBody = alerts.slice(start, end);
+
+  // Alasan = teks bebas pelanggan: wajib di-escape HTML supaya tidak
+  // merusak format pesan (atau menyuntik markup) di Telegram.
+  assert.ok(
+    fnBody.includes("escapeTelegramHtml(reasonText)"),
+    "alasan pelanggan harus di-escape",
+  );
+  assert.ok(
+    fnBody.includes(".slice(0, 200)"),
+    "alasan dipotong supaya pesan tetap rapi",
+  );
+  // Sumber permintaan dibedakan — admin-initiated tidak urgent seperti pelanggan.
+  assert.ok(
+    fnBody.includes('input.requestedByAdmin ? "admin" : "pelanggan"'),
+    "pesan menyebut siapa pengajuannya",
+  );
+  // Satu alert per order: refunds.order_id unik, dedupe menahan retry submit ganda.
+  assert.ok(
+    fnBody.includes("dedupeKey: `refund-requested:${input.orderId}`"),
+    "dedupe per order",
+  );
+  assert.ok(
+    fnBody.includes("if (!isTelegramConfigured())"),
+    "tetap senyap saat Telegram belum dikonfigurasi",
+  );
+});
+
+test("P3.0: hook alert di requestRefundForOrder bersifat best-effort", () => {
+  const service = readFileSync("src/lib/refund-service.ts", "utf8");
+
+  // Alert dipanggil SETELAH baris refund tersimpan — keberhasilannya
+  // tidak boleh menggagalkan permintaan yang sudah valid.
+  const hookMatch = service.match(
+    /await notifyRefundRequested\(\{[\s\S]*?\}\);/,
+  );
+  assert.ok(hookMatch, "notifyRefundRequested dipanggil");
+  assert.ok(
+    service.indexOf("await notifyRefundRequested") >
+      service.indexOf('status: "requested"'),
+    "alert terjadi setelah baris refund dibuat, bukan sebelum",
+  );
+
+  const tryMatch = service.match(
+    /try \{\s*await notifyRefundRequested\([\s\S]*?\} catch \(error\) \{/,
+  );
+  assert.ok(
+    tryMatch,
+    "panggilan dibungkus try/catch — kegagalan antrean tidak menolak refund",
+  );
+  assert.ok(
+    service.includes("Refund-requested Telegram alert failed"),
+    "kegagalan alert dicatat di log server",
+  );
+  assert.ok(
+    service.includes("requestedByAdmin: input.requestedByAdminUserId != null"),
+    "sumber pengajuan diteruskan ke alert",
+  );
+});

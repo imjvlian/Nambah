@@ -215,6 +215,55 @@ export async function notifySupplierDispatchBalanceDepleted(
 }
 
 /**
+ * Permintaan refund BARU masuk (P3.0).
+ *
+ * Tanpa alert ini, admin hanya tahu ada permintaan kalau kebetulan
+ * membuka inspector — refund pelanggan bisa menggantung berhari-hari.
+ * Dipicu saat baris refund "requested" dibuat, baik dari form pelanggan
+ * maupun diajukan admin sendiri.
+ *
+ * Alasan refund adalah teks bebas pelanggan: di-escape HTML dan
+ * dipotong supaya pesan tetap rapi — isinya tetap penting untuk
+ * memutuskan case ini refund atau fulfillment manual.
+ */
+export async function notifyRefundRequested(input: {
+  orderId: string;
+  amount: number;
+  reason: string;
+  requestedByAdmin: boolean;
+}) {
+  if (!isTelegramConfigured()) {
+    return { queued: false as const, reason: "not-configured" as const };
+  }
+
+  const context = await loadOrderContext(input.orderId);
+  if (!context) {
+    return { queued: false as const, reason: "order-not-found" as const };
+  }
+
+  const reasonText = input.reason.trim().slice(0, 200) || "Tidak diketahui";
+
+  const text = [
+    "<b>Permintaan refund BARU</b>",
+    `Order <code>${escapeTelegramHtml(context.order.id)}</code>`,
+    `Brand game: ${escapeTelegramHtml(context.brand)}`,
+    `Produk: ${escapeTelegramHtml(context.productLabel)}`,
+    `Nominal: ${escapeTelegramHtml(new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(input.amount))}`,
+    `Diajukan oleh: ${input.requestedByAdmin ? "admin" : "pelanggan"}`,
+    `Alasan: ${escapeTelegramHtml(reasonText)}`,
+    "Proses di inspector order — uang pelanggan menggantung sampai diputuskan.",
+  ].join("\n");
+
+  return enqueueTelegramMessage(text, {
+    kind: "refund",
+    // Satu refund request per order (unique refunds.order_id), jadi satu
+    // alert per order cukup — dedupeKey juga meredam retry submit ganda.
+    dedupeKey: `refund-requested:${input.orderId}`,
+    payload: { orderId: input.orderId },
+  });
+}
+
+/**
  * Refund selesai diproses.
  *
  * Ini alert operasional, bukan bukti refund ke user. Nominal dan provider
