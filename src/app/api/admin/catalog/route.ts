@@ -9,6 +9,7 @@ type GameRow = {
   name: string;
   short_name: string;
   active: boolean;
+  maintenance: boolean;
   sort_order: number | string;
 };
 
@@ -21,6 +22,7 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
+  maintenance: boolean;
   sort_order: number | string;
 };
 
@@ -50,12 +52,12 @@ export async function GET(request: Request) {
     const [games, products, supplierProducts, balanceRows, melostoreBalanceRows] =
       await Promise.all([
         supabaseSelectAll<GameRow>("games", {
-          select: "id,name,short_name,active,sort_order",
+          select: "id,name,short_name,active,maintenance,sort_order",
           order: "sort_order.asc,name.asc",
         }),
         supabaseSelectAll<ProductRow>("products", {
           select:
-            "id,game_id,label,note,internal_sku,selling_price,reference_price,active,sort_order",
+            "id,game_id,label,note,internal_sku,selling_price,reference_price,active,maintenance,sort_order",
           order: "game_id.asc,sort_order.asc,label.asc",
         }),
         supabaseSelectAll<SupplierProductRow>("supplier_products", {
@@ -126,6 +128,7 @@ export async function GET(request: Request) {
         sellingPrice: Number(product.selling_price),
         referencePrice: Number(product.reference_price),
         active: product.active,
+        maintenance: product.maintenance,
         sortOrder: Number(product.sort_order),
         supplier: {
           mapped,
@@ -171,6 +174,7 @@ export async function GET(request: Request) {
         name: game.name,
         shortName: game.short_name,
         active: game.active,
+        maintenance: game.maintenance,
       })),
       products: catalog,
     });

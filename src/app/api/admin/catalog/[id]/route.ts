@@ -15,6 +15,7 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   active: boolean;
+  maintenance: boolean;
   internal_sku: string | null;
 };
 
@@ -24,6 +25,7 @@ type UpdateProductBody = {
   sellingPrice?: number;
   referencePrice?: number;
   active?: boolean;
+  maintenance?: boolean;
   internalSku?: string | null;
 };
 
@@ -56,7 +58,7 @@ export async function PATCH(
 
   try {
     const [existing] = await supabaseSelect<ProductRow>("products", {
-      select: "id,label,note,internal_sku,selling_price,reference_price,active",
+      select: "id,label,note,internal_sku,selling_price,reference_price,active,maintenance",
       filters: { id: `eq.${productId}` },
       limit: 1,
     });
@@ -86,6 +88,13 @@ export async function PATCH(
         : body.referencePrice;
     const nextActive =
       body.active === undefined ? existing.active : body.active;
+    /*
+     * P3.1: maintenance terpisah dari active - active dimiliki sinkronisasi
+     * katalog (scan bisa menonaktifkan produk yang hilang dari supplier),
+     * maintenance dimiliki admin murni dan sifatnya sementara.
+     */
+    const nextMaintenance =
+      body.maintenance === undefined ? existing.maintenance : body.maintenance;
 
     if (!nextLabel || nextLabel.length > 100) {
       return Response.json(
@@ -173,6 +182,7 @@ export async function PATCH(
         selling_price: nextSellingPrice,
         reference_price: nextReferencePrice,
         active: nextActive,
+        maintenance: nextMaintenance,
         internal_sku: nextInternalSku,
         updated_at: new Date().toISOString(),
       },
@@ -200,6 +210,10 @@ export async function PATCH(
           from: existing.active,
           to: nextActive,
         },
+        maintenance: {
+          from: existing.maintenance,
+          to: nextMaintenance,
+        },
         internalSku: {
           from: existing.internal_sku,
           to: nextInternalSku,
@@ -215,6 +229,7 @@ export async function PATCH(
         sellingPrice: Number(updated?.selling_price ?? nextSellingPrice),
         referencePrice: Number(updated?.reference_price ?? nextReferencePrice),
         active: updated?.active ?? nextActive,
+        maintenance: updated?.maintenance ?? nextMaintenance,
         internalSku: updated?.internal_sku ?? nextInternalSku,
       },
     });

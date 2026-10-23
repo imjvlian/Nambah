@@ -76,6 +76,8 @@ type CatalogProduct = {
   referencePrice: number;
   active: boolean;
   sortOrder: number;
+  /** P3.1: sedang diperbaiki - disembunyikan dari etalase, checkout ditolak. */
+  maintenance: boolean;
   /** SKU milik Lacte - dari generator, bukan kode supplier. */
   internalSku: string | null;
   supplier: {
@@ -118,6 +120,8 @@ type CatalogPayload = {
     name: string;
     shortName: string;
     active: boolean;
+    /** P3.1: seluruh game sedang diperbaiki. */
+    maintenance: boolean;
   }>;
   products: CatalogProduct[];
 };
@@ -3332,6 +3336,86 @@ const txDataStamp = txRange.preset
     }
   }
 
+  /**
+   * P3.1: toggle maintenance SATU SKU - aksi langsung, bukan lewat draft.
+   *
+   * Alasannya kecepatan saat gangguan: maintenance adalah keputusan
+   * menit-menit ("item ini jangan bisa dibeli dulu"), dan mengikatnya
+   * ke draft berarti harus menekan Simpan - sambil takut tidak sengaja
+   * menyimpan perubahan harga yang belum selesai direview.
+   */
+  async function toggleMaintenanceProduk(product: CatalogProduct) {
+    setBusy(`maintenance:${product.id}`);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/catalog/" + encodeURIComponent(product.id),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ maintenance: !product.maintenance }),
+        },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Status maintenance gagal disimpan.");
+      }
+      await loadCatalog();
+      setNotice(
+        product.maintenance
+          ? `Maintenance "${product.label}" diakhiri - kembali terlihat pelanggan.`
+          : `"${product.label}" sedang maintenance - disembunyikan dari etalase dan ditolak checkout.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Status maintenance gagal disimpan.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  /**
+   * P3.1: toggle maintenance SATU GAME - menutup semua SKU-nya sekali klik.
+   * Skenario nyata: "game ini gangguan di supplier, matikan dulu semuanya"
+   * tanpa men-toggle puluhan SKU satu per satu.
+   */
+  async function toggleMaintenanceGame(gameId: string) {
+    const game = catalog?.games.find((item) => item.id === gameId);
+    if (!game) return;
+
+    setBusy(`game-maintenance:${gameId}`);
+    setNotice("");
+    try {
+      const response = await fetch(
+        "/api/admin/games/" + encodeURIComponent(gameId),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ maintenance: !game.maintenance }),
+        },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Status maintenance game gagal disimpan.");
+      }
+      await loadCatalog();
+      setNotice(
+        game.maintenance
+          ? `Maintenance game ${game.name} diakhiri - semua SKU-nya kembali terlihat.`
+          : `Game ${game.name} sedang maintenance - semua SKU disembunyikan dan checkout ditolak.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Status maintenance game gagal disimpan.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function saveAllDirty() {
     if (!catalog) return;
     const dirtyProducts = catalog.products.filter((product) => {
@@ -4103,6 +4187,28 @@ const txDataStamp = txRange.preset
                   <option value="thin">Margin tipis (&lt;5%)</option>
                   <option value="no-cost">Tanpa data modal</option>
                 </select>
+                {/*
+                 * P3.1: toggle maintenance game yang sedang difilter.
+                 * Muncul hanya saat satu game dipilih - tombol "matikan
+                 * game ini dulu" memang dicari saat operator sedang
+                 * menatap game yang bermasalah, bukan di daftar 100+ game.
+                 */}
+                {gameFilter !== "all" &&
+                  catalog.games.some((item) => item.id === gameFilter) && (
+                    <button
+                      type="button"
+                      className="admin-secondary-button"
+                      disabled={
+                        Boolean(busy) || busy === `game-maintenance:${gameFilter}`
+                      }
+                      onClick={() => void toggleMaintenanceGame(gameFilter)}
+                    >
+                      {catalog.games.find((item) => item.id === gameFilter)
+                        ?.maintenance
+                        ? "Maintenance AKTIF — akhiri"
+                        : "Maintenance semua SKU game ini"}
+                    </button>
+                  )}
                 <span className="acc-filter-count">
                   {filteredProducts.length} dari {catalog.products.length} produk
                 </span>
@@ -4641,6 +4747,32 @@ const txDataStamp = txRange.preset
                           ) : (
                             <small className="admin-supplier-warning">
                               Belum terlihat pelanggan
+                            </small>
+                          )}
+                          {/*
+                           * P3.1: maintenance SATU SKU - aksi langsung tanpa
+                           * lewat draft (lihat toggleMaintenanceProduk).
+                           * ON = disembunyikan dari etalase + checkout
+                           * ditolak; status aktif tidak disentuh supaya
+                           * scan katalog dan penyelarasan supplier tidak
+                           * ikut terganggu.
+                           */}
+                          <button
+                            type="button"
+                            className="admin-reset-button"
+                            disabled={Boolean(busy)}
+                            title="Maintenance sementara: disembunyikan dari etalase dan ditolak checkout, tanpa mengubah status aktif"
+                            onClick={() => void toggleMaintenanceProduk(product)}
+                          >
+                            {busy === `maintenance:${product.id}`
+                              ? "..."
+                              : product.maintenance
+                                ? "Maintenance ON — akhiri"
+                                : "Maintenance"}
+                          </button>
+                          {product.maintenance && (
+                            <small className="admin-supplier-warning">
+                              Disembunyikan sementara
                             </small>
                           )}
                         </div>

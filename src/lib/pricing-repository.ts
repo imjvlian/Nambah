@@ -67,6 +67,12 @@ type PricingContext = {
   /** Batas waktu promo yang sedang terpasang (untuk countdown di checkout). */
   promoEndsAt: string | null;
   minimumNambahProfit: number;
+  /*
+   * P3.1: produk sedang maintenance - etalase sudah menyembunyikannya,
+   * tapi halaman yang masih kecache di browser pelanggan bisa mencoba
+   * checkout; gate order yang menolak (409) memakai flag ini.
+   */
+  productMaintenance: boolean;
   source: "static" | "supabase";
 };
 
@@ -86,6 +92,7 @@ type ProductRow = {
   note: string | null;
   selling_price: number | string;
   reference_price: number | string;
+  maintenance: boolean;
 };
 
 type SupplierProductRow = {
@@ -222,6 +229,7 @@ async function getStaticPricingContext(request: PricingRequest): Promise<Pricing
       linkAffiliate,
       promoEndsAt: null,
       minimumNambahProfit: 500,
+      productMaintenance: false,
       source: "static",
     },
   };
@@ -407,7 +415,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
         limit: 1,
       }),
       supabaseSelect<ProductRow>("products", {
-        select: "id,game_id,label,note,selling_price,reference_price",
+        select: "id,game_id,label,note,selling_price,reference_price,maintenance",
         filters: { id: `eq.${packageId}`, game_id: `eq.${gameId}`, active: "eq.true" },
         limit: 1,
       }),
@@ -706,6 +714,7 @@ async function getSupabasePricingContext(request: PricingRequest): Promise<Prici
         linkAffiliate,
         promoEndsAt: promotionRow?.ends_at ?? null,
         minimumNambahProfit: Number(pricingRule.minimum_nambah_profit),
+        productMaintenance: Boolean(product.maintenance),
         source: "supabase",
       },
     };

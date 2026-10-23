@@ -17,6 +17,8 @@ type GameRow = {
   initials: string;
   requires_server: boolean;
   sort_order: number;
+  /** P3.1: seluruh game sedang diperbaiki - sembunyikan semua SKU-nya. */
+  maintenance: boolean;
 };
 
 type ProductRow = {
@@ -27,6 +29,8 @@ type ProductRow = {
   selling_price: number | string;
   reference_price: number | string;
   sort_order: number;
+  /** P3.1: SKU ini sedang diperbaiki - sembunyikan dari etalase. */
+  maintenance: boolean;
 };
 
 type SupplierAvailabilityRow = {
@@ -246,12 +250,12 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     // hundreds produk hilang dari etalase tanpa jejak.
     [gameRows, productRows, paymentRows, recentOrders] = await Promise.all([
       supabaseSelectAll<GameRow>("games", {
-        select: "id,name,short_name,category,accent,initials,requires_server,sort_order",
+        select: "id,name,short_name,category,accent,initials,requires_server,sort_order,maintenance",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
       }),
       supabaseSelectAll<ProductRow>("products", {
-        select: "id,game_id,label,note,selling_price,reference_price,sort_order",
+        select: "id,game_id,label,note,selling_price,reference_price,sort_order,maintenance",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
       }),
@@ -327,12 +331,30 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     popularity.set(order.product_id, (popularity.get(order.product_id) ?? 0) + 1);
   }
 
+  /*
+   * P3.1: item yang sedang maintenance tidak boleh tampil di etalase.
+   *
+   * Dua tingkat: flag game menutup SEMUA SKU-nya sekali toggle (skenario
+   * "game ini gangguan di supplier"), flag SKU menutup satu produk.
+   * Game yang semua SKU-nya tertutup otomatis hilang dari daftar lewat
+   * filter packages.length yang sudah ada - tanpa logika tambahan.
+   *
+   * Menyembunyikan, bukan sekadar menandai: etalase yang menampilkan
+   * item yang tidak bisa dibeli adalah persis masalah yang ditutup
+   * item roadmap ini.
+   */
+  const maintenanceGameIds = new Set(
+    gameRows.filter((game) => game.maintenance).map((game) => game.id),
+  );
+
   const games: Game[] = gameRows
     .map((game) => {
       const packages = productRows
         .filter(
           (product) =>
             product.game_id === game.id &&
+            !maintenanceGameIds.has(game.id) &&
+            !product.maintenance &&
             isPurchasableFromSupplier(product.id),
         )
         .map((product) => ({

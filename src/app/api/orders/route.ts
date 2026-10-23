@@ -100,6 +100,8 @@ type GameAccountRow = {
   name: string;
   short_name: string;
   requires_server: boolean;
+  /** P3.1: game sedang diperbaiki - semua SKU-nya tidak bisa dibeli. */
+  maintenance: boolean;
 };
 
 const MIDTRANS_PAYMENT_MAP: Record<string, string[]> = {
@@ -366,7 +368,7 @@ export async function POST(request: Request) {
   } = pricingContext.context;
 
   const [gameConfig] = await supabaseSelect<GameAccountRow>("games", {
-    select: "id,name,short_name,requires_server",
+    select: "id,name,short_name,requires_server,maintenance",
     filters: { id: `eq.${game.id}`, active: "eq.true" },
     limit: 1,
   });
@@ -374,6 +376,28 @@ export async function POST(request: Request) {
   if (!gameConfig) {
     return Response.json(
       { error: "Konfigurasi akun produk tidak ditemukan." },
+      { status: 409 },
+    );
+  }
+
+  /*
+   * GERBANG MAINTENANCE (P3.1): tolak SEBELUM pembayaran, bukan gagal
+   * setelah dibayar.
+   *
+   * Etalase sudah menyembunyikan item maintenance, tapi halaman produk
+   * bisa masih ter-cache di browser pelanggan (atau dibuka dari tab lama)
+   * - gerbang ini penjaga terakhir supaya tidak ada uang masuk untuk
+   * barang yang memang sedang tidak bisa dikirim.
+   *
+   * Dua tingkat: flag game menutup semua SKU-nya; flag SKU menutup
+   * satu produk (dibawa pricing context).
+   */
+  if (gameConfig.maintenance || pricingContext.context.productMaintenance) {
+    return Response.json(
+      {
+        error:
+          "Produk ini sedang tidak tersedia sementara karena perbaikan. Silakan coba lagi beberapa saat lagi.",
+      },
       { status: 409 },
     );
   }

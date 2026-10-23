@@ -193,6 +193,7 @@ export const ROUTE_SCOPE: ReadonlyArray<readonly [string, AdminScope]> = [
 
   // -- Katalog -----------------------------------------------------------
   ["/api/admin/catalog", "katalog"],
+  ["/api/admin/games", "katalog"],
   ["/api/admin/promotions", "katalog"],
   ["/api/admin/melostore", "katalog"],
   ["/api/admin/digiflazz", "katalog"],
