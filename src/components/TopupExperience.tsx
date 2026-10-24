@@ -1957,7 +1957,13 @@ export default function TopupExperience({
                 <strong>Promo dan referral</strong>
                 <small>
                   Punya kode promo atau referral? Masukkan di sini — potongannya
-                  langsung kelihatan di total.
+                  langsung kelihatan di total.{" "}
+                  {/* P4.1: halaman promo publik — jalur discoverability utama
+                      selain footer; ditaruh persis di titik orang memikirkan
+                      "ada promo nggak ya?" */}
+                  <a className="promo-hint-link" href="/promo">
+                    Lihat semua promo yang sedang jalan →
+                  </a>
                 </small>
               </div>
             </div>

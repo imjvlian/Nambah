@@ -1,0 +1,193 @@
+/*
+ * Halaman /promo (P4.1).
+ *
+ * Gaya kartu mengikuti bahasa visual rumah: garis tipis, sudut membulat,
+ * aksen hanya pada elemen penting (kode + tombol). Tanpa animasi mengganggu
+ * — halaman ini alat konversi, bukan perayaan.
+ */
+
+.promo-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-hero {
+  padding-top: 72px;
+  padding-bottom: 24px;
+  max-width: 720px;
+}
+
+.promo-hero h1 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  margin: 6px 0 10px;
+}
+
+.promo-hero p {
+  color: var(--ink-soft, #5b615a);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.promo-list {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 72px;
+  max-width: 860px;
+  width: 100%;
+}
+
+.promo-card {
+  border: 1px solid var(--line, #e2e4de);
+  border-radius: 16px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface, #fff);
+}
+
+.promo-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.promo-card-head .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.promo-benefit {
+  font-size: 1.35rem;
+  line-height: 1.3;
+  display: block;
+}
+
+.promo-code-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.promo-code-block code {
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  padding: 8px 14px;
+  border: 1px dashed var(--line-strong, #c8ccc2);
+  border-radius: 10px;
+  background: var(--wash, #f6f7f3);
+  font-weight: 700;
+}
+
+.promo-code-block button {
+  border: 1px solid var(--line-strong, #c8ccc2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.promo-code-block button:hover {
+  background: var(--wash, #f6f7f3);
+}
+
+.promo-terms {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.promo-terms li {
+  color: var(--ink-soft, #5b615a);
+  font-size: 0.86rem;
+}
+
+.promo-terms li::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--accent, #2f6b3a);
+  font-weight: 700;
+}
+
+.promo-quota-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #9a6b1f;
+}
+
+.promo-cta {
+  align-self: flex-start;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 2px solid var(--accent, #2f6b3a);
+  padding-bottom: 2px;
+}
+
+.promo-cta:hover {
+  opacity: 0.75;
+}
+
+/* Kuota habis: kartu tetap tampil (jujur), tapi reda supaya fokus
+   jatuh ke promo yang masih bisa dipakai. */
+.promo-card-exhausted {
+  opacity: 0.65;
+}
+
+.promo-card-exhausted .promo-code-block code {
+  text-decoration: line-through;
+}
+
+.promo-empty {
+  border: 1px dashed var(--line-strong, #c8ccc2);
+  border-radius: 16px;
+  padding: 36px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft, #5b615a);
+}
+
+.promo-empty strong {
+  font-size: 1.1rem;
+}
+
+.promo-empty p {
+  margin: 0 0 10px;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+/* Tautan discoverability di kolom promo checkout. */
+.promo-hint-link {
+  font-weight: 600;
+  color: var(--accent, #2f6b3a);
+  white-space: nowrap;
+}
+
+.promo-hint-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .promo-hero {
+    padding-top: 56px;
+  }
+
+  .promo-card {
+    padding: 18px 16px;
+  }
+
+  .promo-benefit {
+    font-size: 1.15rem;
+  }
+}
