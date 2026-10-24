@@ -21,6 +21,10 @@ import {
   TIMELINE_STEPS,
   calculateCountdown,
 } from "@/lib/order-status";
+import {
+  retryCTALabel,
+  stowRetryPrefill,
+} from "@/lib/order-retry";
 import type { PublicOrderStatus } from "@/lib/order-public";
 import { MERCHANT_RETAIL_PAYMENT_METHOD_ID } from "@/lib/catalog";
 import MerchantScanCode from "@/components/MerchantScanCode";
@@ -568,6 +572,37 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
     }
   }
 
+  /**
+   * P3.2: "Coba lagi"/"Top up lagi"/"Buat pesanan baru" — satu perilaku
+   * untuk semuanya: bawa data order lama sebagai prefill, lalu ke etalase.
+   *
+   * Label-nya yang membedakan (lihat retryCTALabel); perilakunya prefill,
+   * bukan auto-beli — pelanggan tetap melihat harga terkini dan semua gate
+   * jalan seperti biasa. Best-effort: gagal sessionStorage tidak boleh
+   * menghalangi navigasi.
+   */
+  function cobaLagiDenganPrefill() {
+    if (order) {
+      stowRetryPrefill({
+        status: order.status,
+        paidAt: order.payment.paidAt,
+        product: {
+          gameId: order.product.gameId,
+          packageId: order.product.packageId,
+        },
+        account: {
+          userId: order.account.userId,
+          ...(order.account.serverId
+            ? { serverId: order.account.serverId }
+            : {}),
+        },
+        promoCode: order.promoCode ?? null,
+        referralCode: order.referralCode ?? null,
+      });
+    }
+    router.push("/#topup");
+  }
+
   if (preview === undefined || order === undefined) {
     return (
       <main>
@@ -661,14 +696,47 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
   const paymentWindowClosed =
     liveStatus === "pending_payment" && countdown.isExpired;
 
-  const statusActions = isPreview
-    ? []
-    : paymentWindowClosed
-      ? [
-          { label: "Buat pesanan baru", action: "new_order" as const },
-          { label: "Periksa status", action: "refresh" as const },
-        ]
-      : STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy");
+  const statusActions = (() => {
+    /*
+     * P3.2: label tombol "new_order" jadi DINAMIS berdasarkan uang.
+     *
+     * Satu aksi (prefill + navigasi), tiga label yang memberi tahu
+     * pelanggan apa yang akan terjadi: "Coba lagi" untuk order yang
+     * tidak pernah mengambil uang, "Top up lagi" untuk pembelian
+     * ulang, dan "Buat pesanan baru" untuk failed-yang-sudah-dibayar
+     * — di situ uang pelanggan tertahan menunggu refund, dan tombol
+     * yang terasa seperti "lanjutkan" berarti menggoda bayar dua kali.
+     */
+    const withRetryLabel = <T extends { label: string; action: string }>(
+      actions: T[],
+    ): T[] =>
+      order
+        ? actions.map((cta) =>
+            cta.action === "new_order"
+              ? {
+                  ...cta,
+                  label: paymentWindowClosed
+                    ? "Coba lagi"
+                    : retryCTALabel({
+                        status: liveStatus,
+                        paidAt: order.payment.paidAt,
+                      }),
+                }
+              : cta,
+          )
+        : actions;
+
+    if (isPreview) return [];
+    if (paymentWindowClosed) {
+      return withRetryLabel([
+        { label: "Buat pesanan baru", action: "new_order" },
+        { label: "Periksa status", action: "refresh" },
+      ]);
+    }
+    return withRetryLabel(
+      STATUS_CTA[liveStatus].filter((cta) => cta.action !== "copy"),
+    );
+  })();
 
   const paymentType = order?.payment.paymentType ?? null;
   const paymentChannel = paymentTypeLabel(paymentType);
@@ -770,8 +838,12 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
               {isPreview
                 ? "Harga sudah disesuaikan dengan promo, referral, dan points yang kamu pakai."
                 : paymentWindowClosed
-                  ? "Waktu pembayaran untuk pesanan ini sudah habis. Buat pesanan baru untuk melanjutkan."
-                  : STATUS_DESCRIPTION[liveStatus]}
+                  ? "Waktu pembayaran untuk pesanan ini sudah habis. Coba lagi - datamu sudah kami siapkan."
+                  : liveStatus === "failed" && order?.payment.paidAt
+                    ? "Pembayaranmu sudah masuk tapi pengiriman gagal. Ajukan refund di bawah - danamu akan kami kembalikan."
+                    : liveStatus === "failed"
+                      ? "Pembayaran gagal atau kedaluwarsa. Tenang, kamu bisa langsung coba lagi - datamu sudah kami siapkan."
+                      : STATUS_DESCRIPTION[liveStatus]}
             </p>
             {!isPreview && (
               <div className="order-status-meta">
@@ -900,12 +972,12 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <small>Pembayaran</small>
                   <strong>Waktu pembayaran habis</strong>
                   <p>
-                    {payment.name} tidak lagi berlaku untuk pesanan ini. Buat
-                    pesanan baru untuk melanjutkan top up.
+                    {payment.name} tidak lagi berlaku untuk pesanan ini. Coba
+                    lagi - datamu sudah kami siapkan.
                   </p>
                 </div>
-                <button type="button" onClick={() => router.push("/#topup")}>
-                  Buat pesanan baru
+                <button type="button" onClick={cobaLagiDenganPrefill}>
+                  Coba lagi
                 </button>
               </div>
             ) : liveStatus === "pending_payment" && isDoku ? (
@@ -1158,7 +1230,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                       if (cta.action === "pay") focusPayment();
                       if (cta.action === "refresh" && order)
                         void refreshStatus(order.id);
-                      if (cta.action === "new_order") router.push("/#topup");
+                      if (cta.action === "new_order") cobaLagiDenganPrefill();
                       if (cta.action === "support")
                         window.open(
                           "mailto:support@nambah.id?subject=Order%20Inquiry",
@@ -1192,7 +1264,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
 
             {!isPreview &&
               !order?.refund &&
-              (liveStatus === "failed" || liveStatus === "success") && (
+              (liveStatus === "success" ||
+                (liveStatus === "failed" && order?.payment.paidAt)) && (
                 <div className="order-refund-request">
                   <strong>Ada masalah dengan pesanan ini?</strong>
                   <textarea

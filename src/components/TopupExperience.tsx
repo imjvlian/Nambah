@@ -31,6 +31,7 @@ import {
   createPublicPricingFallback,
   type PublicPricingResult,
 } from "@/lib/public-pricing";
+import { takeRetryPrefill } from "@/lib/order-retry";
 import { BRAND } from "@/lib/brand";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
@@ -500,6 +501,41 @@ export default function TopupExperience({
   // Guard race popup: respons limit yang datang setelah paket berganti
   // tidak boleh membuka popup untuk paket yang sudah tidak dipilih.
   const selectedPackageIdRef = useRef(selectedPackageId);
+
+  useEffect(() => {
+    /*
+     * P3.2 (24 Okt 2026): prefill dari order sebelumnya — tombol
+     * "Coba lagi"/"Top up lagi" di halaman order menulis data order lama
+     * ke sessionStorage sebelum navigasi ke sini.
+     *
+     * PREFILL, bukan auto-beli: pelanggan tetap melihat harga TERKINI
+     * dan menekan bayar sendiri — semua gate jalan seperti biasa.
+     *
+     * Kode promo/referral hanya mengisi kolom input, TIDAK di-apply
+     * buta: kode yang sudah kedaluwarsa akan mematikan seluruh
+     * pratinjau harga kalau auto-apply; lewat tombol "Terapkan",
+     * validasinya jalan dengan pesan jujur dan harga dasar tetap tampil.
+     *
+     * Game yang sudah tidak ada di etalase (hilang/maintenance P3.1)
+     * membatalkan seluruh prefill — ID game tanpa konteks game-nya
+     * hanya menyesatkan.
+     */
+    const prefill = takeRetryPrefill();
+    if (!prefill) return;
+
+    const game = games.find((item) => item.id === prefill.gameId);
+    if (!game) return;
+
+    setSelectedGameId(game.id);
+    const paket = game.packages.find((item) => item.id === prefill.packageId);
+    setSelectedPackageId(
+      paket ? paket.id : (game.packages[3] ?? game.packages[0]!).id,
+    );
+    setUserId(prefill.userId);
+    if (prefill.serverId) setServerId(prefill.serverId);
+    if (prefill.promoCode) setPromoInput(prefill.promoCode);
+    if (prefill.referralCode) setReferralInput(prefill.referralCode);
+  }, [games]);
 
   const filteredGames = useMemo(() => {
     const keyword = query.trim().toLowerCase();
