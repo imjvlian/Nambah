@@ -1172,3 +1172,31 @@ export async function fulfillPaidOrder(orderId: string): Promise<FulfillmentResu
 
   return runDigiflazzTest(order, transaction, requestRef);
 }
+
+/**
+ * Kickoff fulfillment TANPA menunggu (P3.4, 24 Okt 2026).
+ *
+ * Dipakai jalur yang harus membalik cepat: webhook pembayaran
+ * (Midtrans/DOKU/Paylabs) dan polling status. Semuanya kini hanya
+ * sampai "order terbayar + tercatat", lalu membalik; dispatch ke
+ * supplier berjalan di latar - sama seperti jalur merchant-confirm
+ * yang sudah terbukti sejak 0.6.
+ *
+ * Ini bukan job queue baru, dan memang tidak perlu:
+ *   - orders.status SUDAH menjadi antrean persistennya - "paid" dan
+ *     "processing" berarti order menunggu dispatch;
+ *   - timer reconcile (tiap 5 menit) adalah worker-nya: order
+ *     paid/processing yang lebih tua dari 60 detik di-fulfill ulang;
+ *   - requestRef per order membuat fulfillment idempoten - dua
+ *     kickoff bersamaan (webhook + refresh pelanggan) tidak pernah
+ *     menjadi dua transaksi supplier.
+ *
+ * Semua efek samping (receipt, alert Telegram, sinkron komisi) hidup
+ * DI DALAM fulfillPaidOrder, jadi tidak ada yang hilang karena tidak
+ * di-await. Kegagalan kickoff tercatat di log + tertutup reconcile.
+ */
+export function kickoffFulfillment(orderId: string): void {
+  void fulfillPaidOrder(orderId).catch((error) => {
+    console.error(`Fulfillment kickoff failed for order ${orderId}`, error);
+  });
+}

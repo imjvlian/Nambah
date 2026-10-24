@@ -1,4 +1,4 @@
-import { fulfillPaidOrder } from "@/lib/fulfillment";
+import { kickoffFulfillment } from "@/lib/fulfillment";
 import { gatewayTimeToUtcIso } from "@/lib/gateway-time";
 import {
   getMidtransEnvironment,
@@ -565,16 +565,17 @@ export async function applyMidtransStatus(
     received_at: now,
   });
 
-  // Payment success and fulfillment are deliberately decoupled. A supplier
-  // outage must never erase a verified Midtrans payment. Repeated webhook or
-  // manual refresh calls are safe because fulfillment uses a deterministic
-  // supplier request_ref per order.
+  /*
+   * P3.4: fulfillment dipanggil TANPA menunggu — webhook/polling membalik
+   * segera setelah "order terbayar + tercatat", dispatch ke supplier
+   * berjalan di latar. A supplier outage must never erase a verified
+   * payment (order sudah tersimpan); repeated calls stay safe karena
+   * requestRef per order membuat fulfillment idempoten. Order yang
+   * kickoff-nya mati (deploy/restart) dijemput timer reconcile
+   * (paid/processing > 60 detik, tiap 5 menit).
+   */
   if (orderStatus === "paid" || orderStatus === "processing") {
-    try {
-      await fulfillPaidOrder(orderId);
-    } catch (error) {
-      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
-    }
+    kickoffFulfillment(orderId);
   }
 
   const publicOrder = await getPublicOrder(orderId);
@@ -774,13 +775,11 @@ export async function applyDokuStatus(
     );
   }
 
-  // Fulfillment decoupled — sama seperti jalur Midtrans.
+  // Fulfillment decoupled — P3.4: kickoff tanpa menunggu, sama seperti
+  // jalur Midtrans. Receipt + alert + komisi hidup di dalam fulfillment;
+  // order yang kickoff-nya mati dijemput timer reconcile.
   if (orderStatus === "paid" || orderStatus === "processing") {
-    try {
-      await fulfillPaidOrder(orderId);
-    } catch (error) {
-      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
-    }
+    kickoffFulfillment(orderId);
   }
 
   const publicOrder = await getPublicOrder(orderId);
@@ -982,11 +981,8 @@ export async function applyPaylabsStatus(
   }
 
   if (orderStatus === "paid" || orderStatus === "processing") {
-    try {
-      await fulfillPaidOrder(orderId);
-    } catch (error) {
-      console.error(`Fulfillment trigger failed for order ${orderId}`, error);
-    }
+    // P3.4: kickoff tanpa menunggu — jalur Paylabs sama seperti Midtrans/DOKU.
+    kickoffFulfillment(orderId);
   }
 
   const publicOrder = await getPublicOrder(orderId);
