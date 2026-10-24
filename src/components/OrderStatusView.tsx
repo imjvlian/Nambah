@@ -641,12 +641,19 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </h1>
             <p>
               {accessDenied
-                ? "Buka pesanan lewat link yang kamu dapat setelah checkout — atau buat pesanan baru di bawah."
-                : "Buat pesanan baru aja, ya."}
+                ? "Buka pesanan lewat link yang kamu dapat setelah checkout — atau cek status pesananmu dengan Order ID."
+                : "Buat pesanan baru aja, ya — atau cek status pesananmu dengan Order ID."}
             </p>
-            <Link className="primary-button" href="/#topup">
-              Buat pesanan baru <span>→</span>
-            </Link>
+            <div className="order-empty-actions">
+              <Link className="primary-button" href="/#topup">
+                Buat pesanan baru <span>→</span>
+              </Link>
+              {/* P4.2: jalur pemulihan untuk pelanggan yang kehilangan
+                  link ordernya — Order ID + kontak checkout. */}
+              <Link className="order-secondary-link" href="/cek-status">
+                Cek status dengan Order ID
+              </Link>
+            </div>
           </div>
         </section>
       </main>

@@ -21,8 +21,10 @@ export default function SiteFooter() {
           <a href="/#popular">Populer</a>
           <a href="/#how-it-works">Cara kerja</a>
           <a href="/promo">Promo</a>
-          {/* P4.3: landing program afiliasi — jalur rekrutmen mitra baru. */}
           <a href="/afiliasi">Afiliasi</a>
+          {/* P4.2: pemulihan akses order — tamu yang kehilangan link
+              ordernya mulai pencarian dari sini. */}
+          <a href="/cek-status">Cek pesanan</a>
         </nav>
 
         <nav className="footer-col" aria-label="Akun">

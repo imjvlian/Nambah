@@ -1036,3 +1036,12 @@
 .order-rating-expand:hover {
   background: var(--wash, #f6f7f3);
 }
+
+/* Dua aksi di kartu order tidak ditemukan: pesanan baru + pemulihan
+   akses lewat Order ID (P4.2). */
+.order-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
