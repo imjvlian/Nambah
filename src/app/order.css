@@ -937,3 +937,102 @@
   font-size: 13px;
   max-width: 320px;
 }
+
+/*
+ * Slot promosi kecil di order summary (P4.5).
+ *
+ * Batasan dari plan order-summary-ad-slot.md: kecil dan rapi, tidak
+ * popup, tidak interstitial, tidak menutupi Order ID/SN/total/tombol.
+ * Posisi paling bawah sticky card, di bawah rating form.
+ */
+.order-summary-ad {
+  min-height: 90px;
+  max-height: 120px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-top: 1px solid var(--line, #e2e4de);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-summary-ad > small {
+  color: var(--ink-soft, #5b615a);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.order-summary-ad-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.order-summary-ad-body strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.order-summary-ad-body span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--ink-soft, #5b615a);
+}
+
+.order-summary-ad-link {
+  color: var(--accent, #2f6b3a);
+  font-weight: 600;
+}
+
+.order-summary-ad-link:hover {
+  text-decoration: underline;
+}
+
+.order-summary-ad-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.order-summary-ad-code code {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border: 1px dashed var(--line-strong, #c8ccc2);
+  border-radius: 8px;
+  background: var(--wash, #f6f7f3);
+}
+
+.order-summary-ad-code button {
+  border: 1px solid var(--line-strong, #c8ccc2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.order-summary-ad-code button:hover {
+  background: var(--wash, #f6f7f3);
+}
+
+/* Tombol buka form ulasan (tampil ringkas setelah ulasan terkirim). */
+.order-rating-expand {
+  align-self: flex-start;
+  border: 1px solid var(--line-strong, #c8ccc2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.order-rating-expand:hover {
+  background: var(--wash, #f6f7f3);
+}

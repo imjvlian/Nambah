@@ -40,6 +40,14 @@ export default function OrderRatingForm({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  /*
+   * P4.5: kolom ulasan terbuka hanya setelah bintang diklik.
+   *
+   * Form lengkap (textarea + tombol kirim) yang terbuka sejak awal membuat
+   * layar ulasan terasa seperti pekerjaan — kebanyakan orang hanya ingin
+   * memberi bintang. Bintang dulu, tulisan menyusul kalau memang mau.
+   */
+  const [expanded, setExpanded] = useState(false);
 
   // `isSuccess` ikut jadi dependensi. Status order berubah dari `processing`
   // ke `success` lewat polling di OrderStatusView tanpa ganti halaman, jadi
@@ -144,6 +152,12 @@ export default function OrderRatingForm({
 
   const activeRating = hoverRating || rating;
   const submitted = Boolean(state?.review) && !notice;
+  /*
+   * Sudah pernah mengirim ulasan? Tampil dulu versi ringkas (bintangnya
+   * saja + tombol ubah). Form terbuka dengan klik bintang ATAU tombol
+   * "Ubah ulasan" — ganti bintang setelah terbuka tidak menutupnya lagi.
+   */
+  const showCommentForm = expanded;
 
   return (
     <div className="form-block order-rating">
@@ -176,7 +190,10 @@ export default function OrderRatingForm({
             onMouseEnter={() => setHoverRating(value)}
             onFocus={() => setHoverRating(value)}
             onBlur={() => setHoverRating(0)}
-            onClick={() => setRating(value)}
+            onClick={() => {
+              setRating(value);
+              setExpanded(true);
+            }}
           >
             ★
           </button>
@@ -186,26 +203,38 @@ export default function OrderRatingForm({
         </span>
       </div>
 
-      <label className="order-rating-comment">
-        <span>Ulasan (opsional)</span>
-        <textarea
-          value={comment}
-          maxLength={MAX_COMMENT_LENGTH}
-          rows={3}
-          placeholder="Ceritakan pengalaman top up kamu."
-          onChange={(event) => setComment(event.target.value)}
-        />
-        <small>{comment.length}/{MAX_COMMENT_LENGTH}</small>
-      </label>
+      {submitted && !showCommentForm ? (
+        <button
+          type="button"
+          className="order-rating-expand"
+          onClick={() => setExpanded(true)}
+        >
+          Ubah ulasan
+        </button>
+      ) : (
+        <>
+          <label className="order-rating-comment">
+            <span>Ulasan (opsional)</span>
+            <textarea
+              value={comment}
+              maxLength={MAX_COMMENT_LENGTH}
+              rows={3}
+              placeholder="Ceritakan pengalaman top up kamu."
+              onChange={(event) => setComment(event.target.value)}
+            />
+            <small>{comment.length}/{MAX_COMMENT_LENGTH}</small>
+          </label>
 
-      <button
-        type="button"
-        className="primary-button full"
-        disabled={busy || rating < 1}
-        onClick={() => void submit()}
-      >
-        {busy ? "Menyimpan..." : submitted ? "Perbarui ulasan" : "Kirim ulasan"}
-      </button>
+          <button
+            type="button"
+            className="primary-button full"
+            disabled={busy || rating < 1}
+            onClick={() => void submit()}
+          >
+            {busy ? "Menyimpan..." : submitted ? "Perbarui ulasan" : "Kirim ulasan"}
+          </button>
+        </>
+      )}
 
       {notice && <p className="inline-message">{notice}</p>}
       {error && <p className="inline-message warning" role="alert">{error}</p>}

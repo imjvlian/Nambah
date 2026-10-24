@@ -13,6 +13,7 @@ import { previewOrderStorageKey, type PreviewOrder } from "@/lib/order-preview";
 import { paymentTypeLabel } from "@/lib/payment-label";
 import { formatIDR } from "@/lib/pricing";
 import OrderRatingForm from "@/components/OrderRatingForm";
+import OrderSummaryAdSlot from "@/components/OrderSummaryAdSlot";
 import {
   MERCHANT_TIMELINE_STEPS,
   STATUS_CTA,
@@ -1217,6 +1218,17 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 isSuccess={liveStatus === "success"}
               />
             )}
+
+            {/*
+             * P4.5: slot promosi kecil — PALING BAWAH sticky card, di bawah
+             * rating form. Hanya setelah transaksi tuntas (success /
+             * awaiting_receivable); iklan di atas tombol bayar = gangguan,
+             * dan pelanggan yang baru gagal tidak sedang mood belanja.
+             * Isinya house-ad (promo aktif) — seam AdSense ada di komponen.
+             */}
+            {!isPreview &&
+              (liveStatus === "success" ||
+                liveStatus === "awaiting_receivable") && <OrderSummaryAdSlot />}
 
             {!isPreview && statusActions.length > 0 && (
               <div className="order-summary-actions">
