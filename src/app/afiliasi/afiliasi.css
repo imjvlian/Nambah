@@ -1,0 +1,165 @@
+/*
+ * Halaman /afiliasi (P4.3) — landing publik program afiliasi.
+ *
+ * Halaman marketing, bukan dashboard: satu kolom narasi, angka besar
+ * untuk skema komisi, dan CTA yang jelas. Tanpa animasi mengganggu.
+ */
+
+.afiliasi-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.afiliasi-page section {
+  width: 100%;
+}
+
+.afiliasi-hero {
+  padding-top: 72px;
+  padding-bottom: 32px;
+  max-width: 760px;
+}
+
+.afiliasi-hero h1 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  margin: 6px 0 10px;
+}
+
+.afiliasi-hero > p {
+  color: var(--ink-soft, #5b615a);
+  line-height: 1.65;
+  margin: 0 0 20px;
+}
+
+.afiliasi-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.afiliasi-cta-secondary {
+  font-weight: 600;
+  color: var(--accent, #2f6b3a);
+}
+
+.afiliasi-cta-secondary:hover {
+  text-decoration: underline;
+}
+
+.afiliasi-rates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding-top: 8px;
+  padding-bottom: 48px;
+  max-width: 980px;
+}
+
+.afiliasi-rates article {
+  border: 1px solid var(--line, #e2e4de);
+  border-radius: 16px;
+  padding: 20px 22px;
+  background: var(--surface, #fff);
+}
+
+.afiliasi-rates small {
+  display: block;
+  color: var(--ink-soft, #5b615a);
+  margin-bottom: 6px;
+}
+
+.afiliasi-rates strong {
+  font-size: 1.6rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.afiliasi-rates p {
+  margin: 0;
+  color: var(--ink-soft, #5b615a);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.afiliasi-steps {
+  max-width: 760px;
+  padding-bottom: 48px;
+}
+
+.afiliasi-steps h2,
+.afiliasi-notes h2 {
+  font-size: 1.4rem;
+  margin: 0 0 18px;
+}
+
+.afiliasi-steps ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.afiliasi-steps li {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.afiliasi-steps li > span {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  border: 1px solid var(--accent, #2f6b3a);
+  color: var(--accent, #2f6b3a);
+}
+
+.afiliasi-steps strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.afiliasi-steps p {
+  margin: 0;
+  color: var(--ink-soft, #5b615a);
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+.afiliasi-notes {
+  max-width: 760px;
+  padding-bottom: 80px;
+}
+
+.afiliasi-notes ul {
+  margin: 0 0 24px;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--ink-soft, #5b615a);
+  line-height: 1.65;
+}
+
+.afiliasi-notes strong {
+  color: var(--ink, inherit);
+}
+
+@media (max-width: 820px) {
+  .afiliasi-rates {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .afiliasi-hero {
+    padding-top: 56px;
+  }
+}

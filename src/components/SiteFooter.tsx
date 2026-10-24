@@ -20,9 +20,9 @@ export default function SiteFooter() {
           <a href="/#catalog-start">Top up</a>
           <a href="/#popular">Populer</a>
           <a href="/#how-it-works">Cara kerja</a>
-          {/* P4.1: jalur discoverability promo — pelanggan yang dengar
-              "ada kode" tapi tidak punya kodenya mulai dari sini. */}
           <a href="/promo">Promo</a>
+          {/* P4.3: landing program afiliasi — jalur rekrutmen mitra baru. */}
+          <a href="/afiliasi">Afiliasi</a>
         </nav>
 
         <nav className="footer-col" aria-label="Akun">
