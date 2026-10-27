@@ -139,7 +139,7 @@ test("halaman order: failed-yang-dibayar menunjuk ke refund, bukan retry", () =>
     "form refund digerbang paidAt",
   );
   assert.ok(
-    view.includes("Pembayaranmu sudah masuk tapi pengiriman gagal"),
+    view.includes("Pembayaran Anda sudah masuk tapi pengiriman gagal"),
     "deskripsi jujur untuk kasus uang tertahan",
   );
   assert.ok(

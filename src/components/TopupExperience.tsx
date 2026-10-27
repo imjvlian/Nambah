@@ -1002,7 +1002,7 @@ export default function TopupExperience({
         if (!mounted) return;
         if (!response.ok || !data.pricing) {
           setPricingError(
-            data.error ?? "Sebentar, harga belum ke-update. Coba lagi ya.",
+            data.error ?? "Sebentar, harga belum diperbarui. Silakan coba lagi.",
           );
           setPromoEndsAt(null);
           if (appliedPromoCode) setPromoMessage("");
@@ -1088,7 +1088,7 @@ export default function TopupExperience({
     let mounted = true;
 
     const timer = window.setTimeout(async () => {
-      setUsernameCheck({ status: "loading", message: "Cek akun dulu ya…" });
+      setUsernameCheck({ status: "loading", message: "Mengecek akun…" });
 
       try {
         const response = await fetch("/api/game-account/check", {
@@ -1127,7 +1127,7 @@ export default function TopupExperience({
             server: normalizedServerId,
             message:
               data.message ??
-              "Format ID kamu sudah benar. Produk ini belum bisa dicek otomatis — pastikan sekali lagi sebelum bayar.",
+              "Format ID Anda sudah benar. Produk ini belum bisa diperiksa otomatis — silakan periksa sekali lagi sebelum membayar.",
           });
           return;
         }
@@ -1179,7 +1179,7 @@ export default function TopupExperience({
         setUsernameCheck({
           status: "error",
           message:
-            "Cek otomatisnya lagi down, tapi tenang — kamu tetap bisa lanjut bayar.",
+            "Pengecekan otomatis sedang tidak tersedia — Anda tetap bisa melanjutkan pembayaran.",
         });
       }
     }, 700);
@@ -1229,7 +1229,7 @@ export default function TopupExperience({
     if (viewerState !== "authenticated") {
       setAppliedPromoCode("");
       setPromoMessage(
-        "Kode promo cuma bisa dipakai kalau kamu login. Masuk atau daftar gratis dulu, ya.",
+        "Kode promo hanya bisa dipakai jika Anda masuk. Silakan masuk atau daftar gratis terlebih dahulu.",
       );
       return;
     }
@@ -1262,7 +1262,7 @@ export default function TopupExperience({
     if (viewerState !== "authenticated") {
       setAppliedReferralCode("");
       setReferralMessage(
-        "Kode referral hanya untuk pengguna login. Masuk atau daftar gratis dulu, baru pakai kodenya.",
+        "Kode referral hanya untuk pengguna yang masuk. Silakan masuk atau daftar gratis terlebih dahulu.",
       );
       return;
     }
@@ -1291,7 +1291,7 @@ export default function TopupExperience({
 
     let guestContact: { email: string; whatsapp: string } | null = null;
     if (viewerState === "loading") {
-      setContactError("Sebentar, kami masih cek login kamu. Coba lagi sesaat.");
+      setContactError("Sebentar, kami masih memeriksa login Anda. Silakan coba lagi sesaat.");
       return;
     }
     if (viewerState === "guest") {
@@ -1311,7 +1311,7 @@ export default function TopupExperience({
 
     if (!serverPricing) {
       setNotice(
-        pricingError || "Sebentar, harga belum ke-update. Coba lagi ya.",
+        pricingError || "Sebentar, harga belum diperbarui. Silakan coba lagi.",
       );
       return;
     }
@@ -1406,7 +1406,7 @@ export default function TopupExperience({
         // ulang dengan kunci sama akan menerima order itu kembali.
         setConfirmOpen(false);
         setNotice(
-          data.error ?? "Aduh, pembayarannya gagal dibuat. Coba lagi ya.",
+          data.error ?? "Maaf, pembayaran gagal dibuat. Silakan coba lagi.",
         );
         // Penolakan dengan penyebab jelas dari gerbang verifikasi:
         // popup, bukan cuma notice kecil (permintaan owner 21 Okt).
@@ -1538,17 +1538,17 @@ export default function TopupExperience({
         ) : (
           <div className="topup-intro">
             <span className="eyebrow">Checkout</span>
-            <h2>Top up tanpa muter-muter.</h2>
+            <h2>Top up dengan cepat dan mudah.</h2>
             <p>
               Harga, promo, dan benefit referral dihitung otomatis, lalu
-              disesuaikan dengan kode yang kamu pakai sebelum pembayaran dibuat.
+              disesuaikan dengan kode yang Anda pakai sebelum pembayaran dibuat.
             </p>
             <div className="trust-list">
               <span>
                 <b>01</b> Harga jelas
               </span>
               <span>
-                <b>02</b> Promo nggak ribet
+                <b>02</b> Promo mudah dipakai
               </span>
               <span>
                 <b>03</b> Referral menguntungkan
@@ -1703,8 +1703,8 @@ export default function TopupExperience({
                             punya kolom itu sama sekali. */}
                         <small>
                           {accountSchema.server
-                            ? "Sebentar, kami cek ID dan Zone kamu."
-                            : "Sebentar, kami cek ID akun kamu."}
+                            ? "Sebentar, kami memeriksa ID dan Zone Anda."
+                            : "Sebentar, kami memeriksa ID akun Anda."}
                         </small>
                       </span>
                     </>
@@ -1723,7 +1723,7 @@ export default function TopupExperience({
                             </>
                           ) : (
                             <>
-                              Akun kamu{" "}
+                              Akun Anda{" "}
                               <strong>
                                 {usernameCheck.nickname ?? "terverifikasi"}
                               </strong>
@@ -1816,7 +1816,7 @@ export default function TopupExperience({
                 <div>
                   <strong>Kirim struk ke</strong>
                   <small>
-                    Kamu belum login — struk transaksinya akan dikirim ke email
+                    Anda belum masuk — struk transaksinya akan dikirim ke email
                     dan WhatsApp ini.
                   </small>
                 </div>
@@ -1857,8 +1857,8 @@ export default function TopupExperience({
               </div>
 
               <p className="guest-receipt-note">
-                Kontak ini cuma dipakai buat kirim struk dan update status
-                order. Nggak ada lainnya.
+                Kontak ini hanya dipakai untuk mengirim struk dan memperbarui
+                status pesanan. Tidak untuk keperluan lain.
               </p>
             </div>
           )}
@@ -1869,7 +1869,7 @@ export default function TopupExperience({
               <div>
                 <strong>Pilih nominal</strong>
                 <small>
-                  Semua nominal sudah kami kelompokkan biar gampang dicari.
+                  Semua nominal sudah kami kelompokkan agar mudah dicari.
                 </small>
               </div>
             </div>
@@ -2035,7 +2035,7 @@ export default function TopupExperience({
 
             {pricing.referralCode && pricing.referralDiscount > 0 && (
               <p className="referral-active">
-                Referral {pricing.referralCode} aktif · kamu hemat{" "}
+                Referral {pricing.referralCode} aktif · Anda hemat{" "}
                 {formatIDR(pricing.referralDiscount)}.
                 {pricing.referralDiscountCapped
                   ? " Benefit disesuaikan otomatis agar transaksi tetap aman."
@@ -2057,8 +2057,8 @@ export default function TopupExperience({
                 <strong>Lacte Points</strong>
                 <small>
                   {viewerState === "authenticated"
-                    ? "Tukar points biar totalnya turun. Points baru masuk setelah transaksi kamu sukses."
-                    : "Login dulu biar points kamu numpuk dan bisa dipakai."}
+                    ? "Tukar points agar totalnya turun. Points baru masuk setelah transaksi Anda sukses."
+                    : "Masuk terlebih dahulu agar points Anda terkumpul dan bisa dipakai."}
                 </small>
               </div>
             </div>
@@ -2066,7 +2066,7 @@ export default function TopupExperience({
             {viewerState === "authenticated" ? (
               pointsLoading ? (
                 <div className="points-checkout-loading">
-                  Ngambil saldo points…
+                  Mengambil saldo points…
                 </div>
               ) : pointsSummary ? (
                 <div className="points-checkout-card">
@@ -2138,9 +2138,9 @@ export default function TopupExperience({
                     </>
                   ) : (
                     <p className="points-checkout-note">
-                      Points kamu belum bisa dipakai di transaksi ini — butuh
+                      Points Anda belum bisa dipakai di transaksi ini — butuh
                       minimal {pointsSummary.rules.minimumRedeem} points, atau
-                      nominalnya terlalu kecil. Naikkan nominalnya, ya.
+                      nominalnya terlalu kecil. Silakan naikkan nominalnya.
                     </p>
                   )}
                 </div>
@@ -2154,8 +2154,8 @@ export default function TopupExperience({
               <div className="points-guest-callout">
                 <span>N+</span>
                 <p>
-                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk dulu
-                  ke akun {BRAND.shortName} biar points kamu mulai numpuk.
+                  Setiap Rp2.000 eligible spend menghasilkan 1 point. Masuk
+                  ke akun {BRAND.shortName} agar points Anda mulai terkumpul.
                 </p>
               </div>
             )}
@@ -2205,16 +2205,16 @@ export default function TopupExperience({
                     <div>
                       <strong>Pilih toko</strong>
                       <small>
-                        Kamu bayar langsung ke toko ini. Lacte cuma bantu
-                        teruskan pesanannya.
+                        Anda membayar langsung ke toko ini. Lacte hanya membantu
+                        meneruskan pesanannya.
                       </small>
                     </div>
                   </div>
 
                   {!merchantList.length ? (
                     <p className="inline-message warning">
-                      Belum ada toko yang bisa menerima pesanan ini. Pilih
-                      metode bayar lain dulu, ya.
+                      Belum ada toko yang bisa menerima pesanan ini. Silakan
+                      pilih metode pembayaran lain.
                     </p>
                   ) : (
                     <div className="payment-list">
@@ -2564,9 +2564,10 @@ export default function TopupExperience({
                     ✓
                   </span>
                   <div className="checkout-confirm-head-copy">
-                    <h3 id="checkout-confirm-title">Periksa transaksi kamu</h3>
+                    <h3 id="checkout-confirm-title">Periksa transaksi Anda</h3>
                     <p>
-                      Sekali cek lagi — data ini yang dipakai buat kirim itemmu.
+                      Periksa sekali lagi — data inilah yang dipakai untuk
+                      mengirim item Anda.
                     </p>
                   </div>
                 </header>

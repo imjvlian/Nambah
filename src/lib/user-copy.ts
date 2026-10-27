@@ -24,9 +24,9 @@ const INTERNAL_REJECTION_COPY: Record<
   string
 > = {
   profit_below_minimum:
-    "Kode ini belum bisa dipakai untuk produk ini. Coba checkout tanpa kodenya, ya.",
+    "Kode ini belum bisa dipakai untuk produk ini. Silakan checkout tanpa kodenya.",
   referral_margin_too_thin:
-    "Referral ini belum bisa dipakai untuk produk ini. Coba checkout tanpa kodenya, ya.",
+    "Referral ini belum bisa dipakai untuk produk ini. Silakan checkout tanpa kodenya.",
 };
 
 /**
@@ -50,10 +50,10 @@ const CUSTOMER_REJECTION_COPY: Record<
     `Referral ${code} bisa dipakai mulai belanja ${minimumOrder}.`,
 
   referral_not_stackable: ({ code, otherCode }) =>
-    `Referral ${code} nggak bisa dipakai bareng promo ${otherCode}. Pilih salah satu ya.`,
+    `Referral ${code} tidak bisa dipakai bersama promo ${otherCode}. Silakan pilih salah satu.`,
 
   points_exceed_subtotal: () =>
-    "Points-nya kebanyakan. Kurangi biar totalnya pas.",
+    "Jumlah points terlalu banyak. Silakan kurangi agar totalnya pas.",
 };
 
 export function rejectionCodeCopy(

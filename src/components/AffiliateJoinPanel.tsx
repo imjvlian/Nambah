@@ -65,7 +65,7 @@ const LINK_FIELDS = [
   {
     key: "otherUrl",
     label: "Link lain",
-    placeholder: "Facebook, Discord, Telegram, atau web kamu",
+    placeholder: "Facebook, Discord, Telegram, atau web Anda",
     suggestions: [],
   },
 ] as const;
@@ -79,17 +79,17 @@ const STATUS_TEXT: Record<
   pending: {
     label: "Menunggu ditinjau",
     tone: "wait",
-    note: "Permintaan kamu sudah masuk antrean. Admin akan menghubungi lewat WhatsApp kalau perlu.",
+    note: "Permintaan Anda sudah masuk antrean. Admin akan menghubungi lewat WhatsApp jika perlu.",
   },
   approved: {
     label: "Disetujui",
     tone: "done",
-    note: "Kode affiliate kamu sudah aktif. Bagikan link-nya untuk mulai mendapat komisi.",
+    note: "Kode affiliate Anda sudah aktif. Bagikan link-nya untuk mulai mendapat komisi.",
   },
   rejected: {
     label: "Belum disetujui",
     tone: "bad",
-    note: "Kamu bisa mengubah alasan dan mengajukan lagi.",
+    note: "Anda bisa mengubah alasan dan mengajukan kembali.",
   },
 };
 
@@ -215,7 +215,7 @@ export default function AffiliateJoinPanel() {
     setError("");
 
     if (!hasAnyLink) {
-      setError("Isi minimal satu link channel kamu.");
+      setError("Isi minimal satu link channel Anda.");
       return;
     }
 
@@ -290,7 +290,7 @@ export default function AffiliateJoinPanel() {
         </div>
         <div className="affiliate-join-body">
           <p>
-            Kode kamu: <b>{data.code}</b>
+            Kode Anda: <b>{data.code}</b>
           </p>
           <p className="affiliate-join-hint">
             Bagikan <code>/r/{data.code}</code> untuk mulai mendapat komisi.
@@ -353,7 +353,7 @@ export default function AffiliateJoinPanel() {
                         displayName: event.target.value,
                       }))
                     }
-                    placeholder="Nama channel kamu"
+                    placeholder="Nama channel Anda"
                   />
                 </label>
                 <label>
@@ -371,7 +371,7 @@ export default function AffiliateJoinPanel() {
                   />
                 </label>
                 <label>
-                  <span>Ceritakan channel kamu</span>
+                  <span>Ceritakan channel Anda</span>
                   <textarea
                     rows={3}
                     value={draft.motivation}
@@ -381,7 +381,7 @@ export default function AffiliateJoinPanel() {
                         motivation: event.target.value,
                       }))
                     }
-                    placeholder="Di mana kamu mengiklankan? Berapa perkiraan orang yang lihat?"
+                    placeholder="Di mana Anda mengiklankan? Berapa perkiraan orang yang melihat?"
                   />
                 </label>
                 <LinkFields
@@ -400,9 +400,9 @@ export default function AffiliateJoinPanel() {
         ) : (
           <>
             <p>
-              Daftar sebagai afiliasi, dapat komisi dari setiap order yang kamu
+              Daftar sebagai afiliasi, dapat komisi dari setiap order yang Anda
               arahkan ke {BRAND.shortName}. Rate komisinya ditentukan admin
-              setelah pengajuan kamu ditinjau.
+              setelah pengajuan Anda ditinjau.
             </p>
             <form onSubmit={submit} className="affiliate-join-form">
               <label>
@@ -415,7 +415,7 @@ export default function AffiliateJoinPanel() {
                       displayName: event.target.value,
                     }))
                   }
-                  placeholder="Nama channel kamu"
+                  placeholder="Nama channel Anda"
                 />
               </label>
               <label>
@@ -433,7 +433,7 @@ export default function AffiliateJoinPanel() {
                 />
               </label>
               <label>
-                <span>Ceritakan channel kamu</span>
+                <span>Ceritakan channel Anda</span>
                 <textarea
                   rows={3}
                   value={draft.motivation}
@@ -443,7 +443,7 @@ export default function AffiliateJoinPanel() {
                       motivation: event.target.value,
                     }))
                   }
-                  placeholder="Di mana kamu mengiklankan? Berapa perkiraan orang yang lihat?"
+                  placeholder="Di mana Anda mengiklankan? Berapa perkiraan orang yang melihat?"
                 />
               </label>
               <LinkFields

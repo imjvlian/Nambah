@@ -13,8 +13,8 @@ type ReviewState = {
 const REASON_COPY: Record<string, string> = {
   "order-not-finished": "Ulasan bisa diberikan setelah transaksi selesai.",
   "order-not-found": "Order ini tidak ditemukan.",
-  unauthorized: "Kamu tidak punya akses ke order ini.",
-  "missing-order-access": "Buka halaman order dari link yang kamu terima untuk memberi ulasan.",
+  unauthorized: "Anda tidak punya akses ke order ini.",
+  "missing-order-access": "Buka halaman order dari link yang Anda terima untuk memberi ulasan.",
 };
 
 const RATING_LABELS = ["Buruk", "Kurang", "Cukup", "Bagus", "Sangat bagus"];
@@ -142,7 +142,7 @@ export default function OrderRatingForm({
           ? { ...current, eligible: true, review: data.review! }
           : current,
       );
-      setNotice("Terima kasih, ulasanmu sudah tersimpan.");
+      setNotice("Terima kasih, ulasan Anda sudah tersimpan.");
     } catch {
       setError("Ulasan gagal disimpan. Coba lagi sebentar.");
     } finally {
@@ -167,8 +167,8 @@ export default function OrderRatingForm({
           <strong>{submitted ? "Ulasanmu" : "Beri ulasan"}</strong>
           <small>
             {submitted
-              ? "Kamu bisa mengubah ulasan ini kapan saja."
-              : `Bagaimana pengalaman kamu untuk ${state?.productLabel ?? "produk ini"}?`}
+              ? "Anda bisa mengubah ulasan ini kapan saja."
+              : `Bagaimana pengalaman Anda untuk ${state?.productLabel ?? "produk ini"}?`}
           </small>
         </div>
       </div>
@@ -221,7 +221,7 @@ export default function OrderRatingForm({
               value={comment}
               maxLength={MAX_COMMENT_LENGTH}
               rows={3}
-              placeholder="Ceritakan pengalaman top up kamu."
+              placeholder="Ceritakan pengalaman top up Anda."
               onChange={(event) => setComment(event.target.value)}
             />
             <small>{comment.length}/{MAX_COMMENT_LENGTH}</small>

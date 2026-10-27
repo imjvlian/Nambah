@@ -15,19 +15,19 @@ export const STATUS_LABEL: Record<PublicOrderStatus, string> = {
 };
 
 export const STATUS_DESCRIPTION: Record<PublicOrderStatus, string> = {
-  pending_payment: "Selesaikan bayarnya di bawah ya — kamu punya 30 menit.",
+  pending_payment: "Silakan selesaikan pembayaran di bawah — batas waktunya 30 menit.",
   pending_merchant:
-    "Pembayaran sudah diterima toko. Tinggal tunjukkan layar ini ke kasir biar pesanan langsung diproses.",
+    "Pembayaran sudah diterima toko. Silakan tunjukkan layar ini ke kasir agar pesanan langsung diproses.",
   awaiting_receivable:
     "Top up sudah berhasil. Toko akan menerima pembayaran paling lambat 7 hari ke depan.",
-  paid: "Pembayaranmu udah masuk. Sebentar, lagi dicek otomatis.",
+  paid: "Pembayaran Anda sudah kami terima. Mohon tunggu, sedang diperiksa otomatis.",
   processing:
-    "Pesananmu lagi dikirim ke game. Biasanya cuma butuh beberapa menit.",
-  success: `Berhasil! Item sudah masuk ke akunmu. Makasih sudah top up di ${BRAND.shortName}.`,
+    "Pesanan Anda sedang dikirim ke game. Biasanya hanya butuh beberapa menit.",
+  success: `Berhasil! Item sudah masuk ke akun Anda. Terima kasih sudah top up di ${BRAND.shortName}.`,
   failed:
-    "Pembayaran gagal atau ditolak. Tenang, kamu bisa langsung buat pesanan baru.",
-  refunded: "Uangmu sudah dikembalikan ke metode bayar yang kamu pakai.",
-  cancelled: "Pesanan dibatalkan atau waktunya habis. Buat pesanan baru ya.",
+    "Pembayaran gagal atau ditolak. Tenang, Anda bisa langsung membuat pesanan baru.",
+  refunded: "Dana Anda sudah dikembalikan ke metode pembayaran yang dipakai.",
+  cancelled: "Pesanan dibatalkan atau waktunya habis. Silakan buat pesanan baru.",
 };
 
 export type StatusAction = "copy" | "pay" | "refresh" | "new_order" | "support";
@@ -91,22 +91,22 @@ export const TIMELINE_STEPS: {
 }[] = [
   {
     title: "Pesanan dibuat",
-    description: "Nunggu kamu bayar",
+    description: "Menunggu pembayaran Anda",
     status: "pending_payment",
   },
   {
     title: "Pembayaran diterima",
-    description: "Sistem lagi ngecek pembayaranmu",
+    description: "Sistem sedang memeriksa pembayaran Anda",
     status: "paid",
   },
   {
     title: "Sedang diproses",
-    description: "Item lagi dikirim ke akunmu",
+    description: "Item sedang dikirim ke akun Anda",
     status: "processing",
   },
   {
     title: "Top up berhasil",
-    description: "Sudah masuk ke akunmu. Selamat main!",
+    description: "Sudah masuk ke akun Anda. Selamat bermain!",
     status: "success",
   },
 ];
@@ -139,7 +139,7 @@ export const MERCHANT_TIMELINE_STEPS: {
   },
   {
     title: "Top up berhasil",
-    description: "Sudah masuk ke akunmu. Selamat main!",
+    description: "Sudah masuk ke akun Anda. Selamat bermain!",
     status: "success",
   },
 ];

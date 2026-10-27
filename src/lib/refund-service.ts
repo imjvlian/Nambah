@@ -176,19 +176,19 @@ async function sendRefundCompletedEmail(input: {
 <html>
   <body style="margin:0;padding:24px;background:#f4f4f0;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;">
     <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:28px;">
-      <h1 style="margin:0 0 16px;font-size:18px;">Refund kamu sudah diproses</h1>
+      <h1 style="margin:0 0 16px;font-size:18px;">Refund Anda sudah diproses</h1>
       <p style="margin:0 0 12px;line-height:1.6;">
         Hai! Refund sebesar <strong>${amount}</strong> untuk order
         <strong>${input.orderId}</strong> sudah kami kirim kembali ke metode
-        pembayaran yang kamu pakai.
+        pembayaran yang Anda pakai.
       </p>
       <p style="margin:0 0 12px;line-height:1.6;">
-        Dana biasanya masuk mengikuti jam kerja bank/e-wallet kamu. Kalau
+        Dana biasanya masuk mengikuti jam kerja bank/e-wallet Anda. Jika
         setelah 3&times;24 jam dana belum masuk, hubungi CS kami dan sebutkan
-        nomor order di atas ya.
+        nomor order di atas.
       </p>
       <p style="margin:0;line-height:1.6;">
-        Makasih atas kesabarannya!
+        Terima kasih atas kesabaran Anda!
         <br />
         <strong>${BRAND.name}</strong>
       </p>

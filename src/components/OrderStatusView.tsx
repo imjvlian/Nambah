@@ -184,7 +184,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       },
       onPending: () => {
         setNotice(
-          `Pembayaran masih pending. ${BRAND.shortName} lagi cek statusnya…`,
+          `Pembayaran masih pending. ${BRAND.shortName} sedang memeriksa statusnya…`,
         );
         void refreshStatus(id);
       },
@@ -194,7 +194,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       },
       onClose: () => {
         setNotice(
-          "Jendela bayarnya ditutup. Tenang, ordernya masih bisa dibayar sebelum waktunya habis.",
+          "Jendela pembayaran ditutup. Tenang, pesanan masih bisa dibayar sebelum waktunya habis.",
         );
       },
     };
@@ -500,7 +500,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
       }
       setNotice("Order dibuat. Sebentar, pembayarannya kita siapkan.");
     } catch {
-      setNotice("Jaringannya lagi ngaco. Coba lagi sebentar ya.");
+      setNotice("Jaringan sedang bermasalah. Silakan coba lagi sebentar.");
     } finally {
       setBusy(false);
     }
@@ -565,7 +565,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
         current ? { ...current, refund: data.refund ?? null } : current,
       );
       setRefundReason("");
-      setNotice(data.message ?? "Permintaan refund kamu sudah kami terima.");
+      setNotice(data.message ?? "Permintaan refund Anda sudah kami terima.");
     } catch {
       setNotice("Permintaan refund belum dapat dikirim. Coba lagi sebentar.");
     } finally {
@@ -641,8 +641,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </h1>
             <p>
               {accessDenied
-                ? "Buka pesanan lewat link yang kamu dapat setelah checkout — atau cek status pesananmu dengan Order ID."
-                : "Buat pesanan baru aja, ya — atau cek status pesananmu dengan Order ID."}
+                ? "Buka pesanan lewat link yang Anda dapat setelah checkout — atau cek status pesanan Anda dengan Order ID."
+                : "Silakan buat pesanan baru — atau cek status pesanan Anda dengan Order ID."}
             </p>
             <div className="order-empty-actions">
               <Link className="primary-button" href="/#topup">
@@ -801,7 +801,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 <strong>Selesaikan pembayaran di jendela popup.</strong>
                 <p>
                   Jendela kecil pembayaran akan terbuka di atas halaman ini.
-                  Setelah kamu membayar dan menutupnya, status order di sini
+                  Setelah Anda membayar dan menutupnya, status order di sini
                   langsung diperbarui otomatis.
                 </p>
                 <button
@@ -844,13 +844,13 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
             </h1>
             <p>
               {isPreview
-                ? "Harga sudah disesuaikan dengan promo, referral, dan points yang kamu pakai."
+                ? "Harga sudah disesuaikan dengan promo, referral, dan points yang Anda pakai."
                 : paymentWindowClosed
-                  ? "Waktu pembayaran untuk pesanan ini sudah habis. Coba lagi - datamu sudah kami siapkan."
+                  ? "Waktu pembayaran untuk pesanan ini sudah habis. Silakan coba lagi — data Anda sudah kami siapkan."
                   : liveStatus === "failed" && order?.payment.paidAt
-                    ? "Pembayaranmu sudah masuk tapi pengiriman gagal. Ajukan refund di bawah - danamu akan kami kembalikan."
+                    ? "Pembayaran Anda sudah masuk tapi pengiriman gagal. Silakan ajukan refund di bawah — dananya akan kami kembalikan."
                     : liveStatus === "failed"
-                      ? "Pembayaran gagal atau kedaluwarsa. Tenang, kamu bisa langsung coba lagi - datamu sudah kami siapkan."
+                      ? "Pembayaran gagal atau kedaluwarsa. Tenang, Anda bisa langsung coba lagi — data Anda sudah kami siapkan."
                       : STATUS_DESCRIPTION[liveStatus]}
             </p>
             {!isPreview && (
@@ -980,8 +980,8 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <small>Pembayaran</small>
                   <strong>Waktu pembayaran habis</strong>
                   <p>
-                    {payment.name} tidak lagi berlaku untuk pesanan ini. Coba
-                    lagi - datamu sudah kami siapkan.
+                    {payment.name} tidak lagi berlaku untuk pesanan ini. Silakan
+                    coba lagi — data Anda sudah kami siapkan.
                   </p>
                 </div>
                 <button type="button" onClick={cobaLagiDenganPrefill}>
@@ -1042,15 +1042,15 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   </div>
                 ) : (
                   <div className="midtrans-native-warning">
-                    Pembayarannya belum siap. Klik "Periksa status" atau refresh
-                    halaman.
+                    Pembayaran belum siap. Silakan klik "Periksa status" atau muat
+                    ulang halaman.
                   </div>
                 )}
 
                 <div className="midtrans-native-footer">
                   <span>
-                    Begitu kamu bayar, statusnya update otomatis — nggak perlu
-                    kirim bukti transfer.
+                    Begitu Anda membayar, statusnya diperbarui otomatis — tidak
+                    perlu mengirim bukti transfer.
                   </span>
                 </div>
               </div>
@@ -1273,9 +1273,9 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                     : order.refund.status === "processing"
                       ? `Refund ${formatIDR(order.refund.amount)} sedang diproses.`
                       : order.refund.status === "failed"
-                        ? "Refund gagal diproses. Hubungi CS untuk dibantu."
+                        ? "Refund gagal diproses. Silakan hubungi CS untuk dibantu."
                         : order.refund.status === "rejected"
-                          ? "Permintaan refund ditolak. Hubungi CS kalau kamu masih butuh bantuan."
+                          ? "Permintaan refund ditolak. Silakan hubungi CS jika Anda masih butuh bantuan."
                           : `Permintaan refund ${formatIDR(order.refund.amount)} sudah kami terima.`}
                 </p>
               </div>

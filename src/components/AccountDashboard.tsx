@@ -83,7 +83,7 @@ type PointLedger = {
 type AccountTab = "orders" | "points" | "profile" | "affiliate";
 
 const TABS: ReadonlyArray<{ id: AccountTab; label: string; hint: string }> = [
-  { id: "orders", label: "Transaksi", hint: "Riwayat pesanan kamu" },
+  { id: "orders", label: "Transaksi", hint: "Riwayat pesanan Anda" },
   { id: "points", label: "Lacte Points", hint: "Saldo dan aktivitas points" },
   { id: "affiliate", label: "Afiliasi", hint: "Komisi dan pendaftaran" },
   { id: "profile", label: "Profil", hint: "Data untuk checkout" },
@@ -442,7 +442,7 @@ export default function AccountDashboard() {
           <div className="account-section-head">
             <div>
               <span className="eyebrow">Profil</span>
-              <h2>Data checkout kamu.</h2>
+              <h2>Data checkout Anda.</h2>
             </div>
             <span className="account-profile-saved">
               {profile?.updatedAt
@@ -461,7 +461,7 @@ export default function AccountDashboard() {
                     displayName: event.target.value,
                   }))
                 }
-                placeholder="Nama kamu"
+                placeholder="Nama Anda"
               />
             </label>
             <label>
@@ -572,7 +572,7 @@ export default function AccountDashboard() {
             </div>
             {ledger.length === 0 ? (
               <div className="account-points-empty">
-                Belum ada aktivitas points. Top up apa aja sambil login, points
+                Belum ada aktivitas points. Top up apa saja saat masuk, points
                 langsung masuk.
               </div>
             ) : (
@@ -643,8 +643,8 @@ export default function AccountDashboard() {
                 {openCount} pesanan sedang berjalan
               </strong>
               <p>
-                Yang masih diproses atau nunggu pembayaran. Klik buat lihat
-                detail dan SN.
+                Pesanan yang masih diproses atau menunggu pembayaran. Klik
+                untuk melihat detail dan SN.
               </p>
               <div className="account-order-list">
                 {openOrders.map((order) => (

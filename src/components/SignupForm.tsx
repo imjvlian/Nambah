@@ -208,7 +208,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
       if (data.requiresEmailConfirmation) {
         setStep(2);
         setNotice(
-          data.message ?? "Kode 6 digit sudah dikirim ke emailmu.",
+          data.message ?? "Kode 6 digit sudah dikirim ke email Anda.",
         );
         setCooldown(RESEND_SECONDS);
         resetTurnstile();
@@ -247,7 +247,7 @@ export default function SignupForm({ nextPath }: SignupFormProps) {
               <input
                 autoComplete="name"
                 maxLength={50}
-                placeholder="Nama kamu"
+                placeholder="Nama Anda"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
               />

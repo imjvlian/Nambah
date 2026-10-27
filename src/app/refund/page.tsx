@@ -25,7 +25,7 @@ export default function RefundPage() {
     >
       <section>
         <p>
-          Kebijakan ini menjelaskan kapan dana kamu dapat dikembalikan dan
+          Kebijakan ini menjelaskan kapan dana Anda dapat dikembalikan dan
           bagaimana prosesnya. Dokumen ini merupakan bagian dari{" "}
           <a href="/terms">Ketentuan Layanan</a> {BRAND.shortName}.
         </p>
@@ -54,15 +54,15 @@ export default function RefundPage() {
         <h2>2. Kondisi yang TIDAK dapat di-refund</h2>
         <ul>
           <li>
-            Kesalahan penginputan ID akun/nomor tujuan oleh kamu — produk digital
+            Kesalahan penginputan ID akun/nomor tujuan oleh Anda — produk digital
             yang sudah terkirim bersifat final dan tidak dapat ditarik kembali.
           </li>
           <li>
             Pesanan yang sudah berstatus berhasil — <em>kecuali</em> terbukti ada
             kesalahan sistem kami, misalnya nominal atau produk yang terkirim
-            tidak sesuai dengan yang kamu bayar.
+            tidak sesuai dengan yang Anda bayar.
           </li>
-          <li>Pesanan yang kamu batalkan sendiri atau kedaluwarsa sebelum
+          <li>Pesanan yang Anda batalkan sendiri atau kedaluwarsa sebelum
             pembayaran dilakukan (tidak ada dana yang terpotong).</li>
           <li>Akibat pemblokiran/pembekuan akun game oleh penerbit game di luar
             kendali kami.</li>
@@ -73,9 +73,9 @@ export default function RefundPage() {
         <h2>3. Cara mengajukan</h2>
         <ul>
           <li>
-            Buka <strong>halaman status pesanan</strong> kamu (link ada di email
+            Buka <strong>halaman status pesanan</strong> Anda (link ada di email
             atau halaman akun), lalu isi form ajukan refund di kartu ringkasan
-            pesanan. Kamu cukup menjelaskan masalahnya — sisanya kami yang
+            pesanan. Anda cukup menjelaskan masalahnya — sisanya kami yang
             proses.
           </li>
           <li>
@@ -99,12 +99,12 @@ export default function RefundPage() {
           <li>
             Dana dikembalikan ke <strong>metode pembayaran yang sama</strong>{" "}
             bila didukung penyedia pembayaran; alternatifnya melalui transfer
-            manual ke rekening/e-wallet yang kamu berikan.
+            manual ke rekening/e-wallet yang Anda berikan.
           </li>
           <li>
             Untuk refund akibat <strong>kesalahan sistem</strong> kami, biaya
             layanan pembayaran <strong>diserap oleh {BRAND.shortName}</strong>{" "}
-            — kamu menerima kembali nominal penuh yang kamu bayar.
+            — Anda menerima kembali nominal penuh yang Anda bayar.
           </li>
           <li>
             Points dan komisi afiliasi yang terkait pesanan akan{" "}
@@ -116,7 +116,7 @@ export default function RefundPage() {
       <section>
         <h2>5. Sengketa transaksi</h2>
         <p>
-          Jika kamu merasa ada transaksi yang tidak kamu kenali, segera hubungi
+          Jika Anda merasa ada transaksi yang tidak Anda kenali, segera hubungi
           kami sebelum mengajukan chargeback ke bank. Penyelesaian langsung
           biasanya jauh lebih cepat, dan kami berkomitmen menelusuri setiap
           laporan secara transparan.
@@ -128,8 +128,8 @@ export default function RefundPage() {
         <div className="legal-contact-box">
           <p>
             Cara tercepat mengajukan refund adalah lewat form di{" "}
-            <strong>halaman status pesanan</strong>. Kamu juga bisa mengecek
-            status refundnya di halaman yang sama setelah diajukan. Untuk bantuan
+            <strong>halaman status pesanan</strong>. Anda juga bisa mengecek
+            status refund-nya di halaman yang sama setelah diajukan. Untuk bantuan
             lebih lanjut, hubungi kanal dukungan yang tersedia di situs dan
             sertakan selalu nomor order agar verifikasi berjalan cepat.
           </p>

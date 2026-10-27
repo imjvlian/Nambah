@@ -433,7 +433,7 @@ export function renderReceiptHtml(
               <td style="padding:14px 16px;font-size:12px;line-height:1.65;color:#b9c0b4;">
                 <strong style="color:${lime};">Simpan email ini</strong> sebagai bukti transaksi.
                 ${escapeHtml(BRAND.name)} tidak pernah meminta password, kode OTP,
-                atau PIN melalui email. Kalau ada yang menghubungi kamu dengan
+                atau PIN melalui email. Jika ada yang menghubungi Anda dengan
                 alasan seperti itu, abaikan.
               </td>
             </tr>
@@ -532,7 +532,7 @@ export async function deliverSuccessReceipt(
   try {
     const result = await sendBrevoTransactionalEmail({
       to: recipient,
-      subject: `Top up ${context.game.short_name} kamu berhasil — ${orderId}`,
+      subject: `Top up ${context.game.short_name} Anda berhasil — ${orderId}`,
       htmlContent: renderReceiptHtml(context),
       tags: ["nambah-receipt", "order-success"],
     });

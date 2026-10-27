@@ -43,10 +43,10 @@ export type ReviewEligibility = {
  */
 const ELIGIBILITY_MESSAGE: Record<ReviewEligibility["reason"], string> = {
   ok: "",
-  unauthorized: "Kamu tidak punya akses ke order ini.",
+  unauthorized: "Anda tidak punya akses ke order ini.",
   "order-not-found": "Order tidak ditemukan.",
   "order-not-finished": "Ulasan bisa diberikan setelah transaksi selesai.",
-  "missing-order-access": "Buka halaman order dari link yang kamu terima untuk memberi ulasan.",
+  "missing-order-access": "Buka halaman order dari link yang Anda terima untuk memberi ulasan.",
 };
 
 export async function resolveReviewEligibility(
