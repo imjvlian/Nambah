@@ -203,15 +203,17 @@ export default function OrderRatingForm({
         </span>
       </div>
 
-      {submitted && !showCommentForm ? (
-        <button
-          type="button"
-          className="order-rating-expand"
-          onClick={() => setExpanded(true)}
-        >
-          Ubah ulasan
-        </button>
-      ) : (
+      {/*
+       * Tiga keadaan (P4.5, plan §4):
+       *   1. Form terbuka (bintang diklik / tombol Ubah ulasan) →
+       *      textarea + tombol kirim.
+       *   2. Ulasan lama yang masih tertutup → tombol "Ubah ulasan".
+       *   3. Ulasan baru yang belum dibuka → CUMA bintang.
+       *
+       * Versi pertama ternary-nya terbalik: ulasan baru selalu jatuh ke
+       * cabang form penuh — textarea muncul sebelum bintang diklik.
+       */}
+      {showCommentForm ? (
         <>
           <label className="order-rating-comment">
             <span>Ulasan (opsional)</span>
@@ -234,7 +236,15 @@ export default function OrderRatingForm({
             {busy ? "Menyimpan..." : submitted ? "Perbarui ulasan" : "Kirim ulasan"}
           </button>
         </>
-      )}
+      ) : submitted ? (
+        <button
+          type="button"
+          className="order-rating-expand"
+          onClick={() => setExpanded(true)}
+        >
+          Ubah ulasan
+        </button>
+      ) : null}
 
       {notice && <p className="inline-message">{notice}</p>}
       {error && <p className="inline-message warning" role="alert">{error}</p>}

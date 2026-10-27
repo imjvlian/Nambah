@@ -893,3 +893,25 @@
     font-size: 12px;
   }
 }
+
+/*
+ * Baris tautan promo di bawah carousel halaman depan (P4.1).
+ * Kecil dan tenang: carousel sudah jadi sorotan, tautan ini cukup
+ * terlihat tanpa bersaing.
+ */
+.home-promo-link-row {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.home-promo-link-row a {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: var(--text-sm, 13px);
+  text-decoration: none;
+}
+
+.home-promo-link-row a:hover {
+  text-decoration: underline;
+}

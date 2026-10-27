@@ -2,7 +2,8 @@
  * Halaman /afiliasi (P4.3) — landing publik program afiliasi.
  *
  * Halaman marketing, bukan dashboard: satu kolom narasi, angka besar
- * untuk skema komisi, dan CTA yang jelas. Tanpa animasi mengganggu.
+ * untuk skema komisi, dan CTA yang jelas. Semua warna memakai variabel
+ * tema globals.css (situs bertema gelap — aksen = --brand lime).
  */
 
 .afiliasi-page {
@@ -24,10 +25,11 @@
 .afiliasi-hero h1 {
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   margin: 6px 0 10px;
+  color: var(--text);
 }
 
 .afiliasi-hero > p {
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   line-height: 1.65;
   margin: 0 0 20px;
 }
@@ -41,7 +43,7 @@
 
 .afiliasi-cta-secondary {
   font-weight: 600;
-  color: var(--accent, #2f6b3a);
+  color: var(--brand);
 }
 
 .afiliasi-cta-secondary:hover {
@@ -58,15 +60,15 @@
 }
 
 .afiliasi-rates article {
-  border: 1px solid var(--line, #e2e4de);
+  border: 1px solid var(--line);
   border-radius: 16px;
   padding: 20px 22px;
-  background: var(--surface, #fff);
+  background: var(--surface);
 }
 
 .afiliasi-rates small {
   display: block;
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   margin-bottom: 6px;
 }
 
@@ -74,11 +76,12 @@
   font-size: 1.6rem;
   display: block;
   margin-bottom: 8px;
+  color: var(--brand);
 }
 
 .afiliasi-rates p {
   margin: 0;
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -92,6 +95,7 @@
 .afiliasi-notes h2 {
   font-size: 1.4rem;
   margin: 0 0 18px;
+  color: var(--text);
 }
 
 .afiliasi-steps ol {
@@ -117,18 +121,19 @@
   display: grid;
   place-items: center;
   font-weight: 700;
-  border: 1px solid var(--accent, #2f6b3a);
-  color: var(--accent, #2f6b3a);
+  border: 1px solid var(--brand);
+  color: var(--brand);
 }
 
 .afiliasi-steps strong {
   display: block;
   margin-bottom: 4px;
+  color: var(--text);
 }
 
 .afiliasi-steps p {
   margin: 0;
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   line-height: 1.6;
   font-size: 0.92rem;
 }
@@ -144,12 +149,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   line-height: 1.65;
 }
 
 .afiliasi-notes strong {
-  color: var(--ink, inherit);
+  color: var(--text);
 }
 
 @media (max-width: 820px) {

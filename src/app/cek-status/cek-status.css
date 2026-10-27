@@ -1,5 +1,9 @@
 /*
  * Halaman /cek-status (P4.2) — form pemulihan akses order tamu.
+ *
+ * Semua warna memakai variabel tema globals.css; input diberi gaya
+ * eksplisit supaya tidak jatuh ke tampilan bawaan browser (putih)
+ * di atas tema gelap.
  */
 
 .cek-status-page {
@@ -10,17 +14,18 @@
 
 .cek-status-hero {
   padding-top: 72px;
-  padding-bottom: 88px;
-  max-width: 560px;
+  padding-bottom: 96px;
+  max-width: 620px;
 }
 
 .cek-status-hero h1 {
   font-size: clamp(1.6rem, 3.5vw, 2.2rem);
   margin: 6px 0 10px;
+  color: var(--text);
 }
 
 .cek-status-hero > p {
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   line-height: 1.65;
   margin: 0 0 24px;
 }
@@ -29,10 +34,10 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  border: 1px solid var(--line, #e2e4de);
-  border-radius: 16px;
-  padding: 24px;
-  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 22px);
+  padding: 26px 24px;
+  background: var(--surface);
 }
 
 .cek-status-form label {
@@ -44,10 +49,35 @@
 .cek-status-form label > span {
   font-weight: 600;
   font-size: 0.92rem;
+  color: var(--text);
+}
+
+.cek-status-form input {
+  /* Gaya input tema — tanpa ini browser merender putih polos
+     di atas latar gelap. */
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cek-status-form input::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.cek-status-form input:focus {
+  border-color: var(--brand);
 }
 
 .cek-status-form small {
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   font-size: 0.8rem;
 }
 
@@ -57,7 +87,7 @@
 
 .cek-status-error {
   margin: 0;
-  color: #a33b2f;
+  color: #ff8a7a;
   font-size: 0.88rem;
   line-height: 1.6;
 }

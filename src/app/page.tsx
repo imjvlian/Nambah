@@ -37,6 +37,17 @@ export default async function Home() {
       <section id="top" aria-label="Sorotan utama">
         <h1 className="sr-only">Top up cepat. Lanjut main.</h1>
         <PromoBannerCarousel />
+        {/*
+         * P4.1: discoverability promo di halaman depan. Homepage tidak
+         * memuat form checkout (formnya ada di halaman produk), jadi
+         * tautan "lihat semua promo" dipasang di sini — titik pertama
+         * yang dilihat pengunjung baru.
+         */}
+        <div className="home-promo-link-row">
+          <a href="/promo">
+            Lihat semua promo yang sedang berjalan <span>→</span>
+          </a>
+        </div>
       </section>
       <PromoPopup />
       <FlashSaleStrip />

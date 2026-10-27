@@ -1,9 +1,11 @@
 /*
  * Halaman /promo (P4.1).
  *
- * Gaya kartu mengikuti bahasa visual rumah: garis tipis, sudut membulat,
- * aksen hanya pada elemen penting (kode + tombol). Tanpa animasi mengganggu
- * — halaman ini alat konversi, bukan perayaan.
+ * Gaya kartu mengikuti bahasa visual rumah: tema gelap, garis tipis,
+ * sudut membulat, aksen lime (--brand) hanya pada elemen penting
+ * (kode + tombol). Semua warna memakai VARIABEL TEMA globals.css —
+ * jangan menulis warna mentah; halaman ini pernah membuat kode promo
+ * tidak terlihat karena memakai variabel yang tidak ada di tema.
  */
 
 .promo-page {
@@ -21,10 +23,11 @@
 .promo-hero h1 {
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   margin: 6px 0 10px;
+  color: var(--text);
 }
 
 .promo-hero p {
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   line-height: 1.65;
   margin: 0;
 }
@@ -38,13 +41,13 @@
 }
 
 .promo-card {
-  border: 1px solid var(--line, #e2e4de);
+  border: 1px solid var(--line);
   border-radius: 16px;
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: var(--surface, #fff);
+  background: var(--surface);
 }
 
 .promo-card-head {
@@ -64,6 +67,7 @@
   font-size: 1.35rem;
   line-height: 1.3;
   display: block;
+  color: var(--text);
 }
 
 .promo-code-block {
@@ -77,23 +81,26 @@
   font-size: 1.1rem;
   letter-spacing: 0.06em;
   padding: 8px 14px;
-  border: 1px dashed var(--line-strong, #c8ccc2);
+  border: 1px dashed var(--muted);
   border-radius: 10px;
-  background: var(--wash, #f6f7f3);
+  background: var(--surface-2);
+  /* Lime di atas permukaan gelap: kontras tertinggi di tema ini. */
+  color: var(--brand);
   font-weight: 700;
 }
 
 .promo-code-block button {
-  border: 1px solid var(--line-strong, #c8ccc2);
+  border: 1px solid var(--line);
   background: transparent;
   border-radius: 999px;
   padding: 7px 14px;
   cursor: pointer;
   font-size: 0.85rem;
+  color: var(--text);
 }
 
 .promo-code-block button:hover {
-  background: var(--wash, #f6f7f3);
+  background: var(--surface-2);
 }
 
 .promo-terms {
@@ -106,28 +113,30 @@
 }
 
 .promo-terms li {
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
   font-size: 0.86rem;
 }
 
 .promo-terms li::before {
   content: "·";
   margin-right: 6px;
-  color: var(--accent, #2f6b3a);
+  color: var(--brand);
   font-weight: 700;
 }
 
 .promo-quota-note {
   margin: 0;
   font-size: 0.88rem;
-  color: #9a6b1f;
+  /* Amber terang — amber gelap tidak terbaca di tema gelap. */
+  color: #ffd166;
 }
 
 .promo-cta {
   align-self: flex-start;
   font-weight: 600;
   text-decoration: none;
-  border-bottom: 2px solid var(--accent, #2f6b3a);
+  color: var(--brand);
+  border-bottom: 2px solid var(--brand);
   padding-bottom: 2px;
 }
 
@@ -135,7 +144,7 @@
   opacity: 0.75;
 }
 
-/* Kuota habis: kartu tetap tampil (jujur), tapi reda supaya fokus
+/* Kuota habis: kartu tetap tampil (jujur), tapi meredup supaya fokus
    jatuh ke promo yang masih bisa dipakai. */
 .promo-card-exhausted {
   opacity: 0.65;
@@ -146,7 +155,7 @@
 }
 
 .promo-empty {
-  border: 1px dashed var(--line-strong, #c8ccc2);
+  border: 1px dashed var(--muted);
   border-radius: 16px;
   padding: 36px 28px;
   text-align: center;
@@ -154,11 +163,12 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: var(--ink-soft, #5b615a);
+  color: var(--muted);
 }
 
 .promo-empty strong {
   font-size: 1.1rem;
+  color: var(--text);
 }
 
 .promo-empty p {
@@ -170,7 +180,7 @@
 /* Tautan discoverability di kolom promo checkout. */
 .promo-hint-link {
   font-weight: 600;
-  color: var(--accent, #2f6b3a);
+  color: var(--brand);
   white-space: nowrap;
 }
 

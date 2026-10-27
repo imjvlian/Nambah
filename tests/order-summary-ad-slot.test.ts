@@ -53,9 +53,12 @@ test("rating form: textarea terbuka hanya setelah bintang diklik", () => {
     form.includes('className="order-rating-expand"'),
     "tombol Ubah ulasan untuk membuka ulasan lama",
   );
+  // Tiga keadaan yang benar (versi pertama ternary-nya terbalik):
+  // form penuh SAAT showCommentForm, tombol ubah SAAT submitted,
+  // dan TIDAK ADA yang tampil untuk ulasan baru yang belum dibuka.
   assert.ok(
-    form.includes("submitted && !showCommentForm"),
-    "ulangan terkirim tampil ringkas sampai dibuka",
+    form.includes("showCommentForm ? (") && form.includes(") : submitted ? ("),
+    "form penuh hanya saat terbuka; ulasan lama dapat tombol ubah; baru = hanya bintang",
   );
 });
 
