@@ -116,6 +116,7 @@ export const SECTION_SCOPE: Record<string, AdminScope> = {
   // Operasional
   overview: "operasional",
   orders: "operasional",
+  refunds: "operasional",
   receipts: "operasional",
   transactions: "operasional",
   // Katalog
@@ -187,6 +188,12 @@ export const ROUTE_SCOPE: ReadonlyArray<readonly [string, AdminScope]> = [
   // -- Operasional -------------------------------------------------------
   ["/api/admin/overview", "operasional"],
   ["/api/admin/orders", "operasional"],
+  /*
+   * Daftar refund membaca tabel uang keluar — satu grup sisa dengan
+   * Transaksi (operasional, baca-saja). Aksi proses/tolak tetap lewat
+   * route /api/admin/orders/[id]/refund yang superadminOnly.
+   */
+  ["/api/admin/refunds", "operasional"],
   ["/api/admin/receipts", "operasional"],
   ["/api/admin/receipt-preview", "operasional"],
   ["/api/admin/transactions", "operasional"],

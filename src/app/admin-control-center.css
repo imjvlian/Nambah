@@ -2121,6 +2121,28 @@
     minmax(96px,.45fr);
 }
 
+/* Refund: enam kolom, mirip varian promo — Order, Nominal, Penyedia,
+   Status, Alasan, Aksi. Kolom status dilebarkan dari 70px bawaan: status
+   refund "processing"/"completed" tidak muat di pil 70px. */
+.acc-receipts-head.is-refund,
+.acc-receipts-row.is-refund {
+  grid-template-columns:
+    minmax(190px,1.1fr)
+    minmax(100px,.55fr)
+    minmax(150px,.8fr)
+    minmax(118px,.6fr)
+    minmax(190px,.9fr)
+    minmax(160px,.7fr);
+}
+
+/* Tumpukan aksi per baris refund (Proses / Tolak / Tandai selesai). */
+.acc-refund-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Banner: lima kolom, kolom keempat dilebarkan sampai pil status muat. */
 .acc-receipts-head.is-banner,
 .acc-receipts-row.is-banner {

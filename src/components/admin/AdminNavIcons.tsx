@@ -50,6 +50,18 @@ function Icon({ children, className }: { children: ReactNode; className?: string
 
 /* --- Operasional ---------------------------------------------------- */
 
+/** Refund: panah kembali dua arah — uang kembali ke pembeli. */
+export function IconRefund({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M4 10a8 8 0 0 1 13.6-5.7L21 7.5" />
+      <path d="M21 3.5v4h-4" />
+      <path d="M20 14a8 8 0 0 1-13.6 5.7L3 16.5" />
+      <path d="M3 20.5v-4h4" />
+    </Icon>
+  );
+}
+
 /** Ringkasan: dasbor empat kotak. */
 export function IconOverview({ className }: IconProps) {
   return (

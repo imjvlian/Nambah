@@ -23,6 +23,7 @@ import {
   IconPromotions,
   IconPulse,
   IconReceipts,
+  IconRefund,
   IconScan,
   IconSupplier,
   IconSystem,
@@ -64,6 +65,7 @@ import { BRAND } from "@/lib/brand";
 export type AdminSectionId =
   | "overview"
   | "orders"
+  | "refunds"
   | "receipts"
   | "transactions"
   | "catalog"
@@ -121,6 +123,20 @@ export const ADMIN_NAV: AdminNavItem[] = [
     label: "Pesanan",
     Icon: IconOrders,
     hint: "Pesanan masuk dan top up",
+    group: "Operasional",
+  },
+  {
+    id: "refunds",
+    /*
+     * Seksi ini bernama Refund, bukan "Permintaan Refund", supaya setara
+     * dengan "Pesanan" — satu kata, isi halaman menjelaskan dirinya.
+     * Dulu satu-satunya tempat memproses refund adalah di dalam modal
+     * detail order — permintaan pelanggan tak terlihat kecuali admin
+     * menebak order mana yang diajukannya.
+     */
+    label: "Refund",
+    Icon: IconRefund,
+    hint: "Permintaan pengembalian dana pelanggan",
     group: "Operasional",
   },
   {

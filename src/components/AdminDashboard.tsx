@@ -26,6 +26,7 @@ import BrandLogo from "@/components/BrandLogo";
 type AdminSection =
   | "overview"
   | "orders"
+  | "refunds"
   | "catalog"
   | "supplier"
   | "receipts"
@@ -218,6 +219,25 @@ type ReceiptRow = {
   attempts: number;
   lastError: string | null;
   sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Baris tabel seksi Refund — cermin `refunds` + alias camelCase endpoint. */
+type AdminRefundRow = {
+  id: number;
+  orderId: string;
+  provider: string;
+  providerRefundId: string | null;
+  amount: number;
+  reason: string;
+  status: string;
+  requestedBy: string | null;
+  processedBy: string | null;
+  requestNote: string | null;
+  completedNote: string | null;
+  requestedAt: string | null;
+  processedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1133,6 +1153,7 @@ export default function AdminDashboard() {
   const [catalog, setCatalog] = useState<CatalogPayload | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
+  const [refundRows, setRefundRows] = useState<AdminRefundRow[]>([]);
   const [pointsData, setPointsData] = useState<AdminPointsPayload | null>(null);
   const [affiliateData, setAffiliateData] = useState<AffiliatePayload | null>(null);
   const [promotionData, setPromotionData] = useState<PromotionPayload | null>(null);
@@ -1363,6 +1384,16 @@ export default function AdminDashboard() {
     setReceipts(data.receipts ?? []);
   }
 
+  async function loadRefunds() {
+    const response = await fetch("/api/admin/refunds", { cache: "no-store" });
+    const data = (await response.json()) as {
+      refunds?: AdminRefundRow[];
+      error?: string;
+    };
+    if (!response.ok) throw new Error(data.error ?? "Refund gagal dimuat.");
+    setRefundRows(data.refunds ?? []);
+  }
+
   async function loadPoints() {
     const response = await fetch("/api/admin/points", { cache: "no-store" });
     const data = (await response.json()) as AdminPointsPayload & {
@@ -1559,10 +1590,18 @@ export default function AdminDashboard() {
     }
   }
 
-  async function refundAdminOrder(orderId: string) {
+  async function refundAdminOrder(orderId: string, defaultReason?: string) {
+    /*
+     * defaultReason terisi saat tombol memproses permintaan pelanggan yang
+     * sudah ada (status "requested"): alasan barisnya jadi isi default dan
+     * judul prompt menegaskan dana harus sudah keluar di dashboard gateway.
+     * Route tetap satu — POST tanpa action memproses baris yang sudah ada.
+     */
     const reason = window.prompt(
-      "Alasan refund order ini? Minimal 3 karakter.",
-      "",
+      defaultReason
+        ? "Memproses permintaan refund pelanggan. PASTIKAN dana sudah benar-benar keluar dulu di dashboard gateway. Alasan (min. 3 karakter):"
+        : "Alasan refund order ini? Minimal 3 karakter.",
+      defaultReason ?? "",
     );
     if (!reason || reason.trim().length < 3) return;
 
@@ -1582,6 +1621,7 @@ export default function AdminDashboard() {
         throw new Error(data.error ?? "Refund gagal diproses.");
       }
       await inspectOrder(orderId);
+      if (section === "refunds") await loadRefunds();
       setNotice(data.message ?? "Refund diproses.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Refund gagal diproses.");
@@ -1622,6 +1662,7 @@ export default function AdminDashboard() {
         throw new Error(data.error ?? "Aksi refund gagal diproses.");
       }
       await inspectOrder(orderId);
+      if (section === "refunds") await loadRefunds();
       setNotice(
         action === "confirm-completed"
           ? "Refund dikonfirmasi selesai."
@@ -2228,6 +2269,7 @@ const txDataStamp = txRange.preset
         await muatKandidatSupplier();
       }
       if (section === "receipts") await loadReceipts();
+      if (section === "refunds") await loadRefunds();
       if (section === "points") await loadPoints();
       if (section === "affiliates") await loadAffiliates();
       if (section === "promotions") await loadPromotions();
@@ -2343,6 +2385,19 @@ const txDataStamp = txRange.preset
         ),
       );
     }
+    /*
+     * Guard `refundRows.length === 0` memuat daftar sekali per masuk seksi.
+     * Kelemahan jujur: baris yang baru masuk tidak tampil sampai tombol
+     * Refresh ditekan — jadi seksi ini selalu menawarkan tombol Refresh,
+     * bukan memantulkan otomatis.
+     */
+    if (section === "refunds" && refundRows.length === 0) {
+      void loadRefunds().catch((error) =>
+        setNotice(
+          error instanceof Error ? error.message : "Refund gagal dimuat.",
+        ),
+      );
+    }
     if (section === "points" && !pointsData) {
       void loadPoints().catch((error) =>
         setNotice(
@@ -2455,7 +2510,7 @@ const txDataStamp = txRange.preset
         ),
       );
     }
-  }, [section, authState, orders.length, receipts.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness, supplierCatalog]);
+  }, [section, authState, orders.length, receipts.length, refundRows.length, pointsData, affiliateData, promotionData, usersData, financeData, merchantData, readiness, supplierCatalog]);
 
   function updateDraft(productId: string, patch: Partial<DraftProduct>) {
     setDrafts((current) => ({
@@ -4035,9 +4090,18 @@ const txDataStamp = txRange.preset
                       </button>
                       {(String(orderDetail.order.status ?? "") === "failed" ||
                         String(orderDetail.order.status ?? "") === "success") &&
+                        /*
+                         * Tombol Refund juga wajib tampil untuk permintaan
+                         * pelanggan (status "requested"): route di belakangnya
+                         * sudah memproses baris yang ada, bukan membuat baru —
+                         * tanpa ini admin tidak bisa memproses ajukan customer
+                         * yang statusnya requested (bug 28 Okt: hanya
+                         * "Tolak refund" yang muncul).
+                         */
                         (!orderDetail.refund ||
-                          String(orderDetail.refund.status ?? "") ===
-                            "failed") && (
+                          ["failed", "requested"].includes(
+                            String(orderDetail.refund.status ?? ""),
+                          )) && (
                           <button
                             type="button"
                             disabled={Boolean(busy)}
@@ -5025,6 +5089,169 @@ const txDataStamp = txRange.preset
                 {receipts.length === 0 && (
                   <div className="acc-empty">
                     Belum ada log pengiriman email.
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {section === "refunds" && (
+            <>
+              {/*
+               * Permintaan refund mendapat seksi sendiri (28 Okt 2026).
+               *
+               * Dulu satu-satunya pintu memproses refund ada DI DALAM modal
+               * detail order — admin harus sudah tahu order mana yang
+               * diajukannya untuk bisa menemukan tombolnya, dan permintaan
+               * pelanggan tidak punya daftar yang bisa dikerjakan bermasal.
+               *
+               * Seksi ini daftar baca-saja dari tabel `refunds`; aksi
+               * tetap lewat route `/api/admin/orders/[id]/refund`
+               * (superadminOnly), jadi tombol dipandang role: admin biasa
+               * melihat antrean tapi tidak bisa menekan tindakan uang.
+               */}
+              <SectionHead
+                eyebrow="Operasional"
+                title="Permintaan refund"
+                copy="Pengembalian dana yang diajukan pelanggan atau admin. Proses uang keluar hanya dengan pastikan dana sudah benar-benar keluar di dashboard gateway."
+                action={
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() =>
+                      void loadRefunds()
+                        .then(() => setNotice("Daftar refund diperbarui."))
+                        .catch((error: unknown) =>
+                          setNotice(
+                            error instanceof Error
+                              ? error.message
+                              : "Refund gagal dimuat.",
+                          ),
+                        )
+                    }
+                  >
+                    Refresh
+                  </button>
+                }
+              />
+
+              {contextRole === "admin" && (
+                <p className="acc-table-note">
+                  Melihat antrean untuk role admin. Memproses atau menolak
+                  refund adalah hak superadmin.
+                </p>
+              )}
+
+              <div className="acc-table-card">
+                <div className="acc-receipts-head is-refund">
+                  <span>Order</span>
+                  <span>Nominal</span>
+                  <span>Penyedia</span>
+                  <span>Status</span>
+                  <span>Alasan</span>
+                  <span>Aksi</span>
+                </div>
+                {refundRows.map((refund) => {
+                  const isAdmin =
+                    contextRole === "superadmin" || contextRole === "legacy";
+                  const isTerminal =
+                    refund.status === "completed" ||
+                    refund.status === "rejected";
+                  const actionReason =
+                    refund.reason && refund.reason.length >= 3
+                      ? refund.reason
+                      : "Proses permintaan refund pelanggan";
+                  return (
+                    <div
+                      className="acc-receipts-row is-refund"
+                      key={refund.id}
+                    >
+                      <div>
+                        <strong>{refund.orderId}</strong>
+                        <span>{formatTime(refund.requestedAt ?? refund.createdAt)}</span>
+                      </div>
+                      <span>{formatIDR(refund.amount)}</span>
+                      <div>
+                        <strong>{refund.provider}</strong>
+                        <span>
+                          {refund.providerRefundId
+                            ? refund.providerRefundId
+                            : "Belum ada ID penyedia"}
+                        </span>
+                      </div>
+                      <span className={`acc-status ${refund.status}`}>
+                        {refund.status}
+                      </span>
+                      <div>
+                        <strong>{refund.reason}</strong>
+                        {refund.requestNote && (
+                          <small>{refund.requestNote}</small>
+                        )}
+                        {refund.completedNote && (
+                          <small>Selesai: {refund.completedNote}</small>
+                        )}
+                      </div>
+                      <div className="acc-refund-actions">
+                        {!isTerminal && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={Boolean(busy) || !isAdmin}
+                              title={
+                                !isAdmin
+                                  ? "Hanya superadmin yang bisa memproses refund"
+                                  : undefined
+                              }
+                              onClick={() =>
+                                void refundAdminOrder(
+                                  refund.orderId,
+                                  actionReason,
+                                )
+                              }
+                            >
+                              Proses
+                            </button>
+                            <button
+                              type="button"
+                              disabled={Boolean(busy) || !isAdmin}
+                              title={
+                                !isAdmin
+                                  ? "Hanya superadmin yang bisa menolak refund"
+                                  : undefined
+                              }
+                              onClick={() =>
+                                void refundAdminAction(
+                                  refund.orderId,
+                                  "reject",
+                                )
+                              }
+                            >
+                              Tolak
+                            </button>
+                          </>
+                        )}
+                        {refund.status === "processing" && (
+                          <button
+                            type="button"
+                            disabled={Boolean(busy) || !isAdmin}
+                            onClick={() =>
+                              void refundAdminAction(
+                                refund.orderId,
+                                "confirm-completed",
+                              )
+                            }
+                          >
+                            Tandai selesai
+                          </button>
+                        )}
+                        {isTerminal && <span>Tidak ada aksi</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                {refundRows.length === 0 && (
+                  <div className="acc-empty">
+                    Belum ada permintaan refund.
                   </div>
                 )}
               </div>
