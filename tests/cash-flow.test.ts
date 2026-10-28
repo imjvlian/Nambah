@@ -6,6 +6,8 @@ import {
   cashFlowReportToCsv,
   dayKey,
   type CashFlowOrder,
+  type PaidOrderRow,
+  type RefundCashRow,
 } from "../src/lib/cash-flow-rules.ts";
 
 /**
@@ -36,6 +38,31 @@ function order(over: Partial<CashFlowOrder> = {}): CashFlowOrder {
     service_fee_amount: null,
     merchant_payment_cost: null,
     created_at: "2026-10-02T10:00:00.000Z",
+    ...over,
+  };
+}
+
+/**
+ * Basis kas masuk - pembanding `order()` dengan `paid_at`nya sendiri.
+ * Baris ini datanya diambil lapisan I/O (cash-flow.ts), tapi definisi
+ * kasnya dijaga di modul murni.
+ */
+function paid(over: Partial<PaidOrderRow> = {}): PaidOrderRow {
+  return {
+    id: "NMB-1",
+    paid_at: "2026-10-02T10:00:00.000Z",
+    final_price: 100_000,
+    merchant_id: null,
+    ...over,
+  };
+}
+
+function refund(over: Partial<RefundCashRow> = {}): RefundCashRow {
+  return {
+    id: 1,
+    order_id: "NMB-1",
+    amount: 100_000,
+    processed_at: "2026-10-03T10:00:00.000Z",
     ...over,
   };
 }
@@ -503,6 +530,12 @@ test("kas harian: masuk hanya dari pembayaran langsung + pelunasan ritel", () =>
         created_at: "2026-10-02T11:00:00.000Z",
       }),
     ],
+    paidOrders: [
+      paid({ id: "biasa", paid_at: "2026-10-02T10:00:00.000Z", final_price: 100_000 }),
+      // Order ritel ikut tiba dari lapisan data, tapi modul murni
+      // menyaringnya - kas masuknya lewat pelunasan, bukan pembayaran.
+      paid({ id: "ritel", merchant_id: "m-1", final_price: 50_000 }),
+    ],
     merchantPayments: [
       { merchant_id: "m-1", amount: 50_000, created_at: "2026-10-02T12:00:00.000Z" },
     ],
@@ -512,6 +545,7 @@ test("kas harian: masuk hanya dari pembayaran langsung + pelunasan ritel", () =>
 
   const day = report.days.find((d) => d.date === "2026-10-02");
   // 100.000 pembayaran langsung + 50.000 pelunasan ritel.
+  assert.equal(day?.paidCashIn, 100_000);
   assert.equal(day?.cashIn, 150_000);
   // Modal kedua order keluar di hari yang sama: 80.000 + 40.000.
   assert.equal(day?.cashOut, 120_000);
@@ -521,6 +555,7 @@ test("kas harian: masuk hanya dari pembayaran langsung + pelunasan ritel", () =>
 test("kas harian: pencairan afiliasi keluar di hari paid_at", () => {
   const report = buildCashFlowReport({
     orders: [order({ final_price: 100_000, supplier_cost: 80_000 })],
+    paidOrders: [paid()],
     affiliateWithdrawals: [
       { id: 1, amount: 30_000, paid_at: "2026-10-02T14:00:00.000Z" },
     ],
@@ -593,6 +628,10 @@ test("total kas sama dengan penjumlahan baris harian", () => {
       order({ id: "a", created_at: "2026-10-01T08:00:00.000Z", final_price: 100_000, supplier_cost: 80_000, merchant_payment_cost: 1_000 }),
       order({ id: "b", created_at: "2026-10-03T08:00:00.000Z", final_price: 60_000, supplier_cost: 50_000 }),
     ],
+    paidOrders: [
+      paid({ id: "a", paid_at: "2026-10-01T08:30:00.000Z", final_price: 100_000 }),
+      paid({ id: "b", paid_at: "2026-10-03T08:30:00.000Z", final_price: 60_000 }),
+    ],
     merchantPayments: [
       { merchant_id: "m-1", amount: 25_000, created_at: "2026-10-02T10:00:00.000Z" },
     ],
@@ -628,6 +667,11 @@ test("bucket harian tetap mencatat hari yang sama walau transaksi berurutan", ()
       order({ id: "b", created_at: "2026-10-02T09:00:00.000Z", final_price: 20_000 }),
       order({ id: "c", created_at: "2026-10-02T10:00:00.000Z", final_price: 30_000 }),
     ],
+    paidOrders: [
+      paid({ id: "a", paid_at: "2026-10-02T08:30:00.000Z", final_price: 10_000 }),
+      paid({ id: "b", paid_at: "2026-10-02T09:30:00.000Z", final_price: 20_000 }),
+      paid({ id: "c", paid_at: "2026-10-02T10:30:00.000Z", final_price: 30_000 }),
+    ],
     merchantPayments: [
       { merchant_id: "m-1", amount: 5_000, created_at: "2026-10-02T11:00:00.000Z" },
     ],
@@ -642,6 +686,154 @@ test("bucket harian tetap mencatat hari yang sama walau transaksi berurutan", ()
   assert.equal(day?.cashIn, 65_000);
 });
 
+/* ==========================================================================
+   Refund: kas masuk basis pembayaran + kas keluar saat refund selesai.
+
+   Dua gerakan uang nyata dari satu order yang diwujud refund:
+   masuk di hari `paid_at`, keluar di hari `processed_at`. Dulu
+   refund membuat order menghilang dari kas masuk karena statusnya
+   keluar dari `REVENUE_STATUSES` - laporan pasca-refund seakan
+   pembayaran itu tidak pernah ada.
+   ========================================================================== */
+
+test("kas masuk mengikuti paid_at, termasuk order yang sudah direfund", () => {
+  /*
+   * Omzet boleh turun (status refunded bukan pendapatan), tapi kas
+   * masuknya tetap: uang itu benar-benar pernah ada di rekening.
+   */
+  const report = buildCashFlowReport({
+    orders: [order({ status: "refunded", created_at: "2026-10-01T09:00:00.000Z" })],
+    paidOrders: [paid({ paid_at: "2026-10-02T10:00:00.000Z" })],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.grossRevenue, 0);
+  // Dulu refund menghilangkan kas masuk ini; sekarang tetap.
+  assert.equal(report.totals.paidCashIn, 100_000);
+  assert.equal(report.totals.cashIn, 100_000);
+});
+
+test("order gagal yang pernah dibayar tetap kas masuk di hari pembayaran", () => {
+  /*
+   * Payment sukses lalu fulfilment gagal dengan uangnya dikembalikan -
+   * gerakan kas masuknya tetap terjadi. Tanpa ini, kas keluar refundnya
+   * akan membuat laporan terlihat seperti kas menghangus tanpa asal.
+   */
+  const report = buildCashFlowReport({
+    orders: [order({ status: "failed", created_at: "2026-10-02T09:00:00.000Z" })],
+    paidOrders: [paid({ paid_at: "2026-10-02T10:00:00.000Z" })],
+    refundRows: [refund({ amount: 100_000, processed_at: "2026-10-03T09:00:00.000Z" })],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.paidCashIn, 100_000);
+  assert.equal(report.totals.refundPaidOut, 100_000);
+  assert.equal(report.totals.refundCount, 1);
+  assert.equal(report.totals.cashIn, 100_000);
+  assert.equal(report.totals.cashOut, 100_000);
+  assert.equal(report.totals.netCash, 0);
+});
+
+test("refund keluar di hari processed_at, bisa beda dari hari bayar", () => {
+  const report = buildCashFlowReport({
+    orders: [order({ created_at: "2026-10-02T10:00:00.000Z" })],
+    paidOrders: [paid({ paid_at: "2026-10-02T10:00:00.000Z" })],
+    refundRows: [refund({ processed_at: "2026-10-03T09:00:00.000Z" })],
+    from: FROM,
+    to: TO,
+  });
+
+  const dayBayar = report.days.find((d) => d.date === "2026-10-02");
+  const dayRefund = report.days.find((d) => d.date === "2026-10-03");
+  assert.equal(dayBayar?.cashIn, 100_000);
+  assert.equal(dayBayar?.refundPaidOut, 0);
+  // Uang keluar di hari refund, bukan diulang ke hari pembayaran.
+  assert.equal(dayRefund?.refundPaidOut, 100_000);
+  assert.equal(dayRefund?.cashOut, 100_000);
+  assert.equal(dayRefund?.netCash, -100_000);
+});
+
+test("laporan tanpa refund tidak menghasilkan baris refund", () => {
+  /*
+   * Kasus `requested`/`processing` SEEJAK refilter biar hanya SETELAH
+   * dibaca dari tabel completed di lapisan data (cash-flow.ts).
+   * Modul murni menjaga bagian yang pasti: input refund kosong
+   * menghasilkan kas keluar nol.
+   */
+  const report = buildCashFlowReport({
+    orders: [],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.refundPaidOut, 0);
+  assert.equal(report.totals.refundCount, 0);
+  assert.equal(report.totals.cashOut, 0);
+});
+
+test("refund order ritel tetap kas keluar walau penjualannya bukan kas masuk", () => {
+  /*
+   * Uang refund keluar dari SKET rekening Lacte ke pembeli - tidak
+   * peduli kas masuknya tercactus lewat pelunasan toko atau tidak.
+   * Order ritel yang diwujud refund: jualnya dari merchantSettled,
+   * refundnya nyata keluar hari ini.
+   */
+  const report = buildCashFlowReport({
+    orders: [
+      order({ merchant_id: "m-1", status: "refunded", created_at: "2026-10-02T09:00:00.000Z" }),
+    ],
+    paidOrders: [paid({ merchant_id: "m-1" })],
+    merchantPayments: [
+      { merchant_id: "m-1", amount: 100_000, created_at: "2026-10-02T12:00:00.000Z" },
+    ],
+    refundRows: [refund({ processed_at: "2026-10-03T09:00:00.000Z" })],
+    from: FROM,
+    to: TO,
+  });
+
+  const dayBayar = report.days.find((d) => d.date === "2026-10-02");
+  const dayRefund = report.days.find((d) => d.date === "2026-10-03");
+  // Kas masuk tetap hanya lewat pelunasan, konsumer basis tetap nol.
+  assert.equal(dayBayar?.paidCashIn, 0);
+  assert.equal(dayBayar?.cashIn, 100_000);
+  assert.equal(dayRefund?.refundPaidOut, 100_000);
+  assert.equal(dayRefund?.cashOut, 100_000);
+});
+
+test("refund di luar rentang tidak masuk laporan", () => {
+  const report = buildCashFlowReport({
+    orders: [order()],
+    paidOrders: [paid()],
+    refundRows: [
+      refund({ id: 2, amount: 70_000, processed_at: "2026-09-01T09:00:00.000Z" }),
+      refund({ id: 3, amount: 70_000, processed_at: "2026-10-15T09:00:00.000Z" }),
+    ],
+    from: FROM,
+    to: TO,
+  });
+
+  assert.equal(report.totals.refundPaidOut, 0);
+  assert.equal(report.totals.refundCount, 0);
+});
+
+test("CSV memuat kolom Refund di header dan baris dengan nilai refund", () => {
+  const report = buildCashFlowReport({
+    orders: [order()],
+    paidOrders: [paid()],
+    refundRows: [refund({ amount: 100_000, processed_at: "2026-10-03T09:00:00.000Z" })],
+    from: FROM,
+    to: TO,
+  });
+
+  const csv = cashFlowReportToCsv(report);
+  // Kolom Refund ada di header, di antara Fee Gateway dan Uang Masuk.
+  assert.ok(/Fee Gateway,Refund,Uang Masuk/.test(csv));
+  // Hari refund membawa 100000 di kolom ke-9.
+  assert.ok(/2026-10-03,0,0,0,0,0,0,0,100000,0,100000,-100000/.test(csv));
+});
+
 test("CSV harian memuat kolom masuk, keluar, dan selisih", () => {
   const report = buildCashFlowReport({
     orders: [
@@ -651,6 +843,7 @@ test("CSV harian memuat kolom masuk, keluar, dan selisih", () => {
         merchant_payment_cost: 2_000,
       }),
     ],
+    paidOrders: [paid()],
     from: FROM,
     to: TO,
   });
@@ -660,7 +853,11 @@ test("CSV harian memuat kolom masuk, keluar, dan selisih", () => {
   assert.ok(csv.includes("Uang Keluar"));
   assert.ok(csv.includes("Selisih"));
   assert.ok(csv.includes("Fee Gateway"));
-  // 100.000 masuk; 80.000 + 2.000 keluar; sisih 18.000.
-  assert.ok(/2026-10-02,1,100000,80000,20000,0,0,2000,100000,82000,18000/.test(csv));
-  assert.ok(/TOTAL,1,100000,80000,20000,0,0,2000,100000,82000,18000/.test(csv));
+  /*
+   * Kolom: tanggal, pesanan, omzet, supplier, margin, pelunasan,
+   * pencairan, fee gateway, refund, masuk, keluar, selisih.
+   * 100.000 masuk; 80.000 + 2.000 keluar; selisih 18.000.
+   */
+  assert.ok(/2026-10-02,1,100000,80000,20000,0,0,2000,0,100000,82000,18000/.test(csv));
+  assert.ok(/TOTAL,1,100000,80000,20000,0,0,2000,0,100000,82000,18000/.test(csv));
 });

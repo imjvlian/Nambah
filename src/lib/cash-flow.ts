@@ -6,6 +6,8 @@ import {
   type CashFlowOrder,
   type CashFlowReport,
   type MerchantPaymentRow,
+  type PaidOrderRow,
+  type RefundCashRow,
 } from "@/lib/cash-flow-rules";
 import { supabaseSelect } from "@/lib/supabase/server";
 import { rangeToFilter, type ReportRange } from "@/lib/report-range";
@@ -45,7 +47,7 @@ export async function getCashFlowReport(
   range: ReportRange,
   now?: number,
 ): Promise<CashFlowReport> {
-  const [orders, merchantPayments, affiliateWithdrawals, affiliatePending] =
+  const [orders, merchantPayments, affiliateWithdrawals, affiliatePending, paidOrders, refundRows] =
     await Promise.all([
       supabaseSelect<CashFlowOrder>("orders", {
         select:
@@ -84,12 +86,47 @@ export async function getCashFlowReport(
         filters: { status: "eq.approved" },
         limit: MAX_ORDERS,
       }),
+      /*
+       * Basis kas masuk: order yang PAID within rentang.
+       *
+       * Filter `paid_at` menyaring sekaligus menolak order yang belum
+       * dibayar - `paid_at` hanya terisi saat webhook settlement masuk.
+       * Status tidak difilter: order `refunded`/`failed` yang uangnya
+       * pernah masuk tetap kas masuk di hari pembayaran; keluarnya
+       * ditangani baris refund di bawah.
+       *
+       * Batas 5000 sama dengan query order lain. Laporan yang terpotong
+       * jangan disamarkan, tapi selama keduanya memakai batas yang
+       * sama, yang terpotong terpotong bersama - dan itu bisa
+       * dipatok dari satu tempat.
+       */
+      supabaseSelect<PaidOrderRow>("orders", {
+        select: "id,paid_at,final_price,merchant_id",
+        filters: rangeToFilter(range, "paid_at"),
+        order: "paid_at.asc",
+        limit: MAX_ORDERS,
+      }),
+      /*
+       * Refund SELESAI dalam rentang - difilter per `processed_at`
+       * karena itulah momen API refund berhasil dan uang meninggalkan
+       * Lacte. Status `requested`/`processing`/`failed` sengaja tidak:
+       * uangnya belum keluar, dan menghitungnya membuat kas keluar
+       * lebih besar dari kenyataan.
+       */
+      supabaseSelect<RefundCashRow>("refunds", {
+        select: "id,order_id,amount,processed_at",
+        filters: { ...rangeToFilter(range, "processed_at"), status: "eq.completed" },
+        order: "processed_at.asc",
+        limit: MAX_ORDERS,
+      }),
     ]);
 
   const report = buildCashFlowReport({
     orders,
     merchantPayments,
     affiliateWithdrawals,
+    paidOrders,
+    refundRows,
     from: range.from,
     to: range.to,
     now,

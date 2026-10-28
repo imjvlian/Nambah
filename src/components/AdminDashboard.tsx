@@ -492,6 +492,10 @@ type CashFlowPayload = {
     merchantSettled: number;
     affiliatePaidOut: number;
     gatewayFee: number;
+    /** Kas masuk basis pembayaran (paid_at) - termasuk order refunded. */
+    paidCashIn: number;
+    /** Kas keluar refund selesai pada hari itu. */
+    refundPaidOut: number;
     cashIn: number;
     cashOut: number;
     netCash: number;
@@ -513,6 +517,9 @@ type CashFlowPayload = {
     affiliatePaidOut: number;
     affiliatePaidCount: number;
     gatewayFee: number;
+    paidCashIn: number;
+    refundPaidOut: number;
+    refundCount: number;
     cashIn: number;
     cashOut: number;
     netCash: number;
@@ -6049,9 +6056,9 @@ const txDataStamp = txRange.preset
                     {/*
                      * Ringkasan di atas tabel.
                      *
-                     * Tabel delapan kolom harus digulir dan dipindai baris per
-                     * baris untuk menjawab "berapa yang masuk, berapa yang
-                     * keluar, jadi berapa". Tiga angka itu diletakkan dulu
+                     * Tabel sembilan kolom harus digulir dan dipindai
+                     * baris per baris untuk menjawab "berapa yang masuk,
+                     * berapa yang keluar, jadi berapa". Tiga angka itu diletakkan dulu
                      * karena itu pertanyaan yang sebenarnya dicari.
                      */}
                     <div className="acc-cash-summary">
@@ -6090,6 +6097,7 @@ const txDataStamp = txRange.preset
                             <th className="acc-num">Keluar: modal supplier</th>
                             <th className="acc-num">Keluar: pencairan</th>
                             <th className="acc-num">Keluar: fee gateway</th>
+                            <th className="acc-num">Keluar: refund</th>
                             <th className="acc-num">Selisih</th>
                           </tr>
                         </thead>
@@ -6105,7 +6113,16 @@ const txDataStamp = txRange.preset
                                 {day.orders}
                               </td>
                               <td className="acc-num" data-label="Masuk: pembayaran">
-                                {formatIDR(day.grossRevenue)}
+                                {/*
+                                 * paidCashIn, bukan grossRevenue: ini
+                                 * kolom uang yang benar-benar masuk.
+                                 * Omzet memakai status terakhir sukses;
+                                 * kolom ini memakai pembayaran - order
+                                 * yang sudah direfund tetap masuk di
+                                 * hari bayar, keluarnya tinggal lihat
+                                 * kolom refund.
+                                 */}
+                                {formatIDR(day.paidCashIn)}
                               </td>
                               <td
                                 className="acc-num"
@@ -6128,6 +6145,9 @@ const txDataStamp = txRange.preset
                               >
                                 {formatIDR(day.gatewayFee)}
                               </td>
+                              <td className="acc-num" data-label="Keluar: refund">
+                                {formatIDR(day.refundPaidOut)}
+                              </td>
                               <td className="acc-num" data-label="Selisih">
                                 <span
                                   className={
@@ -6147,7 +6167,7 @@ const txDataStamp = txRange.preset
                             <td>TOTAL</td>
                             <td className="acc-num">{cashFlowData.totals.orders}</td>
                             <td className="acc-num">
-                              {formatIDR(cashFlowData.totals.grossRevenue)}
+                              {formatIDR(cashFlowData.totals.paidCashIn)}
                             </td>
                             <td className="acc-num">
                               {formatIDR(cashFlowData.totals.merchantSettled)}
@@ -6160,6 +6180,9 @@ const txDataStamp = txRange.preset
                             </td>
                             <td className="acc-num">
                               {formatIDR(cashFlowData.totals.gatewayFee)}
+                            </td>
+                            <td className="acc-num">
+                              {formatIDR(cashFlowData.totals.refundPaidOut)}
                             </td>
                             <td className="acc-num">
                               <span

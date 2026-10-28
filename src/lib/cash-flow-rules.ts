@@ -95,6 +95,42 @@ export type AffiliateWithdrawalRow = {
   paid_at: string;
 };
 
+/**
+ * Basis KAS MASUK: order yang uangnya benar-benar sudah pernah masuk.
+ *
+ * Satu order bisa berakhir `refunded` atau `failed` (dikembalikan), tapi
+ * kedua gerakan uangnya sudah terjadi: masuk saat pembayaran, keluar saat
+ * refund. Karena itu kas masuk mengikuti `paid_at` - momen uang masuk - dan
+ * TIDAK peduli status akhir order. Bandingkan dengan `CashFlowOrder` di
+ * atas yang dipakai untuk omzet (`grossRevenue`) dan dijaga hanya relevant
+ * pada `success`.
+ *
+ * `paid_at` WAJIB terisi: dibuat oleh lapisan pengambil data yang
+ * memfilter `rangeToFilter(range, "paid_at")`, sehingga order yang belum
+ * dibayar tidak pernah muncul.
+ */
+export type PaidOrderRow = {
+  id: string;
+  paid_at: string;
+  final_price: number | string;
+  merchant_id: string | null;
+};
+
+/**
+ * Refund yang SELESAI - uangnya sudah tinggalkan Lacte.
+ *
+ * Dibucket per `processed_at` karena itulah momen API refund berhasil
+ * dipanggil. Baris `requested`/`processing`/`failed` TIDAK ikut: uang
+ * belum keluar, dan menghitungnya membuat saldo laporan lebih buruk
+ * dari kenyataan.
+ */
+export type RefundCashRow = {
+  id: number;
+  order_id: string;
+  amount: number | string;
+  processed_at: string;
+};
+
 /** Satu titik harian pada grafik. */
 export type CashFlowDay = {
   /** `YYYY-MM-DD` dalam UTC. */
@@ -113,6 +149,16 @@ export type CashFlowDay = {
   affiliatePaidOut: number;
   /** Biaya payment gateway yang terpakai order success hari itu. */
   gatewayFee: number;
+  /**
+   * Uang yang benar-benar MASUK lewat pembayaran order, hari itu.
+   *
+   * Basis `paid_at`, termasuk order yang kini berstatus `refunded` atau
+   * `failed`— uangnya memang pernah masuk; refund-nya dicatat terpisah
+   * sebagai kas keluar `refundPaidOut`. Order ritel TIDAK di sini.
+   */
+  paidCashIn: number;
+  /** Uang keluar refund yang SELESAI pada hari itu. */
+  refundPaidOut: number;
   /**
    * Total uang yang benar-benar MASUK ke rekening Lacte hari itu.
    *
@@ -180,6 +226,20 @@ export type CashFlowTotals = {
   affiliatePaidCount: number;
   /** Total biaya payment gateway yang terpakai di periode ini. */
   gatewayFee: number;
+  /**
+   * Uang masuk lewat pembayaran order di periode ini.
+   *
+   * Basis `paid_at`, bukan status: order yang sudah direfund tetap
+   * dihitung di sini karena uangnya benar-benar pernah masuk - dan
+   * keluarnya tercatat terpisah di `refundPaidOut` pada tanggal refund.
+   * Dengan begitu laporan pasca-refund tidak diam-diam menghapus kas
+   * masuk yang sudah terjadi dari periode yang sudah lampau.
+   */
+  paidCashIn: number;
+  /** Refund SELESAI di periode ini: uang keluar ke pembeli. */
+  refundPaidOut: number;
+  /** Jumlah refund selesai di periode ini. */
+  refundCount: number;
   /** Total kas masuk periode: pembayaran langsung + pelunasan ritel. */
   cashIn: number;
   /** Total kas keluar periode: modal supplier + pencairan afiliasi + fee gateway. */
@@ -242,6 +302,8 @@ function emptyDay(date: string): CashFlowDay {
     merchantSettled: 0,
     affiliatePaidOut: 0,
     gatewayFee: 0,
+    paidCashIn: 0,
+    refundPaidOut: 0,
     cashIn: 0,
     cashOut: 0,
     netCash: 0,
@@ -269,17 +331,23 @@ function dayBucket(days: Map<string, CashFlowDay>, key: string) {
  *
  * Dihitung ulang setiap kali ada yang berubah, bukan dijumlahkan manual per
  * kolom. Kalau `cashOut` dijumlahkan terpisah dari `supplierCost` +
- * `affiliatePaidOut` + `gatewayFee`, satu kolom yang lupa ikut dihitung akan
- * membuat "Selisih" terlihat benar padahal tidak.
+ * `affiliatePaidOut` + `gatewayFee` + `refundPaidOut`, satu kolom yang lupa
+ * ikut dihitung akan membuat "Selisih" terlihat benar padahal tidak.
  *
- * `cashIn` HANYA dua sumber: pembayaran langsung dan pelunasan ritel. Order
- * ritel tidak masuk karena uangnya dibayar di toko dan baru sampai lewat
- * pelunasan. Biaya layanan toko tidak masuk ke kolom mana pun - uangnya tak
- * pernah melewati Lacte.
+ * `cashIn` HANYA dua sumber: pembayaran order dan pelunasan ritel.
+ * Pembayaran pakai `paidCashIn` (basis `paid_at`, termasuk order yang
+ * nanti direfund), bukan `grossRevenue` — omzet memakai status terakhir
+ * `success` dan menghilang saat refund, padahal uangnya sudah pernah masuk.
+ * Refund adalah gerakan kas BERBEDA yang masuk ke `cashOut.refundPaidOut`,
+ * tanggalnya bisa beda dari tanggal pembayaran. Order ritel tidak masuk
+ * karena uangnya dibayar di toko dan baru sampai lewat pelunasan. Biaya
+ * layanan toko tidak masuk ke kolom mana pun - uangnya tak pernah
+ * melewati Lacte.
  */
 function recomputeCash(day: CashFlowDay) {
-  day.cashIn = day.grossRevenue + day.merchantSettled;
-  day.cashOut = day.supplierCost + day.affiliatePaidOut + day.gatewayFee;
+  day.cashIn = day.paidCashIn + day.merchantSettled;
+  day.cashOut =
+    day.supplierCost + day.affiliatePaidOut + day.gatewayFee + day.refundPaidOut;
   day.netCash = day.cashIn - day.cashOut;
 }
 
@@ -299,11 +367,27 @@ export function buildCashFlowReport(input: {
   orders: CashFlowOrder[];
   merchantPayments?: MerchantPaymentRow[];
   affiliateWithdrawals?: AffiliateWithdrawalRow[];
+  /**
+   * Basis kas masuk (bisa dihilangkan - pemanggil lama menangani `[]`).
+   * Dipisah dari `orders` supaya omzet (`grossRevenue`) tetap pakai aturan
+   * status-success-nya sendiri di atas.
+   */
+  paidOrders?: PaidOrderRow[];
+  /** Refund selesai - kas keluar. Kosong di test modul murni yang lama. */
+  refundRows?: RefundCashRow[];
   from: Date;
   to: Date;
   now?: number;
 }): CashFlowReport {
-  const { orders, merchantPayments = [], affiliateWithdrawals = [], from, to } = input;
+  const {
+    orders,
+    merchantPayments = [],
+    affiliateWithdrawals = [],
+    paidOrders = [],
+    refundRows = [],
+    from,
+    to,
+  } = input;
   const fromMs = from.getTime();
   const toMs = to.getTime();
 
@@ -327,6 +411,9 @@ export function buildCashFlowReport(input: {
     affiliatePaidOut: 0,
     affiliatePaidCount: 0,
     gatewayFee: 0,
+    paidCashIn: 0,
+    refundPaidOut: 0,
+    refundCount: 0,
     cashIn: 0,
     cashOut: 0,
     netCash: 0,
@@ -479,6 +566,57 @@ export function buildCashFlowReport(input: {
     }
   }
 
+  /*
+   * Kas masuk berbasis PEMBAYARAN - momen uang fisik masuk, bukan status
+   * order terakhir.
+   *
+   * Order yang kini berstatus `refunded` atau `failed` tetap dihitung di
+   * hari `paid_at`: uangnya benar-benar pernah masuk, dan keluarnya
+   * dicatat terpisah pada tanggal refund (loop di bawah). Menghidangkan
+   * kas masuk dari `grossRevenue` membuat refund menghapus uang masuk
+   * yang sudah terjadi dari periode lampau - laporan tampak seperti
+   * pembayaran tidak pernah ada.
+   *
+   * Order ritel dilewat: uangnya dibayar ke toko dan masuk Lacte lewat
+   * `merchantSettled` - aturan yang sama dengan aturan omzet di atas.
+   */
+  for (const paid of paidOrders) {
+    if (!withinRange(paid.paid_at)) continue;
+    if (paid.merchant_id) continue;
+
+    const amount = num(paid.final_price);
+    totals.paidCashIn += amount;
+
+    const key = dayKey(paid.paid_at);
+    if (key) {
+      const day = dayBucket(days, key);
+      day.paidCashIn += amount;
+      recomputeCash(day);
+    }
+  }
+
+  /*
+   * Refund SELESAI: uang keluar nyata - uang sudah tinggalkan Lacte.
+   *
+   * Semua refund dihitung, termasuk order ritel: uang keluar dari
+   * rekening Lacte ke pembeli, tidak peduli siapa yang menerima kas
+   * masuknya. Dibucket per `processed_at` (momen API refund sukses)
+   * dengan aturan yang sama dengan `paid_at` pencairan afiliasi.
+   */
+  for (const refund of refundRows) {
+    if (!withinRange(refund.processed_at)) continue;
+    const amount = num(refund.amount);
+    totals.refundPaidOut += amount;
+    totals.refundCount += 1;
+
+    const key = dayKey(refund.processed_at);
+    if (key) {
+      const day = dayBucket(days, key);
+      day.refundPaidOut += amount;
+      recomputeCash(day);
+    }
+  }
+
   totals.marginPercent =
     totals.grossRevenue > 0
       ? Math.round((totals.grossProfit / totals.grossRevenue) * 10000) / 100
@@ -496,8 +634,9 @@ export function buildCashFlowReport(input: {
    * yang justru paling dipercaya akan jadi tempat kesalahan itu bersembunyi.
    */
   for (const day of days.values()) totals.gatewayFee += day.gatewayFee;
-  totals.cashIn = totals.grossRevenue + totals.merchantSettled;
-  totals.cashOut = totals.supplierCost + totals.affiliatePaidOut + totals.gatewayFee;
+  totals.cashIn = totals.paidCashIn + totals.merchantSettled;
+  totals.cashOut =
+    totals.supplierCost + totals.affiliatePaidOut + totals.gatewayFee + totals.refundPaidOut;
   totals.netCash = totals.cashIn - totals.cashOut;
 
   /*
@@ -554,6 +693,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
     "Transfer Merchant",
     "Pencairan Afiliasi",
     "Fee Gateway",
+    "Refund",
     "Uang Masuk",
     "Uang Keluar",
     "Selisih",
@@ -574,6 +714,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       day.merchantSettled,
       day.affiliatePaidOut,
       day.gatewayFee,
+      day.refundPaidOut,
       day.cashIn,
       day.cashOut,
       day.netCash,
@@ -594,6 +735,7 @@ export function cashFlowReportToCsv(report: CashFlowReport) {
       totals.merchantSettled,
       totals.affiliatePaidOut,
       totals.gatewayFee,
+      totals.refundPaidOut,
       totals.cashIn,
       totals.cashOut,
       totals.netCash,
