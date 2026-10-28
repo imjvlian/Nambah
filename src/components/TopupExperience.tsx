@@ -32,6 +32,8 @@ import {
   type PublicPricingResult,
 } from "@/lib/public-pricing";
 import { takeRetryPrefill } from "@/lib/order-retry";
+import { groupPaymentMethods } from "@/lib/payment-method-groups";
+import PaymentMethodIcon from "@/components/PaymentMethodIcon";
 import { BRAND } from "@/lib/brand";
 
 type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
@@ -415,7 +417,8 @@ export default function TopupExperience({
   const router = useRouter();
   const defaultGame = games[0]!;
   const defaultPackage = defaultGame.packages[3] ?? defaultGame.packages[0]!;
-  const defaultPayment = paymentMethods[0]!;
+  const defaultPayment =
+    paymentMethods.find((method) => method.id === "qris") ?? paymentMethods[0]!;
 
   const [query, setQuery] = useState("");
   const [selectedGameId, setSelectedGameId] = useState(defaultGame.id);
@@ -423,6 +426,26 @@ export default function TopupExperience({
   const promoSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [paymentId, setPaymentId] = useState(defaultPayment.id);
+  /*
+   * Grup metode pembayaran tertutup secara default (28 Okt 2026): user
+   * membuka grup yang ingin dilihat. `openGroups` menyimpan label grup yang
+   * sedang dibuka — awalnya kosong, jadi semua grup collapse.
+   */
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+
+  const isGroupOpen = (label: string) =>
+    openGroups.has(label) ||
+    groupPaymentMethods(paymentMethods).some(
+      (group) => group.label === label && group.methods.some(({ id }) => id === paymentId),
+    );
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
   const [userId, setUserId] = useState("");
   const [serverId, setServerId] = useState("");
   const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>({
@@ -2177,27 +2200,58 @@ export default function TopupExperience({
                   </small>
                 </div>
               </div>
-              <div className="payment-list">
-                {paymentMethods.map((method) => (
-                  <label
-                    className={`payment-option ${paymentId === method.id ? "active" : ""}`}
-                    key={method.id}
+              {/* Kartu per-kanal dalam grup (owner 28 Okt): QRIS, E-Wallet,
+                  Virtual Account — tiap kanal kartu kecil bericon logonya.
+                  Grup collapse secara default; user membuka grup yang ingin
+                  dilihat. Kanal aktif datang dari DB (migrasi 061);
+                  pengelompokan di sisi klien mengikuti konvensi id. */}
+              {groupPaymentMethods(paymentMethods).map((group) => (
+                <div className="payment-group" key={group.label}>
+                  <button
+                    type="button"
+                    className="payment-group-toggle"
+                    aria-expanded={isGroupOpen(group.label)}
+                    onClick={() => toggleGroup(group.label)}
                   >
-                    <input
-                      checked={paymentId === method.id}
-                      name="payment"
-                      type="radio"
-                      value={method.id}
-                      onChange={() => setPaymentId(method.id)}
-                    />
-                    <span className="radio-dot" />
-                    <span>
-                      <strong>{method.name}</strong>
-                      <small>{method.detail}</small>
+                    <span className="payment-group-label">{group.label}</span>
+                    <span className="payment-group-count">
+                      ({group.methods.length})
                     </span>
-                  </label>
-                ))}
-              </div>
+                    <span className="payment-group-chevron">
+                      {isGroupOpen(group.label) ? "▲" : "▼"}
+                    </span>
+                  </button>
+                  {isGroupOpen(group.label) && (
+                    <div className="payment-grid">
+                      {group.methods.map((method) => (
+                        <label
+                          className={`payment-card ${
+                            paymentId === method.id ? "active" : ""
+                          }`}
+                          key={method.id}
+                        >
+                          <input
+                            checked={paymentId === method.id}
+                            name="payment"
+                            type="radio"
+                            value={method.id}
+                            onChange={() => setPaymentId(method.id)}
+                          />
+                          <span className="payment-card-icon">
+                            <PaymentMethodIcon id={method.id} />
+                          </span>
+                          <span className="payment-card-name">
+                            {method.name}
+                          </span>
+                          <span className="payment-card-detail">
+                            {method.detail}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
 
               {isMerchantRetail ? (
                 <div className="merchant-picker form-block">

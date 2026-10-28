@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { groupPaymentMethods } from "@/lib/payment-method-groups";
 
 /**
  * Migrasi 061 (28 Okt 2026): metode pembayaran lengkap — kanal per-kanal
@@ -130,5 +131,99 @@ test("fallback statis katalog mencerminkan kanal aktif", () => {
   assert.ok(
     !catalog.includes('id: "ewallet"') && !catalog.includes('id: "va"'),
     "genus legacy tidak dipasang di fallback statis aktif",
+  );
+});
+
+test("grup kartu: QRIS / E-Wallet / Virtual Account, urut stabil", () => {
+  const groups = groupPaymentMethods([
+    { id: "bri_va" },
+    { id: "ovo" },
+    { id: "qris" },
+    { id: "gopay" },
+    { id: "echannel" },
+    { id: "permata_va" },
+  ]);
+
+  assert.deepEqual(
+    groups.map((group) => group.label),
+    ["QRIS", "E-Wallet", "Virtual Account"],
+  );
+  assert.deepEqual(
+    groups[2].methods.map((method) => method.id),
+    ["bri_va", "echannel", "permata_va"],
+    "urutan dalam grup mengikuti urutan DB (sort_order)",
+  );
+  // Kanal di luar konvensi tidak hilang.
+  assert.deepEqual(
+    groupPaymentMethods([{ id: "mandiri_qris" }])[0].label,
+    "Lainnya",
+  );
+});
+
+test("UI kartu grup: struktur payment-group/grid/card + icon per kanal", () => {
+  const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
+  const icon = readFileSync("src/components/PaymentMethodIcon.tsx", "utf8");
+
+  assert.ok(
+    ui.includes("groupPaymentMethods(paymentMethods)"),
+    "daftar DB dikelompokkan lewat helper",
+  );
+  assert.ok(
+    ui.includes('className="payment-group"') &&
+      ui.includes('className="payment-grid"') &&
+      ui.includes('className="payment-card'),
+    "grup > grid > kartu dirender di checkout",
+  );
+  assert.ok(
+    ui.includes("<PaymentMethodIcon id={method.id} />"),
+    "tiap kanal memuat icon logonya",
+  );
+  // Radio tetap: nilai & handler setPaymentId supaya pilihan ikut ke order.
+  assert.match(ui, /value=\{method\.id\}/);
+  assert.match(ui, /onChange=\{\(\) => setPaymentId\(method\.id\)\}/);
+
+  // Aset logo tiap kanal AKTIF terpasang di komponen ikon (path aset ada
+  // di LOGO_ASSETS); fallback chip tetap tersedia untuk kanal tanpa aset.
+  for (const [id, asset] of [
+    ["qris", "/product-assets/brands/qris.svg"],
+    ["gopay", "/product-assets/brands/go-pay.svg"],
+    ["shopeepay", "/product-assets/brands/shopee-pay.svg"],
+    ["dana", "/product-assets/brands/dana.svg"],
+    ["ovo", "/product-assets/brands/ovo.svg"],
+    ["bca_va", "/product-assets/brands/bca.png"],
+    ["bni_va", "/product-assets/brands/bni.svg"],
+    ["bri_va", "/product-assets/brands/bri.svg"],
+    ["permata_va", "/product-assets/brands/permata.svg"],
+    ["echannel", "/product-assets/brands/mandiri.svg"],
+  ] as const) {
+    assert.ok(
+      icon.includes(asset),
+      `entri ikon ${id} ada di LOGO_ASSETS`,
+    );
+    assert.ok(
+      readFileSync(`public${asset}`, "utf8").length > 0,
+      `aset ${asset} ada di repo`,
+    );
+  }
+});
+
+test("pilihan awal otomatis ke QRIS (default selection)", () => {
+  const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
+  assert.match(
+    ui,
+    /paymentMethods\.find\(\(method\) => method\.id === "qris"\)/,
+    "default pilihan disetel ke qris, tidak hanya barang pertama dalam array",
+  );
+});
+
+test("grup collapse secara default; state openGroups awal kosong", () => {
+  const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
+  assert.ok(
+    ui.includes("useState<Set<string>>(new Set())"),
+    "state grup terbuka dimulai kosong (semua grup collapse)",
+  );
+  assert.ok(
+    ui.includes("aria-expanded={isGroupOpen(group.label)}"),
+    "label grup berfungsi sebagai tombol toggle collapse",
   );
 });
