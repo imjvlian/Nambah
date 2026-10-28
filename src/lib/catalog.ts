@@ -184,6 +184,9 @@ export const games: Game[] = [
 
 // Fees stay zero in the MVP until the approved Midtrans merchant rate is known.
 // The pricing engine already separates customer fees from merchant costs.
+// Daftar ini fallback statis; mirror dari produksi baris `payment_methods`
+// yang aktif (migrasi 061). Fee gateway 100% diterjunkan ke pembeli oleh
+// Midtrans di halaman pembayaran - tidak dihitung di sini.
 export const paymentMethods: PaymentMethod[] = [
   {
     id: "qris",
@@ -195,18 +198,81 @@ export const paymentMethods: PaymentMethod[] = [
     merchantFeePercent: 0,
   },
   {
-    id: "ewallet",
-    name: "E-Wallet",
-    detail: "GoPay, DANA, ShopeePay dan lainnya",
+    id: "gopay",
+    name: "GoPay",
+    detail: "Konfirmasi di aplikasi Gojek/GoPay",
     customerFeeFlat: 0,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
   },
   {
-    id: "va",
-    name: "Virtual Account",
-    detail: "Transfer bank otomatis",
+    id: "shopeepay",
+    name: "ShopeePay",
+    detail: "Konfirmasi di aplikasi Shopee",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "dana",
+    name: "DANA",
+    detail: "Konfirmasi di aplikasi DANA",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "ovo",
+    name: "OVO",
+    detail: "Konfirmasi di aplikasi OVO",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "bca_va",
+    name: "VA BCA",
+    detail: "Transfer ke nomor Virtual Account BCA",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "bni_va",
+    name: "VA BNI",
+    detail: "Transfer ke nomor Virtual Account BNI",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "bri_va",
+    name: "VA BRI",
+    detail: "Transfer ke nomor Virtual Account BRI",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "permata_va",
+    name: "VA Permata",
+    detail: "Transfer ke nomor Virtual Account Permata",
+    customerFeeFlat: 0,
+    customerFeePercent: 0,
+    merchantFeeFlat: 0,
+    merchantFeePercent: 0,
+  },
+  {
+    id: "echannel",
+    name: "VA Mandiri",
+    detail: "Bayar via ATM/internet banking Mandiri (Mandiri Bill)",
     customerFeeFlat: 0,
     customerFeePercent: 0,
     merchantFeeFlat: 0,

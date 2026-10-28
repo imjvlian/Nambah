@@ -2171,8 +2171,9 @@ export default function TopupExperience({
                 <div>
                   <strong>Metode pembayaran</strong>
                   <small>
-                    Pilih metode yang paling nyaman. Pembayaran diverifikasi
-                    otomatis sebelum pesanan diproses.
+                    Pilih kanal yang Anda suka. Biaya layanan Midtrans
+                    ditambahkan di halaman pembayaran sesuai kanal yang
+                    dipilih; pesanan diverifikasi otomatis sebelum diproses.
                   </small>
                 </div>
               </div>
@@ -2304,14 +2305,11 @@ export default function TopupExperience({
                * tidak ada yang memberi tahu baris mana yang sudah termasuk di
                * total.
                *
-               * Sekarang hanya satu baris. Metode biasa: biaya payment gateway.
-               * Jalur ritel: biaya layanan toko. Keduanya sudah termasuk di
-               * `finalPrice`, jadi user tidak perlu menghitung apa pun.
-               *
-               * Label "Biaya layanan toko" dipakai, bukan "Biaya pembayaran",
-               * karena uang itu benar-benar masuk ke merchant - bukan ke Lacte.
-               * Menyebutnya "biaya pembayaran" akan membuat user mengira Lacte
-               * yang menerimanya.
+               * Sekarang hanya satu baris. Metode biasa: biaya layanan payment gateway -
+kini dinamai "Biaya layanan", bukan "Biaya pembayaran" (keputusan owner
+28 Okt 2026). Jalur ritel: "Biaya layanan toko". Fee Midtrans sendiri
+(Automatic Fee Imposition) ditambahkan di halaman pembayaran, bukan di
+total ini.
                */}
               {isMerchantRetail ? (
                 <div className="summary-line merchant-fee">
@@ -2323,7 +2321,7 @@ export default function TopupExperience({
                 </div>
               ) : (
                 <div className="summary-line">
-                  <span>Biaya pembayaran</span>
+                  <span>Biaya layanan</span>
                   <strong>
                     {pricing.customerPaymentFee === 0
                       ? "Rp0"
@@ -2659,7 +2657,7 @@ export default function TopupExperience({
                     </div>
                   )}
                   <div className="summary-line">
-                    <span>Biaya pembayaran</span>
+                    <span>Biaya layanan</span>
                     <strong>
                       {pricing.customerPaymentFee === 0
                         ? "Rp0"

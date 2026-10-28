@@ -1211,7 +1211,7 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                 </div>
               )}
               <div>
-                <span>Biaya pembayaran</span>
+                <span>Biaya layanan</span>
                 <strong>{formatIDR(pricing.customerPaymentFee)}</strong>
               </div>
             </div>

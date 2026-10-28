@@ -104,8 +104,20 @@ type GameAccountRow = {
   maintenance: boolean;
 };
 
+/*
+ * Pemetaan id `payment_methods` → kanal Midtrans yang diizinkan Snap.
+ *
+ * Baris kanal per-kanal (GoPay, VA BCA, dst. — migrasi 061) memakai id yang
+ * SAMA dengan kanal Midtrans, jadi jalurnya passthrough lewat fallback
+ * `[paymentMethod.id]` di bawah. Entri eksplisit di sini cuma untuk baris
+ * yang id-nya berbeda dari kanalnya:
+ *   - `qris`  → diizinkan `other_qris` (acquirer QRIS generik yang
+ *     dimanggung Midtrans).
+ *   - `ewallet`/`va` — genus legacy (non-aktif sejak migrasi 061); entri
+ *     tetap dipasang sebagai jaring pengaman order lama.
+ */
 const MIDTRANS_PAYMENT_MAP: Record<string, string[]> = {
-  qris: ["gopay", "shopeepay", "other_qris"],
+  qris: ["other_qris"],
   ewallet: ["gopay", "shopeepay", "dana", "ovo"],
   va: ["bank_transfer"],
 };
@@ -476,7 +488,12 @@ export async function POST(request: Request) {
       // Paylabs memetakan channel langsung di createPaymentSession (QRIS/VA/HTML5 fallback).
       enabledPayments = [];
     } else {
-      enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [];
+      enabledPayments = MIDTRANS_PAYMENT_MAP[paymentMethod.id] ?? [
+        // Kanal per-kanal (migrasi 061): id baris = id kanal Midtrans, jadi
+        // passthrough — satu kanal di `enabled_payments` membuat Snap
+        // langsung menampilkan flow metodanya tanpa halaman daftar.
+        paymentMethod.id,
+      ];
       if (!enabledPayments.length) {
         return Response.json(
           { error: "Metode pembayaran belum didukung Midtrans." },

@@ -117,8 +117,22 @@ insert into public.payment_methods (
   merchant_fee_flat, merchant_fee_percent, active, sort_order
 ) values
   ('qris', 'QRIS', 'Semua aplikasi pembayaran', 0, 0, 0, 0, true, 10),
-  ('ewallet', 'E-Wallet', 'GoPay, DANA, ShopeePay dan lainnya', 0, 0, 0, 0, true, 20),
-  ('va', 'Virtual Account', 'Transfer bank otomatis', 0, 0, 0, 0, true, 30)
+  ('gopay', 'GoPay', 'Konfirmasi di aplikasi Gojek/GoPay', 0, 0, 0, 0, true, 20),
+  ('shopeepay', 'ShopeePay', 'Konfirmasi di aplikasi Shopee', 0, 0, 0, 0, true, 30),
+  ('dana', 'DANA', 'Konfirmasi di aplikasi DANA', 0, 0, 0, 0, true, 40),
+  ('ovo', 'OVO', 'Konfirmasi di aplikasi OVO', 0, 0, 0, 0, true, 50),
+  ('bca_va', 'VA BCA', 'Transfer ke nomor Virtual Account BCA', 0, 0, 0, 0, true, 60),
+  ('bni_va', 'VA BNI', 'Transfer ke nomor Virtual Account BNI', 0, 0, 0, 0, true, 70),
+  ('bri_va', 'VA BRI', 'Transfer ke nomor Virtual Account BRI', 0, 0, 0, 0, true, 80),
+  ('permata_va', 'VA Permata', 'Transfer ke nomor Virtual Account Permata', 0, 0, 0, 0, true, 90),
+  ('echannel', 'VA Mandiri', 'Bayar via ATM/internet banking Mandiri (Mandiri Bill)', 0, 0, 0, 0, true, 100),
+  ('indomaret', 'Indomaret', 'Bayar di kasir Indomaret', 0, 0, 0, 0, false, 110),
+  ('alfamart', 'Alfamart', 'Bayar di kasir Alfamart', 0, 0, 0, 0, false, 120),
+  ('credit_card', 'Kartu Kredit/Debit', 'Visa, Mastercard, JCB', 0, 0, 0, 0, false, 130),
+  -- Legasi: genus lama digantikan kanal per-kanal. Id dipertahankan karena
+  -- order historis menunjuk mereka; non-aktif di checkout.
+  ('ewallet', 'E-Wallet', 'GoPay, DANA, ShopeePay dan lainnya', 0, 0, 0, 0, false, 900),
+  ('va', 'Virtual Account', 'Transfer bank otomatis', 0, 0, 0, 0, false, 910)
 on conflict (id) do update set
   name = excluded.name,
   detail = excluded.detail,
