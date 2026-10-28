@@ -1042,7 +1042,7 @@
 .order-summary-ad-code button {
   border: 1px solid var(--line);
   background: transparent;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 4px 12px;
   cursor: pointer;
   font-size: 0.78rem;
@@ -1058,7 +1058,7 @@
   align-self: flex-start;
   border: 1px solid var(--line);
   background: transparent;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 6px 14px;
   cursor: pointer;
   font-size: 0.82rem;
