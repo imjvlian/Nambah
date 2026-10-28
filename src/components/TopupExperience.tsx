@@ -2214,11 +2214,21 @@ export default function TopupExperience({
                     onClick={() => toggleGroup(group.label)}
                   >
                     <span className="payment-group-label">{group.label}</span>
-                    <span className="payment-group-count">
-                      ({group.methods.length})
-                    </span>
                     <span className="payment-group-chevron">
-                      {isGroupOpen(group.label) ? "▲" : "▼"}
+                      <svg
+                        viewBox="0 0 10 6"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M1 1l4 4 4-4"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
                     </span>
                   </button>
                   {isGroupOpen(group.label) && (
@@ -2250,6 +2260,7 @@ export default function TopupExperience({
                       ))}
                     </div>
                   )}
+                  <span className="payment-group-divider" />
                 </div>
               ))}
 
