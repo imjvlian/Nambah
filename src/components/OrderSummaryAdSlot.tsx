@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import CopyButton from "@/components/CopyButton";
-import type { PublicPromotion } from "@/lib/public-promotions";
+import { useEffect, useRef } from "react";
 
 /**
- * Slot iklan kecil di order summary (P4.5) — versi house-ad (opsi B
+ * Slot iklan kecil di order summary (P4.5) — unit Google AdSense (opsi A
  * di plan order-summary-ad-slot.md).
  *
  * Aturan yang ditegakkan komponen ini (dari plan):
@@ -16,67 +14,57 @@ import type { PublicPromotion } from "@/lib/public-promotions";
  *   - tidak menutupi Order ID, SN, total, atau tombol aksi — letaknya
  *     paling bawah sticky card, di bawah rating form.
  *
- * ISI slot untuk sekarang: promo internal yang sedang jalan (ambil
- * yang pertama dari daftar aktif) — konten yang benar-benar berguna,
- * bukan filler. Tanpa promo aktif, slot TIDAK dirender: banner kosong
- * mengganggu dan tidak menghasilkan apa-apa.
+ * Sumber nilainya env yang dibaca saat build (lihat .env.local):
+ *   NEXT_PUBLIC_ADSENSE_CLIENT             ca-pub-... (wajib)
+ *   NEXT_PUBLIC_ADSENSE_SLOT_ORDER_SUMMARY id ad unit angka (wajib agar
+ *                                          unit dirender)
+ * Kalau salah satu kosong, slot TIDAK dirender: meminta iklan ke Google
+ * dengan client/slot kosong hanya menghasilkan error di console dan kotak
+ * kosong bagi pelanggan.
  *
- * SEAM ADSENSE: kalau akun AdSense sudah siap, isi JSX di bawah (antara
- * penanda SEAM) diganti unit `order-summary-small` + ads.txt + CSP
- * domain Google (lihat plan §6 opsi A). Pemanggil dan aturan status
- * tidak berubah.
+ * Loader script-nya <AdSenseScript /> yang dipasang root layout dengan
+ * nonce per-request — CSP production memakai 'strict-dynamic'
+ * (lihat src/lib/csp.ts).
  */
+
+declare global {
+  interface Window {
+    adsbygoogle?: Record<string, unknown>[];
+  }
+}
+
 export default function OrderSummaryAdSlot() {
-  const [promo, setPromo] = useState<PublicPromotion | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const pushed = useRef(false);
 
   useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const response = await fetch("/api/promo", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          promotions?: PublicPromotion[];
-        };
-        if (!active) return;
-        // Slot satu promosi: yang pertama dari daftar sudah cukup —
-        // daftar lengkap ada di halaman /promo.
-        setPromo(data.promotions?.[0] ?? null);
-      } catch {
-        // Iklan bersifat opsional; kegagalan jaringan bukan masalah
-        // yang perlu diperlihatkan ke pelanggan yang baru selesai bayar.
-      } finally {
-        if (active) setLoaded(true);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+    // Loader AdSense dimuat async — sebelum ia hidup, push dari komponen
+    // ini masuk ke antrean window.adsbygoogle dan diproses begitu loader
+    // siap; setelah itu push baru dirender langsung. Ref menjaga React
+    // StrictMode (dev) tidak melakukan push dobel ke <ins> yang sama.
+    if (pushed.current) return;
+    pushed.current = true;
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch {
+      // Iklan bersifat opsional; kegagalan loader bukan sesuatu yang
+      // perlu dipermasalahkan ke pelanggan yang baru selesai bayar.
+    }
   }, []);
 
-  if (!loaded || !promo) return null;
+  const adClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+  const adSlot = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ORDER_SUMMARY;
+  if (!adClient || !adSlot) return null;
 
   return (
-    <div className="order-summary-ad" aria-label="Promo untuk Anda">
-      {/* ── SEAM ADSENSE: mulai isi house-ad ─────────────────────────── */}
-      <small>Promo berikutnya</small>
-      <div className="order-summary-ad-body">
-        <div>
-          <strong>{promo.benefitText}</strong>
-          <span>
-            {promo.name} ·{" "}
-            <a href="/promo" className="order-summary-ad-link">
-              lihat semua promo
-            </a>
-          </span>
-        </div>
-        <span className="order-summary-ad-code">
-          <code>{promo.code}</code>
-          <CopyButton value={promo.code} label="Salin" copiedLabel="Tersalin" />
-        </span>
-      </div>
-      {/* ── SEAM ADSENSE: selesai isi house-ad ────────────────────────── */}
+    <div className="order-summary-ad" aria-label="Iklan">
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block", width: "100%" }}
+        data-ad-client={adClient}
+        data-ad-slot={adSlot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
     </div>
   );
 }

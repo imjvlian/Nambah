@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import AdSenseScript from "@/components/AdSenseScript";
 import ChatWidget from "@/components/ChatWidget";
 import { BRAND, siteUrl } from "@/lib/brand";
 import "./globals.css";
@@ -163,6 +164,7 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body>
+        <AdSenseScript />
         {children}
         <ChatWidget />
       </body>

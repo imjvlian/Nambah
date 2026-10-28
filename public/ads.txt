@@ -1,0 +1,5 @@
+# Authorized Digital Sellers (ADS.txt) - IAB standard.
+# Menyatakan pihak yang berwenang menjual inventaris iklan nambah.my.id.
+# Saat AdSense meninjau situs, baris ini WAJIB ada di root domain:
+# https://nambah.my.id/ads.txt
+google.com, pub-8909235410345672, DIRECT, f08c47fec0942fa0

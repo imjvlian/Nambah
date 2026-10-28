@@ -23,7 +23,7 @@ export default function PrivacyPage() {
     <LegalShell
       eyebrow="Dokumen legal"
       title="Kebijakan Privasi"
-      updated="6 Oktober 2026"
+      updated="28 Oktober 2026"
     >
       <section>
         <p>
@@ -100,6 +100,14 @@ export default function PrivacyPage() {
             dan notifikasi yang memproses data atas instruksi kami.
           </li>
           <li>
+            <strong>Google AdSense</strong> — kami menampilkan iklan yang
+            disajikan oleh Google di sebagian halaman situs. Saat iklan dimuat,
+            Google dapat memasang cookie atau identifier serupa di peramban
+            untuk menyajikan iklan dan mengukur kinerjanya. Kamu dapat mengatur
+            preferensi iklan Google melalui{" "}
+            <a href="https://adssettings.google.com">adssettings.google.com</a>.
+          </li>
+          <li>
             <strong>Otoritas hukum</strong> — bila diwajibkan oleh peraturan yang
             berlaku.
           </li>
@@ -128,9 +136,12 @@ export default function PrivacyPage() {
       <section>
         <h2>6. Cookie</h2>
         <p>
-          Kami menggunakan cookie sesi yang diperlukan untuk login dan keamanan
-          akun (cookie esensial). Kami tidak menggunakan cookie pelacak iklan
-          pihak ketiga.
+          Kami menggunakan cookie esensial: sesi login dan keamanan akun.
+          Halaman yang menampilkan iklan AdSense juga membawa cookie dari
+          Google, yang dipakai Google untuk menyajikan iklan dan mengukur
+          kinerjanya. Kamu dapat meninjau atau mengubah preferensi iklan
+          personal melalui{" "}
+          <a href="https://adssettings.google.com">adssettings.google.com</a>.
         </p>
       </section>
 

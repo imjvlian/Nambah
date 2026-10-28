@@ -3,8 +3,9 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 /**
- * P4.5 (24 Okt 2026): slot promosi kecil di order summary — versi
- * house-ad. Desain lengkap: plan order-summary-ad-slot.md.
+ * P4.5 (28 Okt 2026): slot iklan kecil di order summary — kini unit
+ * Google AdSense nyata (sebelumnya house-ad promo internal; swap nomor
+ * SEAM didokumenkasih di plan order-summary-ad-slot.md §6).
  *
  * Yang dijaga test ini: aturan plan ditegakkan di kode, bukan cuma
  * tertulis. Slot yang melanggar batasan (popup, menutupi tombol, muncul
@@ -62,39 +63,47 @@ test("rating form: textarea terbuka hanya setelah bintang diklik", () => {
   );
 });
 
-test("house-ad: konten nyata, senyap saat tidak ada promo, seam AdSense jelas", () => {
+test("adsense: unit env-gated, loader ber-nonce, ads.txt terpasang", () => {
   const slot = readFileSync("src/components/OrderSummaryAdSlot.tsx", "utf8");
-  const api = readFileSync("src/app/api/promo/route.ts", "utf8");
+  const loader = readFileSync("src/components/AdSenseScript.tsx", "utf8");
+  const layout = readFileSync("src/app/layout.tsx", "utf8");
+  const adsTxt = readFileSync("public/ads.txt", "utf8");
 
-  // Sumber data: endpoint publik yang sama dengan halaman /promo.
-  assert.ok(slot.includes('fetch("/api/promo"'), "slot mengambil dari /api/promo");
+  // Slot tidak dirender kecuali env lengkap — request iklan dengan
+  // client/slot kosong hanya menghasilkan error di console pelanggan.
   assert.ok(
-    api.includes("getActivePromotions()"),
-    "endpoint memakai lib yang sama dengan halaman /promo",
+    slot.includes("if (!adClient || !adSlot) return null;"),
+    "senyap tanpa env AdSense lengkap",
+  );
+  assert.ok(
+    slot.includes("data-ad-client={adClient}") &&
+      slot.includes("data-ad-slot={adSlot}"),
+    "unit mengambil client/slot dari env",
   );
 
-  // Tanpa promo aktif, slot TIDAK dirender — banner kosong = gangguan.
+  // Loader: satu script di root layout, env-gated, ber-nonce (CSP
+  // production 'strict-dynamic' mengabaikan allowlist host — lihat
+  // tests/csp.test.ts).
   assert.ok(
-    slot.includes("if (!loaded || !promo) return null;"),
-    "senyap saat tidak ada promo",
+    loader.includes("NEXT_PUBLIC_ADSENSE_CLIENT"),
+    "loader env-gated",
+  );
+  assert.ok(
+    loader.includes('headers()).get("x-nonce"'),
+    "nonce diambil dari header x-nonce middleware",
+  );
+  assert.ok(loader.includes("nonce="), "script dimuat dengan nonce");
+  assert.ok(
+    layout.includes("<AdSenseScript />"),
+    "loader dipasang sekali di root layout",
   );
 
-  // Konten house-ad: promo pertama + kode salin + link daftar lengkap.
-  assert.ok(slot.includes("CopyButton"), "kode bisa disalin langsung");
-  assert.ok(slot.includes('href="/promo"'), "tautan ke daftar promo");
-
-  // Seam AdSense ditandai eksplisit supaya swap-nya kelak tidak
-  // menyentuh aturan status/gate di pemanggil.
+  // ads.txt di root domain — syarat peninjauan AdSense.
   assert.ok(
-    slot.includes("SEAM ADSENSE"),
-    "penanda seam AdSense harus ada",
-  );
-
-  // Kegagalan fetch promo senyap — pelanggan yang baru selesai bayar
-  // tidak perlu tahu banner gagal dimuat.
-  assert.ok(
-    slot.includes("} catch {"),
-    "galat fetch ditelan dengan sadar (banner opsional)",
+    adsTxt.includes(
+      "google.com, pub-8909235410345672, DIRECT, f08c47fec0942fa0",
+    ),
+    "baris authorized seller AdSense ada di ads.txt",
   );
 });
 

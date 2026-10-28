@@ -962,7 +962,7 @@
 }
 
 /*
- * Slot promosi kecil di order summary (P4.5).
+ * Slot iklan kecil di order summary (P4.5) — unit Google AdSense.
  *
  * Batasan dari plan order-summary-ad-slot.md: kecil dan rapi, tidak
  * popup, tidak interstitial, tidak menutupi Order ID/SN/total/tombol.
@@ -985,72 +985,11 @@
   gap: 8px;
 }
 
-.order-summary-ad > small {
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.order-summary-ad-body {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.order-summary-ad-body strong {
+/* Unit AdSense mengisi penuh lebar kartu; tinggi rendernya ditentukan
+   Google, dan container di atas melipatnya ke maksimum 120px. */
+.order-summary-ad .adsbygoogle {
   display: block;
-  font-size: 0.95rem;
-  margin-bottom: 2px;
-  color: var(--text);
-}
-
-.order-summary-ad-body span {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.order-summary-ad-link {
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.order-summary-ad-link:hover {
-  text-decoration: underline;
-}
-
-.order-summary-ad-code {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.order-summary-ad-code code {
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border: 1px dashed var(--muted);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--brand);
-}
-
-.order-summary-ad-code button {
-  border: 1px solid var(--line);
-  background: transparent;
-  border-radius: 8px;
-  padding: 4px 12px;
-  cursor: pointer;
-  font-size: 0.78rem;
-  color: var(--text);
-}
-
-.order-summary-ad-code button:hover {
-  background: var(--surface-2);
+  width: 100%;
 }
 
 /* Tombol buka form ulasan (tampil ringkas setelah ulasan terkirim). */
