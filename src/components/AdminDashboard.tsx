@@ -236,6 +236,8 @@ type AdminRefundRow = {
   processedBy: string | null;
   requestNote: string | null;
   completedNote: string | null;
+  /** Pesan error terakhir dari gateway — terisi saat baris berstatus failed. */
+  providerResponse: { error?: string } | null;
   requestedAt: string | null;
   processedAt: string | null;
   createdAt: string;
@@ -5191,6 +5193,12 @@ const txDataStamp = txRange.preset
                         {refund.completedNote && (
                           <small>Selesai: {refund.completedNote}</small>
                         )}
+                        {refund.status === "failed" &&
+                          refund.providerResponse?.error && (
+                            <small className="acc-error-text">
+                              Gagal: {refund.providerResponse.error}
+                            </small>
+                          )}
                       </div>
                       <div className="acc-refund-actions">
                         {!isTerminal && (

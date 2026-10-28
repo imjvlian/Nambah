@@ -27,6 +27,7 @@ type RefundRow = {
   processed_by_admin_user_id: string | null;
   request_note: string | null;
   completed_note: string | null;
+  provider_response: Record<string, unknown> | null;
   requested_at: string | null;
   processed_at: string | null;
   created_at: string;
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
 
   try {
     const rows = await supabaseSelect<RefundRow>("refunds", {
-      select: "id,order_id,provider,provider_refund_id,amount,reason,status,requested_by_admin_user_id,processed_by_admin_user_id,request_note,completed_note,requested_at,processed_at,created_at,updated_at",
+      select: "id,order_id,provider,provider_refund_id,amount,reason,status,requested_by_admin_user_id,processed_by_admin_user_id,request_note,completed_note,provider_response,requested_at,processed_at,created_at,updated_at",
       order: "created_at.desc",
       limit: 100,
     });
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
         processedBy: row.processed_by_admin_user_id,
         requestNote: row.request_note,
         completedNote: row.completed_note,
+        providerResponse: row.provider_response,
         requestedAt: row.requested_at,
         processedAt: row.processed_at,
         createdAt: row.created_at,

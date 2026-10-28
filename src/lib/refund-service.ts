@@ -441,12 +441,24 @@ export async function processRefundForOrder(orderId: string) {
       throw new Error("Refund provider ini harus dikonfirmasi manual.");
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Refund gagal diproses.";
+    const rawMessage =
+      error instanceof Error ? error.message : "Refund gagal diproses.";
+    /*
+     * Pesan MENTAH tetap tersimpan di provider_response — bukti audit
+     * apa yang gateway bilang persis. Yang pulang ke operator
+     * diterjemahkan supaya instruksi pemulihannya tegas, bukan teks
+     * teknis Inggris; kasus 414 "merchant insufficient funds" berarti
+     * saldo akun merchant di Midtrans belum ada uang. Penyembuhannya
+     * di dashboard Midtrans (isi saldo), bukan di tombol ini.
+     */
+    const message = /insufficient funds/i.test(rawMessage)
+      ? "Refund ditolak Midtrans: saldo merchant tidak cukup. Isi saldo akun Midtrans, lalu tekan Proses lagi."
+      : rawMessage;
     await supabaseUpdate(
       "refunds",
       {
         status: "failed",
-        provider_response: { error: message.slice(0, 1000) },
+        provider_response: { error: rawMessage.slice(0, 1000) },
         updated_at: new Date().toISOString(),
       },
       { filters: { order_id: `eq.${orderId}`, status: "eq.processing" } },
