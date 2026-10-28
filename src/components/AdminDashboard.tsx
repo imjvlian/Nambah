@@ -5116,6 +5116,7 @@ const txDataStamp = txRange.preset
                 copy="Pengembalian dana yang diajukan pelanggan atau admin. Proses uang keluar hanya dengan pastikan dana sudah benar-benar keluar di dashboard gateway."
                 action={
                   <button
+                    className="acc-primary-link"
                     type="button"
                     disabled={Boolean(busy)}
                     onClick={() =>
@@ -5196,6 +5197,7 @@ const txDataStamp = txRange.preset
                           <>
                             <button
                               type="button"
+                              className="acc-btn"
                               disabled={Boolean(busy) || !isAdmin}
                               title={
                                 !isAdmin
@@ -5213,6 +5215,7 @@ const txDataStamp = txRange.preset
                             </button>
                             <button
                               type="button"
+                              className="acc-btn-danger"
                               disabled={Boolean(busy) || !isAdmin}
                               title={
                                 !isAdmin
@@ -5233,6 +5236,7 @@ const txDataStamp = txRange.preset
                         {refund.status === "processing" && (
                           <button
                             type="button"
+                            className="acc-btn"
                             disabled={Boolean(busy) || !isAdmin}
                             onClick={() =>
                               void refundAdminAction(

@@ -1144,7 +1144,8 @@
 }
 
 .acc-status.success,
-.acc-status.receipt-sent {
+.acc-status.receipt-sent,
+.acc-status.completed {
   border-color: rgba(201,255,63,.2);
   background: rgba(201,255,63,.05);
   color: var(--lime);
@@ -1159,9 +1160,24 @@
 
 .acc-status.failed,
 .acc-status.receipt-failed,
-.acc-status.cancelled {
+.acc-status.cancelled,
+.acc-status.rejected {
   border-color: rgba(231,106,106,.25);
   color: #e0aaaa;
+}
+
+/*
+ * Status refund di seksi Refund.
+ *
+ * `requested` memakai biru yang sama dengan `processing`: menunggu
+ * keputusan bukan kegagalan - tanpa rule ini antrean permintaan pelanggan
+ * tampil abu semua dan satu-satunya pembeda adalah membaca teksnya.
+ * `completed` masuk keluarga hijau di atas, karena uang memang sudah
+ * kembali ke pelanggan.
+ */
+.acc-status.requested {
+  border-color: rgba(111,156,255,.2);
+  color: #adc4f1;
 }
 
 /* Aktif / nonaktif.
