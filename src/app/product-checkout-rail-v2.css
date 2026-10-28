@@ -124,7 +124,7 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--lime);
+    color: #fff;
   }
 
   .product-page .order-card > .form-block:has(.payment-grid) .payment-grid {
@@ -303,7 +303,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: #fff;
 }
 
 .payment-grid {
@@ -376,7 +376,7 @@
 
 .payment-card-detail {
   overflow: hidden;
-  color: var(--lime);
+  color: #fff;
   font-size: 10px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -440,7 +440,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--lime);
+  color: #fff;
 }
 
 /* Grup setelah grup pertama — kurangi sedikit padding atas */
