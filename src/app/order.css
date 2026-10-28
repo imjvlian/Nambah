@@ -659,6 +659,29 @@
   color: #c6ccc2;
 }
 
+/*
+ * Tombol salin Serial Number (P4.5 penyempurnaan 28 Okt): pill ringkas
+ * dengan aksen lime — konsisten dengan chip kode di slot promo. Versi
+ * teks-link yang lama menempel langsung ke nomor SN (padding 4px) dan
+ * sulit disentuh di layar kecil.
+ */
+.order-sn-copy {
+  margin-left: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  vertical-align: middle;
+}
+
+.order-sn-copy:hover {
+  background: var(--surface-2);
+}
+
 .order-empty-card {
   max-width: 720px;
   margin: 40px auto 0;
@@ -954,7 +977,9 @@
   margin-top: 14px;
   overflow: hidden;
   border-top: 1px solid var(--line);
-  padding: 12px 16px 0;
+  /* Padding bawah memberi jarak ke deretan tombol aksi di bawahnya
+     ("Top up lagi") — tanpa ini slot menempel ke tombol. */
+  padding: 12px 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;

@@ -1159,9 +1159,14 @@ export default function OrderStatusView({ orderId }: { orderId: string }) {
                   <dt>Serial Number (SN)</dt>
                   <dd>
                     {serialNumber}{" "}
+                    {/*
+                     * Tombol salin SN: pill dengan jarak tegas dari nomor SN
+                     * (margin-left), bukan teks-link yang menempel — versi
+                     * teks terlalu mepet untuk disentuh di layar kecil.
+                     */}
                     <button
                       type="button"
-                      className="order-secondary-link"
+                      className="order-sn-copy"
                       onClick={() => void copySerialNumber()}
                     >
                       Salin
