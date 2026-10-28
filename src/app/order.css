@@ -660,16 +660,16 @@
 }
 
 /*
- * Tombol salin Serial Number (P4.5 penyempurnaan 28 Okt): pill ringkas
- * dengan aksen lime — konsisten dengan chip kode di slot promo. Versi
- * teks-link yang lama menempel langsung ke nomor SN (padding 4px) dan
- * sulit disentuh di layar kecil.
+ * Tombol salin Serial Number (P4.5 penyempurnaan 28 Okt): persegi
+ * bersudut membulat 8px dengan aksen lime — konsisten dengan chip kode
+ * di slot promo. Versi teks-link yang lama menempel langsung ke nomor
+ * SN (padding 4px) dan sulit disentuh di layar kecil.
  */
 .order-sn-copy {
   margin-left: 8px;
   border: 1px solid var(--line);
   background: transparent;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 4px 12px;
   cursor: pointer;
   font-size: 12px;
