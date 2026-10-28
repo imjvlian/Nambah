@@ -13,6 +13,21 @@ const API_URLS = {
 
 export type MidtransEnvironment = "sandbox" | "production";
 
+/**
+ * Hanya muncul saat fitur "Automatic Fee Imposition" aktif (dashboard
+ * Midtrans: biaya layanan 100% diterjunkan ke pembeli). Semantiknya,
+ * sesuai contoh resmi docs.midtrans.com/docs/snap-advanced-feature:
+ * QRIS Rp100.000 + MDR 0,7% → pembeli bayar Rp100.705 dan
+ * `customer_imposed_payment_fee` = Rp705. Nilai `gross_amount` top-level
+ * di payload = yang DIBAYAR pembeli (nilai order + fee), sementara
+ * settlement ke merchant tetap `original_amount`.
+ */
+export type MidtransGrossAmountInfo = {
+  original_amount?: string;
+  gross_amount?: number | string;
+  customer_imposed_payment_fee?: string;
+};
+
 export type MidtransStatusPayload = {
   order_id?: string;
   transaction_id?: string;
@@ -25,6 +40,9 @@ export type MidtransStatusPayload = {
   signature_key?: string;
   settlement_time?: string;
   transaction_time?: string;
+  extra_info?: {
+    gross_amount_info?: MidtransGrossAmountInfo;
+  };
   [key: string]: unknown;
 };
 

@@ -429,13 +429,59 @@ export async function applyMidtransStatus(
     );
   }
 
+  /*
+   * INVARIANT UANG — nilai dibayar vs nilai order.
+   *
+   * `gross_amount` = yang DIBAYAR pembeli di halaman Midtrans. Dengan fitur
+   * "Automatic Fee Imposition" (dashboard Midtrans: biaya layanan 100%
+   * diterjunkan ke pembeli) fee ditambahkan DI ATAS nilai order, jadi
+   * gross_amount bisa LEBIH BESAR dari final_price:
+   *
+   *   QRIS Rp100.000 + MDR 0,7% → pembeli bayar Rp100.705;
+   *   settlement ke merchant tetap Rp100.000 (= final_price).
+   *
+   * Aturannya:
+   *   - gross < final_price → TOLAK, fail-closed: pembayaran yang lebih
+   *     kecil dari nilai order tidak boleh menandai order dibayar;
+   *   - gross > final_price → sah sebagai fee pembeli. Ketika payload
+   *     membawa `extra_info.gross_amount_info`, selisih ini WAJIB sama
+   *     persis dengan `customer_imposed_payment_fee` yang Midtrans
+   *     umumkan (cek anti-tamper); bila info itu tidak ada, selisih
+   *     tetap diterima — catatan mentah sudah tersimpan per event di
+   *     `midtrans_payment_events` (gross memuat fee).
+   *
+   * Dulu invariant ini tegas `===` — dengan fee-imposition, notifikasi
+   * untuk SEMUA order yang kena fee ditolak di sini: pembayaran masuk
+   * tapi order tidak pernah menjadi paid. Itulah sebabnya aturan berubah.
+   */
   const grossAmount = Number(payload.gross_amount);
-  if (
-    !Number.isFinite(grossAmount) ||
-    Math.round(grossAmount) !== Number(order.final_price)
-  ) {
+  if (!Number.isFinite(grossAmount)) {
     throw new Error(
-      `Gross amount Midtrans tidak cocok untuk order ${orderId}.`,
+      `Gross amount Midtrans tidak valid untuk order ${orderId}.`,
+    );
+  }
+
+  const finalPrice = Number(order.final_price);
+  const buyerFee = Math.round(grossAmount) - finalPrice;
+  if (buyerFee < 0) {
+    throw new Error(
+      `Gross amount Midtrans kurang dari nilai order ${orderId}.`,
+    );
+  }
+
+  const feeInfo = payload.extra_info?.gross_amount_info;
+  if (feeInfo?.customer_imposed_payment_fee != null) {
+    const declaredFee = Number(feeInfo.customer_imposed_payment_fee);
+    if (Number.isFinite(declaredFee) && Math.round(declaredFee) !== buyerFee) {
+      throw new Error(
+        `Fee pembeli Midtrans tidak cocok untuk order ${orderId}: selisih gross=${buyerFee}, diumumkan=${Math.round(declaredFee)}.`,
+      );
+    }
+  }
+
+  if (buyerFee > 0) {
+    console.log(
+      `[midtrans] fee diterjunkan ke pembeli: order=${orderId} gross=${grossAmount} nilai=${finalPrice} fee=${buyerFee} metode=${payload.payment_type ?? "?"}`,
     );
   }
 
