@@ -2260,7 +2260,6 @@ export default function TopupExperience({
                       ))}
                     </div>
                   )}
-                  <span className="payment-group-divider" />
                 </div>
               ))}
 

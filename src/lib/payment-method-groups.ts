@@ -29,12 +29,27 @@ const GROUP_ORDER: PaymentGroupLabel[] = [
 const EWALLET_IDS = new Set(["gopay", "shopeepay", "dana", "ovo"]);
 const RETAIL_IDS = new Set(["indomaret", "alfamart"]);
 
+/*
+ * Baris genus legacy (migrasi 061 menonaktifkannya, tapi DB belum tentu
+ * sudah di-migrasi) dipetakan ke grup yang wajar:
+ *   - `ewallet` → E-Wallet
+ *   - `va`      → Virtual Account
+ * Tanpa ini, keduanya jatuh ke grup "Lainnya" dan user melihat bucket
+ * generik di checkout padahal isinya jelas e-wallet / virtual account.
+ */
+const LEGACY_GROUP_BY_ID: Record<string, PaymentGroupLabel> = {
+  ewallet: "E-Wallet",
+  va: "Virtual Account",
+};
+
 export function paymentGroupOf(id: string): PaymentGroupLabel {
   if (!id) return "Lainnya";
   if (id === "qris") return "QRIS";
   if (EWALLET_IDS.has(id)) return "E-Wallet";
   if (id.endsWith("_va") || id === "echannel") return "Virtual Account";
   if (RETAIL_IDS.has(id)) return "Minimarket";
+  const legacy = LEGACY_GROUP_BY_ID[id];
+  if (legacy) return legacy;
   return "Lainnya";
 }
 
