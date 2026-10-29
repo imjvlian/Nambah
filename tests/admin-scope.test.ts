@@ -283,6 +283,7 @@ test("role admin BOLEH empat grup yang sudah dipetakan", () => {
     "/api/admin/affiliate-requests",
     "/api/admin/affiliates/link",
     "/api/admin/banners",
+    "/api/admin/payment-methods",
   ];
 
   for (const path of boleh) {
@@ -326,6 +327,7 @@ test("SETIAP halaman terpisah punya scope", () => {
     "/admin/melostore-mapping",
     "/admin/banners",
     "/admin/affiliates",
+    "/admin/payment-methods",
   ]) {
     assert.ok(isAdminScope(TOOL_SCOPE[href]), `halaman ${href} tidak punya scope`);
   }

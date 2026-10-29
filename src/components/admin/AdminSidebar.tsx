@@ -355,6 +355,13 @@ export const ADMIN_TOOLS: Array<{
     Icon: IconAffiliates,
   },
   {
+    href: "/admin/payment-methods",
+    label: "Biaya Layanan",
+    hint: "Setel biaya layanan per metode pembayaran",
+    group: "Keuangan",
+    Icon: IconFinance,
+  },
+  {
     href: "/admin/operations",
     label: "Operations Center",
     hint: "Kesehatan seluruh layanan",

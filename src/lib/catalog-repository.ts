@@ -44,6 +44,10 @@ type PaymentMethodRow = {
   id: string;
   name: string;
   detail: string;
+  customer_fee_flat: number | string;
+  customer_fee_percent: number | string;
+  merchant_fee_flat: number | string;
+  merchant_fee_percent: number | string;
   sort_order: number;
 };
 
@@ -52,7 +56,10 @@ type OrderPopularityRow = {
 };
 
 export type ProductGroup = "hemat" | "populer" | "langganan" | "promo";
-export type PublicPaymentMethod = Pick<PaymentMethod, "id" | "name" | "detail">;
+export type PublicPaymentMethod = Pick<
+  PaymentMethod,
+  "id" | "name" | "detail" | "customerFeeFlat" | "customerFeePercent"
+>;
 
 export type PublicCatalogResult = {
   games: Game[];
@@ -186,10 +193,12 @@ function getStaticCatalog(): PublicCatalogResult {
   const popularity = new Map<string, number>();
   return {
     games: staticGames.map((game) => withGameIcon(enrichGame(game, popularity))),
-    paymentMethods: staticPaymentMethods.map(({ id, name, detail }) => ({
-      id,
-      name,
-      detail,
+    paymentMethods: staticPaymentMethods.map((method) => ({
+      id: method.id,
+      name: method.name,
+      detail: method.detail,
+      customerFeeFlat: method.customerFeeFlat,
+      customerFeePercent: method.customerFeePercent,
     })),
     source: "static",
   };
@@ -260,7 +269,7 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
         order: "sort_order.asc",
       }),
       supabaseSelect<PaymentMethodRow>("payment_methods", {
-        select: "id,name,detail,sort_order",
+        select: "id,name,detail,customer_fee_flat,customer_fee_percent,merchant_fee_flat,merchant_fee_percent,sort_order",
         filters: { active: "eq.true" },
         order: "sort_order.asc",
       }),
@@ -389,6 +398,8 @@ export async function getPublicCatalog(): Promise<PublicCatalogResult> {
     id: method.id,
     name: method.name,
     detail: method.detail,
+    customerFeeFlat: Number(method.customer_fee_flat ?? 0),
+    customerFeePercent: Number(method.customer_fee_percent ?? 0),
   }));
 
   if (games.length === 0 || paymentMethods.length === 0) {

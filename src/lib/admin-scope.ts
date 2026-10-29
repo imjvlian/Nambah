@@ -150,6 +150,7 @@ export const TOOL_SCOPE: Record<string, AdminScope> = {
   "/admin/melostore-mapping": "katalog",
   "/admin/banners": "pertumbuhan",
   "/admin/affiliates": "keuangan",
+  "/admin/payment-methods": "keuangan",
 };
 
 /**
@@ -237,6 +238,9 @@ export const ROUTE_SCOPE: ReadonlyArray<readonly [string, AdminScope]> = [
   ["/api/admin/affiliate-requests", "pertumbuhan"],
   ["/api/admin/affiliates/link", "pertumbuhan"],
   ["/api/admin/banners", "pertumbuhan"],
+
+  // -- Keuangan (lanjutan) ------------------------------------------------
+  ["/api/admin/payment-methods", "keuangan"],
 ];
 
 /**

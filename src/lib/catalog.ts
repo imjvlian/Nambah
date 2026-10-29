@@ -182,11 +182,11 @@ export const games: Game[] = [
   },
 ];
 
-// Fees stay zero in the MVP until the approved Midtrans merchant rate is known.
-// The pricing engine already separates customer fees from merchant costs.
-// Daftar ini fallback statis; mirror dari produksi baris `payment_methods`
-// yang aktif (migrasi 061). Fee gateway 100% diterjunkan ke pembeli oleh
-// Midtrans di halaman pembayaran - tidak dihitung di sini.
+// Daftar fallback statis; mirror dari produksi baris `payment_methods`
+// yang aktif (migrasi 061). Biaya layanan per kanal di-set lewat admin
+// dashboard dan disimpan di tabel `payment_methods`; nilai di bawah hanya
+// fallback statis kalau Supabase tidak dapat diakses.
+// QRIS = 0% (larangan surcharge per Peraturan Bank Indonesia).
 export const paymentMethods: PaymentMethod[] = [
   {
     id: "qris",
@@ -202,7 +202,7 @@ export const paymentMethods: PaymentMethod[] = [
     name: "GoPay",
     detail: "Konfirmasi di aplikasi Gojek/GoPay",
     customerFeeFlat: 0,
-    customerFeePercent: 0,
+    customerFeePercent: 200,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
   },
@@ -211,7 +211,7 @@ export const paymentMethods: PaymentMethod[] = [
     name: "ShopeePay",
     detail: "Konfirmasi di aplikasi Shopee",
     customerFeeFlat: 0,
-    customerFeePercent: 0,
+    customerFeePercent: 200,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
   },
@@ -220,7 +220,7 @@ export const paymentMethods: PaymentMethod[] = [
     name: "DANA",
     detail: "Konfirmasi di aplikasi DANA",
     customerFeeFlat: 0,
-    customerFeePercent: 0,
+    customerFeePercent: 150,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
   },
@@ -229,7 +229,7 @@ export const paymentMethods: PaymentMethod[] = [
     name: "OVO",
     detail: "Konfirmasi di aplikasi OVO",
     customerFeeFlat: 0,
-    customerFeePercent: 0,
+    customerFeePercent: 150,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
   },
@@ -237,7 +237,7 @@ export const paymentMethods: PaymentMethod[] = [
     id: "bca_va",
     name: "VA BCA",
     detail: "Transfer ke nomor Virtual Account BCA",
-    customerFeeFlat: 0,
+    customerFeeFlat: 4000,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
@@ -246,7 +246,7 @@ export const paymentMethods: PaymentMethod[] = [
     id: "bni_va",
     name: "VA BNI",
     detail: "Transfer ke nomor Virtual Account BNI",
-    customerFeeFlat: 0,
+    customerFeeFlat: 4000,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
@@ -255,7 +255,7 @@ export const paymentMethods: PaymentMethod[] = [
     id: "bri_va",
     name: "VA BRI",
     detail: "Transfer ke nomor Virtual Account BRI",
-    customerFeeFlat: 0,
+    customerFeeFlat: 4000,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
@@ -264,7 +264,7 @@ export const paymentMethods: PaymentMethod[] = [
     id: "permata_va",
     name: "VA Permata",
     detail: "Transfer ke nomor Virtual Account Permata",
-    customerFeeFlat: 0,
+    customerFeeFlat: 4000,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
@@ -273,7 +273,7 @@ export const paymentMethods: PaymentMethod[] = [
     id: "echannel",
     name: "VA Mandiri",
     detail: "Bayar via ATM/internet banking Mandiri (Mandiri Bill)",
-    customerFeeFlat: 0,
+    customerFeeFlat: 4000,
     customerFeePercent: 0,
     merchantFeeFlat: 0,
     merchantFeePercent: 0,
