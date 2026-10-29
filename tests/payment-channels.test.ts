@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { groupPaymentMethods } from "@/lib/payment-method-groups";
+import {
+  groupPaymentMethods,
+  paymentGroupOf,
+} from "@/lib/payment-method-groups";
 
 /**
  * Migrasi 061 (28 Okt 2026): metode pembayaran lengkap — kanal per-kanal
@@ -226,4 +229,117 @@ test("grup collapse secara default; state openGroups awal kosong", () => {
     ui.includes("aria-expanded={isGroupOpen(group.label)}"),
     "label grup berfungsi sebagai tombol toggle collapse",
   );
+});
+
+test("grup: tanpa garis pemisah tambahan (kotak grup + border cukup)", () => {
+  const ui = readFileSync("src/components/TopupExperience.tsx", "utf8");
+  const css = readFileSync("src/app/product-checkout-rail-v2.css", "utf8");
+
+  assert.ok(
+    !ui.includes("payment-group-divider"),
+    "elemen garis pemisah tidak lagi dirender di checkout",
+  );
+  assert.ok(
+    !css.includes(".payment-group-divider"),
+    "style garis pemisah dihapus",
+  );
+});
+
+test("grup collapsed: label & panah vertikal center (tanpa margin bawah label)", () => {
+  const rawCss = readFileSync("src/app/product-checkout-rail-v2.css", "utf8");
+  // Komentar CSS dibuang dulu: komentar boleh menyebut contoh rule lama
+  // (mis. `margin: 0 0 7px`) sebagai dokumentasi.
+  const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // Label TIDAK boleh punya margin bawah: di dalam baris flex, margin bawah
+  // ikut dihitung alignment sehingga teks terdorong ke atas dan tidak
+  // sejajar dengan panah.
+  const labelBlocks = css.match(
+    /\.payment-group-label \{[^}]*\}/g,
+  );
+  assert.ok(labelBlocks && labelBlocks.length >= 1, "ada blok label grup");
+  for (const block of labelBlocks) {
+    assert.ok(
+      /margin:\s*0(;|\s)/.test(block) && !/margin:\s*0 0 \d/.test(block),
+      `label grup tidak punya margin bawah: ${block.replace(/\s+/g, " ")}`,
+    );
+  }
+
+  // Baris toggle harus flex + align-items center.
+  const toggle = css.match(/\.payment-group-toggle \{[^}]*\}/)?.[0] ?? "";
+  assert.match(toggle, /display:\s*flex/);
+  assert.match(toggle, /align-items:\s*center/);
+
+  // Jarak ke grid diurus .payment-grid, bukan margin label. Setidaknya
+  // satu blok .payment-grid harus punya margin-top.
+  const gridBlocks = css.match(/\.payment-grid \{[^}]*\}/g) ?? [];
+  assert.ok(
+    gridBlocks.some((block) => /margin-top:\s*\d+px/.test(block)),
+    "jarak label ke kartu diurus margin-top .payment-grid",
+  );
+});
+
+test("rail: tetap bisa digulir tapi scrollbar-nya disembunyikan", () => {
+  const css = readFileSync("src/app/product-checkout-rail-v2.css", "utf8");
+
+  const railBlock = css.match(
+    /\.product-page \.order-card > \.checkout-rail \{[^}]*\}/,
+  )?.[0];
+  assert.ok(railBlock, "blok .checkout-rail ada");
+
+  // Tetap scrollable.
+  assert.match(railBlock, /overflow:\s*auto/);
+  assert.match(railBlock, /max-height:\s*calc\(/);
+
+  // Scrollbar disembunyikan - dua-duanya (Firefox/Chrome modern + WebKit).
+  assert.match(
+    railBlock,
+    /scrollbar-width:\s*none/,
+    "scrollbar-width: none hides the bar in Firefox/Chrome 121+",
+  );
+  assert.ok(
+    css.includes(
+      ".product-page .order-card > .checkout-rail::-webkit-scrollbar",
+    ),
+    "::-webkit-scrollbar hides the bar in Safari/older Chrome",
+  );
+});
+
+test("rail CSS: aturan direct-child yang sudah mati dibersihkan", () => {
+  const css = readFileSync("src/app/product-checkout-rail-v2.css", "utf8");
+
+  // Payment block / pricing summary / CTA kini hidup di dalam
+  // .checkout-rail, jadi selector direct-child .order-card > ... tidak
+  // pernah cocok dan hanya jadi jebakan.
+  for (const dead of [
+    ".order-card > .form-block:has(.payment-grid)",
+    ".order-card > .pricing-summary",
+    ".order-card > .primary-button.full",
+  ]) {
+    assert.ok(
+      !css.includes(dead),
+      `aturan mati dibersihkan: ${dead}`,
+    );
+  }
+
+  // Yang masih hidup harus tetap ada.
+  assert.ok(
+    css.includes(".order-card > .checkout-rail"),
+    "container .checkout-rail tetap diatur",
+  );
+  assert.ok(
+    css.includes(".order-card > .form-notice"),
+    "form-notice (masih anak langsung) tetap diatur",
+  );
+});
+
+test("grup legacy: ewallet & va masuk grup yang wajar, bukan 'Lainnya'", () => {
+  assert.equal(paymentGroupOf("ewallet"), "E-Wallet");
+  assert.equal(paymentGroupOf("va"), "Virtual Account");
+  // Kanal per-kanal tetap seperti semula.
+  assert.equal(paymentGroupOf("qris"), "QRIS");
+  assert.equal(paymentGroupOf("gopay"), "E-Wallet");
+  assert.equal(paymentGroupOf("bca_va"), "Virtual Account");
+  assert.equal(paymentGroupOf("echannel"), "Virtual Account");
+  assert.equal(paymentGroupOf("indomaret"), "Minimarket");
 });

@@ -42,168 +42,21 @@
     padding: 20px;
   }
 
-  .product-page .order-card > .form-block:has(.payment-grid),
-  .product-page .order-card > .pricing-summary,
-  .product-page .order-card > .primary-button.full {
-    grid-column: 2;
-    grid-row: 1 / 6;
-    align-self: start;
-    width: 100%;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) {
-    position: sticky;
-    top: 146px;
-    z-index: 7;
-    /*
-     * Tinggi tetap 400px dipilih untuk blok metode pembayaran: 6 baris
-     * kartu (2 kolom x kanal per-kanal, grup QRIS/E-Wallet/VA) muat dengan
-     * sedikit gulir sendiri; blok punya `overflow: auto`.
-     *
-     * Pemilih toko ritel (`merchant-picker`) juga cocok dengan selector ini
-     * karena memuat `.payment-grid`, dan ia muncul di bawah blok metode saat
-     * metode ritel dipilih. Dua blok dengan tinggi tetap akan menutupi
-     * ringkasan harga di layar pendek, jadi blok kedua dibiarkan tumbuh
-     * sendiri.
-     */
-    height: 400px;
-    margin: 0;
-    padding: 18px;
-    overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.11);
-    border-radius: 20px;
-    background: rgba(17, 19, 16, 0.98);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
-    backdrop-filter: blur(14px);
-    scrollbar-width: thin;
-  }
-
   /*
-   * Pemilih toko: tinggi otomatis, dan tidak ikut sticky.
+   * Catatan 29 Okt 2026: aturan untuk payment block / pricing summary / CTA
+   * dengan selector direct-child `.order-card > ...` sudah dihapus.
    *
-   * Kalau ikut sticky, blok ini akan menimpa ringkasan harga di layar
-   * pendek - user memilih toko, lalu tidak bisa melihat total yang harus
-   * dia bayar. Ini lebih buruk daripada menggulir sedikit.
+   * Ketiganya kini hidup di dalam wrapper `.checkout-rail`, jadi selector
+   * direct-child tidak pernah cocok - aturan lama hanya jadi jebakan:
+   * `.payment-group-label { margin: 0 0 7px }` di dalamnya misalnya masih
+   * terbaca seolah sedang mengatur tampilan, padahal tidak berlaku.
+   *
+   * Tampilan rail dikendalikan oleh:
+   *   - `.checkout-rail`        -> container sticky + area scroll
+   *   - `.payment-group`        -> kotak tiap grup metode
+   *   - `.pricing-summary`      -> kartu ringkasan (pricing.css)
+   *   - `.primary-button.full`  -> tombol CTA (globals.css)
    */
-  .product-page .order-card > .form-block.merchant-picker:has(.payment-grid) {
-    position: static;
-    height: auto;
-    max-height: 340px;
-    top: auto;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .form-label {
-    margin-bottom: 14px;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .form-label strong {
-    font-size: 15px;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .form-label small {
-    font-size: 9px;
-    line-height: 1.5;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .payment-grid {
-    gap: 9px;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .payment-group
-    + .payment-group {
-    margin-top: 0;
-  }
-
-  .product-page
-    .order-card
-    > .form-block:has(.payment-grid)
-    .payment-group-label {
-    display: block;
-    margin: 0 0 7px;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #fff;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .payment-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .product-page .order-card > .form-block:has(.payment-grid) .payment-card {
-    padding: 9px 10px;
-  }
-
-  .product-page
-    .order-card
-    > .form-block:has(.payment-grid)
-    .payment-card-name {
-    font-size: 12px;
-  }
-
-  .product-page
-    .order-card
-    > .form-block:has(.payment-grid)
-    .payment-card-detail {
-    font-size: 9px;
-  }
-
-  .product-page .order-card > .pricing-summary {
-    position: sticky;
-    top: 468px;
-    z-index: 6;
-    margin: 322px 0 0;
-    overflow: hidden;
-    border: 1px solid rgba(201, 255, 63, 0.2);
-    border-radius: 20px;
-    background: rgba(13, 15, 12, 0.98);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
-    backdrop-filter: blur(14px);
-  }
-
-  .product-page .order-card > .pricing-summary .pricing-product-row {
-    padding: 16px;
-  }
-
-  .product-page .order-card > .pricing-summary .pricing-product-row small {
-    font-size: 9px;
-  }
-
-  .product-page .order-card > .pricing-summary .pricing-product-row strong {
-    font-size: 13px;
-    line-height: 1.3;
-  }
-
-  .product-page .order-card > .pricing-summary .summary-line {
-    padding: 10px 16px;
-    font-size: 10px;
-  }
-
-  .product-page .order-card > .pricing-summary .summary-line strong {
-    font-size: 10px;
-  }
-
-  .product-page .order-card > .pricing-summary .summary-total {
-    padding: 15px 16px;
-  }
-
-  .product-page .order-card > .pricing-summary .summary-total strong {
-    font-size: 21px;
-  }
-
-  .product-page .order-card > .primary-button.full {
-    position: sticky;
-    top: 704px;
-    z-index: 8;
-    min-height: 64px;
-    margin: 558px 0 0;
-    border-radius: 18px;
-    font-size: 15px;
-    box-shadow: 0 18px 38px rgba(201, 255, 63, 0.15);
-  }
-
   .product-page .order-card > .form-notice {
     grid-column: 1;
     grid-row: auto;
@@ -218,22 +71,12 @@
   }
 }
 
-@media (min-width: 1280px) and (max-height: 820px) {
-  .product-page .order-card > .form-block:has(.payment-grid) {
-    top: 128px;
-    height: 270px;
-  }
+/*
+ * Layar pendek: container `.checkout-rail` sendiri yang menyesuaikan
+ * (lihat blok media di bawah). Aturan direct-child untuk payment block /
+ * summary / CTA sudah dihapus karena tidak lagi anak langsung .order-card.
+ */
 
-  .product-page .order-card > .pricing-summary {
-    top: 412px;
-    margin-top: 284px;
-  }
-
-  .product-page .order-card > .primary-button.full {
-    top: 636px;
-    margin-top: 508px;
-  }
-}
 
 
 /* 0.4.8 — blok "Kontak receipt" untuk tamu.
@@ -266,8 +109,27 @@
     z-index: 7;
     width: 100%;
     max-height: calc(100dvh - 170px);
+    /*
+     * Rail tetap bisa digulir, tapi batang scrollbar-nya disembunyikan.
+     *
+     * Pola: `scrollbar-width: none` (Firefox + Chrome 121+) dan
+     * `::-webkit-scrollbar` (Safari, Chrome lama) harus dua-duanya -
+     * salah satu saja hasilnya berbeda per browser. Pola sama dengan
+     * `.catalog-category-tabs` (catalog-categories.css) dan
+     * `.package-group-tabs` (pricing.css).
+     *
+     * Kenapa disembunyikan: saat semua grup metode dibuka, isinya lebih
+     * tinggi dari viewport sehingga muncul slider tipis di tepi rail.
+     * Slider itu mengganggu tampilan checkout, dan user sering mengira
+     * itu elemen halaman - bukan area yang bisa digulir.
+     */
     overflow: auto;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .product-page .order-card > .checkout-rail::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -290,26 +152,40 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .payment-group:first-of-type {
   margin-top: 0;
 }
 
+/*
+ * Label grup: TIDAK boleh punya margin bawah.
+ *
+ * Label dan chevron berada di dalam satu baris flex
+ * (`.payment-group-toggle`). Margin bawah pada label ikut masuk hitungan
+ * alignment flex, jadi teks terdorong ke atas dan tidak sejajar dengan
+ * panah - terutama saat grup collapsed. Jarak ke grid diurus oleh
+ * `.payment-grid` (margin-top), bukan oleh margin label.
+ */
 .payment-group-label {
   display: block;
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #fff;
+  white-space: nowrap;
 }
 
+/* Jarak label/toggle ke kartu di bawahnya. */
 .payment-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+  margin-top: 10px;
 }
 
 .payment-card {
@@ -426,25 +302,8 @@
   transform: rotate(180deg);
 }
 
-/* Pemisah halus antar grup. */
-.payment-group-divider {
-  height: 1px;
-  margin: 10px 0;
-  background: var(--lime);
-  opacity: 1;
-}
-
-/* Label grup: lebih ringan, tanpa angka berlebihan. */
-.payment-group-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #fff;
-}
-
-/* Grup setelah grup pertama — kurangi sedikit padding atas */
+/* Jarak antar grup diurus margin (kotak grup sudah punya border sendiri,
+   jadi tidak perlu garis pemisah tambahan). */
 .payment-group + .payment-group {
   margin-top: 12px;
-  padding-top: 6px;
 }
